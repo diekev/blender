@@ -52,6 +52,7 @@ extern ModifierTypeInfo modifierType_Cast;
 extern ModifierTypeInfo modifierType_MeshDeform;
 extern ModifierTypeInfo modifierType_ParticleSystem;
 extern ModifierTypeInfo modifierType_ParticleInstance;
+extern ModifierTypeInfo modifierType_ParticleMesher;
 extern ModifierTypeInfo modifierType_Explode;
 extern ModifierTypeInfo modifierType_Cloth;
 extern ModifierTypeInfo modifierType_Collision;

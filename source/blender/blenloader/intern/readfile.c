@@ -4909,6 +4909,12 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 			}
 			lmd->cache_system = NULL;
 		}
+		else if (md->type == eModifierType_ParticleMesher) {
+			ParticleMesherModifierData *pmmd = (ParticleMesherModifierData *)md;
+
+			pmmd->psys = newdataadr(fd, pmmd->psys);
+			link_list(fd, &pmmd->filters);
+		}
 	}
 }
 

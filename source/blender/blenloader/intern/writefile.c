@@ -1620,6 +1620,14 @@ static void write_modifiers(WriteData *wd, ListBase *modbase)
 
 			writedata(wd, DATA, sizeof(float)*lmd->total_verts * 3, lmd->vertexco);
 		}
+		else if (md->type==eModifierType_ParticleMesher) {
+			ParticleMesherModifierData *pmmd = (ParticleMesherModifierData*) md;
+			LevelSetFilter *filter = pmmd->filters.first;
+
+			for (; filter; filter = filter->next) {
+				writestruct(wd, DATA, "LevelSetFilter", 1, filter);
+			}
+		}
 	}
 }
 

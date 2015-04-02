@@ -56,7 +56,6 @@ BF_OPENEXR_LIB = 'Half IlmImf Iex Imath '
 BF_OPENEXR_LIB_STATIC = '${BF_OPENEXR}/lib/libHalf.a ${BF_OPENEXR}/lib/libIlmImf.a ${BF_OPENEXR}/lib/libIex.a ${BF_OPENEXR}/lib/libImath.a ${BF_OPENEXR}/lib/libIlmThread.a'
 # BF_OPENEXR_LIBPATH = '${BF_OPENEXR}/lib'
 
-
 WITH_BF_DDS = True
 
 WITH_BF_JPEG = True
@@ -201,6 +200,13 @@ BF_BOOST_LIB_STATIC = '${BF_BOOST_LIBPATH}/libboost_filesystem.a ${BF_BOOST_LIBP
     '${BF_BOOST_LIBPATH}/libboost_thread.a'
 BF_BOOST_LIB_INTERNATIONAL = 'boost_locale'
 BF_BOOST_LIBPATH = '${BF_BOOST}/lib'
+
+WITH_BF_OPENVDB = True
+BF_OPENVDB = '/usr'
+BF_OPENVDB_INC = '${BF_OPENVDB}/include'
+BF_OPENVDB_LIB = 'openvdb tbb'
+BF_OPENVDB_LIB_PATH = '${BF_OPENVDB}/lib'
+BF_OPENVDB_LIB_STATIC = '${BF_OPENVDB}/lib/libopenvdb.so'
 
 WITH_BF_CYCLES = WITH_BF_OIIO and WITH_BF_BOOST
 

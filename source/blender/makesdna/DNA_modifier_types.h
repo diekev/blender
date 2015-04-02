@@ -84,6 +84,7 @@ typedef enum ModifierType {
 	eModifierType_Wireframe         = 48,
 	eModifierType_DataTransfer      = 49,
 	eModifierType_NormalEdit        = 50,
+	eModifierType_ParticleMesher    = 51,
 	NUM_MODIFIER_TYPES
 } ModifierType;
 
@@ -1401,7 +1402,6 @@ enum {
 	MOD_WIREFRAME_CREASE        = (1 << 5),
 };
 
-
 typedef struct DataTransferModifierData {
 	ModifierData modifier;
 
@@ -1475,6 +1475,66 @@ enum {
 	MOD_NORMALEDIT_MIX_ADD  = 1,
 	MOD_NORMALEDIT_MIX_SUB  = 2,
 	MOD_NORMALEDIT_MIX_MUL  = 3,
+};
+
+typedef struct LevelSetFilter {
+	struct LevelSetFilter *next, *prev;
+
+	int iterations;
+	int width;
+	float offset;
+	char name[64];
+	short type, accuracy, flag, pad[3];
+} LevelSetFilter;
+
+#define LVLSETFILTER_CURRENT 1
+#define LVLSETFILTER_MUTE	 2
+
+typedef struct ParticleMesherModifierData {
+	ModifierData modifier;
+
+	struct ParticleSystem *psys;
+	struct Object *mesher_mask_ob;
+	ListBase filters;
+
+	/* particles converter options */
+	float voxel_size;
+	float min_part_radius;
+	float half_width;
+	float part_scale_factor;
+	float part_vel_factor;
+	float trail_size;
+	short generate_trails;
+	short generate_mask;
+	float mask_width;
+
+	/* mesh <-> volume options */
+	float isovalue;
+	float adaptivity;
+	float mask_offset;
+	float ext_band;
+	float int_band;
+	short invert_mask;
+
+	/* Padding */
+	short pad;
+} ParticleMesherModifierData;
+
+enum {
+	MOD_PART_MESH_MEDIAN	= (1 << 0),
+	MOD_PART_MESH_MEAN		= (1 << 1),
+	MOD_PART_MESH_GAUSSIAN	= (1 << 2),
+	MOD_PART_MESH_MEAN_CURV	= (1 << 3),
+	MOD_PART_MESH_LAPLACIAN	= (1 << 4),
+	MOD_PART_MESH_OFFSET	= (1 << 5),
+};
+
+enum {
+	MOD_PART_MESH_ACC_FISRT		= (1 << 0),
+	MOD_PART_MESH_ACC_SECOND	= (1 << 1),
+	MOD_PART_MESH_ACC_THIRD		= (1 << 2),
+	MOD_PART_MESH_ACC_WENO5		= (1 << 3),
+	MOD_PART_MESH_ACC_HJWENO5	= (1 << 4),
 };
 
 #endif  /* __DNA_MODIFIER_TYPES_H__ */

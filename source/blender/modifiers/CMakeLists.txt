@@ -76,6 +76,7 @@ set(SRC
 	intern/MOD_normal_edit.c
 	intern/MOD_ocean.c
 	intern/MOD_particleinstance.c
+	intern/MOD_particlemesher.c
 	intern/MOD_particlesystem.c
 	intern/MOD_remesh.c
 	intern/MOD_screw.c
@@ -105,6 +106,7 @@ set(SRC
 	intern/MOD_boolean_util.h
 	intern/MOD_fluidsim_util.h
 	intern/MOD_meshcache_util.h
+	intern/MOD_openvdb_util.h
 	intern/MOD_util.h
 	intern/MOD_weightvg_util.h
 )
@@ -146,6 +148,16 @@ if(WITH_OPENNL)
 	add_definitions(-DWITH_OPENNL)
 	list(APPEND INC_SYS
 		../../../intern/opennl/extern
+	)
+endif()
+
+if(WITH_MOD_PARTMESHER)
+	add_definitions(-DWITH_MOD_PARTMESHER)
+	list(APPEND SRC
+		intern/MOD_openvdb_util.c
+	)
+	list(APPEND INC
+		../openvdb
 	)
 endif()
 
