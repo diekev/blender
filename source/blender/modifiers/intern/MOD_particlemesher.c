@@ -95,6 +95,7 @@ static void foreachObjectLink(ModifierData *md, Object *ob, ObjectWalkFunc walk,
 }
 
 static void updateDepgraph(ModifierData *md, DagForest *forest,
+                           struct Main *bmain,
                            struct Scene *scene,
                            Object *ob,
                            DagNode *obNode)
@@ -108,7 +109,7 @@ static void updateDepgraph(ModifierData *md, DagForest *forest,
 		                 "Particle Mesher Modifier");
 	}
 
-	UNUSED_VARS(scene, ob);
+	UNUSED_VARS(bmain, scene, ob);
 }
 
 #ifdef WITH_MOD_PARTMESHER
