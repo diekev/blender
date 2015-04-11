@@ -1320,7 +1320,7 @@ static float project_paint_uvpixel_mask(
 
 		ca_mask = w[0] * ca1 + w[1] * ca2 + w[2] * ca3;
 		ca_mask = curvemapping_evaluateF(ps->cavity_curve, 0, ca_mask);
-		CLAMP(ca_mask, 0.0, 1.0);
+		CLAMP(ca_mask, 0.0f, 1.0f);
 		mask *= ca_mask;
 	}
 
@@ -1964,7 +1964,7 @@ static float angle_2d_clockwise(const float p1[2], const float p2[2], const floa
 	v1[0] = p1[0] - p2[0];    v1[1] = p1[1] - p2[1];
 	v2[0] = p3[0] - p2[0];    v2[1] = p3[1] - p2[1];
 
-	return -atan2(v1[0] * v2[1] - v1[1] * v2[0], v1[0] * v2[0] + v1[1] * v2[1]);
+	return -atan2f(v1[0] * v2[1] - v1[1] * v2[0], v1[0] * v2[0] + v1[1] * v2[1]);
 }
 #endif
 
@@ -2060,8 +2060,10 @@ static void project_bucket_clip_face(
 	/* detect pathological case where face the three vertices are almost colinear in screen space.
 	 * mostly those will be culled but when flood filling or with smooth shading it's a possibility */
 	if (dist_squared_to_line_v2(v1coSS, v2coSS, v3coSS) < 0.5f ||
-		dist_squared_to_line_v2(v2coSS, v3coSS, v1coSS) < 0.5f)
+	    dist_squared_to_line_v2(v2coSS, v3coSS, v1coSS) < 0.5f)
+	{
 		colinear = true;
+	}
 	
 	/* get the UV space bounding box */
 	inside_bucket_flag |= BLI_rctf_isect_pt_v(bucket_bounds, v1coSS);
@@ -3271,7 +3273,7 @@ static void proj_paint_state_cavity_init(ProjPaintState *ps)
 				mul_v3_fl(edges[a], 1.0f / counter[a]);
 				normal_short_to_float_v3(no, mv->no);
 				/* augment the diffe*/
-				cavities[a] = saacos(10.0f * dot_v3v3(no, edges[a])) * M_1_PI;
+				cavities[a] = saacos(10.0f * dot_v3v3(no, edges[a])) * (float)M_1_PI;
 			}
 			else
 				cavities[a] = 0.0;
@@ -4205,7 +4207,7 @@ static void do_projectpaint_soften_f(ProjPaintState *ps, ProjPixel *projPixel, f
 
 			/* now rgba_ub contains the edge result, but this should be converted to luminance to avoid
 			 * colored speckles appearing in final image, and also to check for threshold */
-			rgba[0] = rgba[1] = rgba[2] = rgb_to_grayscale(rgba);
+			rgba[0] = rgba[1] = rgba[2] = IMB_colormanagement_get_luminance(rgba);
 			if (fabsf(rgba[0]) > ps->brush->sharp_threshold) {
 				float alpha = projPixel->pixel.f_pt[3];
 				projPixel->pixel.f_pt[3] = rgba[3] = mask;
@@ -4266,7 +4268,7 @@ static void do_projectpaint_soften(ProjPaintState *ps, ProjPixel *projPixel, flo
 			sub_v3_v3v3(rgba, rgba_pixel, rgba);
 			/* now rgba_ub contains the edge result, but this should be converted to luminance to avoid
 			 * colored speckles appearing in final image, and also to check for threshold */
-			rgba[0] = rgba[1] = rgba[2] = rgb_to_grayscale(rgba);
+			rgba[0] = rgba[1] = rgba[2] = IMB_colormanagement_get_luminance(rgba);
 			if (fabsf(rgba[0]) > ps->brush->sharp_threshold) {
 				float alpha = rgba_pixel[3];
 				rgba[3] = rgba_pixel[3] = mask;
@@ -5231,7 +5233,7 @@ static int texture_paint_image_from_view_exec(bContext *C, wmOperator *op)
 	if (w > maxsize) w = maxsize;
 	if (h > maxsize) h = maxsize;
 
-	ibuf = ED_view3d_draw_offscreen_imbuf(scene, CTX_wm_view3d(C), CTX_wm_region(C), w, h, IB_rect, false, R_ALPHAPREMUL, err_out);
+	ibuf = ED_view3d_draw_offscreen_imbuf(scene, CTX_wm_view3d(C), CTX_wm_region(C), w, h, IB_rect, false, R_ALPHAPREMUL, NULL, err_out);
 	if (!ibuf) {
 		/* Mostly happens when OpenGL offscreen buffer was failed to create, */
 		/* but could be other reasons. Should be handled in the future. nazgul */
@@ -5442,7 +5444,7 @@ static Image *proj_paint_image_create(wmOperator *op, Main *bmain)
 		RNA_string_get(op->ptr, "name", imagename);
 	}
 	ima = BKE_image_add_generated(bmain, width, height, imagename, alpha ? 32 : 24, use_float,
-	                              gen_type, color);
+	                              gen_type, color, false);
 	
 	return ima;
 }
@@ -5485,7 +5487,7 @@ static bool proj_paint_add_slot(bContext *C, wmOperator *op)
 			ntreeUpdateTree(CTX_data_main(C), ntree);
 		}
 		else {
-			MTex *mtex = add_mtex_id(&ma->id, -1);
+			MTex *mtex = BKE_texture_mtex_add_id(&ma->id, -1);
 
 			/* successful creation of mtex layer, now create set */
 			if (mtex) {
@@ -5504,7 +5506,7 @@ static bool proj_paint_add_slot(bContext *C, wmOperator *op)
 					}
 				}
 
-				mtex->tex = add_texture(bmain, DATA_(layer_type_items[type_id].name));
+				mtex->tex = BKE_texture_add(bmain, DATA_(layer_type_items[type_id].name));
 				mtex->mapto = type;
 
 				if (mtex->tex) {

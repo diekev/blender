@@ -268,9 +268,6 @@ void BVH::pack_triangle(int idx, float4 woop[3])
 	assert(tob >= 0 && tob < objects.size());
 	const Mesh *mesh = objects[tob]->mesh;
 
-	if(mesh->has_motion_blur())
-		return;
-
 	int tidx = pack.prim_index[idx];
 	const int *vidx = mesh->triangles[tidx].v;
 	const float3* vpos = &mesh->verts[0];
@@ -299,9 +296,14 @@ void BVH::pack_primitives()
 		if(pack.prim_index[i] != -1) {
 			float4 woop[3];
 
-			if(pack.prim_type[i] & PRIMITIVE_ALL_TRIANGLE)
+			if(pack.prim_type[i] & PRIMITIVE_TRIANGLE) {
 				pack_triangle(i, woop);
-			
+			}
+			else {
+				/* Avoid use of uninitialized memory. */
+				memset(&woop, 0, sizeof(woop));
+			}
+
 			memcpy(&pack.tri_woop[i * nsize], woop, sizeof(float4)*3);
 
 			int tob = pack.prim_object[i];
@@ -636,7 +638,7 @@ void RegularBVH::refit_node(int idx, bool leaf, BoundBox& bbox, uint& visibility
 							size_t steps = mesh->motion_steps - 1;
 							float4 *key_steps = attr->data_float4();
 
-							for (size_t i = 0; i < steps; i++)
+							for(size_t i = 0; i < steps; i++)
 								curve.bounds_grow(k, key_steps + i*mesh_size, bbox);
 						}
 					}
@@ -658,7 +660,7 @@ void RegularBVH::refit_node(int idx, bool leaf, BoundBox& bbox, uint& visibility
 							size_t steps = mesh->motion_steps - 1;
 							float3 *vert_steps = attr->data_float3();
 
-							for (size_t i = 0; i < steps; i++)
+							for(size_t i = 0; i < steps; i++)
 								triangle.bounds_grow(vert_steps + i*mesh_size, bbox);
 						}
 					}
@@ -875,7 +877,7 @@ void QBVH::refit_node(int idx, bool leaf, BoundBox& bbox, uint& visibility)
 							size_t steps = mesh->motion_steps - 1;
 							float4 *key_steps = attr->data_float4();
 
-							for (size_t i = 0; i < steps; i++)
+							for(size_t i = 0; i < steps; i++)
 								curve.bounds_grow(k, key_steps + i*mesh_size, bbox);
 						}
 					}
@@ -897,7 +899,7 @@ void QBVH::refit_node(int idx, bool leaf, BoundBox& bbox, uint& visibility)
 							size_t steps = mesh->motion_steps - 1;
 							float3 *vert_steps = attr->data_float3();
 
-							for (size_t i = 0; i < steps; i++)
+							for(size_t i = 0; i < steps; i++)
 								triangle.bounds_grow(vert_steps + i*mesh_size, bbox);
 						}
 					}

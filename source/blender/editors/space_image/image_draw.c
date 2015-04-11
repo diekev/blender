@@ -68,6 +68,7 @@
 #include "ED_gpencil.h"
 #include "ED_image.h"
 #include "ED_mask.h"
+#include "ED_render.h"
 #include "ED_screen.h"
 
 #include "UI_interface.h"
@@ -79,26 +80,36 @@
 
 #include "image_intern.h"
 
-static void draw_render_info(Scene *scene, Image *ima, ARegion *ar, float zoomx, float zoomy)
+static void draw_render_info(const bContext *C,
+                             Scene *scene,
+                             Image *ima,
+                             ARegion *ar,
+                             float zoomx,
+                             float zoomy)
 {
 	RenderResult *rr;
 	Render *re = RE_GetRender(scene->id.name);
 	RenderData *rd = RE_engine_get_render_data(re);
+	Scene *stats_scene = ED_render_job_get_scene(C);
+	if (stats_scene == NULL) {
+		stats_scene = CTX_data_scene(C);
+	}
 
-	rr = BKE_image_acquire_renderresult(scene, ima);
+	rr = BKE_image_acquire_renderresult(stats_scene, ima);
 
 	if (rr && rr->text) {
 		float fill_color[4] = {0.0f, 0.0f, 0.0f, 0.25f};
 		ED_region_info_draw(ar, rr->text, 1, fill_color);
 	}
 
-	BKE_image_release_renderresult(scene, ima);
+	BKE_image_release_renderresult(stats_scene, ima);
 
 	if (re) {
 		int total_tiles;
+		bool need_free_tiles;
 		rcti *tiles;
 
-		RE_engine_get_current_tiles(re, &total_tiles, &tiles);
+		tiles = RE_engine_get_current_tiles(re, &total_tiles, &need_free_tiles);
 
 		if (total_tiles) {
 			int i, x, y;
@@ -123,7 +134,9 @@ static void draw_render_info(Scene *scene, Image *ima, ARegion *ar, float zoomx,
 				glaDrawBorderCorners(tile, zoomx, zoomy);
 			}
 
-			MEM_freeN(tiles);
+			if (need_free_tiles) {
+				MEM_freeN(tiles);
+			}
 
 			glPopMatrix();
 		}
@@ -770,7 +783,7 @@ void draw_image_main(const bContext *C, ARegion *ar)
 	Image *ima;
 	ImBuf *ibuf;
 	float zoomx, zoomy;
-	bool show_viewer, show_render, show_paint;
+	bool show_viewer, show_render, show_paint, show_stereo3d, show_multilayer;
 	void *lock;
 
 	/* XXX can we do this in refresh? */
@@ -800,6 +813,8 @@ void draw_image_main(const bContext *C, ARegion *ar)
 	show_viewer = (ima && ima->source == IMA_SRC_VIEWER) != 0;
 	show_render = (show_viewer && ima->type == IMA_TYPE_R_RESULT) != 0;
 	show_paint = (ima && (sima->mode == SI_MODE_PAINT) && (show_viewer == false) && (show_render == false));
+	show_stereo3d = (ima && (ima->flag & IMA_IS_STEREO) && (sima->iuser.flag & IMA_SHOW_STEREO));
+	show_multilayer = ima && BKE_image_is_multilayer(ima);
 
 	if (show_viewer) {
 		/* use locked draw for drawing viewer image buffer since the compositor
@@ -808,6 +823,14 @@ void draw_image_main(const bContext *C, ARegion *ar)
 		 * lock (sergey)
 		 */
 		BLI_lock_thread(LOCK_DRAW_IMAGE);
+	}
+
+	if (show_stereo3d) {
+		if (show_multilayer)
+			/* update multiindex and pass for the current eye */
+			BKE_image_multilayer_index(ima->rr, &sima->iuser);
+		else
+			BKE_image_multiview_index(ima, &sima->iuser);
 	}
 
 	ibuf = ED_space_image_acquire_buffer(sima, &lock);
@@ -851,7 +874,7 @@ void draw_image_main(const bContext *C, ARegion *ar)
 
 	/* render info */
 	if (ima && show_render)
-		draw_render_info(sima->iuser.scene, ima, ar, zoomx, zoomy);
+		draw_render_info(C, sima->iuser.scene, ima, ar, zoomx, zoomy);
 }
 
 bool ED_space_image_show_cache(SpaceImage *sima)

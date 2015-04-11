@@ -323,6 +323,7 @@ class VIEW3D_PT_tools_meshedit(View3DPanel, Panel):
         col.menu("VIEW3D_MT_edit_mesh_extrude")
         col.operator("view3d.edit_mesh_extrude_move_normal", text="Extrude Region")
         col.operator("view3d.edit_mesh_extrude_individual_move", text="Extrude Individual")
+        col.operator("mesh.inset", text="Inset Faces")
         col.operator("mesh.edge_face_add")
         col.operator("mesh.subdivide")
         col.operator("mesh.loopcut_slide")
@@ -756,6 +757,10 @@ class VIEW3D_PT_tools_posemode(View3DPanel, Panel):
         row = col.row(align=True)
         row.operator("pose.copy", text="Copy")
         row.operator("pose.paste", text="Paste")
+
+        row = layout.row(align=True)
+        row.operator("pose.propagate", text="Propagate")
+        row.menu("VIEW3D_MT_pose_propagate", icon='TRIA_RIGHT', text="")
 
         col = layout.column(align=True)
         col.operator("poselib.pose_add", text="Add To Library")

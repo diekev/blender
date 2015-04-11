@@ -146,6 +146,13 @@ MINLINE void negate_v4_v4(float r[4], const float a[3]);
 
 MINLINE void negate_v3_short(short r[3]);
 
+MINLINE void abs_v2(float r[2]);
+MINLINE void abs_v2_v2(float r[2], const float a[2]);
+MINLINE void abs_v3(float r[3]);
+MINLINE void abs_v3_v3(float r[3], const float a[3]);
+MINLINE void abs_v4(float r[4]);
+MINLINE void abs_v4_v4(float r[4], const float a[4]);
+
 MINLINE float dot_v2v2(const float a[2], const float b[2]) ATTR_WARN_UNUSED_RESULT;
 MINLINE float dot_v3v3(const float a[3], const float b[3]) ATTR_WARN_UNUSED_RESULT;
 MINLINE float dot_v3v3v3(const float p[3], const float a[3], const float b[3]) ATTR_WARN_UNUSED_RESULT;
@@ -208,6 +215,7 @@ void interp_v4_v4v4_uchar(unsigned char target[4], const unsigned char a[4], con
 void mid_v3_v3v3(float r[3], const float a[3], const float b[3]);
 void mid_v2_v2v2(float r[2], const float a[2], const float b[2]);
 void mid_v3_v3v3v3(float v[3], const float v1[3], const float v2[3], const float v3[3]);
+void mid_v3_v3v3v3v3(float v[3], const float v1[3], const float v2[3], const float v3[3], const float v4[3]);
 
 void mid_v3_v3v3_angle_weighted(float r[3], const float a[3], const float b[3]);
 void mid_v3_angle_weighted(float r[3]);
@@ -263,6 +271,8 @@ void angle_poly_v3(float *angles, const float *verts[3], int len);
 
 void project_v2_v2v2(float c[2], const float v1[2], const float v2[2]);
 void project_v3_v3v3(float r[3], const float p[3], const float n[3]);
+void project_plane_v3_v3v3(float c[3], const float v[3], const float v_plane[3]);
+void project_plane_v2_v2v2(float c[2], const float v[2], const float v_plane[2]);
 void project_v3_plane(float v[3], const float n[3], const float p[3]);
 void reflect_v3_v3v3(float r[3], const float v[3], const float n[3]);
 void ortho_basis_v3v3_v3(float r_n1[3], float r_n2[3], const float n[3]);
@@ -321,6 +331,7 @@ void interp_vn_vn(float *array_tar, const float *array_src, const float t, const
 void fill_vn_i(int *array_tar, const int size, const int val);
 void fill_vn_short(short *array_tar, const int size, const short val);
 void fill_vn_ushort(unsigned short *array_tar, const int size, const unsigned short val);
+void fill_vn_uchar(unsigned char *array_tar, const int size, const unsigned char val);
 void fill_vn_fl(float *array_tar, const int size, const float val);
 
 /**************************** Inline Definitions ******************************/

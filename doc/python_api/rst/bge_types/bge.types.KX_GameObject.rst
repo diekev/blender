@@ -78,6 +78,12 @@ base class --- :class:`SCA_IObject`
 
          The object must have a physics controller for the mass to be applied, otherwise the mass value will be returned as 0.0.
 
+   .. attribute:: isSuspendDynamics
+
+      The object's dynamic state (read-only).
+
+      :type: boolean
+
    .. attribute:: linearDamping
 
       The object's linear damping, also known as translational damping. Can be set simultaneously with angular damping using the :py:meth:`setDamping` method.
@@ -432,6 +438,12 @@ base class --- :class:`SCA_IObject`
       If true, the object's and children's debug properties will be displayed on screen.
 
       :type: boolean
+      
+   .. attribute:: currentLodLevel
+
+      The index of the level of detail (LOD) currently used by this object (read-only).
+
+      :type: int
 
    .. method:: endObject()
 

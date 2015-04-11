@@ -786,7 +786,7 @@ static void cdDM_drawMappedFaces(DerivedMesh *dm,
 		if (tottri == 0) {
 			/* avoid buffer problems in following code */
 		}
-		if (setDrawOptions == NULL) {
+		else if (setDrawOptions == NULL) {
 			/* just draw the entire face array */
 			glDrawArrays(GL_TRIANGLES, 0, (tottri) * 3);
 		}
@@ -927,7 +927,10 @@ static void cdDM_drawMappedFacesGLSL(DerivedMesh *dm,
 
 	glShadeModel(GL_SMOOTH);
 
-	if (setDrawOptions != NULL) {
+	/* workaround for NVIDIA GPUs on Mac not supporting vertex arrays + interleaved formats, see T43342 */
+	if ((GPU_type_matches(GPU_DEVICE_NVIDIA, GPU_OS_MAC, GPU_DRIVER_ANY) && (U.gameflags & USER_DISABLE_VBO)) ||
+	    setDrawOptions != NULL)
+	{
 		DEBUG_VBO("Using legacy code. cdDM_drawMappedFacesGLSL\n");
 		memset(&attribs, 0, sizeof(attribs));
 
@@ -1082,9 +1085,7 @@ static void cdDM_drawMappedFacesGLSL(DerivedMesh *dm,
 						elementsize = GPU_attrib_element_size(datatypes, numdata);
 						buffer = GPU_buffer_alloc(elementsize * dm->drawObject->tot_triangle_point, false);
 						if (buffer == NULL) {
-							GPU_buffer_unbind();
 							buffer = GPU_buffer_alloc(elementsize * dm->drawObject->tot_triangle_point, true);
-							return;
 						}
 						varray = GPU_buffer_lock_stream(buffer);
 						if (varray == NULL) {
@@ -2544,16 +2545,16 @@ DerivedMesh *CDDM_merge_verts(DerivedMesh *dm, const int *vtargetmap, const int 
 		const unsigned int v1 = (vtargetmap[med->v1] != -1) ? vtargetmap[med->v1] : med->v1;
 		const unsigned int v2 = (vtargetmap[med->v2] != -1) ? vtargetmap[med->v2] : med->v2;
 		if (LIKELY(v1 != v2)) {
-			void **eh_p = BLI_edgehash_lookup_p(ehash, v1, v2);
+			void **val_p;
 
-			if (eh_p) {
-				newe[i] = GET_INT_FROM_POINTER(*eh_p);
+			if (BLI_edgehash_ensure_p(ehash, v1, v2, &val_p)) {
+				newe[i] = GET_INT_FROM_POINTER(*val_p);
 			}
 			else {
 				STACK_PUSH(olde, i);
 				STACK_PUSH(medge, *med);
 				newe[i] = c;
-				BLI_edgehash_insert(ehash, v1, v2, SET_INT_IN_POINTER(c));
+				*val_p = SET_INT_IN_POINTER(c);
 				c++;
 			}
 		}

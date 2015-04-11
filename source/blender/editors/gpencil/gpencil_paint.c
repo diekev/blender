@@ -1885,8 +1885,9 @@ static int gpencil_draw_modal(bContext *C, wmOperator *op, const wmEvent *event)
 	 *  - LEFTMOUSE  = standard drawing (all) / straight line drawing (all) / polyline (toolbox only)
 	 *  - RIGHTMOUSE = polyline (hotkey) / eraser (all)
 	 *    (Disabling RIGHTMOUSE case here results in bugs like [#32647])
+	 * also making sure we have a valid event value, to not exit too early
 	 */
-	if (ELEM(event->type, LEFTMOUSE, RIGHTMOUSE)) {
+	if (ELEM(event->type, LEFTMOUSE, RIGHTMOUSE) && (event->val != KM_NOTHING)) {
 		/* if painting, end stroke */
 		if (p->status == GP_STATUS_PAINTING) {
 			int sketch = 0;
@@ -1942,18 +1943,15 @@ static int gpencil_draw_modal(bContext *C, wmOperator *op, const wmEvent *event)
 			 */
 			if (event->type == LEFTMOUSE) {
 				/* restore drawmode to default */
-				// XXX: no need for this... this should just revert by itself
-				if (p->paintmode == GP_PAINTMODE_ERASER)
-					gpencil_draw_toggle_eraser_cursor(C, p, false);
-					
 				p->paintmode = RNA_enum_get(op->ptr, "mode");
 			}
 			else if (event->type == RIGHTMOUSE) {
 				/* turn on eraser */
 				p->paintmode = GP_PAINTMODE_ERASER;
-				gpencil_draw_toggle_eraser_cursor(C, p, true);
 			}
-			
+
+			gpencil_draw_toggle_eraser_cursor(C, p, p->paintmode == GP_PAINTMODE_ERASER);
+
 			/* not painting, so start stroke (this should be mouse-button down) */
 			p = gpencil_stroke_begin(C, op);
 			

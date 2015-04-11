@@ -25,6 +25,7 @@
 #include "BLI_listbase.h"
 #include "DNA_image_types.h"
 #include "BKE_image.h"
+#include "BKE_scene.h"
 #include "BLI_math.h"
 
 extern "C" {
@@ -48,6 +49,8 @@ BaseImageOperation::BaseImageOperation() : NodeOperation()
 	this->m_framenumber = 0;
 	this->m_depthBuffer = NULL;
 	this->m_numberOfChannels = 0;
+	this->m_rd = NULL;
+	this->m_viewName = NULL;
 }
 ImageOperation::ImageOperation() : BaseImageOperation()
 {
@@ -65,8 +68,12 @@ ImageDepthOperation::ImageDepthOperation() : BaseImageOperation()
 ImBuf *BaseImageOperation::getImBuf()
 {
 	ImBuf *ibuf;
-	
-	ibuf = BKE_image_acquire_ibuf(this->m_image, this->m_imageUser, NULL);
+	ImageUser iuser = *this->m_imageUser;
+
+	/* local changes to the original ImageUser */
+	iuser.multi_index = BKE_scene_multiview_view_id_get(this->m_rd, this->m_viewName);
+
+	ibuf = BKE_image_acquire_ibuf(this->m_image, &iuser, NULL);
 	if (ibuf == NULL || (ibuf->rect == NULL && ibuf->rect_float == NULL)) {
 		BKE_image_release_ibuf(this->m_image, ibuf, NULL);
 		return NULL;
@@ -96,7 +103,7 @@ void BaseImageOperation::deinitExecution()
 	BKE_image_release_ibuf(this->m_image, this->m_buffer, NULL);
 }
 
-void BaseImageOperation::determineResolution(unsigned int resolution[2], unsigned int preferredResolution[2])
+void BaseImageOperation::determineResolution(unsigned int resolution[2], unsigned int /*preferredResolution*/[2])
 {
 	ImBuf *stackbuf = getImBuf();
 
@@ -119,10 +126,10 @@ static void sampleImageAtLocation(ImBuf *ibuf, float x, float y, PixelSampler sa
 				nearest_interpolation_color(ibuf, NULL, color, x, y);
 				break;
 			case COM_PS_BILINEAR:
-				bilinear_interpolation_color(ibuf, NULL, color, x - 0.5f, y - 0.5f);
+				bilinear_interpolation_color(ibuf, NULL, color, x, y);
 				break;
 			case COM_PS_BICUBIC:
-				bicubic_interpolation_color(ibuf, NULL, color, x - 0.5f, y - 0.5f);
+				bicubic_interpolation_color(ibuf, NULL, color, x, y);
 				break;
 		}
 	}
@@ -133,10 +140,10 @@ static void sampleImageAtLocation(ImBuf *ibuf, float x, float y, PixelSampler sa
 				nearest_interpolation_color(ibuf, byte_color, NULL, x, y);
 				break;
 			case COM_PS_BILINEAR:
-				bilinear_interpolation_color(ibuf, byte_color, NULL, x - 0.5f, y - 0.5f);
+				bilinear_interpolation_color(ibuf, byte_color, NULL, x, y);
 				break;
 			case COM_PS_BICUBIC:
-				bicubic_interpolation_color(ibuf, byte_color, NULL, x - 0.5f, y - 0.5f);
+				bicubic_interpolation_color(ibuf, byte_color, NULL, x, y);
 				break;
 		}
 		rgba_uchar_to_float(color, byte_color);
@@ -170,7 +177,7 @@ void ImageAlphaOperation::executePixelSampled(float output[4], float x, float y,
 	}
 }
 
-void ImageDepthOperation::executePixelSampled(float output[4], float x, float y, PixelSampler sampler)
+void ImageDepthOperation::executePixelSampled(float output[4], float x, float y, PixelSampler /*sampler*/)
 {
 	if (this->m_depthBuffer == NULL) {
 		output[0] = 0.0f;

@@ -808,6 +808,10 @@ static void recalcData_objects(TransInfo *t)
 					ebo->rad_head *= ebo->length / ebo->oldlength;
 					ebo->rad_tail *= ebo->length / ebo->oldlength;
 					ebo->oldlength = ebo->length;
+
+					if (ebo_parent) {
+						ebo_parent->rad_tail = ebo->rad_head;
+					}
 				}
 			}
 			
@@ -1197,7 +1201,7 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 			if (ELEM(t->mode, TFM_ROTATION, TFM_RESIZE, TFM_TRACKBALL)) {
 				const bool use_island = transdata_check_local_islands(t, t->around);
 
-				if (!use_island) {
+				if (obedit && !use_island) {
 					t->options |= CTX_NO_PET;
 				}
 			}
@@ -1316,7 +1320,13 @@ void initTransInfo(bContext *C, TransInfo *t, wmOperator *op, const wmEvent *eve
 			/* use settings from scene only if modal */
 			if (t->flag & T_MODAL) {
 				if ((t->options & CTX_NO_PET) == 0) {
-					if (t->obedit) {
+					if (t->spacetype == SPACE_IPO) {
+						t->flag |= initTransInfo_edit_pet_to_flag(ts->proportional_fcurve);
+					}
+					else if (t->spacetype == SPACE_ACTION) {
+						t->flag |= initTransInfo_edit_pet_to_flag(ts->proportional_action);
+					}
+					else if (t->obedit) {
 						t->flag |= initTransInfo_edit_pet_to_flag(ts->proportional);
 					}
 					else if (t->options & CTX_GPENCIL_STROKES) {

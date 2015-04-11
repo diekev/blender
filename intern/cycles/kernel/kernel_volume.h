@@ -627,7 +627,7 @@ ccl_device void kernel_volume_decoupled_record(KernelGlobals *kg, PathState *sta
 		step_size = kernel_data.integrator.volume_step_size;
 		/* compute exact steps in advance for malloc */
 		max_steps = max((int)ceilf(ray->t/step_size), 1);
-		if (max_steps > global_max_steps) {
+		if(max_steps > global_max_steps) {
 			max_steps = global_max_steps;
 			step_size = ray->t / (float)max_steps;
 		}
@@ -649,6 +649,7 @@ ccl_device void kernel_volume_decoupled_record(KernelGlobals *kg, PathState *sta
 
 	segment->numsteps = 0;
 	segment->closure_flag = 0;
+	bool is_last_step_empty = false;
 
 	VolumeStep *step = segment->steps;
 
@@ -690,20 +691,30 @@ ccl_device void kernel_volume_decoupled_record(KernelGlobals *kg, PathState *sta
 			step->closure_flag = closure_flag;
 
 			segment->closure_flag |= closure_flag;
+
+			is_last_step_empty = false;
+			segment->numsteps++;
 		}
 		else {
-			/* store empty step (todo: skip consecutive empty steps) */
-			step->sigma_t = make_float3(0.0f, 0.0f, 0.0f);
-			step->sigma_s = make_float3(0.0f, 0.0f, 0.0f);
-			step->closure_flag = 0;
+			if(is_last_step_empty) {
+				/* consecutive empty step, merge */
+				step--;
+			}
+			else {
+				/* store empty step */
+				step->sigma_t = make_float3(0.0f, 0.0f, 0.0f);
+				step->sigma_s = make_float3(0.0f, 0.0f, 0.0f);
+				step->closure_flag = 0;
+
+				segment->numsteps++;
+				is_last_step_empty = true;
+			}
 		}
 
 		step->accum_transmittance = accum_transmittance;
 		step->cdf_distance = cdf_distance;
 		step->t = new_t;
 		step->shade_t = t + random_jitter_offset;
-
-		segment->numsteps++;
 
 		/* stop if at the end of the volume */
 		t = new_t;

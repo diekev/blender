@@ -37,12 +37,10 @@ struct BMesh;
 struct BMFace;
 struct Brush;
 struct CurveMapping;
-struct MDisps;
 struct MeshElemMap;
 struct GridPaintMask;
 struct Main;
 struct MFace;
-struct MultireModifierData;
 struct MVert;
 struct Object;
 struct Paint;
@@ -57,7 +55,6 @@ struct StrokeCache;
 struct Tex;
 struct ImagePool;
 struct UnifiedPaintSettings;
-struct wmOperator;
 
 enum OverlayFlags;
 
@@ -103,7 +100,7 @@ struct Palette      *BKE_palette_add(struct Main *bmain, const char *name);
 struct PaletteColor *BKE_palette_color_add(struct Palette *palette);
 bool                 BKE_palette_is_empty(const struct Palette *palette);
 void                 BKE_palette_color_remove(struct Palette *palette, struct PaletteColor *color);
-void                 BKE_palette_cleanup(struct Palette *palette);
+void                 BKE_palette_clear(struct Palette *palette);
 
 /* paint curves */
 struct PaintCurve *BKE_paint_curve_add(struct Main *bmain, const char *name);
@@ -197,8 +194,8 @@ typedef struct SculptSession {
 	struct StrokeCache *cache;
 } SculptSession;
 
-void BKE_free_sculptsession(struct Object *ob);
-void BKE_free_sculptsession_deformMats(struct SculptSession *ss);
+void BKE_sculptsession_free(struct Object *ob);
+void BKE_sculptsession_free_deformMats(struct SculptSession *ss);
 void BKE_sculptsession_bm_to_me(struct Object *ob, bool reorder);
 void BKE_sculptsession_bm_to_me_for_render(struct Object *object);
 void BKE_sculpt_update_mesh_elements(struct Scene *scene, struct Sculpt *sd, struct Object *ob,

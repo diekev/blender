@@ -613,6 +613,7 @@ static int editsource_exec(bContext *C, wmOperator *op)
 
 		/* redraw and get active button python info */
 		ED_region_do_draw(C, ar);
+		ar->do_draw = false;
 
 		for (BLI_ghashIterator_init(&ghi, ui_editsource_info->hash);
 		     BLI_ghashIterator_done(&ghi) == false;
@@ -921,6 +922,7 @@ static void UI_OT_drop_color(wmOperatorType *ot)
 	ot->description = "Drop colors to buttons";
 
 	ot->invoke = drop_color_invoke;
+	ot->flag = OPTYPE_INTERNAL;
 
 	RNA_def_float_color(ot->srna, "color", 3, NULL, 0.0, FLT_MAX, "Color", "Source color", 0.0, 1.0);
 	RNA_def_boolean(ot->srna, "gamma", 0, "Gamma Corrected", "The source color is gamma corrected ");

@@ -58,6 +58,7 @@
 #include "BLI_linklist_stack.h"
 #include "BLI_string.h"
 #include "BLI_bitmap.h"
+#include "BLI_rect.h"
 
 #include "BKE_DerivedMesh.h"
 #include "BKE_action.h"
@@ -1972,17 +1973,19 @@ static void editmesh_set_connectivity_distance(BMesh *bm, float mtx[3][3], float
 		int i;
 
 		BM_ITER_MESH_INDEX (v, &viter, bm, BM_VERTS_OF_MESH, i) {
+			float dist;
 			BM_elem_index_set(v, i); /* set_inline */
 			BM_elem_flag_disable(v, BM_ELEM_TAG);
 
 			if (BM_elem_flag_test(v, BM_ELEM_SELECT) == 0 || BM_elem_flag_test(v, BM_ELEM_HIDDEN)) {
-				dists[i] = FLT_MAX;
+				dist = FLT_MAX;
 			}
 			else {
 				BLI_LINKSTACK_PUSH(queue, v);
-
-				dists[i] = 0.0f;
+				dist = 0.0f;
 			}
+
+			dists[i] = dists_prev[i] = dist;
 		}
 		bm->elem_index_dirty &= ~BM_VERT;
 	}
@@ -1991,55 +1994,77 @@ static void editmesh_set_connectivity_distance(BMesh *bm, float mtx[3][3], float
 		BMVert *v;
 		LinkNode *lnk;
 
+		/* this is correct but slow to do each iteration,
+		 * instead sync the dist's while clearing BM_ELEM_TAG (below) */
+#if 0
 		memcpy(dists_prev, dists, sizeof(float) * bm->totvert);
+#endif
 
 		while ((v = BLI_LINKSTACK_POP(queue))) {
-			/* quick checks */
-			bool has_edges = (v->e != NULL);
-			bool has_faces = false;
+			BLI_assert(dists[BM_elem_index_get(v)] != FLT_MAX);
 
 			/* connected edge-verts */
-			if (has_edges) {
-				BMIter iter;
-				BMEdge *e;
+			if (v->e != NULL) {
+				BMEdge *e_iter, *e_first;
 
-				BM_ITER_ELEM (e, &iter, v, BM_EDGES_OF_VERT) {
-					has_faces |= (BM_edge_is_wire(e) == false);
+				e_iter = e_first = v->e;
 
-					if (BM_elem_flag_test(e, BM_ELEM_HIDDEN) == 0) {
-						BMVert *v_other = BM_edge_other_vert(e, v);
+				/* would normally use BM_EDGES_OF_VERT, but this runs so often,
+				 * its faster to iterate on the data directly */
+				do {
+
+					if (BM_elem_flag_test(e_iter, BM_ELEM_HIDDEN) == 0) {
+
+						/* edge distance */
+						BMVert *v_other = BM_edge_other_vert(e_iter, v);
 						if (bmesh_test_dist_add(v, v_other, dists, dists_prev, mtx)) {
 							if (BM_elem_flag_test(v_other, BM_ELEM_TAG) == 0) {
 								BM_elem_flag_enable(v_other, BM_ELEM_TAG);
 								BLI_LINKSTACK_PUSH(queue_next, v_other);
 							}
 						}
-					}
-				}
-			}
-			
-			/* imaginary edge diagonally across quad */
-			if (has_faces) {
-				BMIter iter;
-				BMLoop *l;
 
-				BM_ITER_ELEM (l, &iter, v, BM_LOOPS_OF_VERT) {
-					if ((BM_elem_flag_test(l->f, BM_ELEM_HIDDEN) == 0) && (l->f->len == 4)) {
-						BMVert *v_other = l->next->next->v;
-						if (bmesh_test_dist_add(v, v_other, dists, dists_prev, mtx)) {
-							if (BM_elem_flag_test(v_other, BM_ELEM_TAG) == 0) {
-								BM_elem_flag_enable(v_other, BM_ELEM_TAG);
-								BLI_LINKSTACK_PUSH(queue_next, v_other);
-							}
+						/* face distance */
+						if (e_iter->l) {
+							BMLoop *l_iter_radial, *l_first_radial;
+							/**
+							 * imaginary edge diagonally across quad,
+							 * \note, this takes advantage of the rules of winding that we
+							 * know 2 or more of a verts edges wont reference the same face twice.
+							 * Also, if the edge is hidden, the face will be hidden too.
+							 */
+							l_iter_radial = l_first_radial = e_iter->l;
+
+							do {
+								if ((l_iter_radial->v == v) &&
+								    (l_iter_radial->f->len == 4) &&
+								    (BM_elem_flag_test(l_iter_radial->f, BM_ELEM_HIDDEN) == 0))
+								{
+									BMVert *v_other = l_iter_radial->next->next->v;
+									if (bmesh_test_dist_add(v, v_other, dists, dists_prev, mtx)) {
+										if (BM_elem_flag_test(v_other, BM_ELEM_TAG) == 0) {
+											BM_elem_flag_enable(v_other, BM_ELEM_TAG);
+											BLI_LINKSTACK_PUSH(queue_next, v_other);
+										}
+									}
+								}
+							} while ((l_iter_radial = l_iter_radial->radial_next) != l_first_radial);
 						}
 					}
-				}
+				} while ((e_iter = BM_DISK_EDGE_NEXT(e_iter, v)) != e_first);
 			}
 		}
 
+
 		/* clear for the next loop */
 		for (lnk = queue_next; lnk; lnk = lnk->next) {
-			BM_elem_flag_disable((BMVert *)lnk->link, BM_ELEM_TAG);
+			BMVert *v = lnk->link;
+			const int i = BM_elem_index_get(v);
+
+			BM_elem_flag_disable(v, BM_ELEM_TAG);
+
+			/* keep in sync, avoid having to do full memcpy each iteration */
+			dists_prev[i] = dists[i];
 		}
 
 		BLI_LINKSTACK_SWAP(queue, queue_next);
@@ -3304,75 +3329,89 @@ static void posttrans_action_clean(bAnimContext *ac, bAction *act)
 /* ----------------------------- */
 
 /* fully select selected beztriples, but only include if it's on the right side of cfra */
-static int count_fcurve_keys(FCurve *fcu, char side, float cfra)
+static int count_fcurve_keys(FCurve *fcu, char side, float cfra, bool propedit)
 {
 	BezTriple *bezt;
-	int i, count = 0;
+	int i, count = 0, count_all = 0;
 
 	if (ELEM(NULL, fcu, fcu->bezt))
 		return count;
 
 	/* only include points that occur on the right side of cfra */
 	for (i = 0, bezt = fcu->bezt; i < fcu->totvert; i++, bezt++) {
-		if (bezt->f2 & SELECT) {
+		if (FrameOnMouseSide(side, bezt->vec[1][0], cfra)) {
 			/* no need to adjust the handle selection since they are assumed
 			 * selected (like graph editor with SIPO_NOHANDLES) */
-			if (FrameOnMouseSide(side, bezt->vec[1][0], cfra)) {
-				count += 1;
-			}
+			if (bezt->f2 & SELECT)
+				count++;
+
+			count_all++;
 		}
 	}
 
-	return count;
+	if (propedit && count > 0)
+		return count_all;
+	else return count;
 }
 
 /* fully select selected beztriples, but only include if it's on the right side of cfra */
-static int count_gplayer_frames(bGPDlayer *gpl, char side, float cfra)
+static int count_gplayer_frames(bGPDlayer *gpl, char side, float cfra, bool propedit)
 {
 	bGPDframe *gpf;
-	int count = 0;
+	int count = 0, count_all = 0;
 	
 	if (gpl == NULL)
 		return count;
 	
 	/* only include points that occur on the right side of cfra */
 	for (gpf = gpl->frames.first; gpf; gpf = gpf->next) {
-		if (gpf->flag & GP_FRAME_SELECT) {
-			if (FrameOnMouseSide(side, (float)gpf->framenum, cfra))
+		if (FrameOnMouseSide(side, (float)gpf->framenum, cfra)) {
+			if (gpf->flag & GP_FRAME_SELECT)
 				count++;
+			count_all++;
 		}
 	}
 	
-	return count;
+	if (propedit && count > 0)
+		return count_all;
+	else
+		return count;
 }
 
 /* fully select selected beztriples, but only include if it's on the right side of cfra */
-static int count_masklayer_frames(MaskLayer *masklay, char side, float cfra)
+static int count_masklayer_frames(MaskLayer *masklay, char side, float cfra, bool propedit)
 {
 	MaskLayerShape *masklayer_shape;
-	int count = 0;
+	int count = 0, count_all = 0;
 
 	if (masklay == NULL)
 		return count;
 
 	/* only include points that occur on the right side of cfra */
 	for (masklayer_shape = masklay->splines_shapes.first; masklayer_shape; masklayer_shape = masklayer_shape->next) {
-		if (masklayer_shape->flag & MASK_SHAPE_SELECT) {
-			if (FrameOnMouseSide(side, (float)masklayer_shape->frame, cfra))
+		if (FrameOnMouseSide(side, (float)masklayer_shape->frame, cfra)) {
+			if (masklayer_shape->flag & MASK_SHAPE_SELECT)
 				count++;
+			count_all++;
 		}
 	}
 
-	return count;
+	if (propedit && count > 0)
+		return count_all;
+	else
+		return count;
 }
 
 
 /* This function assigns the information to transdata */
-static void TimeToTransData(TransData *td, float *time, AnimData *adt)
+static void TimeToTransData(TransData *td, float *time, AnimData *adt, float ypos)
 {
 	/* memory is calloc'ed, so that should zero everything nicely for us */
 	td->val = time;
 	td->ival = *(time);
+
+	td->center[0] = td->ival;
+	td->center[1] = ypos;
 
 	/* store the AnimData where this keyframe exists as a keyframe of the
 	 * active action as td->extra.
@@ -3387,7 +3426,7 @@ static void TimeToTransData(TransData *td, float *time, AnimData *adt)
  * The 'side' argument is needed for the extend mode. 'B' = both sides, 'R'/'L' mean only data
  * on the named side are used.
  */
-static TransData *ActionFCurveToTransData(TransData *td, TransData2D **td2dv, FCurve *fcu, AnimData *adt, char side, float cfra)
+static TransData *ActionFCurveToTransData(TransData *td, TransData2D **td2dv, FCurve *fcu, AnimData *adt, char side, float cfra, bool propedit, float ypos)
 {
 	BezTriple *bezt;
 	TransData2D *td2d = *td2dv;
@@ -3398,11 +3437,14 @@ static TransData *ActionFCurveToTransData(TransData *td, TransData2D **td2dv, FC
 
 	for (i = 0, bezt = fcu->bezt; i < fcu->totvert; i++, bezt++) {
 		/* only add selected keyframes (for now, proportional edit is not enabled) */
-		if (bezt->f2 & SELECT) { /* note this MUST match count_fcurve_keys(), so can't use BEZSELECTED() macro */
+		if (propedit || (bezt->f2 & SELECT)) { /* note this MUST match count_fcurve_keys(), so can't use BEZSELECTED() macro */
 			/* only add if on the right 'side' of the current frame */
 			if (FrameOnMouseSide(side, bezt->vec[1][0], cfra)) {
-				TimeToTransData(td, bezt->vec[1], adt);
+				TimeToTransData(td, bezt->vec[1], adt, ypos);
 				
+				if (bezt->f2 & SELECT)
+					td->flag |= TD_SELECTED;
+
 				/*set flags to move handles as necessary*/
 				td->flag |= TD_MOVEHANDLE1 | TD_MOVEHANDLE2;
 				td2d->h1 = bezt->vec[0];
@@ -3453,19 +3495,22 @@ void flushTransIntFrameActionData(TransInfo *t)
  * The 'side' argument is needed for the extend mode. 'B' = both sides, 'R'/'L' mean only data
  * on the named side are used.
  */
-static int GPLayerToTransData(TransData *td, tGPFtransdata *tfd, bGPDlayer *gpl, char side, float cfra)
+static int GPLayerToTransData(TransData *td, tGPFtransdata *tfd, bGPDlayer *gpl, char side, float cfra, bool propedit, float ypos)
 {
 	bGPDframe *gpf;
 	int count = 0;
 	
 	/* check for select frames on right side of current frame */
 	for (gpf = gpl->frames.first; gpf; gpf = gpf->next) {
-		if (gpf->flag & GP_FRAME_SELECT) {
+		if (propedit || (gpf->flag & GP_FRAME_SELECT)) {
 			if (FrameOnMouseSide(side, (float)gpf->framenum, cfra)) {
 				/* memory is calloc'ed, so that should zero everything nicely for us */
 				td->val = &tfd->val;
 				td->ival = (float)gpf->framenum;
 				
+				td->center[0] = td->ival;
+				td->center[1] = ypos;
+
 				tfd->val = (float)gpf->framenum;
 				tfd->sdata = &gpf->framenum;
 				
@@ -3481,18 +3526,21 @@ static int GPLayerToTransData(TransData *td, tGPFtransdata *tfd, bGPDlayer *gpl,
 }
 
 /* refer to comment above #GPLayerToTransData, this is the same but for masks */
-static int MaskLayerToTransData(TransData *td, tGPFtransdata *tfd, MaskLayer *masklay, char side, float cfra)
+static int MaskLayerToTransData(TransData *td, tGPFtransdata *tfd, MaskLayer *masklay, char side, float cfra, bool propedit, float ypos)
 {
 	MaskLayerShape *masklay_shape;
 	int count = 0;
 
 	/* check for select frames on right side of current frame */
 	for (masklay_shape = masklay->splines_shapes.first; masklay_shape; masklay_shape = masklay_shape->next) {
-		if (masklay_shape->flag & MASK_SHAPE_SELECT) {
+		if (propedit || (masklay_shape->flag & MASK_SHAPE_SELECT)) {
 			if (FrameOnMouseSide(side, (float)masklay_shape->frame, cfra)) {
 				/* memory is calloc'ed, so that should zero everything nicely for us */
 				td->val = &tfd->val;
 				td->ival = (float)masklay_shape->frame;
+
+				td->center[0] = td->ival;
+				td->center[1] = ypos;
 
 				tfd->val = (float)masklay_shape->frame;
 				tfd->sdata = &masklay_shape->frame;
@@ -3515,15 +3563,25 @@ static void createTransActionData(bContext *C, TransInfo *t)
 	TransData *td = NULL;
 	TransData2D *td2d = NULL;
 	tGPFtransdata *tfd = NULL;
-	
+
+	rcti *mask = &t->ar->v2d.mask;
+	rctf *datamask = &t->ar->v2d.cur;
+
+	float xsize = BLI_rctf_size_x(datamask);
+	float ysize = BLI_rctf_size_y(datamask);
+	float xmask = BLI_rcti_size_x(mask);
+	float ymask = BLI_rcti_size_y(mask);
+
 	bAnimContext ac;
 	ListBase anim_data = {NULL, NULL};
 	bAnimListElem *ale;
 	int filter;
-	
+	const bool propedit = (t->flag & T_PROP_EDIT) != 0;
+
 	int count = 0;
 	float cfra;
-	
+	float ypos = 1.0f / ((ysize / xsize) * (xmask / ymask)) * BLI_rctf_cent_y(&t->ar->v2d.cur);
+
 	/* determine what type of data we are operating on */
 	if (ANIM_animdata_get_context(C, &ac) == 0)
 		return;
@@ -3551,7 +3609,7 @@ static void createTransActionData(bContext *C, TransInfo *t)
 	/* loop 1: fully select ipo-keys and count how many BezTriples are selected */
 	for (ale = anim_data.first; ale; ale = ale->next) {
 		AnimData *adt = ANIM_nla_mapping_get(&ac, ale);
-		
+		int adt_count = 0;
 		/* convert current-frame to action-time (slightly less accurate, especially under
 		 * higher scaling ratios, but is faster than converting all points)
 		 */
@@ -3560,14 +3618,19 @@ static void createTransActionData(bContext *C, TransInfo *t)
 		else
 			cfra = (float)CFRA;
 		
-		if (ale->type == ANIMTYPE_FCURVE)
-			count += count_fcurve_keys(ale->key_data, t->frame_side, cfra);
+		if (ELEM(ale->type, ANIMTYPE_FCURVE, ANIMTYPE_NLACURVE))
+			adt_count = count_fcurve_keys(ale->key_data, t->frame_side, cfra, propedit);
 		else if (ale->type == ANIMTYPE_GPLAYER)
-			count += count_gplayer_frames(ale->data, t->frame_side, cfra);
+			adt_count = count_gplayer_frames(ale->data, t->frame_side, cfra, propedit);
 		else if (ale->type == ANIMTYPE_MASKLAYER)
-			count += count_masklayer_frames(ale->data, t->frame_side, cfra);
+			adt_count = count_masklayer_frames(ale->data, t->frame_side, cfra, propedit);
 		else
 			BLI_assert(0);
+
+		if (adt_count > 0) {
+			count += adt_count;
+			ale->tag = true;
+		}
 	}
 	
 	/* stop if trying to build list if nothing selected */
@@ -3604,11 +3667,22 @@ static void createTransActionData(bContext *C, TransInfo *t)
 	
 	/* loop 2: build transdata array */
 	for (ale = anim_data.first; ale; ale = ale->next) {
+		AnimData *adt;
+
+		if (propedit && !ale->tag)
+			continue;
+
+		adt = ANIM_nla_mapping_get(&ac, ale);
+		if (adt)
+			cfra = BKE_nla_tweakedit_remap(adt, (float)CFRA, NLATIME_CONVERT_UNMAP);
+		else
+			cfra = (float)CFRA;
+
 		if (ale->type == ANIMTYPE_GPLAYER) {
 			bGPDlayer *gpl = (bGPDlayer *)ale->data;
 			int i;
 			
-			i = GPLayerToTransData(td, tfd, gpl, t->frame_side, cfra);
+			i = GPLayerToTransData(td, tfd, gpl, t->frame_side, cfra, propedit, ypos);
 			td += i;
 			tfd += i;
 		}
@@ -3616,7 +3690,7 @@ static void createTransActionData(bContext *C, TransInfo *t)
 			MaskLayer *masklay = (MaskLayer *)ale->data;
 			int i;
 
-			i = MaskLayerToTransData(td, tfd, masklay, t->frame_side, cfra);
+			i = MaskLayerToTransData(td, tfd, masklay, t->frame_side, cfra, propedit, ypos);
 			td += i;
 			tfd += i;
 		}
@@ -3624,15 +3698,7 @@ static void createTransActionData(bContext *C, TransInfo *t)
 			AnimData *adt = ANIM_nla_mapping_get(&ac, ale);
 			FCurve *fcu = (FCurve *)ale->key_data;
 			
-			/* convert current-frame to action-time (slightly less accurate, especially under
-			 * higher scaling ratios, but is faster than converting all points)
-			 */
-			if (adt)
-				cfra = BKE_nla_tweakedit_remap(adt, (float)CFRA, NLATIME_CONVERT_UNMAP);
-			else
-				cfra = (float)CFRA;
-			
-			td = ActionFCurveToTransData(td, &td2d, fcu, adt, t->frame_side, cfra);
+			td = ActionFCurveToTransData(td, &td2d, fcu, adt, t->frame_side, cfra, propedit, ypos);
 		}
 	}
 	
@@ -3659,6 +3725,107 @@ static void createTransActionData(bContext *C, TransInfo *t)
 		 */
 		*((float *)(t->customData)) = min;
 		*((float *)(t->customData) + 1) = max;
+	}
+
+	/* calculate distances for proportional editing */
+	if (propedit) {
+		td = t->data;
+
+		for (ale = anim_data.first; ale; ale = ale->next) {
+			AnimData *adt;
+
+			/* F-Curve may not have any keyframes */
+			if (!ale->tag)
+				continue;
+
+			adt = ANIM_nla_mapping_get(&ac, ale);
+			if (adt)
+				cfra = BKE_nla_tweakedit_remap(adt, (float)CFRA, NLATIME_CONVERT_UNMAP);
+			else
+				cfra = (float)CFRA;
+
+			if (ale->type == ANIMTYPE_GPLAYER) {
+				bGPDlayer *gpl = (bGPDlayer *)ale->data;
+				bGPDframe *gpf;
+
+				for (gpf = gpl->frames.first; gpf; gpf = gpf->next) {
+					if (gpf->flag & GP_FRAME_SELECT) {
+						td->dist = td->rdist = 0.0f;
+					}
+					else {
+						bGPDframe *gpf_iter;
+						float min = FLT_MAX;
+						for (gpf_iter = gpl->frames.first; gpf_iter; gpf_iter = gpf->next) {
+							if (gpf_iter->flag & GP_FRAME_SELECT) {
+								if (FrameOnMouseSide(t->frame_side, (float)gpf_iter->framenum, cfra)) {
+									float val = fabs(gpf->framenum - gpf_iter->framenum);
+									if (val < min)
+										min = val;
+								}
+							}
+						}
+						td->dist = td->rdist = min;
+					}
+					td++;
+				}
+			}
+			else if (ale->type == ANIMTYPE_MASKLAYER) {
+				MaskLayer *masklay = (MaskLayer *)ale->data;
+				MaskLayerShape *masklay_shape;
+
+				for (masklay_shape = masklay->splines_shapes.first; masklay_shape; masklay_shape = masklay_shape->next) {
+					if (FrameOnMouseSide(t->frame_side, (float)masklay_shape->frame, cfra)) {
+						if (masklay_shape->flag & MASK_SHAPE_SELECT) {
+							td->dist = td->rdist = 0.0f;
+						}
+						else {
+							MaskLayerShape *masklay_iter;
+							float min = FLT_MAX;
+							for (masklay_iter = masklay->splines_shapes.first; masklay_iter; masklay_iter = masklay_iter->next) {
+								if (masklay_iter->flag & MASK_SHAPE_SELECT) {
+									if (FrameOnMouseSide(t->frame_side, (float)masklay_iter->frame, cfra)) {
+										float val = fabs(masklay_shape->frame - masklay_iter->frame);
+										if (val < min)
+											min = val;
+									}
+								}
+							}
+							td->dist = td->rdist = min;
+						}
+						td++;
+					}
+				}
+			}
+			else {
+				FCurve *fcu = (FCurve *)ale->key_data;
+				BezTriple *bezt;
+				int i;
+
+				for (i = 0, bezt = fcu->bezt; i < fcu->totvert; i++, bezt++) {
+					if (FrameOnMouseSide(t->frame_side, bezt->vec[1][0], cfra)) {
+						if (bezt->f2 & SELECT) {
+							td->dist = td->rdist = 0.0f;
+						}
+						else {
+							BezTriple *bezt_iter;
+							int j;
+							float min = FLT_MAX;
+							for (j = 0, bezt_iter = fcu->bezt; j < fcu->totvert; j++, bezt_iter++) {
+								if (bezt_iter->f2 & SELECT) {
+									if (FrameOnMouseSide(t->frame_side, (float)bezt_iter->vec[1][0], cfra)) {
+										float val = fabs(bezt->vec[1][0] - bezt_iter->vec[1][0]);
+										if (val < min)
+											min = val;
+									}
+								}
+							}
+							td->dist = td->rdist = min;
+						}
+						td++;
+					}
+				}
+			}
+		}
 	}
 
 	/* cleanup temp list */
@@ -3762,6 +3929,29 @@ static bool graph_edit_use_local_center(TransInfo *t)
 	return (t->around == V3D_LOCAL) && !graph_edit_is_translation_mode(t);
 }
 
+
+static void graph_key_shortest_dist(TransInfo *t, FCurve *fcu, TransData *td_start, TransData *td, int cfra, bool use_handle)
+{
+	int j = 0;
+	TransData *td_iter = td_start;
+
+	td->dist = FLT_MAX;
+	for (; j < fcu->totvert; j++) {
+		BezTriple *bezt = fcu->bezt + j;
+		if (FrameOnMouseSide(t->frame_side, bezt->vec[1][0], cfra)) {
+			const bool sel2 = (bezt->f2 & SELECT) != 0;
+			const bool sel1 = use_handle ? (bezt->f1 & SELECT) != 0 : sel2;
+			const bool sel3 = use_handle ? (bezt->f3 & SELECT) != 0 : sel2;
+
+			if (sel1 || sel2 || sel3) {
+				td->dist = td->rdist = min_ff(td->dist, fabs(td_iter->center[0] - td->center[0]));
+			}
+
+			td_iter += 3;
+		}
+	}
+}
+
 static void createTransGraphEditData(bContext *C, TransInfo *t)
 {
 	SpaceIpo *sipo = (SpaceIpo *)t->sa->spacedata.first;
@@ -3784,6 +3974,7 @@ static void createTransGraphEditData(bContext *C, TransInfo *t)
 	const bool is_translation_mode = graph_edit_is_translation_mode(t);
 	const bool use_handle = !(sipo->flag & SIPO_NOHANDLES);
 	const bool use_local_center = graph_edit_use_local_center(t);
+	const bool propedit = (t->flag & T_PROP_EDIT) != 0;
 	short anim_map_flag = ANIM_UNITCONV_ONLYSEL | ANIM_UNITCONV_SELVERTS;
 	
 	/* determine what type of data we are operating on */
@@ -3815,6 +4006,8 @@ static void createTransGraphEditData(bContext *C, TransInfo *t)
 		AnimData *adt = ANIM_nla_mapping_get(&ac, ale);
 		FCurve *fcu = (FCurve *)ale->key_data;
 		float cfra;
+		int curvecount = 0;
+		bool selected = false;
 
 		/* F-Curve may not have any keyframes */
 		if (fcu->bezt == NULL)
@@ -3835,20 +4028,34 @@ static void createTransGraphEditData(bContext *C, TransInfo *t)
 				const bool sel1 = use_handle ? (bezt->f1 & SELECT) != 0 : sel2;
 				const bool sel3 = use_handle ? (bezt->f3 & SELECT) != 0 : sel2;
 
-				if (!is_translation_mode || !(sel2)) {
-					if (sel1) {
-						count++;
+				if (propedit) {
+					curvecount += 3;
+					if (sel2 || sel1 || sel3)
+						selected = true;
+				}
+				else {
+					if (!is_translation_mode || !(sel2)) {
+						if (sel1) {
+							count++;
+						}
+
+						if (sel3) {
+							count++;
+						}
 					}
 
-					if (sel3) {
+					/* only include main vert if selected */
+					if (sel2 && !use_local_center) {
 						count++;
 					}
 				}
+			}
+		}
 
-				/* only include main vert if selected */
-				if (sel2 && !use_local_center) {
-					count++;
-				}
+		if (propedit) {
+			if (selected) {
+				count += curvecount;
+				ale->tag = true;
 			}
 		}
 	}
@@ -3901,7 +4108,7 @@ static void createTransGraphEditData(bContext *C, TransInfo *t)
 		float cfra;
 
 		/* F-Curve may not have any keyframes */
-		if (fcu->bezt == NULL)
+		if (fcu->bezt == NULL || (propedit && ale->tag == 0))
 			continue;
 
 		/* convert current-frame to action-time (slightly less accurate, especially under
@@ -3924,57 +4131,69 @@ static void createTransGraphEditData(bContext *C, TransInfo *t)
 				TransDataCurveHandleFlags *hdata = NULL;
 				/* short h1=1, h2=1; */ /* UNUSED */
 				
-				/* only include handles if selected, irrespective of the interpolation modes.
-				 * also, only treat handles specially if the center point isn't selected. 
-				 */
-				if (!is_translation_mode || !(sel2)) {
-					if (sel1) {
-						hdata = initTransDataCurveHandles(td, bezt);
-						bezt_to_transdata(td++, td2d++, tdg++, adt, bezt, 0, sel1, true, intvals, mtx, smtx, unit_scale);
-					}
-					else {
-						/* h1 = 0; */ /* UNUSED */
-					}
-					
-					if (sel3) {
-						if (hdata == NULL)
-							hdata = initTransDataCurveHandles(td, bezt);
-						bezt_to_transdata(td++, td2d++, tdg++, adt, bezt, 2, sel3, true, intvals, mtx, smtx, unit_scale);
-					}
-					else {
-						/* h2 = 0; */ /* UNUSED */
-					}
+				if (propedit) {
+					bool is_sel = (sel2 || sel1 || sel3);
+					/* we always select all handles for proportional editing if central handle is selected */
+					initTransDataCurveHandles(td, bezt);
+					bezt_to_transdata(td++, td2d++, tdg++, adt, bezt, 0, is_sel, true, intvals, mtx, smtx, unit_scale);
+					initTransDataCurveHandles(td, bezt);
+					bezt_to_transdata(td++, td2d++, tdg++, adt, bezt, 1, is_sel, false, intvals, mtx, smtx, unit_scale);
+					initTransDataCurveHandles(td, bezt);
+					bezt_to_transdata(td++, td2d++, tdg++, adt, bezt, 2, is_sel, true, intvals, mtx, smtx, unit_scale);
 				}
-				
-				/* only include main vert if selected */
-				if (sel2 && !use_local_center) {
-					/* move handles relative to center */
-					if (is_translation_mode) {
-						if (sel1) td->flag |= TD_MOVEHANDLE1;
-						if (sel3) td->flag |= TD_MOVEHANDLE2;
-					}
-					
-					/* if handles were not selected, store their selection status */
-					if (!(sel1) || !(sel3)) {
-						if (hdata == NULL)
+				else {
+					/* only include handles if selected, irrespective of the interpolation modes.
+					 * also, only treat handles specially if the center point isn't selected.
+					 */
+					if (!is_translation_mode || !(sel2)) {
+						if (sel1) {
 							hdata = initTransDataCurveHandles(td, bezt);
+							bezt_to_transdata(td++, td2d++, tdg++, adt, bezt, 0, sel1, true, intvals, mtx, smtx, unit_scale);
+						}
+						else {
+							/* h1 = 0; */ /* UNUSED */
+						}
+
+						if (sel3) {
+							if (hdata == NULL)
+								hdata = initTransDataCurveHandles(td, bezt);
+							bezt_to_transdata(td++, td2d++, tdg++, adt, bezt, 2, sel3, true, intvals, mtx, smtx, unit_scale);
+						}
+						else {
+							/* h2 = 0; */ /* UNUSED */
+						}
 					}
-					
-					bezt_to_transdata(td++, td2d++, tdg++, adt, bezt, 1, sel2, false, intvals, mtx, smtx, unit_scale);
-					
-				}
-				/* special hack (must be done after initTransDataCurveHandles(), as that stores handle settings to restore...):
-				 *	- Check if we've got entire BezTriple selected and we're scaling/rotating that point,
-				 *	  then check if we're using auto-handles.
-				 *	- If so, change them auto-handles to aligned handles so that handles get affected too
-				 */
-				if (ELEM(bezt->h1, HD_AUTO, HD_AUTO_ANIM) &&
-				    ELEM(bezt->h2, HD_AUTO, HD_AUTO_ANIM) &&
-				    ELEM(t->mode, TFM_ROTATION, TFM_RESIZE))
-				{
-					if (hdata && (sel1) && (sel3)) {
-						bezt->h1 = HD_ALIGN;
-						bezt->h2 = HD_ALIGN;
+
+					/* only include main vert if selected */
+					if (sel2 && !use_local_center) {
+						/* move handles relative to center */
+						if (is_translation_mode) {
+							if (sel1) td->flag |= TD_MOVEHANDLE1;
+							if (sel3) td->flag |= TD_MOVEHANDLE2;
+						}
+
+						/* if handles were not selected, store their selection status */
+						if (!(sel1) || !(sel3)) {
+							if (hdata == NULL)
+								hdata = initTransDataCurveHandles(td, bezt);
+						}
+
+						bezt_to_transdata(td++, td2d++, tdg++, adt, bezt, 1, sel2, false, intvals, mtx, smtx, unit_scale);
+
+					}
+					/* special hack (must be done after initTransDataCurveHandles(), as that stores handle settings to restore...):
+					 *	- Check if we've got entire BezTriple selected and we're scaling/rotating that point,
+					 *	  then check if we're using auto-handles.
+					 *	- If so, change them auto-handles to aligned handles so that handles get affected too
+					 */
+					if (ELEM(bezt->h1, HD_AUTO, HD_AUTO_ANIM) &&
+					    ELEM(bezt->h2, HD_AUTO, HD_AUTO_ANIM) &&
+					    ELEM(t->mode, TFM_ROTATION, TFM_RESIZE))
+					{
+						if (hdata && (sel1) && (sel3)) {
+							bezt->h1 = HD_ALIGN;
+							bezt->h2 = HD_ALIGN;
+						}
 					}
 				}
 			}
@@ -3983,7 +4202,64 @@ static void createTransGraphEditData(bContext *C, TransInfo *t)
 		/* Sets handles based on the selection */
 		testhandles_fcurve(fcu, use_handle);
 	}
-	
+
+	if (propedit) {
+		/* loop 2: build transdata arrays */
+		td = t->data;
+
+		for (ale = anim_data.first; ale; ale = ale->next) {
+			AnimData *adt = ANIM_nla_mapping_get(&ac, ale);
+			FCurve *fcu = (FCurve *)ale->key_data;
+			TransData *td_start = td;
+			float cfra;
+
+			/* F-Curve may not have any keyframes */
+			if (fcu->bezt == NULL || (ale->tag == 0))
+				continue;
+
+			/* convert current-frame to action-time (slightly less accurate, especially under
+			 * higher scaling ratios, but is faster than converting all points)
+			 */
+			if (adt)
+				cfra = BKE_nla_tweakedit_remap(adt, (float)CFRA, NLATIME_CONVERT_UNMAP);
+			else
+				cfra = (float)CFRA;
+
+			/* only include BezTriples whose 'keyframe' occurs on the same side of the current frame as mouse (if applicable) */
+			for (i = 0, bezt = fcu->bezt; i < fcu->totvert; i++, bezt++) {
+				if (FrameOnMouseSide(t->frame_side, bezt->vec[1][0], cfra)) {
+					const bool sel2 = (bezt->f2 & SELECT) != 0;
+					const bool sel1 = use_handle ? (bezt->f1 & SELECT) != 0 : sel2;
+					const bool sel3 = use_handle ? (bezt->f3 & SELECT) != 0 : sel2;
+
+					if (sel1 || sel2) {
+						td->dist = td->rdist =  0.0f;
+					}
+					else {
+						graph_key_shortest_dist(t, fcu, td_start, td, cfra, use_handle);
+					}
+					td++;
+
+					if (sel2) {
+						td->dist = td->rdist = 0.0f;
+					}
+					else {
+						graph_key_shortest_dist(t, fcu, td_start, td, cfra, use_handle);
+					}
+					td++;
+
+					if (sel3 || sel2) {
+						td->dist = td->rdist = 0.0f;
+					}
+					else {
+						graph_key_shortest_dist(t, fcu, td_start, td, cfra, use_handle);
+					}
+					td++;
+				}
+			}
+		}
+	}
+
 	/* cleanup temp list */
 	ANIM_animdata_freelist(&anim_data);
 }
@@ -7594,6 +7870,12 @@ void createTransData(bContext *C, TransInfo *t)
 	else if (t->spacetype == SPACE_ACTION) {
 		t->flag |= T_POINTS | T_2D_EDIT;
 		createTransActionData(C, t);
+
+		if (t->data && (t->flag & T_PROP_EDIT)) {
+			sort_trans_data(t); // makes selected become first in array
+			//set_prop_dist(t, false); /* don't do that, distance has been set in createTransActionData already */
+			sort_trans_data_dist(t);
+		}
 	}
 	else if (t->spacetype == SPACE_NLA) {
 		t->flag |= T_POINTS | T_2D_EDIT;
@@ -7607,13 +7889,12 @@ void createTransData(bContext *C, TransInfo *t)
 	else if (t->spacetype == SPACE_IPO) {
 		t->flag |= T_POINTS | T_2D_EDIT;
 		createTransGraphEditData(C, t);
-#if 0
+
 		if (t->data && (t->flag & T_PROP_EDIT)) {
 			sort_trans_data(t); // makes selected become first in array
-			set_prop_dist(t, 1);
+			set_prop_dist(t, false); /* don't do that, distance has been set in createTransGraphEditData already */
 			sort_trans_data_dist(t);
 		}
-#endif
 	}
 	else if (t->spacetype == SPACE_NODE) {
 		t->flag |= T_POINTS | T_2D_EDIT;
