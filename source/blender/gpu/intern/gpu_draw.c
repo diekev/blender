@@ -351,7 +351,7 @@ static void gpu_make_repbind(Image *ima)
 {
 	ImBuf *ibuf;
 	
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
 	if (ibuf==NULL)
 		return;
 
@@ -519,7 +519,7 @@ int GPU_verify_image(Image *ima, ImageUser *iuser, int tftile, bool compare, boo
 		return 0;
 
 	/* check if we have a valid image buffer */
-	ibuf= BKE_image_acquire_ibuf(ima, iuser, NULL);
+	ibuf= BKE_image_acquire_ibuf(ima, iuser, NULL, IMA_IBUF_IMA);
 
 	if (ibuf==NULL)
 		return 0;
@@ -1034,7 +1034,7 @@ void GPU_paint_update_image(Image *ima, int x, int y, int w, int h)
 {
 	ImBuf *ibuf;
 	
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
 	
 	if (ima->repbind || (GPU_get_mipmap() && !GTS.gpu_mipmap) || !ima->bindcode || !ibuf ||
 		(w == 0) || (h == 0))

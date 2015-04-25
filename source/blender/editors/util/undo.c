@@ -144,10 +144,24 @@ static int ed_undo_step(bContext *C, int step, const char *undoname)
 		SpaceImage *sima = (SpaceImage *)sa->spacedata.first;
 		
 		if ((obact && (obact->mode & OB_MODE_TEXTURE_PAINT)) || (sima->mode == SI_MODE_PAINT)) {
-			if (!ED_undo_paint_step(C, UNDO_PAINT_IMAGE, step, undoname) && undoname) {
+			int r_undo_paint;
+			r_undo_paint = ED_undo_paint_step(C, UNDO_PAINT_IMAGE, step, undoname);
+
+			if (!r_undo_paint && undoname) {
 				if (U.uiflag & USER_GLOBALUNDO) {
 					ED_viewport_render_kill_jobs(wm, bmain, true);
 					BKE_undo_name(C, undoname);
+				}
+			}
+			if (r_undo_paint == 2) {
+				if (U.uiflag & USER_GLOBALUNDO) {
+					undo_editmode_clear();
+					ED_viewport_render_kill_jobs(wm, bmain, true);
+					if (undoname)
+						BKE_undo_name(C, undoname);
+					else
+						BKE_undo_step(C, step);
+					WM_event_add_notifier(C, NC_SCENE | ND_LAYER_CONTENT, CTX_data_scene(C));
 				}
 			}
 			

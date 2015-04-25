@@ -47,6 +47,7 @@
 #include "BKE_depsgraph.h"
 #include "BKE_brush.h"
 #include "BKE_image.h"
+#include "BKE_layer.h"
 #include "BKE_paint.h"
 #include "BKE_report.h"
 #include "BKE_texture.h"
@@ -963,7 +964,7 @@ static int paint_2d_torus_split_region(ImagePaintRegion region[4], ImBuf *dbuf, 
 	return tot;
 }
 
-static void paint_2d_lift_smear(ImBuf *ibuf, ImBuf *ibufb, int *pos)
+static void paint_2d_lift_smear(ImBuf *ibuf, ImBuf *ibufb, int *pos, short lock_alpha)
 {
 	ImagePaintRegion region[4];
 	int a, tot;
@@ -975,10 +976,10 @@ static void paint_2d_lift_smear(ImBuf *ibuf, ImBuf *ibufb, int *pos)
 		IMB_rectblend(ibufb, ibufb, ibuf, NULL, NULL, NULL, 0, region[a].destx, region[a].desty,
 		              region[a].destx, region[a].desty,
 		              region[a].srcx, region[a].srcy,
-		              region[a].width, region[a].height, IMB_BLEND_COPY_RGB, false);
+					  region[a].width, region[a].height, IMB_BLEND_COPY_RGB, false, lock_alpha);
 }
 
-static ImBuf *paint_2d_lift_clone(ImBuf *ibuf, ImBuf *ibufb, int *pos)
+static ImBuf *paint_2d_lift_clone(ImBuf *ibuf, ImBuf *ibufb, int *pos, short lock_alpha)
 {
 	/* note: allocImbuf returns zero'd memory, so regions outside image will
 	 * have zero alpha, and hence not be blended onto the image */
@@ -987,9 +988,9 @@ static ImBuf *paint_2d_lift_clone(ImBuf *ibuf, ImBuf *ibufb, int *pos)
 
 	IMB_rectclip(clonebuf, ibuf, &destx, &desty, &srcx, &srcy, &w, &h);
 	IMB_rectblend(clonebuf, clonebuf, ibufb, NULL, NULL, NULL, 0, destx, desty, destx, desty, destx, desty, w, h,
-	              IMB_BLEND_COPY_ALPHA, false);
+				  IMB_BLEND_COPY_ALPHA, false, lock_alpha);
 	IMB_rectblend(clonebuf, clonebuf, ibuf, NULL, NULL, NULL, 0, destx, desty, destx, desty, srcx, srcy, w, h,
-	              IMB_BLEND_COPY_RGB, false);
+				  IMB_BLEND_COPY_RGB, false, lock_alpha);
 
 	return clonebuf;
 }
@@ -1024,14 +1025,14 @@ static int paint_2d_op(void *state, ImBuf *ibufb, unsigned short *curveb, unsign
 			return 0;
 
 		paint_2d_convert_brushco(ibufb, lastpos, blastpos);
-		paint_2d_lift_smear(s->canvas, ibufb, blastpos);
+		paint_2d_lift_smear(s->canvas, ibufb, blastpos, ((ImageLayer *)imalayer_get_current(s->image))->locked);
 	}
 	else if (s->tool == PAINT_TOOL_CLONE && s->clonecanvas) {
 		liftpos[0] = pos[0] - offset[0] * s->canvas->x;
 		liftpos[1] = pos[1] - offset[1] * s->canvas->y;
 
 		paint_2d_convert_brushco(ibufb, liftpos, bliftpos);
-		clonebuf = paint_2d_lift_clone(s->clonecanvas, ibufb, bliftpos);
+		clonebuf = paint_2d_lift_clone(s->clonecanvas, ibufb, bliftpos, ((ImageLayer *)imalayer_get_current(s->image))->locked);
 	}
 
 	frombuf = (clonebuf) ? clonebuf : ibufb;
@@ -1079,7 +1080,7 @@ static int paint_2d_op(void *state, ImBuf *ibufb, unsigned short *curveb, unsign
 					              region[a].destx, region[a].desty,
 					              origx, origy,
 					              region[a].srcx, region[a].srcy,
-					              region[a].width, region[a].height, blend, ((s->brush->flag & BRUSH_ACCUMULATE) != 0));
+								  region[a].width, region[a].height, blend, ((s->brush->flag & BRUSH_ACCUMULATE) != 0), ((ImageLayer *)imalayer_get_current(s->image))->locked);
 				}
 			}
 
@@ -1091,7 +1092,7 @@ static int paint_2d_op(void *state, ImBuf *ibufb, unsigned short *curveb, unsign
 			              region[a].destx, region[a].desty,
 			              region[a].destx, region[a].desty,
 			              region[a].srcx, region[a].srcy,
-			              region[a].width, region[a].height, blend, false);
+						  region[a].width, region[a].height, blend, false, ((ImageLayer *)imalayer_get_current(s->image))->locked);
 		}
 	}
 
@@ -1103,7 +1104,7 @@ static int paint_2d_op(void *state, ImBuf *ibufb, unsigned short *curveb, unsign
 
 static int paint_2d_canvas_set(ImagePaintState *s, Image *ima)
 {
-	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, s->sima ? &s->sima->iuser : NULL, NULL);
+	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, s->sima ? &s->sima->iuser : NULL, NULL, IMA_IBUF_LAYER);
 
 	/* verify that we can paint and set canvas */
 	if (ima == NULL) {
@@ -1126,7 +1127,7 @@ static int paint_2d_canvas_set(ImagePaintState *s, Image *ima)
 	/* set clone canvas */
 	if (s->tool == PAINT_TOOL_CLONE) {
 		ima = s->brush->clone.image;
-		ibuf = BKE_image_acquire_ibuf(ima, s->sima ? &s->sima->iuser : NULL, NULL);
+		ibuf = BKE_image_acquire_ibuf(ima, s->sima ? &s->sima->iuser : NULL, NULL, IMA_IBUF_LAYER);
 
 		if (!ima || !ibuf || !(ibuf->rect || ibuf->rect_float)) {
 			BKE_image_release_ibuf(ima, ibuf, NULL);
@@ -1168,7 +1169,7 @@ void paint_2d_stroke(void *ps, const float prev_mval[2], const float mval[2], co
 	float newuv[2], olduv[2];
 	ImagePaintState *s = ps;
 	BrushPainter *painter = s->painter;
-	ImBuf *ibuf = BKE_image_acquire_ibuf(s->image, s->sima ? &s->sima->iuser : NULL, NULL);
+	ImBuf *ibuf = BKE_image_acquire_ibuf(s->image, s->sima ? &s->sima->iuser : NULL, NULL, IMA_IBUF_LAYER);
 	const bool is_data = (ibuf && ibuf->colormanage_flag & IMB_COLORMANAGE_IS_DATA);
 
 	if (!ibuf)
@@ -1207,6 +1208,12 @@ void paint_2d_stroke(void *ps, const float prev_mval[2], const float mval[2], co
 	 *            this should probably be changed when texture painting color space is supported
 	 */
 	brush_painter_2d_require_imbuf(painter, (ibuf->rect_float != NULL), !is_data);
+
+	if (s->image->color_space & IMA_COL_GRAY) {
+		painter->brush->rgb[0] = rgb_to_grayscale(painter->brush->rgb);
+		painter->brush->rgb[1] = painter->brush->rgb[0];
+		painter->brush->rgb[2] = painter->brush->rgb[0];
+	}
 
 	brush_painter_2d_refresh_cache(s, painter, newuv, mval, pressure, distance, size);
 
@@ -1262,7 +1269,7 @@ void paint_2d_redraw(const bContext *C, void *ps, bool final)
 	ImagePaintState *s = ps;
 
 	if (s->need_redraw) {
-		ImBuf *ibuf = BKE_image_acquire_ibuf(s->image, s->sima ? &s->sima->iuser : NULL, NULL);
+		ImBuf *ibuf = BKE_image_acquire_ibuf(s->image, s->sima ? &s->sima->iuser : NULL, NULL, IMA_IBUF_LAYER);
 
 		imapaint_image_update(s->sima, s->image, ibuf, false);
 		ED_imapaint_clear_partial_redraw();
@@ -1366,7 +1373,7 @@ void paint_2d_bucket_fill(
 	if (!ima)
 		return;
 
-	ibuf = BKE_image_acquire_ibuf(ima, &sima->iuser, NULL);
+	ibuf = BKE_image_acquire_ibuf(ima, &sima->iuser, NULL, IMA_IBUF_LAYER);
 
 	if (!ibuf)
 		return;
@@ -1543,7 +1550,7 @@ void paint_2d_gradient_fill(
 	if (!ima)
 		return;
 
-	ibuf = BKE_image_acquire_ibuf(ima, &sima->iuser, NULL);
+	ibuf = BKE_image_acquire_ibuf(ima, &sima->iuser, NULL, IMA_IBUF_LAYER);
 
 	if (!ibuf)
 		return;

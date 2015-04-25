@@ -550,7 +550,7 @@ static void image_rect_update(void *rjv, RenderResult *rr, volatile rcti *renrec
 	
 	/* update part of render */
 	render_image_update_pass_and_layer(rj, rr, &rj->iuser);
-	ibuf = BKE_image_acquire_ibuf(ima, &rj->iuser, &lock);
+	ibuf = BKE_image_acquire_ibuf(ima, &rj->iuser, &lock, IMA_IBUF_LAYER);
 	if (ibuf) {
 		/* Don't waste time on CPU side color management if
 		 * image will be displayed using GLSL.
@@ -679,7 +679,7 @@ static void render_endjob(void *rjv)
 	{
 		void *lock;
 		Image *ima = rj->image;
-		ImBuf *ibuf = BKE_image_acquire_ibuf(ima, &rj->iuser, &lock);
+		ImBuf *ibuf = BKE_image_acquire_ibuf(ima, &rj->iuser, &lock, IMA_IBUF_IMA);
 
 		if (ibuf)
 			ibuf->userflags |= IB_DISPLAY_BUFFER_INVALID;

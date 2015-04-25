@@ -66,7 +66,13 @@ ImBuf *BaseImageOperation::getImBuf()
 {
 	ImBuf *ibuf;
 	
-	ibuf = BKE_image_acquire_ibuf(this->m_image, this->m_imageUser, NULL);
+	if (this->m_imageUser->use_layer_ima) {
+		ibuf = BKE_image_acquire_ibuf(this->m_image, this->m_imageUser, NULL, IMA_IBUF_LAYER);
+	}
+	else{
+		ibuf = BKE_image_acquire_ibuf(this->m_image, this->m_imageUser, NULL, IMA_IBUF_IMA);
+	}
+
 	if (ibuf == NULL || (ibuf->rect == NULL && ibuf->rect_float == NULL)) {
 		BKE_image_release_ibuf(this->m_image, ibuf, NULL);
 		return NULL;

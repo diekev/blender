@@ -52,6 +52,7 @@
 #include "BKE_DerivedMesh.h"
 #include "BKE_icons.h"
 #include "BKE_image.h"
+#include "BKE_layer.h"
 #include "BKE_global.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
@@ -1055,6 +1056,8 @@ static int image_open_exec(bContext *C, wmOperator *op)
 	int frame_seq_len = 0;
 	int frame_ofs = 1;
 	bool exists = false;
+	int entry = 0;
+	int action = RNA_enum_get(op->ptr, "action");
 
 	const bool is_relative_path = RNA_boolean_get(op->ptr, "relative_path");
 
@@ -1071,69 +1074,106 @@ static int image_open_exec(bContext *C, wmOperator *op)
 		BLI_freelistN(&frames);
 	}
 
-	errno = 0;
-
-	ima = BKE_image_load_exists_ex(path, &exists);
-
-	if (!ima) {
-		if (op->customdata) MEM_freeN(op->customdata);
-		BKE_reportf(op->reports, RPT_ERROR, "Cannot read '%s': %s",
-		            path, errno ? strerror(errno) : TIP_("unsupported image format"));
-		return OPERATOR_CANCELLED;
-	}
-
-	if (!op->customdata)
-		image_open_init(C, op);
-
-	/* only image path after save, never ibuf */
-	if (is_relative_path) {
-		if (!exists) {
-			BLI_path_rel(ima->name, bmain->name);
+	if (sima) {
+		if (!sima->image) {
+			entry = 1;
 		}
-	}
-
-	/* hook into UI */
-	iod = op->customdata;
-
-	if (iod->pprop.prop) {
-		/* when creating new ID blocks, use is already 1, but RNA
-		 * pointer se also increases user, so this compensates it */
-		ima->id.us--;
-		if ((frame_seq_len > 1) && ima->source == IMA_SRC_FILE) {
-			ima->source = IMA_SRC_SEQUENCE;
-		}
-		RNA_id_pointer_create(&ima->id, &idptr);
-		RNA_property_pointer_set(&iod->pprop.ptr, iod->pprop.prop, idptr);
-		RNA_property_update(C, &iod->pprop.ptr, iod->pprop.prop);
-	}
-
-	if (iod->iuser) {
-		iuser = iod->iuser;
-	}
-	else if (sima) {
-		ED_space_image_set(sima, scene, obedit, ima);
-		iuser = &sima->iuser;
 	}
 	else {
-		Tex *tex = CTX_data_pointer_get_type(C, "texture", &RNA_Texture).data;
-		if (tex && tex->type == TEX_IMAGE) {
-			iuser = &tex->iuser;
-		}
+		entry = 1;
 	}
 
-	/* initialize because of new image */
-	if (iuser) {
-		iuser->frames = frame_seq_len;
-		iuser->sfra = 1;
-		iuser->framenr = 1;
-		iuser->offset = frame_ofs - 1;
-		iuser->fie_ima = 2;
+	if ((entry) || (action & IMA_LAYER_OPEN_IMAGE)) {
+		errno = 0;
+
+		ima = BKE_image_load_exists_ex(path, &exists);
+
+		if (!ima) {
+			if (op->customdata) MEM_freeN(op->customdata);
+			BKE_reportf(op->reports, RPT_ERROR, "Cannot read '%s': %s",
+						path, errno ? strerror(errno) : TIP_("unsupported image format"));
+			return OPERATOR_CANCELLED;
+		}
+
+		if (!op->customdata)
+			image_open_init(C, op);
+
+		/* only image path after save, never ibuf */
+		if (is_relative_path) {
+			if (!exists) {
+				BLI_path_rel(ima->name, bmain->name);
+			}
+		}
+
+		/* hook into UI */
+		iod = op->customdata;
+
+		if (iod->pprop.prop) {
+			/* when creating new ID blocks, use is already 1, but RNA
+		 * pointer se also increases user, so this compensates it */
+			ima->id.us--;
+			if ((frame_seq_len > 1) && ima->source == IMA_SRC_FILE) {
+				ima->source = IMA_SRC_SEQUENCE;
+			}
+			RNA_id_pointer_create(&ima->id, &idptr);
+			RNA_property_pointer_set(&iod->pprop.ptr, iod->pprop.prop, idptr);
+			RNA_property_update(C, &iod->pprop.ptr, iod->pprop.prop);
+		}
+
+		if (iod->iuser) {
+			iuser = iod->iuser;
+		}
+		else if (sima) {
+			ED_space_image_set(sima, scene, obedit, ima);
+			iuser = &sima->iuser;
+		}
+		else {
+			Tex *tex = CTX_data_pointer_get_type(C, "texture", &RNA_Texture).data;
+			if (tex && tex->type == TEX_IMAGE) {
+				iuser = &tex->iuser;
+			}
+		}
+
+		/* initialize because of new image */
+		if (iuser) {
+			iuser->frames = frame_seq_len;
+			iuser->sfra = 1;
+			iuser->framenr = 1;
+			iuser->offset = frame_ofs - 1;
+			iuser->fie_ima = 2;
+		}
+	}
+	else if (action & IMA_LAYER_OPEN_LAYER) {
+		if (sima)
+			ima = sima->image;
+		if (ima) {
+			ImageLayer *iml;
+			struct ImBuf *ibuf;
+			int flag;
+
+			iml = BKE_add_image_file_as_layer(ima, path);
+			iml->background = IMA_LAYER_BG_IMAGE;
+			strcpy(iml->file_path, path);
+			flag = IB_rect | IB_multilayer | IB_metadata;
+
+			/* read ibuf */
+			ibuf = IMB_loadiffname(path, flag, ima->colorspace_settings.name);
+			iml->ibufs.first = NULL;
+			iml->ibufs.last = NULL;
+			BLI_addtail(&iml->ibufs, ibuf);
+
+			if (!iml)
+				return OPERATOR_CANCELLED;
+		}
 	}
 
 	/* XXX unpackImage frees image buffers */
 	ED_preview_kill_jobs(CTX_wm_manager(C), bmain);
 	
-	BKE_image_signal(ima, iuser, IMA_SIGNAL_RELOAD);
+	if (!(action & IMA_LAYER_OPEN_LAYER)) {
+		BKE_image_signal(ima, iuser, IMA_SIGNAL_RELOAD);
+	}
+
 	WM_event_add_notifier(C, NC_IMAGE | NA_EDITED, ima);
 	
 	MEM_freeN(op->customdata);
@@ -1193,6 +1233,13 @@ static int image_open_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(
 /* called by other space types too */
 void IMAGE_OT_open(wmOperatorType *ot)
 {
+	PropertyRNA *prop;
+	static EnumPropertyItem open_actions[] = {
+		{IMA_LAYER_OPEN_IMAGE, "IMAGE", 0, "Image", "Open Image"},
+		{IMA_LAYER_OPEN_LAYER, "LAYER", 0, "Layer", "Open image as layer"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
 	/* identifiers */
 	ot->name = "Open Image";
 	ot->description = "Open image";
@@ -1205,6 +1252,9 @@ void IMAGE_OT_open(wmOperatorType *ot)
 
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	prop = RNA_def_enum(ot->srna, "action", open_actions, IMA_LAYER_DEL_SELECTED, "Action", "Selection action to execute");
+	RNA_def_property_flag(prop, PROP_HIDDEN);
 
 	/* properties */
 	WM_operator_properties_filesel(ot, FILE_TYPE_FOLDER | FILE_TYPE_IMAGE | FILE_TYPE_MOVIE, FILE_SPECIAL, FILE_OPENFILE,
@@ -1370,9 +1420,13 @@ static int save_image_options_init(SaveImageOptions *simopts, SpaceImage *sima, 
                                    const bool guess_path, const bool save_as_render)
 {
 	void *lock;
-	ImBuf *ibuf = ED_space_image_acquire_buffer(sima, &lock);
+	ImBuf *ibuf = NULL;
 
-	if (ibuf) {
+	if (sima && sima->image) {
+		ibuf = BKE_image_acquire_ibuf(sima->image, &sima->iuser, &lock, IMA_IBUF_IMA);
+	}
+
+	if (ibuf && (ibuf->rect || ibuf->rect_float)) {
 		Image *ima = sima->image;
 		bool is_depth_set = false;
 
@@ -1476,10 +1530,14 @@ static bool save_image_doit(bContext *C, SpaceImage *sima, wmOperator *op, SaveI
 {
 	Image *ima = ED_space_image(sima);
 	void *lock;
-	ImBuf *ibuf = ED_space_image_acquire_buffer(sima, &lock);
+	ImBuf *ibuf = NULL;
 	bool ok = false;
 
-	if (ibuf) {
+	if (sima && sima->image) {
+		ibuf = BKE_image_acquire_ibuf(sima->image, &sima->iuser, &lock, IMA_IBUF_IMA);
+	}
+
+	if (ibuf && (ibuf->rect || ibuf->rect_float)) {
 		ImBuf *colormanaged_ibuf;
 		const char *relbase = ID_BLEND_PATH(CTX_data_main(C), &ima->id);
 		const bool relative = (RNA_struct_find_property(op->ptr, "relative_path") && RNA_boolean_get(op->ptr, "relative_path"));
@@ -1932,6 +1990,7 @@ static int image_new_exec(bContext *C, wmOperator *op)
 	float color[4];
 	int width, height, floatbuf, gen_type, alpha;
 	int gen_context;
+	short background, color_space;
 
 	/* retrieve state */
 	sima = CTX_wm_space_image(C);
@@ -1953,10 +2012,28 @@ static int image_new_exec(bContext *C, wmOperator *op)
 	alpha = RNA_boolean_get(op->ptr, "alpha");
 	gen_context = RNA_enum_get(op->ptr, "gen_context");
 
+	background = RNA_enum_get(op->ptr, "background");
+	color_space = RNA_enum_get(op->ptr, "color_space");
+
+	if (background & IMA_LAYER_BG_WHITE) {
+		copy_v4_fl(color, 1.0f);
+	}
+	else if (background & IMA_LAYER_BG_ALPHA) {
+		zero_v4(color);
+	}
+
 	if (!alpha)
 		color[3] = 1.0f;
 
 	ima = BKE_image_add_generated(bmain, width, height, name, alpha ? 32 : 24, floatbuf, gen_type, color);
+
+	if (color_space & IMA_COL_RGB)
+		ima->color_space = IMA_COL_RGB;
+	else
+		ima->color_space = IMA_COL_GRAY;
+
+	((ImageLayer *)ima->imlayers.last)->background = background;
+	copy_v4_v4(((ImageLayer *)ima->imlayers.first)->default_color, color);
 
 	if (!ima)
 		return OPERATOR_CANCELLED;
@@ -2036,10 +2113,28 @@ static int image_new_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(e
 	return WM_operator_props_dialog_popup(C, op, 15 * UI_UNIT_X, 5 * UI_UNIT_Y);
 }
 
+static int image_op_layer_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+{
+	return WM_operator_props_dialog_popup(C, op, 250, 100);;
+}
+
 void IMAGE_OT_new(wmOperatorType *ot)
 {
 	PropertyRNA *prop;
 	static float default_color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+
+	static EnumPropertyItem prop_background_items[] = {
+		{IMA_LAYER_BG_RGB, "RGB", 0, "RGB", ""},
+		{IMA_LAYER_BG_WHITE, "WHITE", 0, "White", ""},
+		{IMA_LAYER_BG_ALPHA, "ALPHA", 0, "Transparent", ""},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	static EnumPropertyItem prop_color_space_items[] = {
+		{IMA_COL_RGB, "RGB", 0, "RGB", ""},
+		{IMA_COL_GRAY, "GRAY", 0, "GrayScale", ""},
+		{0, NULL, 0, NULL, NULL}
+	};
 
 	static EnumPropertyItem gen_context_items[] = {
 		{GEN_CONTEXT_NONE, "NONE", 0, "None", ""},
@@ -2066,10 +2161,12 @@ void IMAGE_OT_new(wmOperatorType *ot)
 	RNA_def_property_subtype(prop, PROP_PIXEL);
 	prop = RNA_def_int(ot->srna, "height", 1024, 1, INT_MAX, "Height", "Image height", 1, 16384);
 	RNA_def_property_subtype(prop, PROP_PIXEL);
+	RNA_def_enum(ot->srna, "background", prop_background_items, 0, "Background", "");
 	prop = RNA_def_float_color(ot->srna, "color", 4, NULL, 0.0f, FLT_MAX, "Color", "Default fill color", 0.0f, 1.0f);
 	RNA_def_property_subtype(prop, PROP_COLOR_GAMMA);
 	RNA_def_property_float_array_default(prop, default_color);
 	RNA_def_boolean(ot->srna, "alpha", 1, "Alpha", "Create an image with an alpha channel");
+	RNA_def_enum(ot->srna, "color_space", prop_color_space_items, 0, "Color Space", "");
 	RNA_def_enum(ot->srna, "generated_type", image_generated_type_items, IMA_GENTYPE_BLANK,
 	             "Generated Type", "Fill the image with a grid for UV map testing");
 	RNA_def_boolean(ot->srna, "float", 0, "32 bit Float", "Create image with 32 bit floating point bit depth");
@@ -2080,19 +2177,52 @@ void IMAGE_OT_new(wmOperatorType *ot)
 
 #undef IMA_DEF_NAME
 
-/********************* invert operators *********************/
+/********************* color operators *********************/
 
-static int image_invert_poll(bContext *C)
+static int image_operator_poll(bContext *C)
 {
 	Image *ima = CTX_data_edit_image(C);
 
-	return BKE_image_has_ibuf(ima, NULL);
+	return BKE_image_has_ibuf(ima, NULL, IMA_IBUF_IMA);
+}
+
+static void free_preview(Image *ima, char mode)
+{
+	ImageLayer *layer;
+
+	if (ima->preview_ibuf) {
+		IMB_freeImBuf(ima->preview_ibuf);
+		ima->preview_ibuf = NULL;
+
+	}
+
+	if (mode == SI_MODE_PAINT) {
+		layer = imalayer_get_current(ima);
+		if (layer) {
+			if (layer->preview_ibuf) {
+				IMB_freeImBuf(layer->preview_ibuf);
+				layer->preview_ibuf = NULL;
+			}
+		}
+	}
+}
+
+static void image_preview_cancel(bContext *C, wmOperator *UNUSED(op))
+{
+	SpaceImage *sima = CTX_wm_space_image(C);
+	Image *ima = CTX_data_edit_image(C);
+	//ImageLayer *layer;
+
+	if (ima) {
+		free_preview(ima, sima->mode);
+		WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
+	}
 }
 
 static int image_invert_exec(bContext *C, wmOperator *op)
 {
 	Image *ima = CTX_data_edit_image(C);
-	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
+	ImBuf *ibuf;
 	SpaceImage *sima = CTX_wm_space_image(C);
 	/* undo is supported only on image paint mode currently */
 	bool support_undo = ((sima != NULL) && (sima->mode == SI_MODE_PAINT));
@@ -2103,7 +2233,16 @@ static int image_invert_exec(bContext *C, wmOperator *op)
 	const bool b = RNA_boolean_get(op->ptr, "invert_b");
 	const bool a = RNA_boolean_get(op->ptr, "invert_a");
 
-	int i;
+	//int i;
+
+	ima->use_layers = false;
+	if (sima->mode == SI_MODE_PAINT) {
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+	}
+	else {
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	}
+	ima->use_layers = true;
 
 	if (ibuf == NULL)  /* TODO: this should actually never happen, but does for render-results -> cleanup */
 		return OPERATOR_CANCELLED;
@@ -2116,34 +2255,17 @@ static int image_invert_exec(bContext *C, wmOperator *op)
 		ED_imapaint_clear_partial_redraw();
 		ED_imapaint_dirty_region(ima, ibuf, 0, 0, ibuf->x, ibuf->y);
 	}
-	/* TODO: make this into an IMB_invert_channels(ibuf,r,g,b,a) method!? */
-	if (ibuf->rect_float) {
-		
-		float *fp = (float *) ibuf->rect_float;
-		for (i = ibuf->x * ibuf->y; i > 0; i--, fp += 4) {
-			if (r) fp[0] = 1.0f - fp[0];
-			if (g) fp[1] = 1.0f - fp[1];
-			if (b) fp[2] = 1.0f - fp[2];
-			if (a) fp[3] = 1.0f - fp[3];
-		}
 
-		if (ibuf->rect) {
-			IMB_rect_from_float(ibuf);
+	IMB_invert_channels(ibuf, r, g, b, a);
+
+	if (sima->mode != SI_MODE_PAINT) {
+		ImageLayer *layer;
+		ImBuf *ibuf_l;
+
+		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+			ibuf_l = (ImBuf *)layer->ibufs.first;
+			IMB_invert_channels(ibuf_l, r, g, b, a);
 		}
-	}
-	else if (ibuf->rect) {
-		
-		char *cp = (char *) ibuf->rect;
-		for (i = ibuf->x * ibuf->y; i > 0; i--, cp += 4) {
-			if (r) cp[0] = 255 - cp[0];
-			if (g) cp[1] = 255 - cp[1];
-			if (b) cp[2] = 255 - cp[2];
-			if (a) cp[3] = 255 - cp[3];
-		}
-	}
-	else {
-		BKE_image_release_ibuf(ima, ibuf, NULL);
-		return OPERATOR_CANCELLED;
 	}
 
 	ibuf->userflags |= IB_BITMAPDIRTY | IB_DISPLAY_BUFFER_INVALID;
@@ -2175,7 +2297,7 @@ void IMAGE_OT_invert(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec = image_invert_exec;
-	ot->poll = image_invert_poll;
+	ot->poll = image_operator_poll;
 	
 	/* properties */
 	prop = RNA_def_boolean(ot->srna, "invert_r", 0, "Red", "Invert Red Channel");
@@ -2189,6 +2311,2632 @@ void IMAGE_OT_invert(wmOperatorType *ot)
 	
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
+static int image_invert_value_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	SpaceImage *sima = CTX_wm_space_image(C);
+	Image *ima = CTX_data_edit_image(C);
+	ImBuf *ibuf;
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	ima->use_layers = false;
+	if (sima->mode == SI_MODE_PAINT)
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+	else
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ima->use_layers = true;
+
+	if (ibuf == NULL)  /* TODO: this should actually never happen, but does for render-results -> cleanup */
+		return OPERATOR_CANCELLED;
+
+	IMB_invert_value(ibuf);
+	if (sima->mode != SI_MODE_PAINT) {
+		ImageLayer *layer;
+		ImBuf *ibuf_l;
+
+		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+			ibuf_l = (ImBuf *)layer->ibufs.first;
+			IMB_invert_value(ibuf_l);
+		}
+	}
+
+	ibuf->userflags |= IB_BITMAPDIRTY;
+
+	WM_event_add_notifier(C, NC_IMAGE | NA_EDITED, ima);
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+void IMAGE_OT_invert_value(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Invert Value";
+	ot->idname = "IMAGE_OT_invert_value";
+	ot->description = "Invert the brightness of each pixel";
+
+	/* api callbacks */
+	ot->exec = image_invert_value_exec;
+	ot->poll = image_operator_poll;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
+static int image_bright_contrast_exec(bContext *C, wmOperator *op)
+{
+	SpaceImage *sima = CTX_wm_space_image(C);
+	Image *ima = CTX_data_edit_image(C);
+	ImBuf *ibuf;
+	float bright, contrast;
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	ima->use_layers = false;
+	if (sima->mode == SI_MODE_PAINT)
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+	else
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ima->use_layers = true;
+
+	free_preview(ima, sima->mode);
+
+	bright = RNA_float_get(op->ptr, "bright");
+	contrast = RNA_float_get(op->ptr, "contrast");
+
+	if ((bright == 0.0f) && (contrast == 0.0f)) {
+		BKE_image_release_ibuf(ima, ibuf, NULL);
+		return OPERATOR_CANCELLED;
+	}
+
+	IMB_bright_contrast(ibuf, bright, contrast);
+	if (sima->mode != SI_MODE_PAINT) {
+		ImageLayer *layer;
+		ImBuf *ibuf_l;
+
+		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+			ibuf_l = (ImBuf *)layer->ibufs.first;
+			IMB_bright_contrast(ibuf_l, bright, contrast);
+		}
+	}
+
+	ibuf->userflags |= IB_BITMAPDIRTY;
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, ima);
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+static bool image_bright_contrast_check(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	SpaceImage *sima = CTX_wm_space_image(C);
+	ImageLayer *layer = NULL;
+	ImBuf *ibuf, *preview_ibuf;
+	float bright, contrast;
+
+	if (!ima)
+		return false;
+
+	ima->use_layers = false;
+	if (sima->mode == SI_MODE_PAINT)
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+	else
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ima->use_layers = true;
+
+	bright = RNA_float_get(op->ptr, "bright");
+	contrast = RNA_float_get(op->ptr, "contrast");
+
+	if (sima->mode == SI_MODE_PAINT) {
+		layer = imalayer_get_current(ima);
+		preview_ibuf = layer->preview_ibuf;
+	}
+	else {
+		preview_ibuf = ima->preview_ibuf;
+	}
+
+	if (preview_ibuf) {
+		IMB_freeImBuf(preview_ibuf);
+		preview_ibuf = NULL;
+	}
+
+	preview_ibuf = IMB_dupImBuf(ibuf);
+
+	IMB_bright_contrast(preview_ibuf, bright, contrast);
+
+	if (sima->mode == SI_MODE_PAINT)
+		layer->preview_ibuf = preview_ibuf;
+	else
+		ima->preview_ibuf = preview_ibuf;
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+	return true;
+}
+
+void IMAGE_OT_bright_contrast(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Bright Contrast";
+	ot->idname = "IMAGE_OT_bright_contrast";
+	ot->description = "Adjust brightness and contrast";
+
+	/* api callbacks */
+	ot->exec = image_bright_contrast_exec;
+	ot->poll = image_operator_poll;
+	ot->invoke = image_op_layer_invoke;
+	ot->check = image_bright_contrast_check;
+	ot->cancel = image_preview_cancel;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	RNA_def_float(ot->srna, "bright", 0.0f, -FLT_MAX, FLT_MAX, "Bright", "Bright", -100, 100);
+	RNA_def_float(ot->srna, "contrast", 0.0f, -FLT_MAX, FLT_MAX, "Contrast", "Contrast", -100, 100);
+}
+
+static int image_desaturate_exec(bContext *C, wmOperator *op)
+{
+	SpaceImage *sima = CTX_wm_space_image(C);
+	Image *ima = CTX_data_edit_image(C);
+	ImBuf *ibuf;
+	int type;
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	type = RNA_enum_get(op->ptr, "type");
+
+	ima->use_layers = false;
+	if (sima->mode == SI_MODE_PAINT)
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+	else
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ima->use_layers = true;
+
+	IMB_desaturate(ibuf, type);
+	if (sima->mode != SI_MODE_PAINT) {
+		ImageLayer *layer;
+		ImBuf *ibuf_l;
+
+		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+			ibuf_l = (ImBuf *)layer->ibufs.first;
+			IMB_desaturate(ibuf_l, type);
+		}
+	}
+
+	ibuf->userflags |= IB_BITMAPDIRTY;
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+void IMAGE_OT_desaturate(wmOperatorType *ot)
+{
+	static EnumPropertyItem slot_des[] = {
+		{1, "LIGHT", 0, "Lightness", ""},
+		{2, "LUM", 0, "Luminosity", ""},
+		{3, "AVG", 0, "Average", ""},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	/* identifiers */
+	ot->name = "Desaturate Image";
+	ot->idname = "IMAGE_OT_desaturate";
+	ot->description = "Desaturate the Image";
+
+	/* api callbacks */
+	ot->exec = image_desaturate_exec;
+	ot->poll = image_operator_poll;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_enum(ot->srna, "type", slot_des, 0, "Type", "");
+}
+
+static int image_posterize_exec(bContext *C, wmOperator *op)
+{
+	SpaceImage *sima = CTX_wm_space_image(C);
+	Image *ima = CTX_data_edit_image(C);
+	ImBuf *ibuf;
+	int levels;
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	levels = RNA_int_get(op->ptr, "levels");
+
+	ima->use_layers = false;
+	if (sima->mode == SI_MODE_PAINT)
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+	else
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ima->use_layers = true;
+
+	free_preview(ima, sima->mode);
+
+	IMB_posterize(ibuf, levels);
+	if (sima->mode != SI_MODE_PAINT) {
+		ImageLayer *layer;
+		ImBuf *ibuf_l;
+
+		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+			ibuf_l = (ImBuf *)layer->ibufs.first;
+			IMB_posterize(ibuf_l, levels);
+		}
+	}
+
+	ibuf->userflags |= IB_BITMAPDIRTY;
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+static bool image_posterize_check(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	SpaceImage *sima = CTX_wm_space_image(C);
+	ImageLayer *layer = NULL;
+	ImBuf *ibuf, *preview_ibuf;
+	int levels;
+
+	if (!ima)
+		return false;
+
+	ima->use_layers = false;
+	if (sima->mode == SI_MODE_PAINT)
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+	else
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ima->use_layers = true;
+
+	levels = RNA_int_get(op->ptr, "levels");
+
+	if (sima->mode == SI_MODE_PAINT) {
+		layer = imalayer_get_current(ima);
+		preview_ibuf = layer->preview_ibuf;
+	}
+	else {
+		preview_ibuf = ima->preview_ibuf;
+	}
+
+	if (preview_ibuf) {
+		IMB_freeImBuf(preview_ibuf);
+		preview_ibuf = NULL;
+	}
+
+	preview_ibuf = IMB_dupImBuf(ibuf);
+
+	IMB_posterize(preview_ibuf, levels);
+
+	if (sima->mode == SI_MODE_PAINT)
+		layer->preview_ibuf = preview_ibuf;
+	else
+		ima->preview_ibuf = preview_ibuf;
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+	return true;
+}
+
+void IMAGE_OT_posterize(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Posterize Image";
+	ot->idname = "IMAGE_OT_posterize";
+	ot->description = "Posterize the Image";
+
+	/* api callbacks */
+	ot->exec = image_posterize_exec;
+	ot->poll = image_operator_poll;
+	ot->invoke = image_op_layer_invoke;
+	ot->check = image_posterize_check;
+	ot->cancel = image_preview_cancel;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_int(ot->srna, "levels", 256, 2, 256, "Levels", "Posterize Levels", 2, 256);
+}
+
+static int image_threshold_exec(bContext *C, wmOperator *op)
+{
+	SpaceImage *sima = CTX_wm_space_image(C);
+	Image *ima = CTX_data_edit_image(C);
+	ImBuf *ibuf;
+	int low, high;
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	low = RNA_int_get(op->ptr, "low");
+	high = RNA_int_get(op->ptr, "high");
+
+	ima->use_layers = false;
+	if (sima->mode == SI_MODE_PAINT)
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+	else
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ima->use_layers = true;
+
+	free_preview(ima, sima->mode);
+
+	IMB_threshold(ibuf, low, high);
+	if (sima->mode != SI_MODE_PAINT) {
+		ImageLayer *layer;
+		ImBuf *ibuf_l;
+
+		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+			ibuf_l = (ImBuf *)layer->ibufs.first;
+			IMB_threshold(ibuf_l, low, high);
+		}
+	}
+
+	ibuf->userflags |= IB_BITMAPDIRTY;
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+static bool image_threshold_check(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	SpaceImage *sima = CTX_wm_space_image(C);
+	ImageLayer *layer = NULL;
+	ImBuf *ibuf, *preview_ibuf;
+	int low, high;
+
+	if (!ima)
+		return false;
+
+	ima->use_layers = false;
+	if (sima->mode == SI_MODE_PAINT)
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+	else
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ima->use_layers = true;
+
+	low = RNA_int_get(op->ptr, "low");
+	high = RNA_int_get(op->ptr, "high");
+
+	if (sima->mode == SI_MODE_PAINT) {
+		layer = imalayer_get_current(ima);
+		preview_ibuf = layer->preview_ibuf;
+	}
+	else {
+		preview_ibuf = ima->preview_ibuf;
+	}
+
+	if (preview_ibuf) {
+		IMB_freeImBuf(preview_ibuf);
+		preview_ibuf = NULL;
+	}
+
+	preview_ibuf = IMB_dupImBuf(ibuf);
+
+	IMB_threshold(preview_ibuf, low, high);
+
+	if (sima->mode == SI_MODE_PAINT)
+		layer->preview_ibuf = preview_ibuf;
+	else
+		ima->preview_ibuf = preview_ibuf;
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+	return true;
+}
+
+void IMAGE_OT_threshold(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Threshold Image";
+	ot->idname = "IMAGE_OT_threshold";
+	ot->description = "Reduce Image to two colours using a threshold";
+
+	/* api callbacks */
+	ot->exec = image_threshold_exec;
+	ot->poll = image_operator_poll;
+	ot->invoke = image_op_layer_invoke;
+	ot->check = image_threshold_check;
+	ot->cancel = image_preview_cancel;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_int(ot->srna, "low", 127, 0, 255, "Low", "Threshold", 0, 255);
+	RNA_def_int(ot->srna, "high", 255, 0, 255, "High", "Threshold", 0, 255);
+}
+
+static int image_exposure_exec(bContext *C, wmOperator *op)
+{
+	SpaceImage *sima = CTX_wm_space_image(C);
+	Image *ima = CTX_data_edit_image(C);
+	ImBuf *ibuf;
+	float exposure, offset, gamma;
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	ima->use_layers = false;
+	if (sima->mode == SI_MODE_PAINT)
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+	else
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ima->use_layers = true;
+
+	free_preview(ima, sima->mode);
+
+	exposure = RNA_float_get(op->ptr, "exposure");
+	offset = RNA_float_get(op->ptr, "offset");
+	gamma = RNA_float_get(op->ptr, "gamma");
+
+	if ((exposure == 0.0f) && (offset == 0.0f) && (gamma == 1.0f)) {
+		BKE_image_release_ibuf(ima, ibuf, NULL);
+		return OPERATOR_CANCELLED;
+	}
+
+	IMB_exposure(ibuf, exposure, offset, gamma);
+	if (sima->mode != SI_MODE_PAINT) {
+		ImageLayer *layer;
+		ImBuf *ibuf_l;
+
+		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+			ibuf_l = (ImBuf *)layer->ibufs.first;
+			IMB_exposure(ibuf_l, exposure, offset, gamma);
+		}
+	}
+
+	ibuf->userflags |= IB_BITMAPDIRTY;
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, ima);
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+static bool image_exposure_check(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	SpaceImage *sima = CTX_wm_space_image(C);
+	ImageLayer *layer = NULL;
+	ImBuf *ibuf, *preview_ibuf;
+	float exposure, offset, gamma;
+
+	if (!ima)
+		return false;
+
+	ima->use_layers = false;
+	if (sima->mode == SI_MODE_PAINT)
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+	else
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ima->use_layers = true;
+
+	exposure = RNA_float_get(op->ptr, "exposure");
+	offset = RNA_float_get(op->ptr, "offset");
+	gamma = RNA_float_get(op->ptr, "gamma");
+
+	if (sima->mode == SI_MODE_PAINT) {
+		layer = imalayer_get_current(ima);
+		preview_ibuf = layer->preview_ibuf;
+	}
+	else {
+		preview_ibuf = ima->preview_ibuf;
+	}
+
+	if (preview_ibuf) {
+		IMB_freeImBuf(preview_ibuf);
+		preview_ibuf = NULL;
+	}
+
+	preview_ibuf = IMB_dupImBuf(ibuf);
+
+	IMB_exposure(preview_ibuf, exposure, offset, gamma);
+
+	if (sima->mode == SI_MODE_PAINT)
+		layer->preview_ibuf = preview_ibuf;
+	else
+		ima->preview_ibuf = preview_ibuf;
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+	return true;
+}
+
+void IMAGE_OT_exposure(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Exposure";
+	ot->idname = "IMAGE_OT_exposure";
+	ot->description = "Exposure the Image";
+
+	/* api callbacks */
+	ot->exec = image_exposure_exec;
+	ot->poll = image_operator_poll;
+	ot->invoke = image_op_layer_invoke;
+	ot->check = image_exposure_check;
+	ot->cancel = image_preview_cancel;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	RNA_def_float(ot->srna, "exposure", 0.0f, -20.0f, 20.0f, "Exposure", "Exposure", -20.0f, 20.0f);
+	RNA_def_float(ot->srna, "offset", 0.0f, -0.5f, 0.5f, "Offset", "Offset", -0.5f, 0.5f);
+	RNA_def_float(ot->srna, "gamma", 1.0f, 0.01f, 9.99f, "Gamma", "Gamma", 0.01f, 9.99f);
+}
+
+static int image_colorize_exec(bContext *C, wmOperator *op)
+{
+	SpaceImage *sima = CTX_wm_space_image(C);
+	Image *ima = CTX_data_edit_image(C);
+	ImBuf *ibuf;
+	int hue, saturation, lightness;
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	hue = RNA_int_get(op->ptr, "hue");
+	saturation = RNA_int_get(op->ptr, "saturation");
+	lightness = RNA_int_get(op->ptr, "lightness");
+
+	ima->use_layers = false;
+	if (sima->mode == SI_MODE_PAINT)
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+	else
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ima->use_layers = true;
+
+	free_preview(ima, sima->mode);
+
+	IMB_colorize(ibuf, hue, saturation, lightness);
+	if (sima->mode != SI_MODE_PAINT) {
+		ImageLayer *layer;
+		ImBuf *ibuf_l;
+
+		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+			ibuf_l = (ImBuf *)layer->ibufs.first;
+			IMB_colorize(ibuf_l, hue, saturation, lightness);
+		}
+	}
+
+	ibuf->userflags |= IB_BITMAPDIRTY;
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+static bool image_colorize_check(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	SpaceImage *sima = CTX_wm_space_image(C);
+	ImageLayer *layer = NULL;
+	ImBuf *ibuf, *preview_ibuf;
+	int hue, saturation, lightness;
+
+	if (!ima)
+		return false;
+
+	ima->use_layers = false;
+	if (sima->mode == SI_MODE_PAINT)
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+	else
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ima->use_layers = true;
+
+	hue = RNA_int_get(op->ptr, "hue");
+	saturation = RNA_int_get(op->ptr, "saturation");
+	lightness = RNA_int_get(op->ptr, "lightness");
+
+	if (sima->mode == SI_MODE_PAINT) {
+		layer = imalayer_get_current(ima);
+		preview_ibuf = layer->preview_ibuf;
+	}
+	else {
+		preview_ibuf = ima->preview_ibuf;
+	}
+
+	if (preview_ibuf) {
+		IMB_freeImBuf(preview_ibuf);
+		preview_ibuf = NULL;
+	}
+
+	preview_ibuf = IMB_dupImBuf(ibuf);
+
+	IMB_colorize(preview_ibuf, hue, saturation, lightness);
+
+	if (sima->mode == SI_MODE_PAINT)
+		layer->preview_ibuf = preview_ibuf;
+	else
+		ima->preview_ibuf = preview_ibuf;
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+	return true;
+}
+
+void IMAGE_OT_colorize(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Colorize Image";
+	ot->idname = "IMAGE_OT_colorize";
+	ot->description = "Colorize the Image";
+
+	/* api callbacks */
+	ot->exec = image_colorize_exec;
+	ot->poll = image_operator_poll;
+	ot->invoke = image_op_layer_invoke;
+	ot->check = image_colorize_check;
+	ot->cancel = image_preview_cancel;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_int(ot->srna, "hue", 180, 0, 360, "Hue", "Hue", 0, 360);
+	RNA_def_int(ot->srna, "saturation", 50, 0, 100, "Saturation", "Saturation", 0, 100);
+	RNA_def_int(ot->srna, "lightness", 0, -100, 100, "Lightness", "Lightness", -100, 100);
+}
+
+/********************* Color Space Operators *********************/
+
+static int image_grayscale_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	ImageLayer *layer;
+	Image *ima = CTX_data_edit_image(C);
+	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+
+	if (ibuf == NULL)
+		return OPERATOR_CANCELLED;
+
+	if ((!ibuf->rect_float) && (!ibuf->rect)) {
+		BKE_image_release_ibuf(ima, ibuf, NULL);
+		return OPERATOR_CANCELLED;
+	}
+
+	ima->color_space = IMA_COL_GRAY;
+	IMB_color_to_bw(ibuf);
+
+	for (layer = (ImageLayer *)ima->imlayers.first; layer; layer = layer->next) {
+		IMB_color_to_bw((ImBuf *)layer->ibufs.first);
+	}
+
+	ibuf->userflags |= IB_BITMAPDIRTY;
+	if (ibuf->mipmap[0])
+		ibuf->userflags |= IB_MIPMAP_INVALID;
+
+	WM_event_add_notifier(C, NC_IMAGE | NA_EDITED, ima);
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+	return OPERATOR_FINISHED;
+}
+
+void IMAGE_OT_color_space_grayscale(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "GrayScale";
+	ot->idname = "IMAGE_OT_color_space_grayscale";
+	ot->description = "Convert the image to GrayScale";
+
+	/* api callbacks */
+	ot->exec = image_grayscale_exec;
+	ot->poll = image_operator_poll;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER;
+}
+
+static int image_rgb_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	Image *ima = CTX_data_edit_image(C);
+
+	ima->color_space = IMA_COL_RGB;
+
+	return OPERATOR_FINISHED;
+}
+
+void IMAGE_OT_color_space_rgb(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "RGB";
+	ot->idname = "IMAGE_OT_color_space_rgb";
+	ot->description = "Convert the image to the RGB";
+
+	/* api callbacks */
+	ot->exec = image_rgb_exec;
+	ot->poll = image_operator_poll;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER;
+}
+
+/************************* New Image Operators ************************/
+
+static int image_duplicate_exec(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	Image *new_ima;
+	ImageLayer *layer, *dup;
+	ImBuf *ibuf;
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	new_ima = BKE_image_copy(G.main, ima);
+
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	//BLI_addtail(&new_ima->ibufs, IMB_dupImBuf(ibuf));
+	new_ima->Act_Layers = ima->Act_Layers;
+	new_ima->num_layers = ima->num_layers;
+	new_ima->use_layers = ima->use_layers;
+	new_ima->color_space = ima->color_space;
+
+	layer = (ImageLayer *)ima->imlayers.first;
+	new_ima->imlayers.first = new_ima->imlayers.last = NULL;
+
+	while (layer) {
+		dup = image_duplicate_layer(ima, layer);
+		BLI_addtail(&new_ima->imlayers, dup);
+
+		layer = layer->next;
+	}
+
+	BKE_report(op->reports, RPT_INFO, "Duplicate Image");
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, ima);
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+void IMAGE_OT_duplicate(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Duplicate";
+	ot->idname = "IMAGE_OT_duplicate";
+	ot->description = "Duplicate the Image";
+
+	/* api callbacks */
+	ot->exec = image_duplicate_exec;
+	ot->poll = image_operator_poll;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
+static int image_flip_exec(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImBuf *ibuf;
+	ImageLayer *layer;
+	int type;
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	ima->use_layers = false;
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ima->use_layers = true;
+
+	type = RNA_enum_get(op->ptr, "type");
+
+	if (type == 1) { /* Flip Horizontally */
+		IMB_flipx(ibuf);
+		for (layer = ima->imlayers.first; layer; layer = layer->next)
+			IMB_flipx((ImBuf *)layer->ibufs.first);
+	}
+	else if (type == 2) { /* Flip Vertically */
+		IMB_flipy(ibuf);
+		for (layer = ima->imlayers.first; layer; layer = layer->next)
+			IMB_flipy((ImBuf *)layer->ibufs.first);
+	}
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+void IMAGE_OT_flip(wmOperatorType *ot)
+{
+	static EnumPropertyItem slot_flip[] = {
+		{1, "FLIP_H", 0, "Horizontally", ""},
+		{2, "FLIP_V", 0, "Vertically", ""},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	/* identifiers */
+	ot->name = "Flip";
+	ot->idname = "IMAGE_OT_flip";
+	ot->description = "Flip the Image";
+
+	/* api callbacks */
+	ot->exec = image_flip_exec;
+	ot->poll = image_operator_poll;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_enum(ot->srna, "type", slot_flip, 0, "Type", "");
+}
+
+static int image_rotate_exec(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImageLayer *layer;
+	ImBuf *ibuf, *ibuf_l;
+	int type;
+	static float col[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	type = RNA_enum_get(op->ptr, "type");
+
+	ima->use_layers = false;
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ima->use_layers = true;
+
+	if (type == 1) { /* ROT_90 */
+		ibuf = IMB_rotation(ibuf, 0.0, 0.0, DEG2RADF(-90.0), 2, 0, col);
+		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+			ibuf_l = (ImBuf *)layer->ibufs.first;
+			layer->ibufs.first = NULL;
+			layer->ibufs.last = NULL;
+			BLI_addtail(&layer->ibufs, IMB_rotation(ibuf_l, 0.0, 0.0, DEG2RADF(-90.0), 2, 0, col));
+		}
+	}
+	else if (type == 2) { /* ROT_90A */
+		ibuf = IMB_rotation(ibuf, 0.0, 0.0, DEG2RADF(90.0), 2, 0, col);
+		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+			ibuf_l = (ImBuf *)layer->ibufs.first;
+			layer->ibufs.first = NULL;
+			layer->ibufs.last = NULL;
+			BLI_addtail(&layer->ibufs, IMB_rotation(ibuf_l, 0.0, 0.0, DEG2RADF(90.0), 2, 0, col));
+		}
+	}
+	else if (type == 3) { /* ROT_180 */
+		ibuf = IMB_rotation(ibuf, 0.0, 0.0, DEG2RADF(180.0), 2, 0, col);
+		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+			ibuf_l = (ImBuf *)layer->ibufs.first;
+			layer->ibufs.first = NULL;
+			layer->ibufs.last = NULL;
+			BLI_addtail(&layer->ibufs, IMB_rotation(ibuf_l, 0.0, 0.0, DEG2RADF(180.0), 2, 0, col));
+		}
+	}
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+void IMAGE_OT_rotate(wmOperatorType *ot)
+{
+	static EnumPropertyItem slot_rot[] = {
+		{1, "ROT_90", 0, "Rotate 90 clockwise", ""},
+		{2, "ROT_90A", 0, "Rotate 90 anti-clockwise", ""},
+		{3, "ROT_180", 0, "Rotate 180", ""},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	/* identifiers */
+	ot->name = "Rotating Image";
+	ot->idname = "IMAGE_OT_rotate";
+	ot->description = "Rotate the Image";
+
+	/* api callbacks */
+	ot->exec = image_rotate_exec;
+	ot->poll = image_operator_poll;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_enum(ot->srna, "type", slot_rot, 0, "Type", "");
+}
+
+static int image_arbitrary_rot_exec(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImageLayer *layer;
+	ImBuf *ibuf, *ibuf_l;
+	float angle;
+	float col[4];
+	short type;
+	int lock;
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	ima->use_layers = false;
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ima->use_layers = true;
+
+	if (ima->preview_ibuf) {
+		IMB_freeImBuf(ima->preview_ibuf);
+		ima->preview_ibuf = NULL;
+	}
+
+	type = RNA_enum_get(op->ptr, "type");
+	angle = RNA_float_get(op->ptr, "angle");
+	lock = RNA_boolean_get(op->ptr, "lock_size");
+
+	imagelayer_get_background_color(col, (ImageLayer*)ima->imlayers.last);
+
+	angle = angle * (-1);
+
+	ibuf = IMB_rotation(ibuf, 0.0, 0.0, angle, type, lock, col);
+	for (layer = ima->imlayers.first; layer; layer = layer->next) {
+		ibuf_l = (ImBuf *)layer->ibufs.first;
+		layer->ibufs.first = NULL;
+		layer->ibufs.last = NULL;
+		BLI_addtail(&layer->ibufs, IMB_rotation(ibuf_l, 0.0, 0.0, angle, type, lock, col));
+	}
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+static bool image_arbitrary_rot_check(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImBuf *ibuf;
+	float col[4];
+	float angle;
+	short type;
+	int lock;
+
+	if (!ima)
+		return false;
+
+	ima->use_layers = false;
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ima->use_layers = true;
+
+	type = RNA_enum_get(op->ptr, "type");
+	angle = RNA_float_get(op->ptr, "angle");
+	lock = RNA_boolean_get(op->ptr, "lock_size");
+	imagelayer_get_background_color(col, (ImageLayer*)ima->imlayers.last);
+
+	angle = angle * (-1);
+
+	if (ima->preview_ibuf) {
+		IMB_freeImBuf(ima->preview_ibuf);
+		ima->preview_ibuf = NULL;
+	}
+
+	ima->preview_ibuf = IMB_dupImBuf(ibuf);
+
+	ima->preview_ibuf = IMB_rotation(ima->preview_ibuf, 0.0, 0.0, angle, type, lock, col);
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+	return true;
+}
+
+void IMAGE_OT_arbitrary_rot(wmOperatorType *ot)
+{
+	PropertyRNA *prop;
+
+	static EnumPropertyItem rotate_items[] = {
+		{0, "NEAREST", 0, "Nearest", ""},
+		{1, "BILINEAR", 0, "Bilinear", ""},
+		{2, "BICUBIC", 0, "Bicubic", ""},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	/* identifiers */
+	ot->name = "Arbitrary Rotating Image";
+	ot->idname = "IMAGE_OT_arbitrary_rot";
+	ot->description = "Arbitrary Rotate the Imager";
+
+	/* api callbacks */
+	ot->exec = image_arbitrary_rot_exec;
+	ot->poll = image_operator_poll;
+	ot->invoke = image_op_layer_invoke;
+	ot->check = image_arbitrary_rot_check;
+	ot->cancel = image_preview_cancel;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_enum(ot->srna, "type", rotate_items, 0, "Type", "");
+	RNA_def_boolean(ot->srna, "lock_size", 1, "Lock size", "Lock size");
+	prop = RNA_def_float_rotation(ot->srna, "angle", 0, NULL, DEG2RADF(-180.0f), DEG2RADF(180.0f),
+								  "Angle", "Angle of rotation", DEG2RADF(-180.0f), DEG2RADF(180.0f));
+	RNA_def_property_float_default(prop, DEG2RADF(0.0f));
+}
+
+static int image_offset_exec(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImageLayer *layer;
+	struct ImBuf *ibuf, *ibuf_l;
+	int x, y, half, wrap;
+	float col[4];
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	ima->use_layers = false;
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ima->use_layers = true;
+
+	if (ima->preview_ibuf) {
+		IMB_freeImBuf(ima->preview_ibuf);
+		ima->preview_ibuf = NULL;
+	}
+
+	x = RNA_int_get(op->ptr, "off_x");
+	y = RNA_int_get(op->ptr, "off_y");
+	half = RNA_boolean_get(op->ptr, "half");
+	wrap = RNA_boolean_get(op->ptr, "wrap");
+
+	if (abs(x) > ibuf->x) {
+		BKE_report(op->reports, RPT_WARNING, "The offset can not be larger than the image.");
+		return OPERATOR_CANCELLED;
+	}
+
+	if (abs(y) > ibuf->y) {
+		BKE_report(op->reports, RPT_WARNING, "The offset can not be larger than the image.");
+		return OPERATOR_CANCELLED;
+	}
+
+	if (!wrap) {
+		imagelayer_get_background_color(col, (ImageLayer*)ima->imlayers.last);
+	}
+
+	ibuf = IMB_offset(ibuf, x, y, half, wrap, col);
+	for (layer = ima->imlayers.first; layer; layer = layer->next) {
+		ibuf_l = (ImBuf *)layer->ibufs.first;
+		layer->ibufs.first = NULL;
+		layer->ibufs.last = NULL;
+		BLI_addtail(&layer->ibufs, IMB_offset(ibuf_l, x, y, half, wrap, col));
+	}
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+static bool image_offset_check(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImBuf *ibuf;
+	float col[4];
+	int x, y, half, wrap;
+
+	if (!ima)
+		return false;
+
+	ima->use_layers = false;
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ima->use_layers = true;
+
+	x = RNA_int_get(op->ptr, "off_x");
+	y = RNA_int_get(op->ptr, "off_y");
+	half = RNA_boolean_get(op->ptr, "half");
+	wrap = RNA_boolean_get(op->ptr, "wrap");
+
+	if (abs(x) > ibuf->x) {
+		if (x > 0)
+			x = ibuf->x;
+		else
+			x = - ibuf->x;
+	}
+
+	if (abs(y) > ibuf->y) {
+		if (y > 0)
+			y = ibuf->y;
+		else
+			y = - ibuf->y;
+	}
+
+	if (!wrap) {
+		imagelayer_get_background_color(col, (ImageLayer*)ima->imlayers.last);
+	}
+
+	if (ima->preview_ibuf) {
+		IMB_freeImBuf(ima->preview_ibuf);
+		ima->preview_ibuf = NULL;
+	}
+
+	ima->preview_ibuf = IMB_dupImBuf(ibuf);
+
+	ima->preview_ibuf = IMB_offset(ima->preview_ibuf, x, y, half, wrap, col);
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+	return true;
+}
+
+void IMAGE_OT_offset(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Offset";
+	ot->idname = "IMAGE_OT_offset";
+	ot->description = "Shift the pixels";
+
+	/* api callbacks */
+	ot->exec = image_offset_exec;
+	ot->poll = image_operator_poll;
+	ot->invoke = image_op_layer_invoke;
+	ot->check = image_offset_check;
+	ot->cancel = image_preview_cancel;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_int(ot->srna, "off_x", 0, INT_MIN, INT_MAX, "X", "Offset X", -16384, 16384);
+	RNA_def_int(ot->srna, "off_y", 0, INT_MIN, INT_MAX, "Y", "Offset Y", -16384, 16384);
+	RNA_def_boolean(ot->srna, "half", 0, "Offset by x/2 y/2", "Offset by x/2 y/2");
+	RNA_def_boolean(ot->srna, "wrap", 1, "Wrap around", "Wrap around");
+}
+
+static int image_scale_exec(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImageLayer *layer;
+	struct ImBuf *ibuf, *ibuf_l;
+	int width, height, proportions;
+	float props;
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	ima->use_layers = false;
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ima->use_layers = true;
+
+	width = RNA_int_get(op->ptr, "width");
+	height = RNA_int_get(op->ptr, "height");
+	proportions = RNA_boolean_get(op->ptr, "proportions");
+
+	if ((width == 0) && (height == 0))
+		return OPERATOR_CANCELLED;
+
+	if (proportions) {
+		if ((width != 0) && (height != 0)) {
+			BKE_report(op->reports, RPT_WARNING, "If you want to keep the proportions, the height or width must be 0.");
+			return OPERATOR_CANCELLED;
+		}
+
+		if ((width == 0) || (height == 0)) {
+			if (width == 0) {
+				props = (float)ibuf->y / ibuf->x;
+				width = (int)floor((float)height / props);
+			}
+			else {
+				props = (float)ibuf->x / ibuf->y;
+				height = (int)floor((float)width / props);
+			}
+		}
+	}
+
+	IMB_scaleImBuf(ibuf, width, height);
+	for (layer = ima->imlayers.first; layer; layer = layer->next) {
+		ibuf_l = (ImBuf *)layer->ibufs.first;
+		layer->ibufs.first = NULL;
+		layer->ibufs.last = NULL;
+		BLI_addtail(&layer->ibufs, IMB_scaleImBuf(ibuf_l, width, height));
+	}
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+void IMAGE_OT_scale(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Scale";
+	ot->idname = "IMAGE_OT_scale";
+	ot->description = "Scale the Image";
+
+	/* api callbacks */
+	ot->exec = image_scale_exec;
+	ot->poll = image_operator_poll;
+	ot->invoke = image_op_layer_invoke;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_int(ot->srna, "width", 0, 0, INT_MAX, "Width", "Width", 0, 16384);
+	RNA_def_int(ot->srna, "height", 0, 0, INT_MAX, "Height", "Height", 0, 16384);
+	RNA_def_boolean(ot->srna, "proportions", 1, "Keep Proportions", "Keep proportions");
+}
+
+static int image_merge_exec(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImageLayer *layer, *prec;
+	int flag = 0;
+	int discard;
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	discard = RNA_boolean_get(op->ptr, "discard");
+
+	for (layer = (ImageLayer *)ima->imlayers.first; layer; layer = layer->next) {
+		if (layer->visible & IMA_LAYER_VISIBLE) {
+			flag = 1;
+			break;
+		}
+	}
+	if (flag == 1) {
+		prec = NULL;
+		for (layer = (ImageLayer *)ima->imlayers.first; layer; layer = layer->next) {
+			if (layer->visible & IMA_LAYER_VISIBLE) {
+				if (prec == NULL) {
+					prec = layer;
+				}
+				else {
+					layer = merge_layers(ima, prec, layer);
+					ima->num_layers--;
+					prec = layer;
+				}
+
+			}
+			else {
+				if (discard) {
+					BLI_remlink(&ima->imlayers, layer);
+					free_image_layer(layer);
+					if (ima->imlayers.first) {
+						if (imalayer_get_current_act(ima) != 1)
+							imalayer_set_current_act(ima, imalayer_get_current_act(ima));
+						else
+							imalayer_set_current_act(ima, imalayer_get_current_act(ima) - 1);
+					}
+					ima->num_layers -= 1;
+				}
+			}
+		}
+		if (discard)
+			ima->Act_Layers = 0;
+		else
+			ima->Act_Layers = ima->num_layers -1;
+		imalayer_set_current_act(ima, ima->Act_Layers);
+	}
+	else
+		BKE_report(op->reports, RPT_INFO, "It can not merge the layers, because the layers are hidden");
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+void IMAGE_OT_merge(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Merge Layer";
+	ot->idname = "IMAGE_OT_merge";
+	ot->description = "";
+
+	/* api callbacks */
+	ot->exec = image_merge_exec;
+	ot->poll = image_operator_poll;
+	ot->invoke = image_op_layer_invoke;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_boolean(ot->srna, "discard", 0, "Del invisible layers", "Discard invisible layers");
+}
+
+static int image_flatten_exec(bContext *C, wmOperator *op)
+{
+	SpaceImage *sima = CTX_wm_space_image(C);
+	Image *ima = CTX_data_edit_image(C);
+	ImageLayer *layer, *prec;
+	ImBuf *ibuf;
+	float col[4];
+	int flag = 0;
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	for (layer = (ImageLayer *)ima->imlayers.first; layer; layer = layer->next) {
+		if (layer->visible & IMA_LAYER_VISIBLE) {
+			flag = 1;
+			break;
+		}
+	}
+	if (flag == 1) {
+		prec = NULL;
+		for (layer = (ImageLayer *)ima->imlayers.first; layer; layer = layer->next) {
+			if (layer->visible & IMA_LAYER_VISIBLE) {
+				if (prec == NULL) {
+					prec = layer;
+				}
+				else {
+					layer = merge_layers(ima, prec, layer);
+					ima->num_layers--;
+					prec = layer;
+				}
+
+			}
+			else {
+				BLI_remlink(&ima->imlayers, layer);
+				free_image_layer(layer);
+				if (ima->imlayers.first) {
+					if (imalayer_get_current_act(ima) != 1)
+						imalayer_set_current_act(ima, imalayer_get_current_act(ima));
+					else
+						imalayer_set_current_act(ima, imalayer_get_current_act(ima) - 1);
+				}
+				ima->num_layers -= 1;
+			}
+		}
+
+		ima->Act_Layers = 0;
+		imalayer_set_current_act(ima, ima->Act_Layers);
+
+		imagelayer_get_background_color(col, prec);
+
+		ima->use_layers = false;
+		if (sima->mode == SI_MODE_PAINT)
+			ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+		else
+			ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+		ima->use_layers = true;
+
+		if (ibuf->rect)
+			IMB_alpha_under_color_byte((unsigned char *)ibuf->rect, ibuf->x, ibuf->y, col);
+		else if (ibuf->rect_float)
+			IMB_alpha_under_color_float(ibuf->rect_float, ibuf->x, ibuf->y, col);
+		if (sima->mode != SI_MODE_PAINT) {
+			ImBuf *ibuf_l;
+
+			ibuf_l = (ImBuf *)prec->ibufs.first;
+			if (ibuf_l->rect)
+				IMB_alpha_under_color_byte((unsigned char *)ibuf_l->rect, ibuf_l->x, ibuf_l->y, col);
+			else if (ibuf_l->rect_float)
+				IMB_alpha_under_color_float(ibuf_l->rect_float, ibuf_l->x, ibuf_l->y, col);
+		}
+
+		ibuf->userflags |= IB_BITMAPDIRTY;
+		BKE_image_release_ibuf(ima, ibuf, NULL);
+	}
+	else
+		BKE_report(op->reports, RPT_INFO, "It can not merge the layers, because the layers are hidden");
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, ima);
+	return OPERATOR_FINISHED;
+}
+
+void IMAGE_OT_flatten(wmOperatorType *ot)
+{
+
+	/* identifiers */
+	ot->name = "Flatten Image";
+	ot->idname = "IMAGE_OT_flatten";
+	ot->description = "";
+
+	/* api callbacks */
+	ot->exec = image_flatten_exec;
+	ot->poll = image_operator_poll;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
+/********************** New Image Layer Operators *********************/
+
+static int image_layer_poll(bContext *C)
+{
+	SpaceImage *sima = CTX_wm_space_image(C);
+	if (sima)
+		return ED_space_image_show_paint(sima);
+	else
+		return 0;
+}
+
+static void image_layer_preview_cancel(bContext *C, wmOperator *UNUSED(op))
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImageLayer *layer;
+
+	layer = imalayer_get_current(ima);
+	if (layer) {
+		if (layer->preview_ibuf) {
+			IMB_freeImBuf(layer->preview_ibuf);
+			layer->preview_ibuf = NULL;
+			WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
+		}
+	}
+}
+
+static int image_layer_add_exec(bContext *C, wmOperator *op)
+{
+	char name[22];
+	float color[4];
+	int alpha, order;
+	Scene *scene;
+	Image *ima = CTX_data_edit_image(C);
+	ImageLayer *iml;
+
+	scene = (Scene*)CTX_data_scene(C);
+
+	if (strcmp(op->idname, "IMAGE_OT_layer_add_default") != 0) {
+		RNA_string_get(op->ptr, "name", name);
+		RNA_float_get_array(op->ptr, "color", color);
+		alpha = RNA_boolean_get(op->ptr, "alpha");
+	}
+	else {
+		strcpy(name, "Layer");
+		zero_v4(color);
+		alpha = 1;
+	}
+
+	order = 2;
+	if (strcmp(op->idname, "IMAGE_OT_layer_add_above") == 0)
+		order = 1;
+	else if (strcmp(op->idname, "IMAGE_OT_layer_add_below") == 0)
+		order = -1;
+
+	if (scene->r.color_mgt_flag & R_COLOR_MANAGEMENT)
+		linearrgb_to_srgb_v3_v3(color, color);
+
+	if (!alpha)
+		color[3] = 1.0f;
+
+	iml = image_add_image_layer(ima, name, alpha ? 32 : 24, color, order);
+
+	if (!iml)
+		return OPERATOR_CANCELLED;
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, ima);
+
+	return OPERATOR_FINISHED;
+}
+
+void IMAGE_OT_layer_add(wmOperatorType *ot)
+{
+	PropertyRNA *prop;
+	static float default_color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+
+	/* identifiers */
+	ot->name = "New Layer";
+	ot->idname = "IMAGE_OT_layer_add";
+	ot->description = "Add a new image layer";
+
+	/* api callbacks */
+	ot->exec = image_layer_add_exec;
+	ot->poll = image_layer_poll;
+	ot->invoke = image_new_invoke;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_string(ot->srna, "name", "Layer", 21, "Name", "Layer name");
+	prop = RNA_def_float_color(ot->srna, "color", 4, NULL, 0.0f, FLT_MAX, "Fill Color", "Color used to fill the layer", 0.0f, 1.0f);
+	RNA_def_property_float_array_default(prop, default_color);
+	RNA_def_boolean(ot->srna, "alpha", 1, "Alpha", "Create an image with an alpha channel");
+}
+
+void IMAGE_OT_layer_add_above(wmOperatorType *ot)
+{
+	PropertyRNA *prop;
+	static float default_color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+
+	/* identifiers */
+	ot->name = "Above active layer";
+	ot->idname = "IMAGE_OT_layer_add_above";
+	ot->description = "Add a new image layer";
+
+	/* api callbacks */
+	ot->exec = image_layer_add_exec;
+	ot->poll = image_layer_poll;
+	ot->invoke = image_new_invoke;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER|OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_string(ot->srna, "name", "Layer", 21, "Name", "Layer name");
+	prop = RNA_def_float_color(ot->srna, "color", 4, NULL, 0.0f, FLT_MAX, "Fill Color", "Color used to fill the layer", 0.0f, 1.0f);
+	RNA_def_property_float_array_default(prop, default_color);
+	RNA_def_boolean(ot->srna, "alpha", 1, "Alpha", "Create an image with an alpha channel");
+}
+
+void IMAGE_OT_layer_add_below(wmOperatorType *ot)
+{
+	PropertyRNA *prop;
+	static float default_color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+
+	/* identifiers */
+	ot->name = "Below active layer";
+	ot->idname = "IMAGE_OT_layer_add_below";
+	ot->description = "Add a new image layer";
+
+	/* api callbacks */
+	ot->exec = image_layer_add_exec;
+	ot->poll = image_layer_poll;
+	ot->invoke = image_new_invoke;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_string(ot->srna, "name", "Layer", 21, "Name", "Layer name");
+	prop = RNA_def_float_color(ot->srna, "color", 4, NULL, 0.0f, FLT_MAX, "Fill Color", "Color used to fill the layer", 0.0f, 1.0f);
+	RNA_def_property_float_array_default(prop, default_color);
+	RNA_def_boolean(ot->srna, "alpha", 1, "Alpha", "Create an image with an alpha channel");
+}
+
+void IMAGE_OT_layer_add_default(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Default layer";
+	ot->idname = "IMAGE_OT_layer_add_default";
+	ot->description = "Add a new image layer";
+
+	/* api callbacks */
+	ot->exec = image_layer_add_exec;
+	ot->poll = image_layer_poll;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
+static int image_layer_duplicate_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImageLayer *iml;
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	iml = image_duplicate_current_image_layer(ima);
+
+	if (!iml)
+		return OPERATOR_CANCELLED;
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, ima);
+
+	return OPERATOR_FINISHED;
+}
+
+void IMAGE_OT_layer_duplicate(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Duplicate Layer";
+	ot->idname = "IMAGE_OT_layer_duplicate";
+	ot->description = "Duplicate the selected image layer";
+
+	/* api callbacks */
+	ot->exec = image_layer_duplicate_exec;
+	ot->poll = image_layer_poll;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
+static int image_layer_remove_exec(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	int action = RNA_enum_get(op->ptr, "action");
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	if (image_remove_layer(ima, action) == -1)
+		BKE_report(op->reports, RPT_INFO, "Impossible to remove only one layer");
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, ima);
+
+	return OPERATOR_FINISHED;
+}
+
+void IMAGE_OT_layer_remove(wmOperatorType *ot)
+{
+	static EnumPropertyItem select_all_actions[] = {
+		{IMA_LAYER_DEL_SELECTED, "SELECTED", 0, "Selected", "Remove the selected layer"},
+		{IMA_LAYER_DEL_HIDDEN, "HIDDEN", 0, "Hidden", "Removes the hidden layers"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	/* identifiers */
+	ot->name = "Remove Layer";
+	ot->idname = "IMAGE_OT_layer_remove";
+	ot->description = "Remove the selected image layer";
+
+	/* api callbacks */
+	ot->exec = image_layer_remove_exec;
+	ot->poll = image_layer_poll;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_enum(ot->srna, "action", select_all_actions, IMA_LAYER_DEL_SELECTED, "Action", "Selection action to execute");
+}
+
+static int image_layer_move_exec(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImageLayer *layer, *tmp;
+	int type, layerID;
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	layer = imalayer_get_current(ima);
+
+	if (!layer)
+		return OPERATOR_CANCELLED;
+
+	type = RNA_enum_get(op->ptr, "type");
+	layerID = imalayer_get_current_act(ima);
+
+	if (!(layer->type & IMA_LAYER_BASE)) {
+		if (type == -1) { /* Move direction: Up */
+			if (layerID > 0) {
+				tmp = layer->prev;
+				BLI_remlink(&ima->imlayers, layer);
+				layer->next = layer->prev = NULL;
+
+				if (tmp)
+					BLI_insertlinkbefore(&ima->imlayers, tmp, layer);
+				else
+					BLI_addhead(&ima->imlayers, layer);
+
+				imalayer_set_current_act(ima, layerID - 1);
+			}
+		}
+		else if (type == 1){ /* Move direction: Down */
+			if (layerID < (ima->num_layers - 1)) {
+				tmp = layer->next;
+				if (!(tmp->type & IMA_LAYER_BASE)) {
+					BLI_remlink(&ima->imlayers, layer);
+					layer->next = layer->prev = NULL;
+
+					if (tmp)
+						BLI_insertlinkafter(&ima->imlayers, tmp, layer);
+					else
+						BLI_addtail(&ima->imlayers, layer);
+
+					imalayer_set_current_act(ima, layerID+1);
+				}
+			}
+		}
+		else if (type == -2) {  /* Move direction: Top */
+			BLI_remlink(&ima->imlayers, layer);
+			layer->next = layer->prev = NULL;
+			BLI_addhead(&ima->imlayers, layer);
+			ima->Act_Layers = 0;
+		}
+		else if (type == 2) {  /* Move direction: Bottom */
+			BLI_remlink(&ima->imlayers, layer);
+			layer->next = layer->prev = NULL;
+			if (((ImageLayer *)ima->imlayers.last)->type & IMA_LAYER_BASE) {
+				BLI_insertlinkafter(&ima->imlayers,((ImageLayer *)ima->imlayers.last)->prev, layer);
+				ima->Act_Layers = ima->num_layers - 2;
+			}
+			else {
+				BLI_addtail(&ima->imlayers, layer);
+				ima->Act_Layers = ima->num_layers - 1;
+			}
+		}
+		else if (type == 3) {  /* Move direction: Invert */
+			int i = 0, lim;
+			ImageLayer *tmp, *next, *prev, *tmp_up, *tmp_down;
+			if (ima->num_layers > 2) {
+				if (ima->num_layers % 2 == 0)
+					lim = (ima->num_layers / 2);
+				else
+					lim = (ima->num_layers / 2) + 1;
+
+				tmp_up = (ImageLayer *)ima->imlayers.first;
+				tmp_down = ((ImageLayer *)ima->imlayers.last)->prev;
+				while ((i<lim) && (tmp_up != tmp_down)) {
+					tmp = tmp_up;
+
+					next = tmp_down->next;
+					prev = tmp_down->prev;
+
+					tmp_down->next = tmp->next;
+					tmp_down->prev = tmp->prev;
+					if (tmp->prev)
+						tmp->prev->next = tmp_down;
+					else
+						ima->imlayers.first = tmp_down;
+					tmp->next->prev = tmp_down;
+
+					tmp_up->next = next;
+					tmp_up->prev = prev;
+					if (prev)
+						prev->next = tmp_up;
+					next->prev = tmp_up;
+
+					prev = tmp_up->prev;
+					tmp_up = tmp_down->next;
+					tmp_down = prev;
+					i++;
+				}
+			}
+		}
+	}
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+void IMAGE_OT_layer_move(wmOperatorType *ot)
+{
+	static EnumPropertyItem slot_move[] = {
+		{-2, "TOP", 0, "Top", ""},
+		{-1, "UP", 0, "Up", ""},
+		{1, "DOWN", 0, "Down", ""},
+		{2, "BOTTOM", 0, "Bottom", ""},
+		{3, "INVERT", 0, "Invert", ""},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	/* identifiers */
+	ot->name = "Move Layer";
+	ot->idname = "IMAGE_OT_layer_move";
+	ot->description = "Move image layers up and down";
+
+	/* api callbacks */
+	ot->exec = image_layer_move_exec;
+	ot->poll = image_layer_poll;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_enum(ot->srna, "type", slot_move, 0, "Type", "");
+}
+
+static int image_layer_select_exec(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImageLayer *layer;
+	int action = RNA_enum_get(op->ptr, "action");
+
+	layer = imalayer_get_current(ima);
+
+	switch (action) {
+		case IMA_LAYER_SEL_PREVIOUS:
+			if (ima->Act_Layers >= 1) {
+				layer->select = !IMA_LAYER_SEL_CURRENT;
+				layer->prev->select = IMA_LAYER_SEL_CURRENT;
+				ima->Act_Layers--;
+			}
+			break;
+		case IMA_LAYER_SEL_NEXT:
+			if (ima->Act_Layers < (ima->num_layers-1)) {
+				layer->select = !IMA_LAYER_SEL_CURRENT;
+				layer->next->select = IMA_LAYER_SEL_CURRENT;
+				ima->Act_Layers++;
+			}
+			break;
+		case IMA_LAYER_SEL_TOP:
+			((ImageLayer *)ima->imlayers.first)->select = IMA_LAYER_SEL_CURRENT;
+			ima->Act_Layers = 0;
+			break;
+		case IMA_LAYER_SEL_BOTTOM:
+			((ImageLayer *)ima->imlayers.last)->select = IMA_LAYER_SEL_CURRENT;
+			ima->Act_Layers = ima->num_layers - 1;
+			break;
+	}
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
+	return OPERATOR_FINISHED;
+}
+
+void IMAGE_OT_layer_select(wmOperatorType *ot)
+{
+	static EnumPropertyItem select_all_actions[] = {
+		{IMA_LAYER_SEL_PREVIOUS, "PREVIOUS", 0, "Previous", "Select the previous layer"},
+		{IMA_LAYER_SEL_NEXT, "NEXT", 0, "Next", "Select the next layer"},
+		{IMA_LAYER_SEL_TOP, "TOP", 0, "Top", "Select the top layer"},
+		{IMA_LAYER_SEL_BOTTOM, "BOTTOM", 0, "Select the bottom layer"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	/* identifiers */
+	ot->name = "Select Layers";
+	ot->idname = "IMAGE_OT_layer_select";
+	ot->description = "Select layers";
+
+	/* api callbacks */
+	ot->exec = image_layer_select_exec;
+	ot->poll = image_layer_poll;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_enum(ot->srna, "action", select_all_actions, IMA_LAYER_SEL_NEXT, "Action", "Selection action to execute");
+}
+
+static int image_layer_merge_exec(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImageLayer *layer;
+	int type;
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	type = RNA_enum_get(op->ptr, "type");
+
+	if (type == 1) { /* Merge Layers */
+		layer = imalayer_get_current(ima);
+		if (!layer)
+			return OPERATOR_CANCELLED;
+
+		if (!(layer->type & IMA_LAYER_BASE)) {
+			ImageLayer *next;
+
+			next = layer->next;
+			if ((next->visible & IMA_LAYER_VISIBLE) && (!(next->locked & IMA_LAYER_LOCK))) {
+				merge_layers(ima, layer, next);
+
+				imalayer_set_current_act(ima, imalayer_get_current_act(ima));
+				ima->num_layers--;
+			}
+			else
+				if (!(next->visible & IMA_LAYER_VISIBLE))
+					BKE_report(op->reports, RPT_INFO, "It can not merge the layers, because the next layer is hidden");
+				else
+					BKE_report(op->reports, RPT_INFO, "It can not merge the layers, because the next layer is locked");
+		}
+	}
+	else if (type == 2) { /* Merge Visible */
+		int i = 0;
+		ImageLayer *next;
+		for (layer = (ImageLayer *)ima->imlayers.first; layer; layer = layer->next) {
+			if (layer->visible & IMA_LAYER_VISIBLE) {
+				i = 1;
+				break;
+			}
+		}
+		if (i == 1) {
+			next = layer;
+			while ((next != NULL) && (layer->type != IMA_LAYER_BASE)) {
+				next = layer->next;
+				while ((next != NULL) && (!(next->visible & IMA_LAYER_VISIBLE)))
+					next = next->next;
+
+				if (next) {
+					layer = merge_layers(ima, layer, next);
+					ima->num_layers--;
+				}
+			}
+			imalayer_set_current_act(ima,imalayer_get_current_act(ima));
+		}
+		else
+			BKE_report(op->reports, RPT_INFO, "It can not merge the layers, because the layers are hidden");
+	}
+	else if (type == 3) {  /* Merge All */
+		ImageLayer *next, *app;
+		static float white_color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+
+		for (layer = (ImageLayer *)ima->imlayers.first; layer; layer = layer->next) {
+			if (layer->visible & IMA_LAYER_VISIBLE) {
+				break;
+			}
+			else {
+				BLI_remlink(&ima->imlayers, layer);
+				free_image_layer(layer);
+				ima->num_layers--;
+			}
+		}
+		if (ima->imlayers.first) {
+			next = layer;
+			while ((next != NULL) && (layer->type != IMA_LAYER_BASE)) {
+				next = layer->next;
+				while ((next != NULL) && (!(next->visible & IMA_LAYER_VISIBLE))) {
+					app = next;
+					next = next->next;
+
+					BLI_remlink(&ima->imlayers, app);
+					free_image_layer(app);
+					ima->num_layers--;
+				}
+				if (next) {
+					layer = merge_layers(ima, layer, next);
+					ima->num_layers--;
+				}
+			}
+
+			imalayer_set_current_act(ima, imalayer_get_current_act(ima));
+			layer = (ImageLayer *)ima->imlayers.last;
+			if (!(layer->type & IMA_LAYER_BASE)) {
+				ImBuf *base;
+				int i;
+
+				strcpy(layer->name, "Background");
+				layer->background = IMA_LAYER_BG_WHITE;
+				copy_v4_v4(layer->default_color, white_color);
+				base = (ImBuf *)layer->ibufs.first;
+				if (base->rect_float) {
+					float *fp_b = (float *)base->rect_float;
+					for (i = base->x * base->y; i > 0; i--, fp_b += 4) {
+						if (fp_b[3] != 1.0f) {
+							if (fp_b[3] == 0.0f) {
+								copy_v3_fl(fp_b, 1.0f);
+							}
+							fp_b[3] = 1.0f;
+						}
+					}
+				} else if (base->rect) {
+					char *cp_b = (char *) base->rect;
+					for (i = base->x * base->y; i > 0; i--, cp_b += 4) {
+						if (cp_b[3] != 255) {
+							if (cp_b[3] == 0) {
+								cp_b[0] = 255;
+								cp_b[1] = 255;
+								cp_b[2] = 255;
+							}
+							cp_b[3] = 255;
+						}
+					}
+				}
+			}
+		}
+		else {
+			image_add_image_layer_base(ima);
+			layer = (ImageLayer *)ima->imlayers.last;
+			layer->background = IMA_LAYER_BG_WHITE;
+			copy_v4_v4(layer->default_color, white_color);
+			imalayer_fill_color(ima, white_color);
+		}
+	}
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+void IMAGE_OT_layer_merge(wmOperatorType *ot)
+{
+	static EnumPropertyItem slot_merge[] = {
+		{1, "DOWN", 0, "Down", ""},
+		{2, "VISIBLE", 0, "Visible", ""},
+		{3, "ONE", 0, "One", ""},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	/* identifiers */
+	ot->name = "Merge Layer";
+	ot->idname = "IMAGE_OT_layer_merge";
+	ot->description = "Layers merge into one";
+
+	/* api callbacks */
+	ot->exec = image_layer_merge_exec;
+	ot->poll = image_layer_poll;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_enum(ot->srna, "type", slot_merge, 0, "Type", "");
+}
+
+static int image_layer_clean_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImageLayer *layer;
+	static float alpha_color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+	static float white_color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+
+	layer = imalayer_get_current(ima);
+
+	if (layer->background & IMA_LAYER_BG_IMAGE) {
+		int flag;
+		struct ImBuf *ibuf;
+
+		ibuf = layer->ibufs.first;
+		BLI_remlink(&layer->ibufs, ibuf);
+		IMB_freeImBuf(ibuf);
+
+		flag = IB_rect | IB_multilayer | IB_metadata;
+
+		ibuf = IMB_loadiffname(layer->file_path, flag, ima->colorspace_settings.name);
+
+		BLI_addtail(&layer->ibufs, ibuf);
+	}
+	else if (layer->background & IMA_LAYER_BG_WHITE)
+		imalayer_fill_color(ima, white_color);
+	else if (layer->background & IMA_LAYER_BG_ALPHA)
+		imalayer_fill_color(ima, alpha_color);
+	else {
+		if (layer->default_color[0] != -1)
+			imalayer_fill_color(ima, layer->default_color);
+	}
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, ima);
+	return OPERATOR_FINISHED;
+}
+
+void IMAGE_OT_layer_clean(wmOperatorType *ot)
+{
+
+	/* identifiers */
+	ot->name = "Clean Layer";
+	ot->idname = "IMAGE_OT_layer_clean";
+	ot->description = "Clean image layers";
+
+	/* api callbacks */
+	ot->exec = image_layer_clean_exec;
+	ot->poll = image_layer_poll;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
+static int image_layer_flip_exec(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImageLayer *layer;
+	int type;
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	type = RNA_enum_get(op->ptr, "type");
+
+	layer = imalayer_get_current(ima);
+	if (!layer)
+		return OPERATOR_CANCELLED;
+
+	if (type == 1) /* Flip Horizontally */
+		IMB_flipx((ImBuf *)layer->ibufs.first);
+	else if (type == 2) /* Flip Vertically */
+		IMB_flipy((ImBuf *)layer->ibufs.first);
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+void IMAGE_OT_layer_flip(wmOperatorType *ot)
+{
+	static EnumPropertyItem slot_flip[] = {
+		{1, "FLIP_H", 0, "Horizontally", ""},
+		{2, "FLIP_V", 0, "Vertically", ""},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	/* identifiers */
+	ot->name = "Flip Layer";
+	ot->idname = "IMAGE_OT_layer_flip";
+	ot->description = "Flip the Layer";
+
+	/* api callbacks */
+	ot->exec = image_layer_flip_exec;
+	ot->poll = image_layer_poll;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_enum(ot->srna, "type", slot_flip, 0, "Type", "");
+}
+
+static int image_layer_rotate_exec(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImageLayer *layer;
+	ImBuf *ibuf;
+	int type;
+	float col[4];
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	type = RNA_enum_get(op->ptr, "type");
+
+	layer = imalayer_get_current(ima);
+	if (!layer)
+		return OPERATOR_CANCELLED;
+
+	imagelayer_get_background_color(col, layer);
+
+	ibuf = (ImBuf*)((ImageLayer*)layer->ibufs.first);
+	if (type == 1) { /* ROT_90 */
+		layer->ibufs.first = NULL;
+		layer->ibufs.last = NULL;
+		BLI_addtail(&layer->ibufs, IMB_rotation(ibuf, 0.0, 0.0, DEG2RADF(-90.0), 2, 0, col));
+	}
+	else if (type == 2) { /* ROT_90A */
+		layer->ibufs.first = NULL;
+		layer->ibufs.last = NULL;
+		BLI_addtail(&layer->ibufs, IMB_rotation(ibuf, 0.0, 0.0, DEG2RADF(90.0), 2, 0, col));
+	}
+	else if (type == 3) { /* ROT_180 */
+		layer->ibufs.first = NULL;
+		layer->ibufs.last = NULL;
+		BLI_addtail(&layer->ibufs, IMB_rotation(ibuf, 0.0, 0.0, DEG2RADF(180.0), 2, 0, col));
+	}
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+void IMAGE_OT_layer_rotate(wmOperatorType *ot)
+{
+	static EnumPropertyItem slot_rot[] = {
+		{1, "ROT_90", 0, "Rotate 90 clockwise", ""},
+		{2, "ROT_90A", 0, "Rotate 90 anti-clockwise", ""},
+		{3, "ROT_180", 0, "Rotate 180", ""},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	/* identifiers */
+	ot->name = "Rotating Layer";
+	ot->idname = "IMAGE_OT_layer_rotate";
+	ot->description = "Rotate the Layer";
+
+	/* api callbacks */
+	ot->exec = image_layer_rotate_exec;
+	ot->poll = image_layer_poll;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_enum(ot->srna, "type", slot_rot, 0, "Type", "");
+}
+
+static int image_layer_arbitrary_rot_exec(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImageLayer *layer;
+	ImBuf *ibuf;
+	float angle;
+	float col[4];
+	short type;
+	int lock;
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	ima->use_layers = false;
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+	ima->use_layers = true;
+
+	layer = imalayer_get_current(ima);
+	if (!layer)
+		return OPERATOR_CANCELLED;
+
+	if (layer->preview_ibuf) {
+		IMB_freeImBuf(layer->preview_ibuf);
+		layer->preview_ibuf = NULL;
+	}
+
+	type = RNA_enum_get(op->ptr, "type");
+	angle = RNA_float_get(op->ptr, "angle");
+	lock = RNA_boolean_get(op->ptr, "lock_size");
+	imagelayer_get_background_color(col, layer);
+
+	angle = angle * (-1);
+
+	ibuf = (ImBuf *)layer->ibufs.first;
+	layer->ibufs.first = NULL;
+	layer->ibufs.last = NULL;
+	BLI_addtail(&layer->ibufs, IMB_rotation(ibuf, 0.0, 0.0, angle, type, lock, col));
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+static bool image_layer_arbitrary_rot_check(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImageLayer *layer;
+	ImBuf *ibuf;
+	float angle;
+	float col[4];
+	short type;
+	int lock;
+
+	if (!ima)
+		return false;
+
+	ima->use_layers = false;
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+	ima->use_layers = true;
+
+	layer = imalayer_get_current(ima);
+	type = RNA_enum_get(op->ptr, "type");
+	angle = RNA_float_get(op->ptr, "angle");
+	lock = RNA_boolean_get(op->ptr, "lock_size");
+
+	imagelayer_get_background_color(col, layer);
+
+	angle = angle * (-1);
+
+	if (layer->preview_ibuf) {
+		IMB_freeImBuf(layer->preview_ibuf);
+		layer->preview_ibuf = NULL;
+	}
+
+	layer->preview_ibuf = IMB_dupImBuf(ibuf);
+
+	layer->preview_ibuf = IMB_rotation(layer->preview_ibuf, 0.0, 0.0, angle, type, lock, col);
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+	return true;
+}
+
+void IMAGE_OT_layer_arbitrary_rot(wmOperatorType *ot)
+{
+	PropertyRNA *prop;
+
+	static EnumPropertyItem rotate_items[] = {
+		{0, "NEAREST", 0, "Nearest", ""},
+		{1, "BILINEAR", 0, "Bilinear", ""},
+		{2, "BICUBIC", 0, "Bicubic", ""},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	/* identifiers */
+	ot->name = "Arbitrary Rotating Layer";
+	ot->idname = "IMAGE_OT_layer_arbitrary_rot";
+	ot->description = "Arbitrary Rotate the Layer";
+
+	/* api callbacks */
+	ot->exec = image_layer_arbitrary_rot_exec;
+	ot->poll = image_layer_poll;
+	ot->invoke = image_op_layer_invoke;
+	ot->check = image_layer_arbitrary_rot_check;
+	ot->cancel = image_layer_preview_cancel;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_enum(ot->srna, "type", rotate_items, 0, "Type", "");
+	RNA_def_boolean(ot->srna, "lock_size", 1, "Lock size", "Lock size");
+	prop = RNA_def_float_rotation(ot->srna, "angle", 0, NULL, DEG2RADF(-180.0f), DEG2RADF(180.0f),
+								  "Angle", "Angle of rotation", DEG2RADF(-180.0f), DEG2RADF(180.0f));
+	RNA_def_property_float_default(prop, DEG2RADF(0.0f));
+}
+
+static int image_layer_offset_exec(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImageLayer *layer;
+	struct ImBuf *ibuf;
+	int x, y, half, wrap;
+	float col[4];
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	layer = imalayer_get_current(ima);
+	if (!layer)
+		return OPERATOR_CANCELLED;
+
+	ibuf = (ImBuf *)layer->ibufs.first;
+	if (!ibuf)
+		return OPERATOR_CANCELLED;
+
+	x = RNA_int_get(op->ptr, "off_x");
+	y = RNA_int_get(op->ptr, "off_y");
+	half = RNA_boolean_get(op->ptr, "half");
+	wrap = RNA_boolean_get(op->ptr, "wrap");
+
+	if (abs(x) > ibuf->x) {
+		BKE_report(op->reports, RPT_WARNING, "The offset can not be larger than the image.");
+		return OPERATOR_CANCELLED;
+	}
+
+	if (abs(y) > ibuf->y) {
+		BKE_report(op->reports, RPT_WARNING, "The offset can not be larger than the image.");
+		return OPERATOR_CANCELLED;
+	}
+
+	if (!wrap)
+		imagelayer_get_background_color(col, layer);
+
+	layer->ibufs.first = NULL;
+	layer->ibufs.last = NULL;
+	BLI_addtail(&layer->ibufs, IMB_offset(ibuf, x, y, half, wrap, col));
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+static bool image_layer_offset_check(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImageLayer *layer;
+	ImBuf *ibuf;
+	float col[4];
+	int x, y, half, wrap;
+
+	if (!ima)
+		return false;
+
+	ima->use_layers = false;
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+	ima->use_layers = true;
+
+	layer = imalayer_get_current(ima);
+	x = RNA_int_get(op->ptr, "off_x");
+	y = RNA_int_get(op->ptr, "off_y");
+	half = RNA_boolean_get(op->ptr, "half");
+	wrap = RNA_boolean_get(op->ptr, "wrap");
+
+	if (abs(x) > ibuf->x) {
+		if (x > 0)
+			x = ibuf->x;
+		else
+			x = - ibuf->x;
+	}
+
+	if (abs(y) > ibuf->y) {
+		if (y > 0)
+			y = ibuf->y;
+		else
+			y = - ibuf->y;
+	}
+
+	if (!wrap) {
+		imagelayer_get_background_color(col, layer);
+	}
+
+	if (layer->preview_ibuf) {
+		IMB_freeImBuf(layer->preview_ibuf);
+		layer->preview_ibuf = NULL;
+	}
+
+	layer->preview_ibuf = IMB_dupImBuf(ibuf);
+
+	layer->preview_ibuf = IMB_offset(layer->preview_ibuf, x, y, half, wrap, col);
+
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+	return true;
+}
+
+void IMAGE_OT_layer_offset(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Offset Layer";
+	ot->idname = "IMAGE_OT_layer_offset";
+	ot->description = "Shift the pixels";
+
+	/* api callbacks */
+	ot->exec = image_layer_offset_exec;
+	ot->poll = image_layer_poll;
+	ot->invoke = image_op_layer_invoke;
+	ot->check = image_layer_offset_check;
+	ot->cancel = image_layer_preview_cancel;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_int(ot->srna, "off_x", 0, INT_MIN, INT_MAX, "X", "Offset X", -16384, 16384);
+	RNA_def_int(ot->srna, "off_y", 0, INT_MIN, INT_MAX, "Y", "Offset Y", -16384, 16384);
+	RNA_def_boolean(ot->srna, "half", 0, "Offset by x/2 y/2", "Offset by x/2 y/2");
+	RNA_def_boolean(ot->srna, "wrap", 1, "Wrap around", "Wrap around");
+}
+
+static int image_layer_scale_exec(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImageLayer *layer;
+	struct ImBuf *ibuf;
+	int width, height, proportions;
+	float props;
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	layer = imalayer_get_current(ima);
+	if (!layer)
+		return OPERATOR_CANCELLED;
+
+	ibuf = (ImBuf *)layer->ibufs.first;
+	if (!ibuf)
+		return OPERATOR_CANCELLED;
+
+	width = RNA_int_get(op->ptr, "width");
+	height = RNA_int_get(op->ptr, "height");
+	proportions = RNA_boolean_get(op->ptr, "proportions");
+
+	if ((width == 0) && (height == 0))
+		return OPERATOR_CANCELLED;
+
+	if (proportions) {
+		if ((width != 0) && (height != 0)) {
+			BKE_report(op->reports, RPT_WARNING, "If you want to keep the proportions, the height or width must be 0.");
+			return OPERATOR_CANCELLED;
+		}
+
+		if ((width == 0) || (height == 0)) {
+			if (width == 0) {
+				props = (float)ibuf->y / ibuf->x;
+				width = (int)floor((float)height / props);
+			}
+			else {
+				props = (float)ibuf->x / ibuf->y;
+				height = (int)floor((float)width / props);
+			}
+		}
+	}
+
+	IMB_scaleImBuf(ibuf, width, height);
+
+	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+void IMAGE_OT_layer_scale(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Scale Layer";
+	ot->idname = "IMAGE_OT_layer_scale";
+	ot->description = "Scale the layer";
+
+	/* api callbacks */
+	ot->exec = image_layer_scale_exec;
+	ot->poll = image_layer_poll;
+	ot->invoke = image_op_layer_invoke;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_int(ot->srna, "width", 0, 0, INT_MAX, "Width", "Width", 0, 16384);
+	RNA_def_int(ot->srna, "height", 0, 0, INT_MAX, "Height", "Height", 0, 16384);
+	RNA_def_boolean(ot->srna, "proportions", 1, "Keep Proportions", "Keep proportions");
+}
+
+static int image_layer_size_exec(bContext *C, wmOperator *op)
+{
+	Image *ima = CTX_data_edit_image(C);
+	ImageLayer *layer;
+	struct ImBuf *ibuf;
+	int width, height, off_x, off_y, proportions, centre;
+	float props;
+	float col[4];
+
+	if (!ima)
+		return OPERATOR_CANCELLED;
+
+	layer = imalayer_get_current(ima);
+	if (!layer)
+		return OPERATOR_CANCELLED;
+
+	ibuf = (ImBuf *)layer->ibufs.first;
+	if (!ibuf)
+		return OPERATOR_CANCELLED;
+
+	width = RNA_int_get(op->ptr, "width");
+	height = RNA_int_get(op->ptr, "height");
+	proportions = RNA_boolean_get(op->ptr, "proportions");
+
+	off_x = RNA_int_get(op->ptr, "off_x");
+	off_y = RNA_int_get(op->ptr, "off_y");
+	centre = RNA_boolean_get(op->ptr, "centre");
+
+	if ((width == 0) && (height == 0))
+		return OPERATOR_CANCELLED;
+
+	if (proportions) {
+		if ((width != 0) && (height != 0)) {
+			BKE_report(op->reports, RPT_WARNING, "If you want to keep the proportions, the height or width must be 0.");
+			return OPERATOR_CANCELLED;
+		}
+
+		if ((width == 0) || (height == 0)) {
+			if (width == 0) {
+				props = (float)ibuf->y / ibuf->x;
+				width = (int)floor((float)height / props);
+			}
+			else {
+				props = (float)ibuf->x / ibuf->y;
+				height = (int)floor((float)width / props);
+			}
+		}
+	}
+
+	if (width > ibuf->x) {
+		if (off_x < 0) {
+			BKE_report(op->reports, RPT_WARNING, "The offset must be greater than 0.");
+			return OPERATOR_CANCELLED;
+		}
+	}
+	else {
+		if (off_x > 0) {
+			BKE_report(op->reports, RPT_WARNING, "The offset should be less than 0.");
+			return OPERATOR_CANCELLED;
+		}
+	}
+
+	if (height > ibuf->y) {
+		if (off_y < 0) {
+			BKE_report(op->reports, RPT_WARNING, "The offset must be greater than 0.");
+			return OPERATOR_CANCELLED;
+		}
+	}
+	else {
+		if (off_y > 0) {
+			BKE_report(op->reports, RPT_WARNING, "The offset should be less than 0.");
+			return OPERATOR_CANCELLED;
+		}
+	}
+
+	imagelayer_get_background_color(col, layer);
+	layer->ibufs.first = NULL;
+	layer->ibufs.last = NULL;
+	BLI_addtail(&layer->ibufs, IMB_size(ibuf, width, height, off_x, off_y, centre, col));
+
+	WM_event_add_notifier(C, NC_IMAGE|ND_DRAW, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+void IMAGE_OT_layer_size(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Layer Boundary Size";
+	ot->idname = "IMAGE_OT_layer_size";
+	ot->description = "Adjust the layer dimensions";
+
+	/* api callbacks */
+	ot->exec = image_layer_size_exec;
+	ot->poll = image_layer_poll;
+	ot->invoke = image_op_layer_invoke;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	RNA_def_int(ot->srna, "width", 0, 0, INT_MAX, "Width", "Width", 0, 16384);
+	RNA_def_int(ot->srna, "height", 0, 0, INT_MAX, "Height", "Height", 0, 16384);
+	RNA_def_boolean(ot->srna, "proportions", 1, "Keep Proportions", "Keep proportions");
+	RNA_def_int(ot->srna, "off_x", 0, INT_MIN, INT_MAX, "Offset X", "Offset X", -16384, 16384);
+	RNA_def_int(ot->srna, "off_y", 0, INT_MIN, INT_MAX, "Offset Y", "Offset Y", -16384, 16384);
+	RNA_def_boolean(ot->srna, "centre", 0, "Centre", "Centre");
 }
 
 /********************* pack operator *********************/
@@ -2215,7 +4963,7 @@ static int image_pack_exec(bContext *C, wmOperator *op)
 {
 	struct Main *bmain = CTX_data_main(C);
 	Image *ima = CTX_data_edit_image(C);
-	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
+	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
 	const bool as_png = RNA_boolean_get(op->ptr, "as_png");
 
 	if (!image_pack_test(C, op))
@@ -2249,7 +4997,7 @@ static int image_pack_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(
 	if (!image_pack_test(C, op))
 		return OPERATOR_CANCELLED;
 
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
 
 	if (!as_png && (ibuf && (ibuf->userflags & IB_BITMAPDIRTY))) {
 		pup = UI_popup_menu_begin(C, IFACE_("OK"), ICON_QUESTION);
@@ -2395,7 +5143,7 @@ static void image_sample_draw(const bContext *C, ARegion *ar, void *arg_info)
 		Scene *scene = CTX_data_scene(C);
 
 		ED_image_draw_info(scene, ar, info->color_manage, info->use_default_view, info->channels,
-		                   info->x, info->y, info->colp, info->colfp, info->linearcol, info->zp, info->zfp);
+						   info->x, info->y, info->colp, info->colfp, info->linearcol, info->zp, info->zfp, 1);
 	}
 }
 
@@ -2781,7 +5529,7 @@ static int image_record_composite_apply(bContext *C, wmOperator *op)
 
 	ED_area_tag_redraw(CTX_wm_area(C));
 	
-	ibuf = BKE_image_acquire_ibuf(sima->image, &sima->iuser, NULL);
+	ibuf = BKE_image_acquire_ibuf(sima->image, &sima->iuser, NULL, IMA_IBUF_IMA);
 	/* save memory in flipbooks */
 	if (ibuf)
 		imb_freerectfloatImBuf(ibuf);

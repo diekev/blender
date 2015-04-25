@@ -84,7 +84,7 @@ static void sample_draw(const bContext *C, ARegion *ar, void *arg_info)
 	if (info->draw) {
 		ED_image_draw_info(scene, ar, info->color_manage, false, info->channels,
 		                   info->x, info->y, info->colp, info->colfp,
-		                   info->linearcol, NULL, NULL);
+						   info->linearcol, NULL, NULL, 2);
 	}
 }
 

@@ -707,6 +707,14 @@ static void node_buts_image_user(uiLayout *layout, bContext *C, PointerRNA *ptr,
 		col = uiLayoutColumn(layout, false);
 		uiItemR(col, ptr, "layer", 0, NULL, ICON_NONE);
 	}
+
+	if ((source == IMA_SRC_GENERATED) || (source == IMA_SRC_FILE)) {
+		Image *ima = imaptr->data;
+		col = uiLayoutColumn(layout, false);
+		if (ima->num_layers > 1) {
+			uiItemR(col, ptr, "use_layer_ima", 0, NULL, ICON_NONE);
+		}
+	}
 }
 
 static void node_shader_buts_material(uiLayout *layout, bContext *C, PointerRNA *ptr)
@@ -3125,7 +3133,7 @@ void draw_nodespace_back_pix(const bContext *C, ARegion *ar, SpaceNode *snode, b
 		return;
 	
 	ima = BKE_image_verify_viewer(IMA_TYPE_COMPOSITE, "Viewer Node");
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock, IMA_IBUF_IMA);
 	if (ibuf) {
 		float x, y; 
 		

@@ -562,6 +562,16 @@ const unsigned char *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colo
 					cp = ts->preview_stitch_active;
 					break;
 
+				case TH_SHOW_BOUNDARY_LAYER:
+					cp = &ts->show_boundary_layer;
+					break;
+				case TH_COL1_BOUNDARY_LAYER:
+					cp = ts->col1_boundary_layer;
+					break;
+				case TH_COL2_BOUNDARY_LAYER:
+					cp = ts->col2_boundary_layer;
+					break;
+
 				case TH_PAINT_CURVE_HANDLE:
 					cp = ts->paint_curve_handle;
 					break;
@@ -1076,6 +1086,10 @@ void ui_theme_init_default(void)
 	rgba_char_args_set_fl(btheme->tima.preview_stitch_stitchable, 0.0, 1.0, 0.0, 1.0);
 	rgba_char_args_set_fl(btheme->tima.preview_stitch_unstitchable, 1.0, 0.0, 0.0, 1.0);
 	rgba_char_args_set_fl(btheme->tima.preview_stitch_active, 0.886, 0.824, 0.765, 0.140);
+
+	btheme->tima.show_boundary_layer = TH_IMAGE_LAYER_BOUNDARY;
+	rgba_char_args_set(btheme->tima.col1_boundary_layer, 255, 255, 0, 255);
+	rgba_char_args_set(btheme->tima.col2_boundary_layer, 255, 0, 255, 255);
 
 	rgba_char_args_test_set(btheme->tima.uv_others, 96, 96, 96, 255);
 	rgba_char_args_test_set(btheme->tima.uv_shadow, 112, 112, 112, 255);
@@ -2592,6 +2606,15 @@ void init_userdef_do_versions(void)
 			CLAMP(c, 0, 255);
 			cp[2] = c;
 			cp[3] = 255;
+		}
+	}
+
+	if (U.versionfile < 273 || (U.versionfile == 273 && U.subversionfile < 8)) {
+		bTheme *btheme;
+		for (btheme = U.themes.first; btheme; btheme = btheme->next) {
+			btheme->tima.show_boundary_layer = TH_IMAGE_LAYER_BOUNDARY;
+			rgba_char_args_set_fl(btheme->tima.col1_boundary_layer, 1.0, 1.0, 0.0, 1.0);
+			rgba_char_args_set_fl(btheme->tima.col2_boundary_layer, 1.0, 0.0, 1.0, 1.0);
 		}
 	}
 		

@@ -446,7 +446,7 @@ static void image_multi_cb(bContext *C, void *rr_v, void *iuser_v)
 {
 	ImageUser *iuser = iuser_v;
 
-	BKE_image_multilayer_index(rr_v, iuser); 
+	BKE_render_multilayer_index(rr_v, iuser); 
 	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
 }
 static void image_multi_inclay_cb(bContext *C, void *rr_v, void *iuser_v) 
@@ -460,7 +460,7 @@ static void image_multi_inclay_cb(bContext *C, void *rr_v, void *iuser_v)
 
 	if (iuser->layer < tot - 1) {
 		iuser->layer++;
-		BKE_image_multilayer_index(rr, iuser); 
+		BKE_render_multilayer_index(rr, iuser); 
 		WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
 	}
 }
@@ -470,7 +470,7 @@ static void image_multi_declay_cb(bContext *C, void *rr_v, void *iuser_v)
 
 	if (iuser->layer > 0) {
 		iuser->layer--;
-		BKE_image_multilayer_index(rr_v, iuser); 
+		BKE_render_multilayer_index(rr_v, iuser); 
 		WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
 	}
 }
@@ -488,7 +488,7 @@ static void image_multi_incpass_cb(bContext *C, void *rr_v, void *iuser_v)
 
 		if (iuser->pass < tot - 1) {
 			iuser->pass++;
-			BKE_image_multilayer_index(rr, iuser); 
+			BKE_render_multilayer_index(rr, iuser); 
 			WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
 		}
 	}
@@ -499,7 +499,7 @@ static void image_multi_decpass_cb(bContext *C, void *rr_v, void *iuser_v)
 
 	if (iuser->pass > 0) {
 		iuser->pass--;
-		BKE_image_multilayer_index(rr_v, iuser); 
+		BKE_render_multilayer_index(rr_v, iuser); 
 		WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
 	}
 }
@@ -692,7 +692,7 @@ void uiTemplateImage(uiLayout *layout, bContext *C, PointerRNA *ptr, const char 
 		UI_block_funcN_set(block, rna_update_cb, MEM_dupallocN(cb), NULL);
 
 		if (ima->source == IMA_SRC_VIEWER) {
-			ImBuf *ibuf = BKE_image_acquire_ibuf(ima, iuser, &lock);
+			ImBuf *ibuf = BKE_image_acquire_ibuf(ima, iuser, &lock, IMA_IBUF_IMA);
 			image_info(scene, iuser, ima, ibuf, str, MAX_IMAGE_INFO_LEN);
 			BKE_image_release_ibuf(ima, ibuf, lock);
 
@@ -766,13 +766,21 @@ void uiTemplateImage(uiLayout *layout, bContext *C, PointerRNA *ptr, const char 
 				}
 			}
 
+			if (ima->color_space & IMA_COL_GRAY) {
+				uiItemL(layout, "Mode Color Space: GrayScale", ICON_NONE);
+			}
+			else {
+				uiItemL(layout, "Mode Color Space: RGB", ICON_NONE);
+			}
+
 			col = uiLayoutColumn(layout, false);
 			uiTemplateColorspaceSettings(col, &imaptr, "colorspace_settings");
 			uiItemR(col, &imaptr, "use_view_as_render", 0, NULL, ICON_NONE);
 
 			if (ima->source != IMA_SRC_GENERATED) {
 				if (compact == 0) { /* background image view doesnt need these */
-					ImBuf *ibuf = BKE_image_acquire_ibuf(ima, iuser, NULL);
+					ImBuf *ibuf_l = BKE_image_acquire_ibuf(ima, iuser, &lock, IMA_IBUF_LAYER);
+					ImBuf *ibuf = BKE_image_get_first_ibuf(ima);
 					bool has_alpha = true;
 
 					if (ibuf) {
@@ -781,7 +789,7 @@ void uiTemplateImage(uiLayout *layout, bContext *C, PointerRNA *ptr, const char 
 
 						has_alpha = (valid_channels & IMA_CHAN_FLAG_ALPHA) != 0;
 
-						BKE_image_release_ibuf(ima, ibuf, NULL);
+						BKE_image_release_ibuf(ima, ibuf_l, NULL);
 					}
 
 					if (has_alpha) {
@@ -852,7 +860,6 @@ void uiTemplateImage(uiLayout *layout, bContext *C, PointerRNA *ptr, const char 
 					uiItemR(layout, &imaptr, "generated_color", 0, NULL, ICON_NONE);
 				}
 			}
-
 		}
 
 		UI_block_funcN_set(block, NULL, NULL, NULL);
@@ -987,7 +994,7 @@ void uiTemplateImageInfo(uiLayout *layout, bContext *C, Image *ima, ImageUser *i
 	if (!ima || !iuser)
 		return;
 
-	ibuf = BKE_image_acquire_ibuf(ima, iuser, &lock);
+	ibuf = BKE_image_acquire_ibuf(ima, iuser, &lock, IMA_IBUF_IMA);
 
 	image_info(CTX_data_scene(C), iuser, ima, ibuf, str, MAX_IMAGE_INFO_LEN);
 	BKE_image_release_ibuf(ima, ibuf, lock);

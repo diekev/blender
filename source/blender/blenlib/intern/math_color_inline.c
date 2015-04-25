@@ -291,6 +291,13 @@ MINLINE void float_to_byte_dither_v3(unsigned char b[3], const float f[3], float
 
 /**************** Alpha Transformations *****************/
 
+MINLINE char pixel_is_transparent(const unsigned char pix[4])
+{
+	if ((pix[0] == 0) && (pix[1] == 0) && (pix[2] == 0) && (pix[3] == 0))
+		return 1;
+	return 0;
+}
+
 MINLINE void premul_to_straight_v4_v4(float straight[4], const float premul[4])
 {
 	if (premul[3] == 0.0f || premul[3] == 1.0f) {

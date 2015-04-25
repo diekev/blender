@@ -44,6 +44,7 @@
 
 #include "BKE_colortools.h"
 #include "BKE_image.h"
+#include "BKE_layer.h"
 #include "BKE_texture.h"
 #include "BKE_tracking.h"
 

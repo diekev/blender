@@ -60,8 +60,7 @@ typedef struct ImageUser {
 
 	short flag;
 	
-	int pad2;
-
+	char use_layer_ima, pad1[3];
 } ImageUser;
 
 typedef struct RenderSlot {
@@ -74,12 +73,104 @@ typedef struct RenderSlot {
 /* #define IMA_DO_PREMUL	4 */
 #define IMA_NEED_FRAME_RECALC	8
 
+/* **************** IMAGE LAYER ********************* */
+
+typedef struct ImageLayer {
+	struct ImageLayer *next, *prev;
+	/* struct MovieCache *cache; */
+	char name[64];
+	char file_path[1024];
+	float opacity;
+	short background;
+	short mode;
+	short type;
+	short visible;
+	short select;
+	short locked;
+	int pad1;
+	float default_color[4];
+	int pad2;
+	ListBase ibufs;
+	struct ImBuf *preview_ibuf;
+} ImageLayer;
+
+/* ImageLayer.mode */
+typedef enum ImageLayerMode {
+	IMA_LAYER_NORMAL = 0,
+
+	IMA_LAYER_MULTIPLY = 1,
+	IMA_LAYER_SCREEN = 2,
+	IMA_LAYER_OVERLAY = 3,
+	IMA_LAYER_SOFT_LIGHT = 4,
+	IMA_LAYER_HARD_LIGHT = 5,
+
+	IMA_LAYER_COLOR_DODGE = 6,
+	IMA_LAYER_LINEAR_DODGE = 7,
+	IMA_LAYER_COLOR_BURN = 8,
+	IMA_LAYER_LINEAR_BURN = 9,
+
+	IMA_LAYER_AVERAGE = 10,
+	IMA_LAYER_ADD = 11,
+	IMA_LAYER_SUBTRACT = 12,
+	IMA_LAYER_DIFFERENCE = 13,
+	IMA_LAYER_LIGHTEN = 14,
+	IMA_LAYER_DARKEN = 15,
+
+	IMA_LAYER_NEGATION = 16,
+	IMA_LAYER_EXCLUSION = 17,
+
+	IMA_LAYER_LINEAR_LIGHT = 18,
+	IMA_LAYER_VIVID_LIGHT = 19,
+	IMA_LAYER_PIN_LIGHT = 20,
+	IMA_LAYER_HARD_MIX = 21,
+	IMA_LAYER_INVERSE_COLOR_BURN = 22,
+	IMA_LAYER_SOFT_BURN = 23
+} ImageLayerMode;
+
+#define IMA_LAYER_MAX_LEN	64
+
+/* ImageLayer.background */
+#define IMA_LAYER_BG_RGB		(1 << 0)
+#define IMA_LAYER_BG_WHITE		(1 << 1)
+#define IMA_LAYER_BG_ALPHA		(1 << 2)
+#define IMA_LAYER_BG_IMAGE		(1 << 3)
+
+/* ImageLayer.type */
+#define IMA_LAYER_BASE		(1 << 0)
+#define IMA_LAYER_LAYER		(1 << 1)
+
+/* ImageLayer.visible */
+#define IMA_LAYER_VISIBLE	(1 << 0)
+
+/* ImageLayer.select */
+#define IMA_LAYER_SEL_CURRENT	(1 << 0)
+#define	IMA_LAYER_SEL_PREVIOUS	(1 << 1)
+#define	IMA_LAYER_SEL_NEXT		(1 << 2)
+#define IMA_LAYER_SEL_TOP		(1 << 3)
+#define IMA_LAYER_SEL_BOTTOM	(1 << 4)
+
+/* ImageLayer.locked */
+#define IMA_LAYER_LOCK			1
+#define IMA_LAYER_LOCK_ALPHA	2
+
+/* Option for delete the layer*/
+#define IMA_LAYER_DEL_SELECTED	(1 << 0)
+#define IMA_LAYER_DEL_HIDDEN	(1 << 1)
+
+/* Option for open a image*/
+#define IMA_LAYER_OPEN_IMAGE	(1 << 0)
+#define IMA_LAYER_OPEN_LAYER	(1 << 1)
+
+/* Option for Image Node */
+#define IMA_USE_LAYER	(1 << 0)
+
 typedef struct Image {
 	ID id;
 	
 	char name[1024];			/* file path, 1024 = FILE_MAX */
 	
 	struct MovieCache *cache;	/* not written in file */
+	struct ImBuf *preview_ibuf;
 	struct GPUTexture *gputexture;	/* not written in file */
 	
 	/* sources from: */
@@ -124,6 +215,14 @@ typedef struct Image {
 
 	char pad[7];
 	RenderSlot render_slots[8];  /* 8 = IMA_MAX_RENDER_SLOT */
+
+	/* image layers */
+	int Act_Layers;
+	int num_layers;
+	short use_layers;
+	short color_space;
+	int pad4;
+	struct ListBase imlayers;
 } Image;
 
 
@@ -174,5 +273,9 @@ enum {
 	IMA_ALPHA_STRAIGHT = 0,
 	IMA_ALPHA_PREMUL = 1,
 };
+
+/* color_space */
+#define IMA_COL_RGB		(1<<0)
+#define IMA_COL_GRAY	(1<<1)
 
 #endif

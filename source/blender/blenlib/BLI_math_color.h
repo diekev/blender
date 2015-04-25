@@ -113,6 +113,7 @@ void BLI_init_srgb_conversion(void);
 
 /**************** Alpha Transformations *****************/
 
+MINLINE char pixel_is_transparent(const unsigned char pix[4]);
 MINLINE void premul_to_straight_v4_v4(float straight[4], const float premul[4]);
 MINLINE void premul_to_straight_v4(float color[4]);
 MINLINE void straight_to_premul_v4_v4(float straight[4], const float premul[4]);

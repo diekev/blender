@@ -208,6 +208,7 @@ static int undo_stack_step(bContext *C, UndoStack *stack, int step, const char *
 	if (step == 1) {
 		if (stack->current == NULL) {
 			/* pass */
+			return 2;
 		}
 		else {
 			if (!name || STREQ(stack->current->name, name)) {
@@ -223,6 +224,7 @@ static int undo_stack_step(bContext *C, UndoStack *stack, int step, const char *
 	else if (step == -1) {
 		if ((stack->current != NULL && stack->current->next == NULL) || BLI_listbase_is_empty(&stack->elems)) {
 			/* pass */
+			return 2;
 		}
 		else {
 			if (!name || STREQ(stack->current->name, name)) {

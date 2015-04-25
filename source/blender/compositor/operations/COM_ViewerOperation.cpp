@@ -124,7 +124,7 @@ void ViewerOperation::initImage()
 {
 	Image *ima = this->m_image;
 	void *lock;
-	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, this->m_imageUser, &lock);
+	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, this->m_imageUser, &lock, IMA_IBUF_IMA);
 
 	if (!ibuf) return;
 	BLI_lock_thread(LOCK_DRAW_IMAGE);

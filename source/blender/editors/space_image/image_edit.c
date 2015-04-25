@@ -114,7 +114,12 @@ ImBuf *ED_space_image_acquire_buffer(SpaceImage *sima, void **lock_r)
 			return BIF_render_spare_imbuf();
 		else
 #endif
-		ibuf = BKE_image_acquire_ibuf(sima->image, &sima->iuser, lock_r);
+		if (sima->mode == SI_MODE_PAINT) {
+			ibuf = BKE_image_acquire_ibuf(sima->image, &sima->iuser, lock_r, IMA_IBUF_LAYER);
+		}
+		else {
+			ibuf = BKE_image_acquire_ibuf(sima->image, &sima->iuser, lock_r, IMA_IBUF_IMA);
+		}
 
 		if (ibuf) {
 			if (ibuf->rect || ibuf->rect_float)

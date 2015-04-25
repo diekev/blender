@@ -142,6 +142,7 @@
 #include "BKE_treehash.h"
 #include "BKE_sound.h"
 
+#include "IMB_imbuf_types.h"
 
 #include "NOD_common.h"
 #include "NOD_socket.h"
@@ -3349,6 +3350,8 @@ static void lib_link_image(FileData *fd, Main *main)
 
 static void direct_link_image(FileData *fd, Image *ima)
 {
+	ImageLayer *iml;
+
 	/* for undo system, pointers could be restored */
 	if (fd->imamap)
 		ima->cache = newimaadr(fd, ima->cache);
@@ -3379,6 +3382,20 @@ static void direct_link_image(FileData *fd, Image *ima)
 	}
 	
 	ima->packedfile = direct_link_packedfile(fd, ima->packedfile);
+	//ima->colorspace_settings = newdataadr(fd, &ima->colorspace_settings);
+	link_list(fd, &ima->imlayers);
+
+	for (iml = (ImageLayer *)ima->imlayers.first; iml; iml = iml->next)
+		link_list(fd, &iml->ibufs);
+
+	for (iml = (ImageLayer *)ima->imlayers.first; iml; iml = iml->next) {
+		ImBuf *ibuf = iml->ibufs.first;
+		for (; ibuf; ibuf = ibuf->next) {
+			ibuf->rect_float = newdataadr(fd, ibuf->rect_float);
+			ibuf->rect = newdataadr(fd, ibuf->rect);
+		}
+	}
+
 	ima->preview = direct_link_preview_image(fd, ima->preview);
 	ima->ok = 1;
 }

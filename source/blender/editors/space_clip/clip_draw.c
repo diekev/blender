@@ -1037,7 +1037,7 @@ static void draw_plane_marker_image(Scene *scene,
 		return;
 	}
 
-	ibuf = BKE_image_acquire_ibuf(image, NULL, &lock);
+	ibuf = BKE_image_acquire_ibuf(image, NULL, &lock, IMA_IBUF_IMA);
 
 	if (ibuf) {
 		unsigned char *display_buffer;

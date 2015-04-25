@@ -37,6 +37,7 @@
 extern "C" {
 #endif
 
+struct ColorManagedColorspaceSettings;
 struct Image;
 struct ImBuf;
 struct Tex;
@@ -148,17 +149,20 @@ enum {
 #define IMA_CHAN_FLAG_RGB   2
 #define IMA_CHAN_FLAG_ALPHA 4
 
+#define IMA_IBUF_IMA	1
+#define IMA_IBUF_LAYER	2
+
 /* checks whether there's an image buffer for given image and user */
-bool BKE_image_has_ibuf(struct Image *ima, struct ImageUser *iuser);
+bool BKE_image_has_ibuf(struct Image *ima, struct ImageUser *iuser, int type_ibuf);
 
 /* same as above, but can be used to retrieve images being rendered in
  * a thread safe way, always call both acquire and release */
-struct ImBuf *BKE_image_acquire_ibuf(struct Image *ima, struct ImageUser *iuser, void **lock_r);
+struct ImBuf *BKE_image_acquire_ibuf(struct Image *ima, struct ImageUser *iuser, void **lock_r, int type_ibuf);
 void BKE_image_release_ibuf(struct Image *ima, struct ImBuf *ibuf, void *lock);
 
 struct ImagePool *BKE_image_pool_new(void);
 void BKE_image_pool_free(struct ImagePool *pool);
-struct ImBuf *BKE_image_pool_acquire_ibuf(struct Image *ima, struct ImageUser *iuser, struct ImagePool *pool);
+struct ImBuf *BKE_image_pool_acquire_ibuf(struct Image *ima, struct ImageUser *iuser, struct ImagePool *pool, int type_ibuf);
 void BKE_image_pool_release_ibuf(struct Image *ima, struct ImBuf *ibuf, struct ImagePool *pool);
 
 /* set an alpha mode based on file extension */
@@ -170,6 +174,11 @@ struct Image *BKE_image_load(struct Main *bmain, const char *filepath);
 /* returns existing Image when filename/type is same (frame optional) */
 struct Image *BKE_image_load_exists_ex(const char *filepath, bool *r_exists);
 struct Image *BKE_image_load_exists(const char *filepath);
+
+struct ImageLayer *BKE_add_image_file_as_layer(struct Image *ima, const char *name);
+struct ImBuf *add_ibuf_size(unsigned int width, unsigned int height, const char *name,
+							int depth, int floatbuf, short gen_type,const float color[4],
+							struct ColorManagedColorspaceSettings *colorspace_settings);
 
 /* adds image, adds ibuf, generates color or pattern */
 struct Image *BKE_image_add_generated(
@@ -194,7 +203,9 @@ void BKE_image_user_file_path(struct ImageUser *iuser, struct Image *ima, char *
 void BKE_image_update_frame(const struct Main *bmain, int cfra);
 
 /* sets index offset for multilayer files */
-struct RenderPass *BKE_image_multilayer_index(struct RenderResult *rr, struct ImageUser *iuser);
+struct RenderPass *BKE_render_multilayer_index(struct RenderResult *rr, struct ImageUser *iuser);
+
+struct ImageLayer *BKE_image_multilayer_index(struct Image *ima, struct ImageUser *iuser);
 
 /* for multilayer images as well as for render-viewer */
 struct RenderResult *BKE_image_acquire_renderresult(struct Scene *scene, struct Image *ima);

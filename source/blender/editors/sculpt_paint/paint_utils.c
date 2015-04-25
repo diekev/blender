@@ -473,7 +473,7 @@ void paint_sample_color(bContext *C, ARegion *ar, int x, int y, bool texpaint_pr
 						image = imapaint->canvas;
 					
 					if (image) {
-						ImBuf *ibuf = BKE_image_acquire_ibuf(image, NULL, NULL);
+						ImBuf *ibuf = BKE_image_acquire_ibuf(image, NULL, NULL, IMA_IBUF_IMA);
 						if (ibuf && ibuf->rect) {
 							float uv[2];
 							float u, v;

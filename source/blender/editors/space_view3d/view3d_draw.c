@@ -1639,7 +1639,7 @@ static void view3d_draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d,
 					ibuf = NULL; /* frame is out of range, dont show */
 				}
 				else {
-					ibuf = BKE_image_acquire_ibuf(ima, &bgpic->iuser, &lock);
+					ibuf = BKE_image_acquire_ibuf(ima, &bgpic->iuser, &lock, IMA_IBUF_IMA);
 					releaseibuf = ibuf;
 				}
 

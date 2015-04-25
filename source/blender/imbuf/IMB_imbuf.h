@@ -198,7 +198,7 @@ void IMB_rectcpy(struct ImBuf *drect, struct ImBuf *srect, int destx,
 void IMB_rectblend(struct ImBuf *dbuf, struct ImBuf *obuf, struct ImBuf *sbuf,
 	unsigned short *dmask, unsigned short *curvemask, unsigned short *mmask, float mask_max,
 	int destx,  int desty, int origx, int origy, int srcx, int srcy,
-	int width, int height, IMB_BlendMode mode, bool accumulate);
+	int width, int height, IMB_BlendMode mode, bool accumulate, short lock_alpha);
 
 /**
  *
@@ -451,6 +451,15 @@ void bilinear_interpolation_color_wrap(struct ImBuf *in, unsigned char col[4], f
 void IMB_alpha_under_color_float(float *rect_float, int x, int y, float backcol[3]);
 void IMB_alpha_under_color_byte(unsigned char *rect, int x, int y, float backcol[3]);
 
+void IMB_invert_channels(struct ImBuf *in, const short r, const short g, const short b, const short a);
+void IMB_bright_contrast(struct ImBuf *in, float bright, float contrast);
+void IMB_desaturate(struct ImBuf *in, int type);
+void IMB_posterize(struct ImBuf *in, int levels);
+void IMB_threshold(struct ImBuf *in, int low, int high);
+void IMB_exposure(struct ImBuf *in, float exposure, float offset, float gamma);
+void IMB_colorize(struct ImBuf *in, int hue, int saturation, int lightness);
+void IMB_invert_value(struct ImBuf *in);
+
 /**
  *
  * \attention defined in readimage.c
@@ -499,11 +508,19 @@ struct ImBuf *IMB_double_y(struct ImBuf *ibuf1);
  */
 void IMB_flipx(struct ImBuf *ibuf);
 void IMB_flipy(struct ImBuf *ibuf);
+struct ImBuf *IMB_rotation(struct ImBuf *ibuf, float x, float y, float angle, int filter_type, int lock, float default_color[4]);
 
 /* Premultiply alpha */
 
 void IMB_premultiply_alpha(struct ImBuf *ibuf);
 void IMB_unpremultiply_alpha(struct ImBuf *ibuf);
+
+/**
+ *
+ * \attention Defined in offset.c
+ */
+struct ImBuf *IMB_offset(struct ImBuf *ibuf, float x, float y, int half, int wrap, float default_color[4]);
+struct ImBuf *IMB_size(struct ImBuf *ibuf, int width, int height, int off_x, int off_y, int centre, float default_color[4]);
 
 /**
  *

@@ -165,6 +165,8 @@
 #include "NOD_socket.h"	/* for sock->default_value data */
 #endif
 
+#include "IMB_imbuf_types.h"
+
 
 #include "BLO_writefile.h"
 #include "BLO_readfile.h"
@@ -2117,7 +2119,9 @@ static void write_images(WriteData *wd, ListBase *idbase)
 {
 	Image *ima;
 	PackedFile * pf;
-
+	ImageLayer *iml;
+	ColorManagedColorspaceSettings *cs_s;
+	ImBuf *ibuf;
 
 	ima= idbase->first;
 	while (ima) {
@@ -2132,9 +2136,31 @@ static void write_images(WriteData *wd, ListBase *idbase)
 				writedata(wd, DATA, pf->size, pf->data);
 			}
 
+			//if (ima->colorspace_settings) {
+			cs_s = &ima->colorspace_settings;
+			writestruct(wd, DATA, "ColorManagedColorspaceSettings", 1, cs_s);
+			//}
+
+			if (ima->imlayers.last) {
+				for (iml = (ImageLayer *)ima->imlayers.first; iml; iml = iml->next)
+					writestruct(wd, DATA, "ImageLayer", 1, iml);
+
+				for (iml = (ImageLayer *)ima->imlayers.first; iml; iml = iml->next) {
+					for (ibuf = (ImBuf *)iml->ibufs.first; ibuf; ibuf = ibuf->next)
+						writestruct(wd, DATA, "ImBuf", 1, ibuf);
+				}
+
+				for (iml = (ImageLayer *)ima->imlayers.first; iml; iml = iml->next) {
+					for (ibuf = (ImBuf *)iml->ibufs.first; ibuf; ibuf = ibuf->next) {
+						writedata(wd, DATA, ibuf->x * ibuf->y * sizeof(float) * 4, ibuf->rect_float);
+						writedata(wd, DATA, ibuf->x * ibuf->y * sizeof(char) * 4, ibuf->rect);
+					}
+				}
+			}
+
 			write_previews(wd, ima->preview);
 		}
-		ima= ima->id.next;
+		ima = ima->id.next;
 	}
 	/* flush helps the compression for undo-save */
 	mywrite(wd, MYWRITE_FLUSH, 0);

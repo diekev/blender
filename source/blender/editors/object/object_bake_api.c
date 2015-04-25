@@ -181,7 +181,7 @@ static bool write_internal_bake_pixels(
 	char *mask_buffer = NULL;
 	const size_t num_pixels = (size_t)width * (size_t)height;
 
-	ibuf = BKE_image_acquire_ibuf(image, NULL, &lock);
+	ibuf = BKE_image_acquire_ibuf(image, NULL, &lock, IMA_IBUF_IMA);
 
 	if (!ibuf)
 		return false;
@@ -388,7 +388,7 @@ static bool bake_object_check(Object *ob, ReportList *reports)
 				}
 			}
 
-			ibuf = BKE_image_acquire_ibuf(image, NULL, &lock);
+			ibuf = BKE_image_acquire_ibuf(image, NULL, &lock, IMA_IBUF_IMA);
 
 			if (ibuf) {
 				BKE_image_release_ibuf(image, ibuf, lock);
@@ -529,7 +529,7 @@ static size_t initialize_internal_images(BakeImages *bake_images, ReportList *re
 		void *lock;
 
 		BakeImage *bk_image = &bake_images->data[i];
-		ibuf = BKE_image_acquire_ibuf(bk_image->image, NULL, &lock);
+		ibuf = BKE_image_acquire_ibuf(bk_image->image, NULL, &lock, IMA_IBUF_IMA);
 
 		if (ibuf) {
 			bk_image->width = ibuf->x;

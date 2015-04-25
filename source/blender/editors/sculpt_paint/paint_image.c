@@ -58,6 +58,7 @@
 #include "BKE_DerivedMesh.h"
 #include "BKE_brush.h"
 #include "BKE_image.h"
+#include "BKE_layer.h"
 #include "BKE_main.h"
 #include "BKE_material.h"
 #include "BKE_node.h"
@@ -297,7 +298,7 @@ static void image_undo_restore_runtime(ListBase *lb)
 
 	for (tile = lb->first; tile; tile = tile->next) {
 		Image *ima = tile->ima;
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
 
 		undo_copy_tile(tile, tmpibuf, ibuf, RESTORE);
 
@@ -335,7 +336,7 @@ void ED_image_undo_restore(bContext *C, ListBase *lb)
 			ima = BLI_findstring(&bmain->image, tile->idname, offsetof(ID, name));
 		}
 
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
 
 		if (ima && ibuf && !STREQ(tile->ibufname, ibuf->name)) {
 			/* current ImBuf filename was changed, probably current frame
@@ -349,7 +350,10 @@ void ED_image_undo_restore(bContext *C, ListBase *lb)
 		}
 
 		if (!ima || !ibuf || !(ibuf->rect || ibuf->rect_float)) {
-			BKE_image_release_ibuf(ima, ibuf, NULL);
+			if (ibuf) {
+				if (ibuf->rect || ibuf->rect_float)
+					BKE_image_release_ibuf(ima, ibuf, NULL);
+			}
 			continue;
 		}
 
@@ -589,6 +593,7 @@ static Brush *image_paint_brush(bContext *C)
 static int image_paint_poll(bContext *C)
 {
 	Object *obact;
+	wmWindow *win = CTX_wm_window(C);
 
 	if (!image_paint_brush(C))
 		return 0;
@@ -603,10 +608,18 @@ static int image_paint_poll(bContext *C)
 		if (sima) {
 			ARegion *ar = CTX_wm_region(C);
 
-			if ((sima->mode == SI_MODE_PAINT) && ar->regiontype == RGN_TYPE_WINDOW) {
+			if ((sima->mode == SI_MODE_PAINT) &&
+				(ar->regiontype == RGN_TYPE_WINDOW) &&
+				(!(imalayer_is_locked(sima->image) & IMA_LAYER_LOCK)))
+			{
+				if ((!(win->modalcursor & BC_NSEW_SCROLLCURSOR)) || (!(win->modalcursor & BC_EYEDROPPER_CURSOR)))
+					WM_cursor_modal_set(win, BC_PAINTBRUSHCURSOR);
+
 				return 1;
 			}
 		}
+
+		WM_cursor_modal_restore(CTX_wm_window(C));
 	}
 
 	return 0;

@@ -226,7 +226,7 @@ static int load_tex(Brush *br, ViewContext *vc, float zoom, bool col, bool prima
 #endif
 
 			if (mtex->tex->type == TEX_IMAGE && mtex->tex->ima) {
-				ImBuf *tex_ibuf = BKE_image_pool_acquire_ibuf(mtex->tex->ima, &mtex->tex->iuser, pool);
+				ImBuf *tex_ibuf = BKE_image_pool_acquire_ibuf(mtex->tex->ima, &mtex->tex->iuser, pool, IMA_IBUF_IMA);
 				/* For consistency, sampling always returns color in linear space */
 				if (tex_ibuf && tex_ibuf->rect_float == NULL) {
 					convert_to_linear = true;

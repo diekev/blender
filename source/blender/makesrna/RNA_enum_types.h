@@ -67,6 +67,7 @@ extern EnumPropertyItem image_type_items[];
 extern EnumPropertyItem image_color_mode_items[];
 extern EnumPropertyItem image_color_depth_items[];
 extern EnumPropertyItem image_generated_type_items[];
+extern EnumPropertyItem image_layer_mode_items[];
 
 extern EnumPropertyItem normal_space_items[];
 extern EnumPropertyItem normal_swizzle_items[];

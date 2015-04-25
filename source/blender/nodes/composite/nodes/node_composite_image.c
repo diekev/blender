@@ -193,6 +193,23 @@ static void cmp_node_image_add_multilayer_outputs(bNodeTree *ntree, bNode *node,
 	}
 }
 
+static void cmp_node_image_add_imagelayer_outputs(bNodeTree *ntree, bNode *node, ImageLayer *layer)
+{
+	bNodeSocket *sock;
+	NodeImageLayer *sockdata;
+	ImageLayer *lpass;
+	int index;
+	for (lpass = layer, index = 0; lpass; lpass = lpass->prev, index++) {
+		sock = nodeAddStaticSocket(ntree, node, SOCK_OUT, SOCK_RGBA, PROP_NONE, lpass->name, lpass->name);
+		/* extra socket info */
+		sockdata = MEM_callocN(sizeof(NodeImageLayer), "node image layer");
+		sock->storage = sockdata;
+
+		sockdata->pass_index = index;
+		sockdata->pass_flag = SCE_PASS_COMBINED;//lpass->passtype;
+	}
+}
+
 static void cmp_node_image_create_outputs(bNodeTree *ntree, bNode *node)
 {
 	Image *ima = (Image *)node->id;
@@ -214,7 +231,7 @@ static void cmp_node_image_create_outputs(bNodeTree *ntree, bNode *node)
 		load_iuser.framenr = offset;
 
 		/* make sure ima->type is correct */
-		ibuf = BKE_image_acquire_ibuf(ima, &load_iuser, NULL);
+		ibuf = BKE_image_acquire_ibuf(ima, &load_iuser, NULL, IMA_IBUF_IMA);
 		
 		if (ima->rr) {
 			RenderLayer *rl = BLI_findlink(&ima->rr->layers, iuser->layer);
@@ -228,9 +245,14 @@ static void cmp_node_image_create_outputs(bNodeTree *ntree, bNode *node)
 			else
 				cmp_node_image_add_render_pass_outputs(ntree, node, RRES_OUT_IMAGE | RRES_OUT_ALPHA);
 		}
-		else
-			cmp_node_image_add_render_pass_outputs(ntree, node, RRES_OUT_IMAGE | RRES_OUT_ALPHA | RRES_OUT_Z);
-		
+		else {
+			if (iuser->use_layer_ima) {
+				cmp_node_image_add_imagelayer_outputs(ntree, node, ima->imlayers.last);
+			}
+			else
+				cmp_node_image_add_render_pass_outputs(ntree, node, RRES_OUT_IMAGE | RRES_OUT_ALPHA | RRES_OUT_Z);
+		}
+
 		BKE_image_release_ibuf(ima, ibuf, NULL);
 	}
 	else

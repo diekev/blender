@@ -39,6 +39,8 @@
 #include "BLI_math_color_blend.h"
 #include "BLI_math_vector.h"
 
+#include "DNA_image_types.h" /* for IMA_LAYER_LOCK_ALPHA - XXX? (kevin) */
+
 #include "IMB_imbuf_types.h"
 #include "IMB_imbuf.h"
 
@@ -289,7 +291,7 @@ static void imb_rectclip3(ImBuf *dbuf, ImBuf *obuf, ImBuf *sbuf, int *destx,
 void IMB_rectcpy(ImBuf *dbuf, ImBuf *sbuf, int destx, 
                  int desty, int srcx, int srcy, int width, int height)
 {
-	IMB_rectblend(dbuf, dbuf, sbuf, NULL, NULL, NULL, 0, destx, desty, destx, desty, srcx, srcy, width, height, IMB_BLEND_COPY, false);
+	IMB_rectblend(dbuf, dbuf, sbuf, NULL, NULL, NULL, 0, destx, desty, destx, desty, srcx, srcy, width, height, IMB_BLEND_COPY, false, 2);
 }
 
 typedef void (*IMB_blend_func)(unsigned char *dst, const unsigned char *src1, const unsigned char *src2);
@@ -299,7 +301,7 @@ typedef void (*IMB_blend_func_float)(float *dst, const float *src1, const float 
 void IMB_rectblend(ImBuf *dbuf, ImBuf *obuf, ImBuf *sbuf, unsigned short *dmask, unsigned short *curvemask,
                    unsigned short *texmask, float mask_max,
                    int destx,  int desty, int origx, int origy, int srcx, int srcy, int width, int height,
-                   IMB_BlendMode mode, bool accumulate)
+				   IMB_BlendMode mode, bool accumulate, short lock_alpha)
 {
 	unsigned int *drect = NULL, *orect, *srect = NULL, *dr, *or, *sr;
 	float *drectf = NULL, *orectf, *srectf = NULL, *drf, *orf, *srf;
@@ -542,30 +544,32 @@ void IMB_rectblend(ImBuf *dbuf, ImBuf *obuf, ImBuf *sbuf, unsigned short *dmask,
 							unsigned char *src = (unsigned char *)sr;
 							float mask_lim = mask_max * (*cmr);
 
-							if (texmaskrect)
-								mask_lim *= ((*tmr++) / 65535.0f);
+							if (!((lock_alpha & IMA_LAYER_LOCK_ALPHA) && (pixel_is_transparent((unsigned char *)or)))) {
+								if (texmaskrect)
+									mask_lim *= ((*tmr++) / 65535.0f);
 
-							if (src[3] && mask_lim) {
-								float mask;
+								if (src[3] && mask_lim) {
+									float mask;
 
-								if (accumulate)
-									mask = *dmr + mask_lim;
-								else
-									mask = *dmr + mask_lim - (*dmr  * (*cmr / 65535.0f));
+									if (accumulate)
+										mask = *dmr + mask_lim;
+									else
+										mask = *dmr + mask_lim - (*dmr  * (*cmr / 65535.0f));
 
-								mask = min_ff(mask, 65535.0);
+									mask = min_ff(mask, 65535.0);
 
-								if (mask > *dmr) {
-									unsigned char mask_src[4];
+									if (mask > *dmr) {
+										unsigned char mask_src[4];
 
-									*dmr = mask;
+										*dmr = mask;
 
-									mask_src[0] = src[0];
-									mask_src[1] = src[1];
-									mask_src[2] = src[2];
-									mask_src[3] = divide_round_i(src[3] * mask, 65535);
+										mask_src[0] = src[0];
+										mask_src[1] = src[1];
+										mask_src[2] = src[2];
+										mask_src[3] = divide_round_i(src[3] * mask, 65535);
 
-									func((unsigned char *)dr, (unsigned char *)or, mask_src);
+										func((unsigned char *)dr, (unsigned char *)or, mask_src);
+									}
 								}
 							}
 						}
@@ -577,20 +581,22 @@ void IMB_rectblend(ImBuf *dbuf, ImBuf *obuf, ImBuf *sbuf, unsigned short *dmask,
 							unsigned char *src = (unsigned char *)sr;
 							float mask = (float)mask_max * ((float)(*cmr));
 
-							if (texmaskrect)
-								mask *= ((float)(*tmr++) / 65535.0f);
+							if (!((lock_alpha & IMA_LAYER_LOCK_ALPHA) && (pixel_is_transparent((unsigned char *)or)))) {
+								if (texmaskrect)
+									mask *= ((float)(*tmr++) / 65535.0f);
 
-							mask = min_ff(mask, 65535.0);
+								mask = min_ff(mask, 65535.0);
 
-							if (src[3] && (mask > 0.0f)) {
-								unsigned char mask_src[4];
+								if (src[3] && (mask > 0.0f)) {
+									unsigned char mask_src[4];
 
-								mask_src[0] = src[0];
-								mask_src[1] = src[1];
-								mask_src[2] = src[2];
-								mask_src[3] = divide_round_i(src[3] * mask, 65535);
+									mask_src[0] = src[0];
+									mask_src[1] = src[1];
+									mask_src[2] = src[2];
+									mask_src[3] = divide_round_i(src[3] * mask, 65535);
 
-								func((unsigned char *)dr, (unsigned char *)or, mask_src);
+									func((unsigned char *)dr, (unsigned char *)or, mask_src);
+								}
 							}
 						}
 					}
