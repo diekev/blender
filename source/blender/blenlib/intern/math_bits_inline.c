@@ -16,17 +16,44 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
  * ***** END GPL LICENSE BLOCK *****
+ * */
+
+/** \file blender/blenlib/intern/math_bits_inline.c
+ *  \ingroup bli
  */
 
-/** \file gpu_extensions_private.h
- *  \ingroup gpu
- */
+#ifndef __MATH_BITS_INLINE_C__
+#define __MATH_BITS_INLINE_C__
 
-#ifndef __GPU_EXTENSIONS_PRIVATE_H__
-#define __GPU_EXTENSIONS_PRIVATE_H__
+#include "BLI_math_bits.h"
 
-/* call this before running any of the functions below */
-void gpu_extensions_init(void);
-void gpu_extensions_exit(void);
+MINLINE unsigned int highest_order_bit_i(unsigned int n)
+{
+	n |= (n >>  1);
+	n |= (n >>  2);
+	n |= (n >>  4);
+	n |= (n >>  8);
+	n |= (n >> 16);
+	return n - (n >> 1);
+}
 
-#endif  /* __GPU_EXTENSIONS_PRIVATE_H__ */
+MINLINE unsigned short highest_order_bit_s(unsigned short n)
+{
+	n |= (n >>  1);
+	n |= (n >>  2);
+	n |= (n >>  4);
+	n |= (n >>  8);
+	return (unsigned short)(n - (n >> 1));
+}
+
+#ifndef __GNUC__
+MINLINE int count_bits_i(unsigned int i)
+{
+	/* variable-precision SWAR algorithm. */
+	i = i - ((i >> 1) & 0x55555555);
+	i = (i & 0x33333333) + ((i >> 2) & 0x33333333);
+	return (((i + (i >> 4)) & 0x0F0F0F0F) * 0x01010101) >> 24;
+}
+#endif
+
+#endif /* __MATH_BITS_INLINE_C__ */

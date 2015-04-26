@@ -331,7 +331,7 @@ static PointerRNA rna_UserDef_system_get(PointerRNA *ptr)
 
 static void rna_UserDef_audio_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *UNUSED(ptr))
 {
-	sound_init(bmain);
+	BKE_sound_init(bmain);
 }
 
 static void rna_Userdef_memcache_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *UNUSED(ptr))
@@ -548,7 +548,7 @@ static EnumPropertyItem *rna_userdef_audio_device_itemf(bContext *UNUSED(C), Poi
 #endif
 
 #ifdef WITH_JACK
-	if (sound_is_jack_supported()) {
+	if (BKE_sound_is_jack_supported()) {
 		RNA_enum_item_add(&item, &totitem, &audio_device_items[index]);
 	}
 	index++;
@@ -2403,6 +2403,18 @@ static void rna_def_userdef_theme_space_image(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Current Frame", "");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 
+	prop = RNA_def_property(srna, "metadatabg", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "metadatabg");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Metadata Background", "");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
+	prop = RNA_def_property(srna, "metadatatext", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "metadatatext");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Metadata Text", "");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
 	rna_def_userdef_theme_spaces_curves(srna, false, false, false, true);
 
 	rna_def_userdef_theme_spaces_paint_curves(srna);
@@ -3353,7 +3365,12 @@ static void rna_def_userdef_view(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "use_quit_dialog", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "uiflag", USER_QUIT_PROMPT);
 	RNA_def_property_ui_text(prop, "Prompt Quit",
-	                         "Asks for confirmation when quitting through the window close button");
+	                         "Ask for confirmation when quitting through the window close button");
+
+	prop = RNA_def_property(srna, "use_gl_warn_support", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "uiflag2", USER_OPENGL_NO_WARN_SUPPORT);
+	RNA_def_property_ui_text(prop, "Warn On Deprecated OpenGL",
+	                         "Pop up a warning when an old OpenGL version is detected");
 
 	/* Toolbox click-hold delay */
 	prop = RNA_def_property(srna, "open_left_mouse_delay", PROP_INT, PROP_NONE);
@@ -3660,7 +3677,7 @@ static void rna_def_userdef_edit(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Grease Pencil Eraser Radius", "Radius of eraser 'brush'");
 	
 	
-	prop = RNA_def_property(srna, "grease_pencil_default_color", PROP_FLOAT, PROP_COLOR);
+	prop = RNA_def_property(srna, "grease_pencil_default_color", PROP_FLOAT, PROP_COLOR_GAMMA);
 	RNA_def_property_float_sdna(prop, NULL, "gpencil_new_layer_col");
 	RNA_def_property_array(prop, 4);
 	RNA_def_property_ui_text(prop, "Grease Pencil Default Color", "Color of new Grease Pencil layers");
@@ -4136,8 +4153,8 @@ static void rna_def_userdef_system(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "uiflag2", USER_REGION_OVERLAP);
 	RNA_def_property_ui_text(prop, "Region Overlap",
 	                         "Draw tool/property regions over the main region, when using Triple Buffer");
-	RNA_def_property_update(prop, 0, "rna_userdef_dpi_update");
-	
+	RNA_def_property_update(prop, 0, "rna_userdef_dpi_update");	
+
 #ifdef WITH_CYCLES
 	prop = RNA_def_property(srna, "compute_device_type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_flag(prop, PROP_ENUM_NO_CONTEXT);

@@ -509,6 +509,13 @@ bool	CcdPhysicsEnvironment::RemoveCcdPhysicsController(CcdPhysicsController* ctr
 	btRigidBody* body = ctrl->GetRigidBody();
 	if (body)
 	{
+		btBroadphaseProxy *proxy = ctrl->GetCollisionObject()->getBroadphaseHandle();
+		btDispatcher *dispatcher = m_dynamicsWorld->getDispatcher();
+		btOverlappingPairCache *pairCache = m_dynamicsWorld->getPairCache();
+
+		CleanPairCallback cleanPairs(proxy, pairCache, dispatcher);
+		pairCache->processAllOverlappingPairs(&cleanPairs, dispatcher);
+
 		for (int i = ctrl->getNumCcdConstraintRefs() - 1; i >= 0; i--)
 		{
 			btTypedConstraint* con = ctrl->getCcdConstraintRef(i);
@@ -562,6 +569,7 @@ void	CcdPhysicsEnvironment::UpdateCcdPhysicsController(CcdPhysicsController* ctr
 	// this function is used when the collisionning group of a controller is changed
 	// remove and add the collistioning object
 	btRigidBody* body = ctrl->GetRigidBody();
+	btSoftBody *softBody = ctrl->GetSoftBody();
 	btCollisionObject* obj = ctrl->GetCollisionObject();
 	if (obj)
 	{
@@ -574,6 +582,9 @@ void	CcdPhysicsEnvironment::UpdateCcdPhysicsController(CcdPhysicsController* ctr
 				body->getCollisionShape()->calculateLocalInertia(newMass, inertia);
 			body->setMassProps(newMass, inertia);
 			m_dynamicsWorld->addRigidBody(body, newCollisionGroup, newCollisionMask);
+		}
+		else if (softBody) {
+			m_dynamicsWorld->addSoftBody(softBody);
 		}
 		else {
 			m_dynamicsWorld->addCollisionObject(obj, newCollisionGroup, newCollisionMask);
@@ -634,6 +645,11 @@ void CcdPhysicsEnvironment::RefreshCcdPhysicsController(CcdPhysicsController* ct
 			m_dynamicsWorld->getPairCache()->cleanProxyFromPairs(proxy,m_dynamicsWorld->getDispatcher());
 		}
 	}
+}
+
+bool CcdPhysicsEnvironment::IsActiveCcdPhysicsController(CcdPhysicsController *ctrl)
+{
+	return (m_controllers.find(ctrl) != m_controllers.end());
 }
 
 void CcdPhysicsEnvironment::AddCcdGraphicController(CcdGraphicController* ctrl)
@@ -752,8 +768,8 @@ public:
 void	CcdPhysicsEnvironment::ProcessFhSprings(double curTime,float interval)
 {
 	std::set<CcdPhysicsController*>::iterator it;
-	// dynamic of Fh spring is based on a timestep of 1/60
-	int numIter = (int)(interval*60.0001f);
+	// Add epsilon to the tick rate for numerical stability
+	int numIter = (int)(interval*(KX_KetsjiEngine::GetTicRate() + 0.001f));
 	
 	for (it=m_controllers.begin(); it!=m_controllers.end(); it++)
 	{
@@ -2644,7 +2660,6 @@ int			CcdPhysicsEnvironment::CreateConstraint(class PHY_IPhysicsController* ctrl
 	if (!rb0)
 		return 0;
 
-	
 	btVector3 pivotInB = rb1 ? rb1->getCenterOfMassTransform().inverse()(rb0->getCenterOfMassTransform()(pivotInA)) : 
 		rb0->getCenterOfMassTransform() * pivotInA;
 	btVector3 axisInA(axisX,axisY,axisZ);
@@ -2656,6 +2671,8 @@ int			CcdPhysicsEnvironment::CreateConstraint(class PHY_IPhysicsController* ctrl
 	{
 	case PHY_POINT2POINT_CONSTRAINT:
 		{
+			// If either of the controllers is missing, we can't do anything.
+			if (!c0 || !c1) return 0;
 
 			btPoint2PointConstraint* p2p = 0;
 
@@ -2684,6 +2701,9 @@ int			CcdPhysicsEnvironment::CreateConstraint(class PHY_IPhysicsController* ctrl
 
 	case PHY_GENERIC_6DOF_CONSTRAINT:
 		{
+			// If either of the controllers is missing, we can't do anything.
+			if (!c0 || !c1) return 0;
+
 			btGeneric6DofConstraint* genericConstraint = 0;
 
 			if (rb1)
@@ -2737,7 +2757,7 @@ int			CcdPhysicsEnvironment::CreateConstraint(class PHY_IPhysicsController* ctrl
 					*rb0,s_fixedObject2,
 					frameInA,frameInB,useReferenceFrameA);
 			}
-			
+
 			if (genericConstraint)
 			{
 				//m_constraints.push_back(genericConstraint);
@@ -2754,6 +2774,9 @@ int			CcdPhysicsEnvironment::CreateConstraint(class PHY_IPhysicsController* ctrl
 		}
 	case PHY_CONE_TWIST_CONSTRAINT:
 		{
+			// If either of the controllers is missing, we can't do anything.
+			if (!c0 || !c1) return 0;
+
 			btConeTwistConstraint* coneTwistContraint = 0;
 
 			
@@ -2805,7 +2828,7 @@ int			CcdPhysicsEnvironment::CreateConstraint(class PHY_IPhysicsController* ctrl
 					*rb0,s_fixedObject2,
 					frameInA,frameInB);
 			}
-			
+
 			if (coneTwistContraint)
 			{
 				//m_constraints.push_back(genericConstraint);
@@ -2828,6 +2851,9 @@ int			CcdPhysicsEnvironment::CreateConstraint(class PHY_IPhysicsController* ctrl
 
 	case PHY_LINEHINGE_CONSTRAINT:
 		{
+			// If either of the controllers is missing, we can't do anything.
+			if (!c0 || !c1) return 0;
+
 			btHingeConstraint* hinge = 0;
 
 			if (rb1)
@@ -3515,12 +3541,14 @@ void CcdPhysicsEnvironment::ConvertObject(KX_GameObject *gameobj, RAS_MeshObject
 	if (isbulletdyna)
 		gameobj->SetRecordAnimation(true);
 
+	physicscontroller->SetNewClientInfo(gameobj->getClientInfo());
+
 	// don't add automatically sensor object, they are added when a collision sensor is registered
 	if (!isbulletsensor && (blenderobject->lay & activeLayerBitInfo) != 0)
 	{
 		this->AddCcdPhysicsController( physicscontroller);
 	}
-	physicscontroller->SetNewClientInfo(gameobj->getClientInfo());
+
 	{
 		btRigidBody* rbody = physicscontroller->GetRigidBody();
 
@@ -3588,4 +3616,80 @@ void CcdPhysicsEnvironment::ConvertObject(KX_GameObject *gameobj, RAS_MeshObject
 		}
 	}
 #endif
+}
+
+
+void CcdPhysicsEnvironment::SetupObjectConstraints(KX_GameObject *obj_src, KX_GameObject *obj_dest,
+	                                               bRigidBodyJointConstraint *dat)
+{
+	PHY_IPhysicsController *phy_src = obj_src->GetPhysicsController();
+	PHY_IPhysicsController *phy_dest = obj_dest->GetPhysicsController();
+	PHY_IPhysicsEnvironment *phys_env = obj_src->GetScene()->GetPhysicsEnvironment();
+
+	/* We need to pass a full constraint frame, not just axis. */
+	MT_Matrix3x3 localCFrame(MT_Vector3(dat->axX,dat->axY,dat->axZ));
+	MT_Vector3 axis0 = localCFrame.getColumn(0);
+	MT_Vector3 axis1 = localCFrame.getColumn(1);
+	MT_Vector3 axis2 = localCFrame.getColumn(2);
+	MT_Vector3 scale = obj_src->NodeGetWorldScaling();
+
+	/* Apply not only the pivot and axis values, but also take scale into count
+	 * this is not working well, if only one or two axis are scaled, but works ok on
+	 * homogeneous scaling. */
+	int constraintId = phys_env->CreateConstraint(
+		phy_src, phy_dest, (PHY_ConstraintType)dat->type,
+	    (float)(dat->pivX * scale.x()), (float)(dat->pivY * scale.y()), (float)(dat->pivZ * scale.z()),
+	    (float)(axis0.x() * scale.x()), (float)(axis0.y() * scale.y()), (float)(axis0.z() * scale.z()),
+	    (float)(axis1.x() * scale.x()), (float)(axis1.y() * scale.y()), (float)(axis1.z() * scale.z()),
+	    (float)(axis2.x() * scale.x()), (float)(axis2.y() * scale.y()), (float)(axis2.z() * scale.z()),
+		dat->flag);
+
+	/* PHY_POINT2POINT_CONSTRAINT = 1,
+	 * PHY_LINEHINGE_CONSTRAINT = 2,
+	 * PHY_ANGULAR_CONSTRAINT = 3,
+	 * PHY_CONE_TWIST_CONSTRAINT = 4,
+	 * PHY_VEHICLE_CONSTRAINT = 11,
+	 * PHY_GENERIC_6DOF_CONSTRAINT = 12 */
+
+	if (!constraintId)
+		return;
+
+	int dof = 0;
+	int dof_max = 0;
+	int dofbit = 0;
+
+	switch (dat->type) {
+		/* Set all the limits for generic 6DOF constraint. */
+		case PHY_GENERIC_6DOF_CONSTRAINT:
+			dof_max = 6;
+			dofbit = 1;
+			break;
+		/* Set XYZ angular limits for cone twist constraint. */
+		case PHY_CONE_TWIST_CONSTRAINT:
+			dof = 3;
+			dof_max = 6;
+			dofbit = 1 << 3;
+			break;
+		/* Set only X angular limits for line hinge and angular constraint. */
+		case PHY_LINEHINGE_CONSTRAINT:
+		case PHY_ANGULAR_CONSTRAINT:
+			dof = 3;
+			dof_max = 4;
+			dofbit = 1 << 3;
+			break;
+		default:
+			break;
+	}
+
+	for (; dof < dof_max; dof++) {
+		if (dat->flag & dofbit) {
+			phys_env->SetConstraintParam(constraintId, dof, dat->minLimit[dof], dat->maxLimit[dof]);
+		}
+		else {
+			/* minLimit > maxLimit means free (no limit) for this degree of freedom. */
+			phys_env->SetConstraintParam(constraintId, dof, 1.0f, -1.0f);
+		}
+		dofbit <<= 1;
+	}
+
 }

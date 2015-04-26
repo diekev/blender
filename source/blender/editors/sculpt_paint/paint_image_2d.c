@@ -346,8 +346,8 @@ static unsigned short *brush_painter_curve_mask_new(BrushPainter *painter, int d
 {
 	Brush *brush = painter->brush;
 
-	int xoff = -diameter * 0.5f + 0.5f;
-	int yoff = -diameter * 0.5f + 0.5f;
+	int xoff = -radius;
+	int yoff = -radius;
 
 	unsigned short *mask, *m;
 	int x, y;
@@ -890,7 +890,7 @@ static void paint_2d_lift_soften(ImagePaintState *s, ImBuf *ibuf, ImBuf *ibufb, 
 
 					/* now rgba_ub contains the edge result, but this should be converted to luminance to avoid
 					 * colored speckles appearing in final image, and also to check for threshold */
-					outrgb[0] = outrgb[1] = outrgb[2] = rgb_to_grayscale(outrgb);
+					outrgb[0] = outrgb[1] = outrgb[2] = IMB_colormanagement_get_luminance(outrgb);
 					if (fabsf(outrgb[0]) > threshold) {
 						float mask = BKE_brush_alpha_get(s->scene, s->brush);
 						float alpha = rgba[3];
@@ -997,8 +997,8 @@ static ImBuf *paint_2d_lift_clone(ImBuf *ibuf, ImBuf *ibufb, int *pos, short loc
 
 static void paint_2d_convert_brushco(ImBuf *ibufb, const float pos[2], int ipos[2])
 {
-	ipos[0] = (int)floorf((pos[0] - ibufb->x / 2) + 1.0f);
-	ipos[1] = (int)floorf((pos[1] - ibufb->y / 2) + 1.0f);
+	ipos[0] = (int)floorf((pos[0] - ibufb->x / 2));
+	ipos[1] = (int)floorf((pos[1] - ibufb->y / 2));
 }
 
 static int paint_2d_op(void *state, ImBuf *ibufb, unsigned short *curveb, unsigned short *texmaskb, const float lastpos[2], const float pos[2])
@@ -1110,7 +1110,7 @@ static int paint_2d_canvas_set(ImagePaintState *s, Image *ima)
 	if (ima == NULL) {
 		return 0;
 	}
-	else if (ima->packedfile && ima->rr) {
+	else if (BKE_image_has_packedfile(ima) && ima->rr) {
 		s->warnpackedfile = ima->id.name + 2;
 		return 0;
 	}

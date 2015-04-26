@@ -234,7 +234,7 @@ void BKE_object_modifier_hook_reset(Object *ob, HookModifierData *hmd)
 
 bool BKE_object_support_modifier_type_check(Object *ob, int modifier_type)
 {
-	ModifierTypeInfo *mti;
+	const ModifierTypeInfo *mti;
 
 	mti = modifierType_getInfo(modifier_type);
 
@@ -329,6 +329,45 @@ void BKE_object_free_derived_caches(Object *ob)
 	BKE_object_free_curve_cache(ob);
 }
 
+void BKE_object_free_caches(Object *object)
+{
+	ModifierData *md;
+	short update_flag = 0;
+
+	/* Free particle system caches holding paths. */
+	if (object->particlesystem.first) {
+		ParticleSystem *psys;
+		for (psys = object->particlesystem.first;
+		     psys != NULL;
+		     psys = psys->next)
+		{
+			psys_free_path_cache(psys, psys->edit);
+			update_flag |= PSYS_RECALC;
+		}
+	}
+
+	/* Free memory used by cached derived meshes in the particle system modifiers. */
+	for (md = object->modifiers.first; md != NULL; md = md->next) {
+		if (md->type == eModifierType_ParticleSystem) {
+			ParticleSystemModifierData *psmd = (ParticleSystemModifierData *) md;
+			if (psmd->dm != NULL) {
+				psmd->dm->needsFree = 1;
+				psmd->dm->release(psmd->dm);
+				psmd->dm = NULL;
+				update_flag |= OB_RECALC_DATA;
+			}
+		}
+	}
+
+	/* Tag object for update, so once memory critical operation is over and
+	 * scene update routines are back to it's business the object will be
+	 * guaranteed to be in a known state.
+	 */
+	if (update_flag != 0) {
+		DAG_id_tag_update(&object->id, update_flag);
+	}
+}
+
 /* do not free object itself */
 void BKE_object_free_ex(Object *ob, bool do_id_user)
 {
@@ -369,7 +408,7 @@ void BKE_object_free_ex(Object *ob, bool do_id_user)
 	ob->iuser = NULL;
 	if (ob->bb) MEM_freeN(ob->bb); 
 	ob->bb = NULL;
-	if (ob->adt) BKE_free_animdata((ID *)ob);
+	if (ob->adt) BKE_animdata_free((ID *)ob);
 	if (ob->poselib) ob->poselib->id.us--;
 	if (ob->gpd) ((ID *)ob->gpd)->us--;
 	if (ob->defbase.first)
@@ -385,7 +424,7 @@ void BKE_object_free_ex(Object *ob, bool do_id_user)
 	free_controllers(&ob->controllers);
 	free_actuators(&ob->actuators);
 	
-	BKE_constraints_free(&ob->constraints);
+	BKE_constraints_free_ex(&ob->constraints, do_id_user);
 	
 	free_partdeflect(ob->pd);
 	BKE_rigidbody_free_object(ob);
@@ -395,7 +434,7 @@ void BKE_object_free_ex(Object *ob, bool do_id_user)
 	if (ob->bsoft) bsbFree(ob->bsoft);
 	if (ob->gpulamp.first) GPU_lamp_free(ob);
 
-	BKE_free_sculptsession(ob);
+	BKE_sculptsession_free(ob);
 
 	if (ob->pc_ids.first) BLI_freelistN(&ob->pc_ids);
 
@@ -492,7 +531,7 @@ void BKE_object_unlink(Object *ob)
 			bPoseChannel *pchan;
 			for (pchan = obt->pose->chanbase.first; pchan; pchan = pchan->next) {
 				for (con = pchan->constraints.first; con; con = con->next) {
-					bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
+					const bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
 					ListBase targets = {NULL, NULL};
 					bConstraintTarget *ct;
 					
@@ -523,7 +562,7 @@ void BKE_object_unlink(Object *ob)
 		sca_remove_ob_poin(obt, ob);
 		
 		for (con = obt->constraints.first; con; con = con->next) {
-			bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
+			const bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
 			ListBase targets = {NULL, NULL};
 			bConstraintTarget *ct;
 			
@@ -1009,7 +1048,7 @@ Object *BKE_object_add_only_object(Main *bmain, int type, const char *name)
 	ob->jump_speed = 10.0f;
 	ob->fall_speed = 55.0f;
 	ob->col_group = 0x01;
-	ob->col_mask = 0xff;
+	ob->col_mask = 0xffff;
 
 	/* NT fluid sim defaults */
 	ob->fluidsimSettings = NULL;
@@ -1059,10 +1098,12 @@ void BKE_object_lod_add(Object *ob)
 		BLI_addtail(&ob->lodlevels, base);
 		base->flags = OB_LOD_USE_MESH | OB_LOD_USE_MAT;
 		base->source = ob;
+		base->obhysteresis = 10;
 		last = ob->currentlod = base;
 	}
 	
 	lod->distance = last->distance + 25.0f;
+	lod->obhysteresis = 10;
 	lod->flags = OB_LOD_USE_MESH | OB_LOD_USE_MAT;
 
 	BLI_addtail(&ob->lodlevels, lod);
@@ -1367,7 +1408,7 @@ static void copy_object_pose(Object *obn, Object *ob)
 		chan->flag &= ~(POSE_LOC | POSE_ROT | POSE_SIZE);
 		
 		for (con = chan->constraints.first; con; con = con->next) {
-			bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
+			const bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
 			ListBase targets = {NULL, NULL};
 			bConstraintTarget *ct;
 			
@@ -1666,7 +1707,7 @@ void BKE_object_copy_proxy_drivers(Object *ob, Object *target)
 		
 		/* add new animdata block */
 		if (!ob->adt)
-			ob->adt = BKE_id_add_animdata(&ob->id);
+			ob->adt = BKE_animdata_add_id(&ob->id);
 		
 		/* make a copy of all the drivers (for now), then correct any links that need fixing */
 		free_fcurves(&ob->adt->drivers);
@@ -2180,7 +2221,7 @@ static void give_parvert(Object *par, int nr, float vec[3])
 					     md != NULL;
 					     md = md->next)
 					{
-						ModifierTypeInfo *mti = modifierType_getInfo(md->type);
+						const ModifierTypeInfo *mti = modifierType_getInfo(md->type);
 						/* TODO(sergey): Check for disabled modifiers. */
 						if (mti->type != eModifierTypeType_OnlyDeform && md->next != NULL) {
 							use_special_ss_case = false;
@@ -2973,8 +3014,12 @@ void BKE_object_handle_update_ex(EvaluationContext *eval_ctx,
 {
 	if (ob->recalc & OB_RECALC_ALL) {
 		/* speed optimization for animation lookups */
-		if (ob->pose)
+		if (ob->pose) {
 			BKE_pose_channels_hash_make(ob->pose);
+			if (ob->pose->flag & POSE_CONSTRAINTS_NEED_UPDATE_FLAGS) {
+				BKE_pose_update_constraint_flags(ob->pose);
+			}
+		}
 
 		if (ob->recalc & OB_RECALC_DATA) {
 			if (ob->type == OB_ARMATURE) {
@@ -3199,7 +3244,7 @@ void BKE_object_sculpt_modifiers_changed(Object *ob)
 				ss->pbvh = NULL;
 			}
 
-			BKE_free_sculptsession_deformMats(ob->sculpt);
+			BKE_sculptsession_free_deformMats(ob->sculpt);
 		}
 		else {
 			PBVHNode **nodes;
@@ -3478,6 +3523,19 @@ KeyBlock *BKE_object_insert_shape_key(Object *ob, const char *name, const bool f
 
 }
 
+bool BKE_object_flag_test_recursive(const Object *ob, short flag)
+{
+	if (ob->flag & flag) {
+		return true;
+	}
+	else if (ob->parent) {
+		return BKE_object_flag_test_recursive(ob->parent, flag);
+	}
+	else {
+		return false;
+	}
+}
+
 bool BKE_object_is_child_recursive(Object *ob_parent, Object *ob_child)
 {
 	for (ob_child = ob_child->parent; ob_child; ob_child = ob_child->parent) {
@@ -3616,7 +3674,7 @@ int BKE_object_is_deform_modified(Scene *scene, Object *ob)
 	     md && (flag != (eModifierMode_Render | eModifierMode_Realtime));
 	     md = md->next)
 	{
-		ModifierTypeInfo *mti = modifierType_getInfo(md->type);
+		const ModifierTypeInfo *mti = modifierType_getInfo(md->type);
 		bool can_deform = mti->type == eModifierTypeType_OnlyDeform ||
 		                  is_modifier_animated;
 
@@ -3673,7 +3731,7 @@ void BKE_object_relink(Object *ob)
 	modifiers_foreachIDLink(ob, copy_object__forwardModifierLinks, NULL);
 
 	if (ob->adt)
-		BKE_relink_animdata(ob->adt);
+		BKE_animdata_relink(ob->adt);
 	
 	if (ob->rigidbody_constraint)
 		BKE_rigidbody_relink_constraint(ob->rigidbody_constraint);

@@ -313,24 +313,32 @@ void BKE_paint_curve_set(Brush *br, PaintCurve *pc)
 	}
 }
 
+void BKE_paint_curve_clamp_endpoint_add_index(PaintCurve *pc, const int add_index)
+{
+	pc->add_index = (add_index || pc->tot_points == 1) ? (add_index + 1) : 0;
+}
+
 /* remove colour from palette. Must be certain color is inside the palette! */
 void BKE_palette_color_remove(Palette *palette, PaletteColor *color)
 {
-	if (color) {
-		int numcolors = BLI_listbase_count(&palette->colors);
-		if ((numcolors == palette->active_color + 1) && (numcolors != 1))
-			palette->active_color--;
-		
-		BLI_remlink(&palette->colors, color);
-		BLI_addhead(&palette->deleted, color);
+	if (BLI_listbase_count_ex(&palette->colors, palette->active_color) == palette->active_color) {
+		palette->active_color--;
 	}
+
+	BLI_remlink(&palette->colors, color);
+
+	if (palette->active_color < 0 && !BLI_listbase_is_empty(&palette->colors)) {
+		palette->active_color = 0;
+	}
+
+	MEM_freeN(color);
 }
 
-void BKE_palette_cleanup(Palette *palette)
+void BKE_palette_clear(Palette *palette)
 {
-	BLI_freelistN(&palette->deleted);
+	BLI_freelistN(&palette->colors);
+	palette->active_color = 0;
 }
-
 
 Palette *BKE_palette_add(Main *bmain, const char *name)
 {
@@ -353,7 +361,6 @@ PaletteColor *BKE_palette_color_add(Palette *palette)
 {
 	PaletteColor *color = MEM_callocN(sizeof(*color), "Pallete Color");
 	BLI_addtail(&palette->colors, color);
-	palette->active_color = BLI_listbase_count(&palette->colors) - 1;
 	return color;
 }
 
@@ -557,15 +564,11 @@ void paint_calculate_rake_rotation(UnifiedPaintSettings *ups, Brush *brush, cons
 	}
 }
 
-void BKE_free_sculptsession_deformMats(SculptSession *ss)
+void BKE_sculptsession_free_deformMats(SculptSession *ss)
 {
-	if (ss->orig_cos) MEM_freeN(ss->orig_cos);
-	if (ss->deform_cos) MEM_freeN(ss->deform_cos);
-	if (ss->deform_imats) MEM_freeN(ss->deform_imats);
-
-	ss->orig_cos = NULL;
-	ss->deform_cos = NULL;
-	ss->deform_imats = NULL;
+	MEM_SAFE_FREE(ss->orig_cos);
+	MEM_SAFE_FREE(ss->deform_cos);
+	MEM_SAFE_FREE(ss->deform_imats);
 }
 
 /* Write out the sculpt dynamic-topology BMesh to the Mesh */
@@ -624,7 +627,7 @@ void BKE_sculptsession_bm_to_me_for_render(Object *object)
 	}
 }
 
-void BKE_free_sculptsession(Object *ob)
+void BKE_sculptsession_free(Object *ob)
 {
 	if (ob && ob->sculpt) {
 		SculptSession *ss = ob->sculpt;
@@ -718,7 +721,7 @@ static bool sculpt_modifiers_active(Scene *scene, Sculpt *sd, Object *ob)
 
 	/* exception for shape keys because we can edit those */
 	for (; md; md = md->next) {
-		ModifierTypeInfo *mti = modifierType_getInfo(md->type);
+		const ModifierTypeInfo *mti = modifierType_getInfo(md->type);
 		if (!modifier_isEnabled(scene, md, eModifierMode_Realtime)) continue;
 		if (ELEM(md->type, eModifierType_ShapeKey, eModifierType_Multires)) continue;
 
@@ -765,7 +768,12 @@ void BKE_sculpt_update_mesh_elements(Scene *scene, Sculpt *sd, Object *ob,
 	}
 
 	/* BMESH ONLY --- at some point we should move sculpt code to use polygons only - but for now it needs tessfaces */
-	BKE_mesh_tessface_ensure(me);
+	if (ss->bm) {
+		BKE_mesh_tessface_clear(me);
+	}
+	else {
+		BKE_mesh_tessface_ensure(me);
+	}
 
 	if (!mmd) ss->kb = BKE_keyblock_from_object(ob);
 	else ss->kb = NULL;
@@ -780,7 +788,6 @@ void BKE_sculpt_update_mesh_elements(Scene *scene, Sculpt *sd, Object *ob,
 		ss->mvert = NULL;
 		ss->mpoly = NULL;
 		ss->mloop = NULL;
-		ss->face_normals = NULL;
 	}
 	else {
 		ss->totvert = me->totvert;
@@ -788,7 +795,6 @@ void BKE_sculpt_update_mesh_elements(Scene *scene, Sculpt *sd, Object *ob,
 		ss->mvert = me->mvert;
 		ss->mpoly = me->mpoly;
 		ss->mloop = me->mloop;
-		ss->face_normals = NULL;
 		ss->multires = NULL;
 		ss->vmask = CustomData_get_layer(&me->vdata, CD_PAINT_MASK);
 	}
@@ -802,7 +808,7 @@ void BKE_sculpt_update_mesh_elements(Scene *scene, Sculpt *sd, Object *ob,
 		if (!ss->orig_cos) {
 			int a;
 
-			BKE_free_sculptsession_deformMats(ss);
+			BKE_sculptsession_free_deformMats(ss);
 
 			ss->orig_cos = (ss->kb) ? BKE_keyblock_convert_to_vertcos(ob, ss->kb) : BKE_mesh_vertexCos_get(me, NULL);
 
@@ -815,7 +821,7 @@ void BKE_sculpt_update_mesh_elements(Scene *scene, Sculpt *sd, Object *ob,
 		}
 	}
 	else {
-		BKE_free_sculptsession_deformMats(ss);
+		BKE_sculptsession_free_deformMats(ss);
 	}
 
 	if (ss->kb != NULL && ss->deform_cos == NULL) {

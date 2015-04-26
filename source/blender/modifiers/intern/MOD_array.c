@@ -102,7 +102,9 @@ static void foreachObjectLink(
 }
 
 static void updateDepgraph(ModifierData *md, DagForest *forest,
-                           struct Scene *UNUSED(scene), Object *UNUSED(ob), DagNode *obNode)
+                           struct Main *UNUSED(bmain),
+                           struct Scene *UNUSED(scene),
+                           Object *UNUSED(ob), DagNode *obNode)
 {
 	ArrayModifierData *amd = (ArrayModifierData *) md;
 
@@ -499,7 +501,7 @@ static DerivedMesh *arrayModifier_doArray(
 		if (dist > eps) {
 			/* this gives length = first copy start to last copy end
 			 * add a tiny offset for floating point rounding errors */
-			count = (length + eps) / dist;
+			count = (length + eps) / dist + 1;
 		}
 		else {
 			/* if the offset has no translation, just make one copy */

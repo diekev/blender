@@ -467,7 +467,7 @@ void outliner_do_object_operation(bContext *C, Scene *scene_act, SpaceOops *soop
 static void clear_animdata_cb(int UNUSED(event), TreeElement *UNUSED(te),
                               TreeStoreElem *tselem, void *UNUSED(arg))
 {
-	BKE_free_animdata(tselem->id);
+	BKE_animdata_free(tselem->id);
 }
 
 
@@ -694,23 +694,26 @@ static void outliner_do_data_operation(SpaceOops *soops, int type, int event, Li
 	}
 }
 
-static void outline_delete_hierarchy(bContext *C, Scene *scene, Base *base)
+static Base *outline_delete_hierarchy(bContext *C, Scene *scene, Base *base)
 {
-	Base *child_base;
+	Base *child_base, *base_next;
 	Object *parent;
 
 	if (!base) {
-	    return;
+	    return NULL;
 	}
 
-	for (child_base = scene->base.first; child_base; child_base = child_base->next) {
+	for (child_base = scene->base.first; child_base; child_base = base_next) {
+		base_next = child_base->next;
 		for (parent = child_base->object->parent; parent && (parent != base->object); parent = parent->parent);
 		if (parent) {
-			outline_delete_hierarchy(C, scene, child_base);
+			base_next = outline_delete_hierarchy(C, scene, child_base);
 		}
 	}
 
+	base_next = base->next;
 	ED_base_object_free_and_unlink(CTX_data_main(C), scene, base);
+	return base_next;
 }
 
 static void object_delete_hierarchy_cb(
@@ -943,16 +946,15 @@ static int outliner_group_operation_exec(bContext *C, wmOperator *op)
 		default:
 			BLI_assert(0);
 	}
-	
 
 	if (event == 3) { /* instance */
 		/* works without this except if you try render right after, see: 22027 */
 		DAG_relations_tag_update(CTX_data_main(C));
 	}
-	
-	ED_undo_push(C, prop_group_op_types[event].name);
+
+	ED_undo_push(C, prop_group_op_types[event - 1].name);
 	WM_event_add_notifier(C, NC_GROUP, NULL);
-	
+
 	return OPERATOR_FINISHED;
 }
 
@@ -1652,8 +1654,13 @@ static int outliner_operation(bContext *C, wmOperator *UNUSED(op), const wmEvent
 	Scene *scene = CTX_data_scene(C);
 	ARegion *ar = CTX_wm_region(C);
 	SpaceOops *soops = CTX_wm_space_outliner(C);
+	uiBut *but = UI_context_active_but_get(C);
 	TreeElement *te;
 	float fmval[2];
+
+	if (but) {
+		UI_but_tooltip_timer_remove(C, but);
+	}
 
 	UI_view2d_region_to_view(&ar->v2d, event->mval[0], event->mval[1], &fmval[0], &fmval[1]);
 	

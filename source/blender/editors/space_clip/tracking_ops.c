@@ -825,12 +825,8 @@ static void apply_mouse_slide(bContext *C, SlideMarkerData *data)
 		     plane_track = plane_track->next)
 		{
 			if ((plane_track->flag & PLANE_TRACK_AUTOKEY) == 0) {
-				int i;
-				for (i = 0; i < plane_track->point_tracksnr; i++) {
-					if (plane_track->point_tracks[i] == data->track) {
-						BKE_tracking_track_plane_from_existing_motion(plane_track, framenr);
-						break;
-					}
+				if (BKE_tracking_plane_track_has_point_track(plane_track, data->track)) {
+					BKE_tracking_track_plane_from_existing_motion(plane_track, framenr);
 				}
 			}
 		}
@@ -2042,7 +2038,7 @@ static void object_solver_inverted_matrix(Scene *scene, Object *ob, float invmat
 	bool found = false;
 
 	for (con = ob->constraints.first; con; con = con->next) {
-		bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
+		const bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
 
 		if (!cti)
 			continue;
@@ -2073,7 +2069,7 @@ static Object *object_solver_camera(Scene *scene, Object *ob)
 	bConstraint *con;
 
 	for (con = ob->constraints.first; con; con = con->next) {
-		bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
+		const bConstraintTypeInfo *cti = BKE_constraint_typeinfo_get(con);
 
 		if (!cti)
 			continue;
@@ -3054,7 +3050,7 @@ static int frame_jump_exec(bContext *C, wmOperator *op)
 
 	if (CFRA != sc->user.framenr) {
 		CFRA = sc->user.framenr;
-		sound_seek_scene(CTX_data_main(C), scene);
+		BKE_sound_seek_scene(CTX_data_main(C), scene);
 
 		WM_event_add_notifier(C, NC_SCENE | ND_FRAME, scene);
 	}
@@ -3116,6 +3112,12 @@ static int join_tracks_exec(bContext *C, wmOperator *op)
 
 			if (tracking->stabilization.rot_track == track)
 				tracking->stabilization.rot_track = act_track;
+
+			/* TODO(sergey): Re-evaluate planes with auto-key. */
+			BKE_tracking_plane_tracks_replace_point_track(tracking,
+			                                              track,
+			                                              act_track);
+
 
 			BKE_tracking_track_free(track);
 			BLI_freelinkN(tracksbase, track);

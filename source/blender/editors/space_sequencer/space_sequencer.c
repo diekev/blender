@@ -144,9 +144,9 @@ static SpaceLink *sequencer_new(const bContext *C)
 	ar->alignment = RGN_ALIGN_TOP;
 	ar->flag |= RGN_FLAG_HIDDEN;
 	/* for now, aspect ratio should be maintained, and zoom is clamped within sane default limits */
-	ar->v2d.keepzoom = V2D_KEEPASPECT | V2D_KEEPZOOM;
-	ar->v2d.minzoom = 0.00001f;
-	ar->v2d.maxzoom = 100000.0f;
+	ar->v2d.keepzoom = V2D_KEEPASPECT | V2D_KEEPZOOM | V2D_LIMITZOOM;
+	ar->v2d.minzoom = 0.001f;
+	ar->v2d.maxzoom = 1000.0f;
 	ar->v2d.tot.xmin = -960.0f; /* 1920 width centered */
 	ar->v2d.tot.ymin = -540.0f; /* 1080 height centered */
 	ar->v2d.tot.xmax = 960.0f;
@@ -564,7 +564,10 @@ static void sequencer_preview_area_draw(const bContext *C, ARegion *ar)
 	SpaceSeq *sseq = sa->spacedata.first;
 	Scene *scene = CTX_data_scene(C);
 	wmWindowManager *wm = CTX_wm_manager(C);
-	int show_split = scene->ed && scene->ed->over_flag & SEQ_EDIT_OVERLAY_SHOW && sseq->mainb == SEQ_DRAW_IMG_IMBUF;
+	const bool show_split = (
+	        scene->ed &&
+	        (scene->ed->over_flag & SEQ_EDIT_OVERLAY_SHOW) &&
+	        (sseq->mainb == SEQ_DRAW_IMG_IMBUF));
 
 	/* XXX temp fix for wrong setting in sseq->mainb */
 	if (sseq->mainb == SEQ_DRAW_SEQUENCE) sseq->mainb = SEQ_DRAW_IMG_IMBUF;

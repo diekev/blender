@@ -447,6 +447,23 @@ public:
 #endif
 };
 
+class CleanPairCallback : public btOverlapCallback
+{
+	btBroadphaseProxy *m_cleanProxy;
+	btOverlappingPairCache *m_pairCache;
+	btDispatcher *m_dispatcher;
+
+public:
+	CleanPairCallback(btBroadphaseProxy *cleanProxy, btOverlappingPairCache *pairCache, btDispatcher *dispatcher)
+		:m_cleanProxy(cleanProxy),
+		m_pairCache(pairCache),
+		m_dispatcher(dispatcher)
+	{
+	}
+
+	virtual bool processOverlap(btBroadphasePair &pair);
+};
+
 ///CcdPhysicsController is a physics object that supports continuous collision detection and time of impact based physics resolution.
 class CcdPhysicsController : public PHY_IPhysicsController
 {
@@ -598,7 +615,7 @@ protected:
 
 		
 		virtual void		ResolveCombinedVelocities(float linvelX,float linvelY,float linvelZ,float angVelX,float angVelY,float angVelZ);
-
+		virtual void		RefreshCollisions();
 		virtual void		SuspendDynamics(bool ghost);
 		virtual void		RestoreDynamics();
 
@@ -712,12 +729,20 @@ protected:
 			return GetConstructionInfo().m_bDyna;
 		}
 
+		virtual bool IsSuspended() const
+		{
+			return m_suspended;
+		}
+
 		virtual bool IsCompound()
 		{
 			return GetConstructionInfo().m_shapeInfo->m_shapeType == PHY_SHAPE_COMPOUND;
 		}
 
 		virtual bool ReinstancePhysicsShape(KX_GameObject *from_gameobj, RAS_MeshObject* from_meshobj);
+
+		/* Method to replicate rigid body joint contraints for group instances. */
+		virtual void ReplicateConstraints(KX_GameObject *gameobj, std::vector<KX_GameObject*> constobj);
 
 #ifdef WITH_CXX_GUARDEDALLOC
 	MEM_CXX_CLASS_ALLOC_FUNCS("GE:CcdPhysicsController")

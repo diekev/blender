@@ -252,6 +252,13 @@ void mid_v3_v3v3v3(float v[3], const float v1[3], const float v2[3], const float
 	v[2] = (v1[2] + v2[2] + v3[2]) / 3.0f;
 }
 
+void mid_v3_v3v3v3v3(float v[3], const float v1[3], const float v2[3], const float v3[3], const float v4[3])
+{
+	v[0] = (v1[0] + v2[0] + v3[0] + v4[0]) / 4.0f;
+	v[1] = (v1[1] + v2[1] + v3[1] + v4[1]) / 4.0f;
+	v[2] = (v1[2] + v2[2] + v3[2] + v4[2]) / 4.0f;
+}
+
 /**
  * Specialized function for calculating normals.
  * fastpath for:
@@ -563,6 +570,27 @@ void project_v3_v3v3(float c[3], const float v1[3], const float v2[3])
 	c[0] = mul * v2[0];
 	c[1] = mul * v2[1];
 	c[2] = mul * v2[2];
+}
+
+/**
+ * In this case plane is a 3D vector only (no 4th component).
+ *
+ * Projecting will make \a c a copy of \a v orthogonal to \a v_plane.
+ *
+ * \note If \a v is exactly perpendicular to \a v_plane, \a c will just be a copy of \a v.
+ */
+void project_plane_v3_v3v3(float c[3], const float v[3], const float v_plane[3])
+{
+	float delta[3];
+	project_v3_v3v3(delta, v, v_plane);
+	sub_v3_v3v3(c, v, delta);
+}
+
+void project_plane_v2_v2v2(float c[2], const float v[2], const float v_plane[2])
+{
+	float delta[2];
+	project_v2_v2v2(delta, v, v_plane);
+	sub_v2_v2v2(c, v, delta);
 }
 
 /* project a vector on a plane defined by normal and a plane point p */
@@ -1034,6 +1062,15 @@ void fill_vn_short(short *array_tar, const int size, const short val)
 void fill_vn_ushort(unsigned short *array_tar, const int size, const unsigned short val)
 {
 	unsigned short *tar = array_tar + (size - 1);
+	int i = size;
+	while (i--) {
+		*(tar--) = val;
+	}
+}
+
+void fill_vn_uchar(unsigned char *array_tar, const int size, const unsigned char val)
+{
+	unsigned char *tar = array_tar + (size - 1);
 	int i = size;
 	while (i--) {
 		*(tar--) = val;

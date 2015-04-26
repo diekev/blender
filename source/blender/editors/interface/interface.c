@@ -37,6 +37,7 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_userdef_types.h"
@@ -513,7 +514,7 @@ static void ui_draw_links(uiBlock *block)
 	uiBut *but;
 	uiLinkLine *line;
 
-	/* Draw the grey out lines. Do this first so they appear at the
+	/* Draw the gray out lines. Do this first so they appear at the
 	 * bottom of inactive or active lines.
 	 * As we go, remember if we see any active or selected lines. */
 	bool found_selectline = false;
@@ -548,7 +549,7 @@ static void ui_draw_links(uiBlock *block)
 	}
 
 	/* Draw any active lines (lines with either button being hovered over).
-	 * Do this last so they appear on top of inactive and grey out lines. */
+	 * Do this last so they appear on top of inactive and gray out lines. */
 	if (found_activeline) {
 		for (but = block->buttons.first; but; but = but->next) {
 			if (but->type == UI_BTYPE_LINK && but->link) {
@@ -1930,7 +1931,7 @@ void ui_but_value_set(uiBut *but, double value)
 
 int ui_but_string_get_max_length(uiBut *but)
 {
-	if (ELEM(but->type, UI_BTYPE_TEXT, UI_BTYPE_SEARCH_MENU, UI_BTYPE_SEARCH_MENU_UNLINK))
+	if (ELEM(but->type, UI_BTYPE_TEXT, UI_BTYPE_SEARCH_MENU))
 		return but->hardmax;
 	else
 		return UI_MAX_DRAW_STR;
@@ -1950,6 +1951,56 @@ uiBut *ui_but_drag_multi_edit_get(uiBut *but)
 
 	return but_iter;
 }
+
+/** \name Check to show extra icons
+ *
+ * Extra icons are shown on the right hand side of buttons.
+ * \{ */
+
+static bool ui_but_icon_extra_is_visible_search_unlink(const uiBut *but)
+{
+	BLI_assert(but->type == UI_BTYPE_SEARCH_MENU);
+	return ((but->editstr == NULL) &&
+	        (but->drawstr[0] != '\0') &&
+	        (but->flag & UI_BUT_SEARCH_UNLINK));
+}
+
+static bool ui_but_icon_extra_is_visible_eyedropper(uiBut *but)
+{
+	StructRNA *type;
+	short idcode;
+
+	BLI_assert(but->type == UI_BTYPE_SEARCH_MENU && (but->flag & UI_BUT_SEARCH_UNLINK));
+
+	if (but->rnaprop == NULL) {
+		return false;
+	}
+
+	type = RNA_property_pointer_type(&but->rnapoin, but->rnaprop);
+	idcode = RNA_type_to_ID_code(type);
+
+
+	return ((but->editstr == NULL) &&
+	        (idcode == ID_OB || OB_DATA_SUPPORT_ID(idcode)));
+}
+
+uiButExtraIconType ui_but_icon_extra_get(uiBut *but)
+{
+	if ((but->flag & UI_BUT_SEARCH_UNLINK) == 0) {
+		/* pass */
+	}
+	else if (ui_but_icon_extra_is_visible_search_unlink(but)) {
+		return UI_BUT_ICONEXTRA_UNLINK;
+	}
+	else if (ui_but_icon_extra_is_visible_eyedropper(but)) {
+		return UI_BUT_ICONEXTRA_EYEDROPPER;
+	}
+
+	return UI_BUT_ICONEXTRA_NONE;
+}
+
+/** \} */
+
 
 static double ui_get_but_scale_unit(uiBut *but, double value)
 {
@@ -2031,7 +2082,7 @@ static float ui_get_but_step_unit(uiBut *but, float step_default)
  */
 void ui_but_string_get_ex(uiBut *but, char *str, const size_t maxlen, const int float_precision)
 {
-	if (but->rnaprop && ELEM(but->type, UI_BTYPE_TEXT, UI_BTYPE_SEARCH_MENU, UI_BTYPE_SEARCH_MENU_UNLINK)) {
+	if (but->rnaprop && ELEM(but->type, UI_BTYPE_TEXT, UI_BTYPE_SEARCH_MENU)) {
 		PropertyType type;
 		const char *buf = NULL;
 		int buf_len;
@@ -2073,7 +2124,7 @@ void ui_but_string_get_ex(uiBut *but, char *str, const size_t maxlen, const int 
 		BLI_strncpy(str, but->poin, maxlen);
 		return;
 	}
-	else if (ELEM(but->type, UI_BTYPE_SEARCH_MENU, UI_BTYPE_SEARCH_MENU_UNLINK)) {
+	else if (but->type == UI_BTYPE_SEARCH_MENU) {
 		/* string */
 		BLI_strncpy(str, but->poin, maxlen);
 		return;
@@ -2194,7 +2245,7 @@ static void ui_but_string_free_internal(uiBut *but)
 
 bool ui_but_string_set(bContext *C, uiBut *but, const char *str)
 {
-	if (but->rnaprop && ELEM(but->type, UI_BTYPE_TEXT, UI_BTYPE_SEARCH_MENU, UI_BTYPE_SEARCH_MENU_UNLINK)) {
+	if (but->rnaprop && ELEM(but->type, UI_BTYPE_TEXT, UI_BTYPE_SEARCH_MENU)) {
 		if (RNA_property_editable(&but->rnapoin, but->rnaprop)) {
 			PropertyType type;
 
@@ -2246,7 +2297,7 @@ bool ui_but_string_set(bContext *C, uiBut *but, const char *str)
 
 		return true;
 	}
-	else if (ELEM(but->type, UI_BTYPE_SEARCH_MENU, UI_BTYPE_SEARCH_MENU_UNLINK)) {
+	else if (but->type == UI_BTYPE_SEARCH_MENU) {
 		/* string */
 		BLI_strncpy(but->poin, str, but->hardmax);
 		return true;
@@ -2714,11 +2765,11 @@ void ui_but_update(uiBut *but)
 					}
 					else {
 						const int prec = ui_but_calc_float_precision(but, value);
-						slen += BLI_snprintf(but->drawstr + slen, sizeof(but->drawstr) - slen, "%.*f", prec, value);
+						slen += BLI_snprintf_rlen(but->drawstr + slen, sizeof(but->drawstr) - slen, "%.*f", prec, value);
 					}
 				}
 				else {
-					slen += BLI_snprintf(but->drawstr + slen, sizeof(but->drawstr) - slen, "%d", (int)value);
+					slen += BLI_snprintf_rlen(but->drawstr + slen, sizeof(but->drawstr) - slen, "%d", (int)value);
 				}
 
 				if (but->rnaprop) {
@@ -2754,7 +2805,6 @@ void ui_but_update(uiBut *but)
 
 		case UI_BTYPE_TEXT:
 		case UI_BTYPE_SEARCH_MENU:
-		case UI_BTYPE_SEARCH_MENU_UNLINK:
 			if (!but->editstr) {
 				char str[UI_MAX_DRAW_STR];
 
@@ -3139,7 +3189,7 @@ static uiBut *ui_def_but(uiBlock *block, int type, int retval, const char *str,
 	         ELEM(but->type,
 	              UI_BTYPE_MENU, UI_BTYPE_TEXT, UI_BTYPE_LABEL,
 	              UI_BTYPE_BLOCK, UI_BTYPE_BUT_MENU, UI_BTYPE_SEARCH_MENU,
-	              UI_BTYPE_PROGRESS_BAR, UI_BTYPE_SEARCH_MENU_UNLINK))
+	              UI_BTYPE_PROGRESS_BAR))
 	{
 		but->drawflag |= (UI_BUT_TEXT_LEFT | UI_BUT_ICON_LEFT);
 	}

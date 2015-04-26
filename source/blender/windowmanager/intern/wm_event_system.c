@@ -71,6 +71,8 @@
 
 #include "BIF_gl.h"
 
+#include "GPU_debug.h"
+
 #include "UI_interface.h"
 
 #include "PIL_time.h"
@@ -121,7 +123,7 @@ void wm_event_free(wmEvent *event)
 	}
 
 	if (event->tablet_data) {
-		MEM_freeN(event->tablet_data);
+		MEM_freeN((void *)event->tablet_data);
 	}
 
 	MEM_freeN(event);
@@ -1676,9 +1678,14 @@ static int wm_handler_fileselect_do(bContext *C, ListBase *handlers, wmEventHand
 				sa = handler->op_area;
 			}
 
-			/* we already had a fullscreen here -> mark new space as a stacked fullscreen */
 			if (sa->full) {
+				/* ensure the first area becomes the file browser, because the second one is the small
+				 * top (info-)area which might be too small (in fullscreens we have max two areas) */
+				if (sa->prev) {
+					sa = sa->prev;
+				}
 				ED_area_newspace(C, sa, SPACE_FILE);     /* 'sa' is modified in-place */
+				/* we already had a fullscreen here -> mark new space as a stacked fullscreen */
 				sa->flag |= AREA_FLAG_STACKED_FULLSCREEN;
 			}
 			else {
@@ -1836,7 +1843,7 @@ static int wm_action_not_handled(int action)
 static int wm_handlers_do_intern(bContext *C, wmEvent *event, ListBase *handlers)
 {
 #ifndef NDEBUG
-	const int do_debug_handler = (G.debug & G_DEBUG_HANDLERS) &&
+	const bool do_debug_handler = (G.debug & G_DEBUG_HANDLERS) &&
 	        /* comment this out to flood the console! (if you really want to test) */
 	        !ELEM(event->type, MOUSEMOVE, INBETWEEN_MOUSEMOVE)
 	        ;
@@ -2216,7 +2223,7 @@ void wm_event_do_handlers(bContext *C)
 			Scene *scene = win->screen->scene;
 			
 			if (scene) {
-				int is_playing_sound = sound_scene_playing(win->screen->scene);
+				int is_playing_sound = BKE_sound_scene_playing(win->screen->scene);
 				
 				if (is_playing_sound != -1) {
 					bool is_playing_screen;
@@ -2233,7 +2240,7 @@ void wm_event_do_handlers(bContext *C)
 					}
 					
 					if (is_playing_sound == 0) {
-						const float time = sound_sync_scene(scene);
+						const float time = BKE_sound_sync_scene(scene);
 						if (finite(time)) {
 							int ncfra = time * (float)FPS + 0.5f;
 							if (ncfra != scene->r.cfra) {
@@ -2321,6 +2328,11 @@ void wm_event_do_handlers(bContext *C)
 						/* restore for the next iteration of wm_event_do_handlers */
 						win->screen->skip_handling = false;
 						break;
+					}
+
+					/* update azones if needed - done here because it needs to be independent from redraws */
+					if (sa->flag & AREA_FLAG_ACTIONZONES_UPDATE) {
+						ED_area_azones_update(sa, &event->x);
 					}
 
 					if (wm_event_inside_i(event, &sa->totrct)) {
@@ -2417,12 +2429,7 @@ void wm_event_do_handlers(bContext *C)
 	/* update key configuration after handling events */
 	WM_keyconfig_update(wm);
 
-	if (G.debug) {
-		GLenum error = glGetError();
-		if (error != GL_NO_ERROR) {
-			printf("GL error: %s\n", gluErrorString(error));
-		}
-	}
+	GPU_ASSERT_NO_GL_ERRORS("wm_event_do_handlers");
 }
 
 /* ********** filesector handling ************ */
@@ -3107,7 +3114,7 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, int U
 
 			event.x = evt->x = pd->x;
 			event.y = evt->y = pd->y;
-			event.val = 0;
+			event.val = KM_NOTHING;
 			
 			/* Use prevx/prevy so we can calculate the delta later */
 			event.prevx = event.x - pd->deltaX;
@@ -3335,7 +3342,7 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, int U
 			event.type = TIMER;
 			event.custom = EVT_DATA_TIMER;
 			event.customdata = customdata;
-			event.val = 0;
+			event.val = KM_NOTHING;
 			event.keymodifier = 0;
 			wm_event_add(win, &event);
 
@@ -3345,7 +3352,7 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, int U
 		case GHOST_kEventNDOFMotion:
 		{
 			event.type = NDOF_MOTION;
-			event.val = 0;
+			event.val = KM_NOTHING;
 			attach_ndof_data(&event, customdata);
 			wm_event_add(win, &event);
 
@@ -3410,7 +3417,9 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, int U
 		case GHOST_kEventImeCompositionEnd:
 		{
 			event.val = KM_PRESS;
-			win->ime_data->is_ime_composing = false;
+			if (win->ime_data) {
+				win->ime_data->is_ime_composing = false;
+			}
 			event.type = WM_IME_COMPOSITE_END;
 			wm_event_add(win, &event);
 			break;
@@ -3500,7 +3509,7 @@ float WM_event_tablet_data(const wmEvent *event, int *pen_flip, float tilt[2])
 		zero_v2(tilt);
 
 	if (event->tablet_data) {
-		wmTabletData *wmtab = event->tablet_data;
+		const wmTabletData *wmtab = event->tablet_data;
 
 		erasor = (wmtab->Active == EVT_TABLET_ERASER);
 		if (wmtab->Active != EVT_TABLET_NONE) {

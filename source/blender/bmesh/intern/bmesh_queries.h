@@ -65,12 +65,22 @@ BMFace *BM_vert_pair_share_face_by_angle(
         const bool allow_adjacent) ATTR_NONNULL();
 
 int     BM_vert_edge_count_nonwire(const BMVert *v) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
+#define BM_vert_edge_count_is_equal(v, n) (BM_vert_edge_count_ex(v, (n) + 1) == n)
+#define BM_vert_edge_count_is_over(v, n) (BM_vert_edge_count_ex(v, (n) + 1) == (n) + 1)
+int     BM_vert_edge_count_ex(const BMVert *v, const int count_max) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 int     BM_vert_edge_count(const BMVert *v) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
+#define BM_edge_face_count_is_equal(e, n) (BM_edge_face_count_ex(e, (n) + 1) == n)
+#define BM_edge_face_count_is_over(e, n) (BM_edge_face_count_ex(e, (n) + 1) == (n) + 1)
+int     BM_edge_face_count_ex(const BMEdge *e, const int count_max) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 int     BM_edge_face_count(const BMEdge *e) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
+#define BM_vert_face_count_is_equal(v, n) (BM_vert_face_count_ex(v, (n) + 1) == n)
+#define BM_vert_face_count_is_over(v, n) (BM_vert_face_count_ex(v, (n) + 1) == (n) + 1)
+int     BM_vert_face_count_ex(const BMVert *v, int count_max) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 int     BM_vert_face_count(const BMVert *v) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 BMEdge *BM_vert_other_disk_edge(BMVert *v, BMEdge *e) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 
 bool    BM_vert_is_edge_pair(const BMVert *v) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
+bool    BM_vert_face_check(BMVert *v) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 bool    BM_vert_is_wire(const BMVert *v) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 BLI_INLINE bool    BM_edge_is_wire(const BMEdge *e) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 
@@ -98,6 +108,7 @@ float   BM_edge_calc_face_angle_signed(const BMEdge *e) ATTR_WARN_UNUSED_RESULT 
 void    BM_edge_calc_face_tangent(const BMEdge *e, const BMLoop *e_loop, float r_tangent[3]) ATTR_NONNULL();
 
 float   BM_vert_calc_edge_angle(BMVert *v) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
+float   BM_vert_calc_edge_angle_ex(BMVert *v, const float fallback) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 float   BM_vert_calc_shell_factor(BMVert *v) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 float   BM_vert_calc_shell_factor_ex(BMVert *v, const float no[3], const char hflag) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 float   BM_vert_calc_mean_tagged_edge_length(BMVert *v) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
@@ -131,8 +142,9 @@ BMLoop *BM_face_vert_share_loop(BMFace *f, BMVert *v) ATTR_WARN_UNUSED_RESULT AT
 BMLoop *BM_face_edge_share_loop(BMFace *f, BMEdge *e) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 
 void    BM_edge_ordered_verts(const BMEdge *edge, BMVert **r_v1, BMVert **r_v2) ATTR_NONNULL();
-void    BM_edge_ordered_verts_ex(const BMEdge *edge, BMVert **r_v1, BMVert **r_v2,
-                                 const BMLoop *edge_loop) ATTR_NONNULL();
+void    BM_edge_ordered_verts_ex(
+        const BMEdge *edge, BMVert **r_v1, BMVert **r_v2,
+        const BMLoop *edge_loop) ATTR_NONNULL();
 
 bool BM_vert_is_all_edge_flag_test(const BMVert *v, const char hflag, const bool respect_hide) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 bool BM_vert_is_all_face_flag_test(const BMVert *v, const char hflag, const bool respect_hide) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
@@ -146,12 +158,16 @@ bool BM_face_is_normal_valid(const BMFace *f) ATTR_WARN_UNUSED_RESULT ATTR_NONNU
 
 float BM_mesh_calc_volume(BMesh *bm, bool is_signed) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL();
 
-int   BM_mesh_calc_face_groups(BMesh *bm, int *r_groups_array, int (**r_group_index)[2],
-                               BMElemFilterFunc filter_fn, void *user_data,
-                               const char hflag_test, const char htype_step) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL(1, 2, 3);
-int   BM_mesh_calc_edge_groups(BMesh *bm, int *r_groups_array, int (**r_group_index)[2],
-                               BMElemFilterFunc filter_fn, void *user_data,
-                               const char hflag_test) ATTR_WARN_UNUSED_RESULT ATTR_NONNULL(1, 2, 3);
+int   BM_mesh_calc_face_groups(
+        BMesh *bm, int *r_groups_array, int (**r_group_index)[2],
+        BMElemFilterFunc filter_fn, void *user_data,
+        const char hflag_test, const char htype_step)
+        ATTR_WARN_UNUSED_RESULT ATTR_NONNULL(1, 2, 3);
+int   BM_mesh_calc_edge_groups(
+        BMesh *bm, int *r_groups_array, int (**r_group_index)[2],
+        BMElemFilterFunc filter_fn, void *user_data,
+        const char hflag_test)
+        ATTR_WARN_UNUSED_RESULT ATTR_NONNULL(1, 2, 3);
 
 /* not really any good place  to put this */
 float bmesh_subd_falloff_calc(const int falloff, float val) ATTR_WARN_UNUSED_RESULT;

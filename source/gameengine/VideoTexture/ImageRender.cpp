@@ -200,7 +200,7 @@ void ImageRender::Render()
 	m_canvas->ClearColor(m_background[0], m_background[1], m_background[2], m_background[3]);
 	m_canvas->ClearBuffer(RAS_ICanvas::COLOR_BUFFER|RAS_ICanvas::DEPTH_BUFFER);
 	m_rasterizer->BeginFrame(m_engine->GetClockTime());
-	m_engine->SetWorldSettings(m_scene->GetWorldInfo());
+	m_scene->GetWorldInfo()->UpdateWorldSettings();
 	m_rasterizer->SetAuxilaryClientInfo(m_scene);
 	m_rasterizer->DisplayFog();
 	// matrix calculation, don't apply any of the stereo mode
@@ -272,6 +272,12 @@ void ImageRender::Render()
 	// restore the stereo mode now that the matrix is computed
 	m_rasterizer->SetStereoMode(stereomode);
 
+    if (stereomode == RAS_IRasterizer::RAS_STEREO_QUADBUFFERED) {
+        // In QUAD buffer stereo mode, the GE render pass ends with the right eye on the right buffer
+        // but we need to draw on the left buffer to capture the render
+        // TODO: implement an explicit function in rasterizer to restore the left buffer.
+        m_rasterizer->SetEye(RAS_IRasterizer::RAS_STEREO_LEFTEYE);
+    }
 	m_scene->CalculateVisibleMeshes(m_rasterizer,m_camera);
 
 	m_scene->RenderBuckets(camtrans, m_rasterizer);

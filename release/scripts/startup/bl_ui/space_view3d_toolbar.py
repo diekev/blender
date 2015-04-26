@@ -100,7 +100,7 @@ class VIEW3D_PT_tools_object(View3DPanel, Panel):
                 row.operator("object.shade_smooth", text="Smooth")
                 row.operator("object.shade_flat", text="Flat")
 
-            if obj_type in {'MESH'}:
+            if obj_type == 'MESH':
                 col = layout.column(align=True)
                 col.label(text="Data Transfer:")
                 row = col.row(align=True)
@@ -323,6 +323,7 @@ class VIEW3D_PT_tools_meshedit(View3DPanel, Panel):
         col.menu("VIEW3D_MT_edit_mesh_extrude")
         col.operator("view3d.edit_mesh_extrude_move_normal", text="Extrude Region")
         col.operator("view3d.edit_mesh_extrude_individual_move", text="Extrude Individual")
+        col.operator("mesh.inset", text="Inset Faces")
         col.operator("mesh.edge_face_add")
         col.operator("mesh.subdivide")
         col.operator("mesh.loopcut_slide")
@@ -757,6 +758,10 @@ class VIEW3D_PT_tools_posemode(View3DPanel, Panel):
         row.operator("pose.copy", text="Copy")
         row.operator("pose.paste", text="Paste")
 
+        row = layout.row(align=True)
+        row.operator("pose.propagate", text="Propagate")
+        row.menu("VIEW3D_MT_pose_propagate", icon='TRIA_RIGHT', text="")
+
         col = layout.column(align=True)
         col.operator("poselib.pose_add", text="Add To Library")
 
@@ -1120,7 +1125,7 @@ class TEXTURE_UL_texpaintslots(UIList):
             if (not mat.use_nodes) and context.scene.render.engine in {'BLENDER_RENDER', 'BLENDER_GAME'}:
                 mtex_index = mat.texture_paint_slots[index].index
                 layout.prop(mat, "use_textures", text="", index=mtex_index)
-        elif self.layout_type in {'GRID'}:
+        elif self.layout_type == 'GRID':
             layout.alignment = 'CENTER'
             layout.label(text="")
 
@@ -1903,7 +1908,7 @@ class VIEW3D_PT_tools_history(View3DPanel, Panel):
         row = col.row(align=True)
         row.operator("ed.undo")
         row.operator("ed.redo")
-        if obj is None or obj.mode not in {'SCULPT'}:
+        if obj is None or obj.mode != 'SCULPT':
             # Sculpt mode does not generate an undo menu it seems...
             col.operator("ed.undo_history")
 

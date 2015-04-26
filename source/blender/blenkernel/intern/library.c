@@ -384,7 +384,7 @@ bool id_copy(ID *id, ID **newid, bool test)
 			if (!test) *newid = (ID *)BKE_mask_copy((Mask *)id);
 			return true;
 		case ID_LS:
-			if (!test) *newid = (ID *)BKE_linestyle_copy((FreestyleLineStyle *)id);
+			if (!test) *newid = (ID *)BKE_linestyle_copy(G.main, (FreestyleLineStyle *)id);
 			return true;
 	}
 	
@@ -432,7 +432,7 @@ bool id_single_user(bContext *C, ID *id, PointerRNA *ptr, PropertyRNA *prop)
 		if (RNA_property_editable(ptr, prop)) {
 			if (id_copy(id, &newid, false) && newid) {
 				/* copy animation actions too */
-				BKE_copy_animdata_id_action(id);
+				BKE_animdata_copy_id_action(id);
 				/* us is 1 by convention, but RNA_property_pointer_set
 				 * will also increment it, so set it to zero */
 				newid->us = 0;
@@ -610,13 +610,13 @@ int set_listbasepointers(Main *main, ListBase **lb)
 	lb[a++] = &(main->speaker);
 
 	lb[a++] = &(main->world);
+	lb[a++] = &(main->movieclip);
 	lb[a++] = &(main->screen);
 	lb[a++] = &(main->object);
 	lb[a++] = &(main->linestyle); /* referenced by scenes */
 	lb[a++] = &(main->scene);
 	lb[a++] = &(main->library);
 	lb[a++] = &(main->wm);
-	lb[a++] = &(main->movieclip);
 	lb[a++] = &(main->mask);
 	
 	lb[a] = NULL;
@@ -785,7 +785,7 @@ static void id_copy_animdata(ID *id, const bool do_action)
 	
 	if (adt) {
 		IdAdtTemplate *iat = (IdAdtTemplate *)id;
-		iat->adt = BKE_copy_animdata(iat->adt, do_action); /* could be set to false, need to investigate */
+		iat->adt = BKE_animdata_copy(iat->adt, do_action); /* could be set to false, need to investigate */
 	}
 }
 

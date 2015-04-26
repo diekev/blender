@@ -379,7 +379,7 @@ static int imapaint_pick_face(ViewContext *vc, const int mval[2], unsigned int *
 		return 0;
 
 	/* sample only on the exact position */
-	*r_index = view3d_sample_backbuf(vc, mval[0], mval[1]);
+	*r_index = ED_view3d_backbuf_sample(vc, mval[0], mval[1]);
 
 	if ((*r_index) == 0 || (*r_index) > (unsigned int)totpoly) {
 		return 0;
@@ -439,6 +439,7 @@ void paint_sample_color(bContext *C, ARegion *ar, int x, int y, bool texpaint_pr
 		}
 
 		color = BKE_palette_color_add(palette);
+		palette->active_color = BLI_listbase_count(&palette->colors) - 1;
 	}
 
 

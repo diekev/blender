@@ -450,7 +450,7 @@ static int new_texture_exec(bContext *C, wmOperator *UNUSED(op))
 		tex = BKE_texture_copy(tex);
 	}
 	else {
-		tex = add_texture(bmain, DATA_("Texture"));
+		tex = BKE_texture_add(bmain, DATA_("Texture"));
 	}
 
 	/* hook into UI */
@@ -605,6 +605,70 @@ void SCENE_OT_render_layer_remove(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
 }
 
+/********************** render view operators *********************/
+
+static int render_view_remove_poll(bContext *C)
+{
+	Scene *scene = CTX_data_scene(C);
+
+	/* don't allow user to remove "left" and "right" views */
+	return scene->r.actview > 1;
+}
+
+static int render_view_add_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	Scene *scene = CTX_data_scene(C);
+
+	BKE_scene_add_render_view(scene, NULL);
+	scene->r.actview = BLI_listbase_count(&scene->r.views) - 1;
+
+	WM_event_add_notifier(C, NC_SCENE | ND_RENDER_OPTIONS, scene);
+
+	return OPERATOR_FINISHED;
+}
+
+void SCENE_OT_render_view_add(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Add Render View";
+	ot->idname = "SCENE_OT_render_view_add";
+	ot->description = "Add a render view";
+
+	/* api callbacks */
+	ot->exec = render_view_add_exec;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
+static int render_view_remove_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	Scene *scene = CTX_data_scene(C);
+	SceneRenderView *rv = BLI_findlink(&scene->r.views, scene->r.actview);
+
+	if (!BKE_scene_remove_render_view(scene, rv))
+		return OPERATOR_CANCELLED;
+
+	WM_event_add_notifier(C, NC_SCENE | ND_RENDER_OPTIONS, scene);
+
+	return OPERATOR_FINISHED;
+}
+
+void SCENE_OT_render_view_remove(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Remove Render View";
+	ot->idname = "SCENE_OT_render_view_remove";
+	ot->description = "Remove the selected render view";
+
+	/* api callbacks */
+	ot->exec = render_view_remove_exec;
+	ot->poll = render_view_remove_poll;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+}
+
 #ifdef WITH_FREESTYLE
 
 static bool freestyle_linestyle_check_report(FreestyleLineSet *lineset, ReportList *reports)
@@ -731,10 +795,11 @@ void SCENE_OT_freestyle_module_move(wmOperatorType *ot)
 
 static int freestyle_lineset_add_exec(bContext *C, wmOperator *UNUSED(op))
 {
+	Main *bmain = CTX_data_main(C);
 	Scene *scene = CTX_data_scene(C);
 	SceneRenderLayer *srl = BLI_findlink(&scene->r.layers, scene->r.actlay);
 
-	BKE_freestyle_lineset_add(&srl->freestyleConfig, NULL);
+	BKE_freestyle_lineset_add(bmain, &srl->freestyleConfig, NULL);
 
 	DAG_id_tag_update(&scene->id, 0);
 	WM_event_add_notifier(C, NC_SCENE | ND_RENDER_OPTIONS, scene);
@@ -893,6 +958,7 @@ void SCENE_OT_freestyle_lineset_move(wmOperatorType *ot)
 
 static int freestyle_linestyle_new_exec(bContext *C, wmOperator *op)
 {
+	Main *bmain = CTX_data_main(C);
 	Scene *scene = CTX_data_scene(C);
 	SceneRenderLayer *srl = BLI_findlink(&scene->r.layers, scene->r.actlay);
 	FreestyleLineSet *lineset = BKE_freestyle_lineset_get_active(&srl->freestyleConfig);
@@ -903,10 +969,10 @@ static int freestyle_linestyle_new_exec(bContext *C, wmOperator *op)
 	}
 	if (lineset->linestyle) {
 		lineset->linestyle->id.us--;
-		lineset->linestyle = BKE_linestyle_copy(lineset->linestyle);
+		lineset->linestyle = BKE_linestyle_copy(bmain, lineset->linestyle);
 	}
 	else {
-		lineset->linestyle = BKE_linestyle_new("LineStyle", NULL);
+		lineset->linestyle = BKE_linestyle_new(bmain, "LineStyle");
 	}
 	DAG_id_tag_update(&lineset->linestyle->id, 0);
 	WM_event_add_notifier(C, NC_LINESTYLE, lineset->linestyle);
@@ -1490,7 +1556,7 @@ static int envmap_clear_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	Tex *tex = CTX_data_pointer_get_type(C, "texture", &RNA_Texture).data;
 	
-	BKE_free_envmapdata(tex->env);
+	BKE_texture_envmap_free_data(tex->env);
 	
 	WM_event_add_notifier(C, NC_TEXTURE | NA_EDITED, tex);
 	
@@ -1533,7 +1599,7 @@ static int envmap_clear_all_exec(bContext *C, wmOperator *UNUSED(op))
 	
 	for (tex = bmain->tex.first; tex; tex = tex->id.next)
 		if (tex->env)
-			BKE_free_envmapdata(tex->env);
+			BKE_texture_envmap_free_data(tex->env);
 	
 	WM_event_add_notifier(C, NC_TEXTURE | NA_EDITED, tex);
 	

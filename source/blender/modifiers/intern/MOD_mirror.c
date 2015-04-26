@@ -73,6 +73,7 @@ static void foreachObjectLink(ModifierData *md, Object *ob,
 }
 
 static void updateDepgraph(ModifierData *md, DagForest *forest,
+                           struct Main *UNUSED(bmain),
                            struct Scene *UNUSED(scene),
                            Object *UNUSED(ob),
                            DagNode *obNode)
@@ -93,7 +94,7 @@ static DerivedMesh *doMirrorOnAxis(MirrorModifierData *mmd,
                                    int axis)
 {
 	const float tolerance_sq = mmd->tolerance * mmd->tolerance;
-	const int do_vtargetmap = !(mmd->flag & MOD_MIR_NO_MERGE);
+	const bool do_vtargetmap = (mmd->flag & MOD_MIR_NO_MERGE) == 0;
 	int tot_vtargetmap = 0;  /* total merge vertices */
 
 	DerivedMesh *result;

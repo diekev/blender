@@ -120,6 +120,7 @@ set(SRC
 	intern/mask_rasterize.c
 	intern/material.c
 	intern/mball.c
+	intern/mball_tessellate.c
 	intern/mesh.c
 	intern/mesh_evaluate.c
 	intern/mesh_mapping.c
@@ -135,6 +136,7 @@ set(SRC
 	intern/object_deform.c
 	intern/object_dupli.c
 	intern/ocean.c
+	intern/outliner_treehash.c
 	intern/packedFile.c
 	intern/paint.c
 	intern/particle.c
@@ -172,7 +174,6 @@ set(SRC
 	intern/tracking_solver.c
 	intern/tracking_stabilize.c
 	intern/tracking_util.c
-	intern/treehash.c
 	intern/unit.c
 	intern/world.c
 	intern/writeavi.c
@@ -211,6 +212,8 @@ set(SRC
 	BKE_depsgraph.h
 	BKE_displist.h
 	BKE_dynamicpaint.h
+	BKE_editmesh.h
+	BKE_editmesh_bvh.h
 	BKE_effect.h
 	BKE_fcurve.h
 	BKE_fluidsim.h
@@ -235,6 +238,7 @@ set(SRC
 	BKE_mask.h
 	BKE_material.h
 	BKE_mball.h
+	BKE_mball_tessellate.h
 	BKE_mesh.h
 	BKE_mesh_mapping.h
 	BKE_mesh_remap.h
@@ -246,6 +250,7 @@ set(SRC
 	BKE_object.h
 	BKE_object_deform.h
 	BKE_ocean.h
+	BKE_outliner_treehash.h
 	BKE_packedFile.h
 	BKE_paint.h
 	BKE_particle.h
@@ -266,12 +271,9 @@ set(SRC
 	BKE_speaker.h
 	BKE_subsurf.h
 	BKE_suggestions.h
-	BKE_editmesh.h
-	BKE_editmesh_bvh.h
 	BKE_text.h
 	BKE_texture.h
 	BKE_tracking.h
-	BKE_treehash.h
 	BKE_unit.h
 	BKE_utildefines.h
 	BKE_world.h
@@ -424,9 +426,16 @@ if(WITH_JACK)
 endif()
 
 if(WITH_LZO)
-	list(APPEND INC_SYS
-		../../../extern/lzo/minilzo
-	)
+	if(WITH_SYSTEM_LZO)
+		list(APPEND INC_SYS
+			${LZO_INCLUDE_DIR}
+		)
+		add_definitions(-DWITH_SYSTEM_LZO)
+	else()
+		list(APPEND INC_SYS
+			../../../extern/lzo/minilzo
+		)
+	endif()
 	add_definitions(-DWITH_LZO)
 endif()
 

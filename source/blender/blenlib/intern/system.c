@@ -27,10 +27,13 @@
 
 #include "BLI_system.h"
 
+#include "MEM_guardedalloc.h"
+
 /* for backtrace */
 #if defined(__linux__) || defined(__APPLE__)
 #  include <execinfo.h>
-#elif defined(_MSV_VER)
+#elif defined(WIN32)
+#  include <windows.h>
 #  include <DbgHelp.h>
 #endif
 
@@ -96,18 +99,18 @@ void BLI_system_backtrace(FILE *fp)
 	/* Windows  */
 #elif defined(_MSC_VER)
 
-	(void)fp;
-#if 0
+#ifndef NDEBUG
 #define MAXSYMBOL 256
-	unsigned short	i;
+#define SIZE 100
+	unsigned short i;
 	void *stack[SIZE];
 	unsigned short nframes;
-	SYMBOL_INFO	*symbolinfo;
+	SYMBOL_INFO *symbolinfo;
 	HANDLE process;
 
 	process = GetCurrentProcess();
 
-	SymInitialize(process, NULL, true);
+	SymInitialize(process, NULL, TRUE);
 
 	nframes = CaptureStackBackTrace(0, SIZE, stack, NULL);
 	symbolinfo = MEM_callocN(sizeof(SYMBOL_INFO) + MAXSYMBOL * sizeof(char), "crash Symbol table");
@@ -122,11 +125,13 @@ void BLI_system_backtrace(FILE *fp)
 
 	MEM_freeN(symbolinfo);
 #undef MAXSYMBOL
-#endif
-
+#undef SIZE
+#else
+	fprintf(fp, "Crash backtrace not supported on release builds\n");
+#endif /* NDEBUG */
+#else /* _MSC_VER */
 	/* ------------------ */
 	/* non msvc/osx/linux */
-#else
 	(void)fp;
 #endif
 

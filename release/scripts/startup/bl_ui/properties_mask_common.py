@@ -36,7 +36,7 @@ class MASK_UL_layers(UIList):
             row.prop(mask, "hide", text="", emboss=False)
             row.prop(mask, "hide_select", text="", emboss=False)
             row.prop(mask, "hide_render", text="", emboss=False)
-        elif self.layout_type in {'GRID'}:
+        elif self.layout_type == 'GRID':
             layout.alignment = 'CENTER'
             layout.label(text="", icon_value=icon)
 
@@ -173,8 +173,8 @@ class MASK_PT_point:
         parent = point.parent
 
         col = layout.column()
-        # Currently only parenting yo movie clip is allowed, so do not
-        # ver-oplicate things for now and use single template_ID
+        # Currently only parenting the movie-clip is allowed,
+        # so do not over-complicate things for now by using single template_ID
         #col.template_any_ID(parent, "id", "id_type", text="")
 
         col.label("Parent:")
@@ -190,7 +190,7 @@ class MASK_PT_point:
             col.prop_search(parent, "parent", tracking,
                             "objects", icon='OBJECT_DATA', text="Object:")
 
-            tracks_list = "tracks" if parent.type == 'POINT_TRACK' else 'plane_tracks'
+            tracks_list = "tracks" if parent.type == 'POINT_TRACK' else "plane_tracks"
 
             if parent.parent in tracking.objects:
                 object = tracking.objects[parent.parent]

@@ -60,7 +60,7 @@
 #include "BKE_global.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
-#include "BKE_mball.h"
+#include "BKE_mball_tessellate.h"
 #include "BKE_node.h"
 #include "BKE_report.h"
 
@@ -199,6 +199,7 @@ void WM_init(bContext *C, int argc, const char **argv)
 		GPU_init();
 
 		GPU_set_mipmap(!(U.gameflags & USER_DISABLE_MIPMAP));
+		GPU_set_linear_mipmap(true);
 		GPU_set_anisotropic(U.anisotropic_filter);
 		GPU_set_gpu_mipmapping(U.use_gpu_mipmap);
 
@@ -327,7 +328,7 @@ bool WM_init_game(bContext *C)
 
 		WM_operator_name_call(C, "VIEW3D_OT_game_start", WM_OP_EXEC_DEFAULT, NULL);
 
-		sound_exit();
+		BKE_sound_exit();
 
 		return true;
 	}
@@ -397,7 +398,7 @@ void WM_exit_ext(bContext *C, const bool do_python)
 {
 	wmWindowManager *wm = C ? CTX_wm_manager(C) : NULL;
 
-	sound_exit();
+	BKE_sound_exit();
 
 	/* first wrap up running stuff, we assume only the active WM is running */
 	/* modal handlers are on window level freed, others too? */
@@ -406,7 +407,7 @@ void WM_exit_ext(bContext *C, const bool do_python)
 		wmWindow *win;
 
 		if (!G.background) {
-			if ((U.uiflag2 & USER_KEEP_SESSION) || BKE_undo_valid(NULL)) {
+			if ((U.uiflag2 & USER_KEEP_SESSION) || BKE_undo_is_valid(NULL)) {
 				/* save the undo state as quit.blend */
 				char filename[FILE_MAX];
 				bool has_edited;
@@ -516,7 +517,7 @@ void WM_exit_ext(bContext *C, const bool do_python)
 		GPU_exit();
 	}
 
-	BKE_reset_undo(); 
+	BKE_undo_reset();
 	
 	ED_file_exit(); /* for fsmenu */
 

@@ -33,13 +33,11 @@
 
 struct ID;
 struct BoundBox;
-struct DispList;
 struct EdgeHash;
 struct ListBase;
 struct LinkNode;
 struct BLI_Stack;
 struct MemArena;
-struct BMEditMesh;
 struct BMesh;
 struct Main;
 struct Mesh;
@@ -49,18 +47,11 @@ struct MFace;
 struct MEdge;
 struct MVert;
 struct MDeformVert;
-struct MCol;
 struct Object;
-struct MTFace;
-struct VecNor;
 struct CustomData;
 struct DerivedMesh;
 struct Scene;
 struct MLoopUV;
-struct UvVertMap;
-struct UvMapVert;
-struct UvElementMap;
-struct UvElement;
 struct ReportList;
 
 #ifdef __cplusplus
@@ -78,12 +69,13 @@ extern "C" {
 
 struct BMesh *BKE_mesh_to_bmesh(struct Mesh *me, struct Object *ob);
 
-int poly_find_loop_from_vert(const struct MPoly *poly,
-                             const struct MLoop *loopstart,
-                             unsigned vert);
-
-int poly_get_adj_loops_from_vert(unsigned r_adj[3], const struct MPoly *poly,
-                                 const struct MLoop *mloop, unsigned vert);
+int poly_find_loop_from_vert(
+        const struct MPoly *poly,
+        const struct MLoop *loopstart,
+        unsigned vert);
+int poly_get_adj_loops_from_vert(
+        unsigned r_adj[2], const struct MPoly *poly,
+        const struct MLoop *mloop, unsigned vert);
 
 int BKE_mesh_edge_other_vert(const struct MEdge *e, int v);
 
@@ -128,7 +120,10 @@ bool BKE_mesh_uv_cdlayer_rename_index(struct Mesh *me, const int poly_index, con
                                       const char *new_name, const bool do_tessface);
 bool BKE_mesh_uv_cdlayer_rename(struct Mesh *me, const char *old_name, const char *new_name, bool do_tessface);
 
-float (*BKE_mesh_vertexCos_get(struct Mesh *me, int *r_numVerts))[3];
+float (*BKE_mesh_vertexCos_get(const struct Mesh *me, int *r_numVerts))[3];
+
+void BKE_mesh_calc_normals_split(struct Mesh *mesh);
+void BKE_mesh_split_faces(struct Mesh *mesh);
 
 struct Mesh *BKE_mesh_new_from_object(struct Main *bmain, struct Scene *sce, struct Object *ob,
                                       int apply_modifiers, int settings, int calc_tessface, int calc_undeformed);

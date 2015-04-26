@@ -99,7 +99,7 @@ void BKE_material_free_ex(Material *ma, bool do_id_user)
 	if (ma->ramp_col) MEM_freeN(ma->ramp_col);
 	if (ma->ramp_spec) MEM_freeN(ma->ramp_spec);
 	
-	BKE_free_animdata((ID *)ma);
+	BKE_animdata_free((ID *)ma);
 	
 	if (ma->preview)
 		BKE_previewimg_free(&ma->preview);
@@ -806,9 +806,13 @@ void assign_material_id(ID *id, Material *ma, short act)
 	if (act > MAXMAT) return;
 	if (act < 1) act = 1;
 
+	/* this is needed for Python overrides,
+	 * we just have to take care that the UI can't do this */
+#if 0
 	/* prevent crashing when using accidentally */
 	BLI_assert(id->lib == NULL);
 	if (id->lib) return;
+#endif
 
 	/* test arraylens */
 
