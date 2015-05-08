@@ -725,14 +725,16 @@ struct ImageLayer *merge_layers(Image *ima, ImageLayer *iml, ImageLayer *iml_nex
 {
 	ImBuf *ibuf, *result_ibuf;
 	 /* merge layers */
-	result_ibuf = imalayer_blend((ImBuf*)((ImageLayer*)iml_next->ibufs.first), (ImBuf*)((ImageLayer*)iml->ibufs.first),
-								 iml->opacity, iml->mode, ((ImageLayer*)iml_next->ibufs.first)->background);
+	result_ibuf = imalayer_blend((ImBuf*)((ImageLayer*)iml_next->ibufs.first),
+	                             (ImBuf*)((ImageLayer*)iml->ibufs.first),
+								 iml->opacity, iml->mode,
+	                             ((ImageLayer*)iml_next->ibufs.first)->background);
 	
 	iml_next->background = IMA_LAYER_BG_RGB;
 	iml_next->file_path[0] = '\0';
 	copy_v4_fl(iml_next->default_color, -1.0f);
 
-	/* Delete old ibuf*/
+	/* Delete old ibuf */
 	ibuf = (ImBuf *)iml_next->ibufs.first;
 	BLI_remlink(&iml_next->ibufs, ibuf);
  
@@ -740,7 +742,7 @@ struct ImageLayer *merge_layers(Image *ima, ImageLayer *iml, ImageLayer *iml_nex
 		MEM_freeN(ibuf->userdata);
 		ibuf->userdata = NULL;
 	}
- 	IMB_freeImBuf(ibuf);
+	IMB_freeImBuf(ibuf);
 
 	/* add new ibuf */
 	BLI_addtail(&iml_next->ibufs, result_ibuf);

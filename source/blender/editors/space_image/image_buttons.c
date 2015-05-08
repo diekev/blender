@@ -515,7 +515,7 @@ static void image_multi_cb(bContext *C, void *rr_v, void *iuser_v)
 {
 	ImageUser *iuser = iuser_v;
 
-	BKE_render_multilayer_index(rr_v, iuser);
+	BKE_image_multilayer_index(rr_v, iuser);
 	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
 }
 
@@ -530,7 +530,7 @@ static void image_multi_inclay_cb(bContext *C, void *rr_v, void *iuser_v)
 
 	if (iuser->layer < tot - 1) {
 		iuser->layer++;
-		BKE_render_multilayer_index(rr, iuser); 
+		BKE_image_multilayer_index(rr, iuser);
 		WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
 	}
 }
@@ -540,7 +540,7 @@ static void image_multi_declay_cb(bContext *C, void *rr_v, void *iuser_v)
 
 	if (iuser->layer > 0) {
 		iuser->layer--;
-		BKE_render_multilayer_index(rr_v, iuser); 
+		BKE_image_multilayer_index(rr_v, iuser);
 		WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
 	}
 }
@@ -570,7 +570,7 @@ static void image_multi_incpass_cb(bContext *C, void *rr_v, void *iuser_v)
 
 		if (next != NULL && iuser->passtype != next->passtype) {
 			iuser->passtype = next->passtype;
-			BKE_render_multilayer_index(rr, iuser);
+			BKE_image_multilayer_index(rr, iuser);
 			WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
 		}
 	}
@@ -601,7 +601,7 @@ static void image_multi_decpass_cb(bContext *C, void *rr_v, void *iuser_v)
 
 		if (prev != NULL && iuser->passtype != prev->passtype) {
 			iuser->passtype = prev->passtype;
-			BKE_render_multilayer_index(rr, iuser);
+			BKE_image_multilayer_index(rr, iuser);
 			WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
 		}
 	}

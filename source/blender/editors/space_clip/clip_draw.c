@@ -1124,7 +1124,7 @@ static void draw_plane_marker_ex(SpaceClip *sc, Scene *scene, MovieTrackingPlane
 	bool tiny = (sc->flag & SC_SHOW_TINY_MARKER) != 0;
 	bool is_selected_track = (plane_track->flag & SELECT) != 0;
 	const bool has_image = plane_track->image != NULL &&
-	                       BKE_image_has_ibuf(plane_track->image, NULL);
+	                       BKE_image_has_ibuf(plane_track->image, NULL, IMA_IBUF_IMA);
 	const bool draw_plane_quad = !has_image || plane_track->image_opacity == 0.0f;
 	float px[2];
 

@@ -1791,7 +1791,7 @@ static bool save_image_doit(bContext *C, SpaceImage *sima, wmOperator *op, SaveI
 					else
 						BKE_image_multiview_index(ima, &iuser);
 
-					ibuf = BKE_image_acquire_ibuf(sima->image, &iuser, &lock);
+					ibuf = BKE_image_acquire_ibuf(sima->image, &iuser, &lock, IMA_IBUF_IMA);
 					ibuf->planes = planes;
 
 					BKE_scene_multiview_view_filepath_get(&scene->r, simopts->filepath, view, filepath);
@@ -1840,7 +1840,7 @@ static bool save_image_doit(bContext *C, SpaceImage *sima, wmOperator *op, SaveI
 						BKE_image_multiview_index(ima, &iuser);
 					}
 
-					ibuf = BKE_image_acquire_ibuf(sima->image, &iuser, &lock);
+					ibuf = BKE_image_acquire_ibuf(sima->image, &iuser, &lock, IMA_IBUF_IMA);
 
 					if (ibuf == NULL) {
 						BKE_report(op->reports, RPT_ERROR, "Did not write, unexpected error when saving stereo image");

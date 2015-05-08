@@ -41,7 +41,7 @@ ImBuf *MultilayerBaseOperation::getImBuf()
 	this->m_imageUser->view = this->m_view;
 	this->m_imageUser->passtype = this->m_passtype;
 
-	if (BKE_render_multilayer_index(this->m_image->rr, this->m_imageUser)) {
+	if (BKE_image_multilayer_index(this->m_image->rr, this->m_imageUser)) {
 		ImBuf *ibuf = BaseImageOperation::getImBuf();
 		this->m_imageUser->view = view;
 		return ibuf;

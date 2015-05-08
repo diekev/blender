@@ -102,7 +102,7 @@ static SpinLock image_spin;
 
 /* prototypes */
 static size_t image_num_files(struct Image *ima);
-static ImBuf *image_acquire_ibuf(Image *ima, ImageUser *iuser, void **r_lock);
+static ImBuf *image_acquire_ibuf(Image *ima, ImageUser *iuser, void **r_lock, int type_ibuf);
 static void image_update_views_format(Image *ima, ImageUser *iuser);
 static void image_add_view(Image *ima, const char *viewname, const char *filepath);
 
@@ -2738,35 +2738,10 @@ void BKE_image_signal(Image *ima, ImageUser *iuser, int signal)
 	}
 }
 
-ImageLayer *BKE_image_multilayer_index(Image *ima, ImageUser *iuser)
-{
-	ImageLayer *iml, *layer;
-
-	if (ima == NULL)
-		return NULL;
-
-	if (iuser) {
-		short index = 0;
-		//BLI_lock_thread(LOCK_IMAGE);
-		for (iml = ima->imlayers.last; iml; iml = iml->prev, index++) {
-			if (iml->select & IMA_LAYER_SEL_CURRENT)
-				layer->select = !IMA_LAYER_SEL_CURRENT;
-
-			if (iuser->layer == index) {
-				iml->select = IMA_LAYER_SEL_CURRENT;
-				layer = iml;
-			}
-		}
-		//BLI_unlock_thread(LOCK_IMAGE);
-	}
-
-	return layer;
-}
-
 /* if layer or pass changes, we need an index for the imbufs list */
 /* note it is called for rendered results, but it doesnt use the index! */
 /* and because rendered results use fake layer/passes, don't correct for wrong indices here */
-RenderPass *BKE_render_multilayer_index(RenderResult *rr, ImageUser *iuser)
+RenderPass *BKE_image_multilayer_index(RenderResult *rr, ImageUser *iuser)
 {
 	RenderLayer *rl;
 	RenderPass *rpass = NULL;
@@ -2948,7 +2923,7 @@ static ImBuf *image_get_buffer_cb(void *base, const size_t view_id)
 
 	BKE_image_multiview_index(ima, &iuser);
 
-	return image_acquire_ibuf(ima, &iuser, NULL);
+	return image_acquire_ibuf(ima, &iuser, NULL, IMA_IBUF_IMA);
 }
 #endif  /* WITH_OPENEXR */
 
@@ -3282,7 +3257,7 @@ static ImBuf *image_load_sequence_multilayer(Image *ima, ImageUser *iuser, int f
 		}
 	}
 	if (ima->rr) {
-		RenderPass *rpass = BKE_render_multilayer_index(ima->rr, iuser);
+		RenderPass *rpass = BKE_image_multilayer_index(ima->rr, iuser);
 
 		if (rpass) {
 			// printf("load from pass %s\n", rpass->name);
@@ -3598,7 +3573,7 @@ static ImBuf *image_get_ibuf_multilayer(Image *ima, ImageUser *iuser)
 		}
 	}
 	if (ima->rr) {
-		RenderPass *rpass = BKE_render_multilayer_index(ima->rr, iuser);
+		RenderPass *rpass = BKE_image_multilayer_index(ima->rr, iuser);
 
 		if (rpass) {
 			ibuf = IMB_allocImBuf(ima->rr->rectx, ima->rr->recty, 32, 0);
@@ -3927,6 +3902,7 @@ static ImBuf *image_get_cached_ibuf(Image *ima, ImageUser *iuser, int *r_frame, 
 			ibuf = image_get_cached_ibuf_for_index_frame(ima, index, 0);
 	}
 	else if (ima->source == IMA_SRC_GENERATED) {
+		if (ima->type == IMA_TYPE_IMAGE)
 			ibuf = image_get_ibuf_layer(ima);
 		else
 			ibuf = image_get_cached_ibuf_for_index_frame(ima, index, 0); //type_ibuf

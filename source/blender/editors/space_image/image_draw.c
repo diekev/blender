@@ -914,120 +914,7 @@ void draw_image_main(const bContext *C, ARegion *ar)
 	/* draw the image or grid */
 	if (ibuf == NULL) {
 		ED_region_grid_draw(ar, zoomx, zoomy);
-	else if (sima->flag & SI_DRAW_TILE)
-		draw_image_buffer_repeated(C, sima, ar, scene, ima, ibuf, zoomx, zoomy);
-	else if (ima && (ima->tpageflag & IMA_TILES))
-		draw_image_buffer_tiled(sima, ar, scene, ima, ibuf, 0.0f, 0.0, zoomx, zoomy);
-	else if (ima && !show_render && (sima->mode == SI_MODE_PAINT)) {
-		next_ibuf = NULL;
-		ima->use_layers = true;
-		layer = (ImageLayer*)ima->imlayers.last;
 
-		b_x = ibuf->x;
-		b_y = ibuf->y;
-
-		background = layer->background;
-
-		if (ima->preview_ibuf) {
-			p_ibuf = ima->preview_ibuf;
-			if ((p_ibuf->channels == 4) || (background & IMA_LAYER_BG_ALPHA)) {
-				UI_view2d_view_to_region(&ar->v2d, 0.0f, 0.0f, &x, &y);
-				fdrawcheckerboard(x, y, x + p_ibuf->x * zoomx, y + p_ibuf->y * zoomy);
-			}
-			glEnable(GL_BLEND);
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-			draw_layer_buffer(C, sima, ar, scene, p_ibuf, 0.0f, 0.0f, zoomx, zoomy);
-			glDisable(GL_BLEND);
-			b_x = p_ibuf->x;
-			b_y = p_ibuf->y;
-		}
-		else {
-			for (layer = (ImageLayer*)ima->imlayers.last; layer; layer = layer->prev) {
-				if ((!first) || (layer->preview_ibuf)) {
-					if ((layer->opacity != 1.0f) || (ibuf->channels == 4) || (background & IMA_LAYER_BG_ALPHA)) {
-						UI_view2d_view_to_region(&ar->v2d, 0.0f, 0.0f, &x, &y);
-						if (layer->preview_ibuf)
-							fdrawcheckerboard(x, y, x + layer->preview_ibuf->x * zoomx, y + layer->preview_ibuf->y * zoomy);
-						else
-							fdrawcheckerboard(x, y, x + ibuf->x * zoomx, y + ibuf->y * zoomy);
-						first = 1;
-					}
-				}
-
-				if (layer->visible & IMA_LAYER_VISIBLE) {
-					if (layer->preview_ibuf)
-						ibuf_l = layer->preview_ibuf;
-					else
-						ibuf_l = (ImBuf*)layer->ibufs.first;
-
-					if (ibuf_l) {
-						result_ibuf = imalayer_blend(next_ibuf, ibuf_l, layer->opacity, layer->mode, background);
-
-						if (next_ibuf)
-							IMB_freeImBuf(next_ibuf);
-
-						next_ibuf = IMB_dupImBuf(result_ibuf);
-						sp_x = 0.0f;
-						sp_y = 0.0f;
-
-						glEnable(GL_BLEND);
-						glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-						glColor4f(1.0f, 1.0f, 1.0f, layer->opacity);
-						draw_layer_buffer(C, sima, ar, scene, result_ibuf, sp_x, sp_y, zoomx, zoomy);
-						glDisable(GL_BLEND);
-
-						if (result_ibuf)
-							IMB_freeImBuf(result_ibuf);
-					}
-				}
-
-				if (UI_GetThemeValue(TH_SHOW_BOUNDARY_LAYER)) {
-					if (layer->select & IMA_LAYER_SEL_CURRENT) {
-						if (ibuf_l) {
-							b_x = ibuf_l->x;
-							b_y = ibuf_l->y;
-						}
-					}
-				}
-			}
-		}
-		glDisable(GL_BLEND);
-		if (UI_GetThemeValue(TH_SHOW_BOUNDARY_LAYER))
-			layer_draw_boundary(x, y, b_x, b_y, zoomx, zoomy);
-	}
-	else {
-		if (ima->imlayers.last) {
-			layer = ima->imlayers.last;
-			if (layer->background & IMA_LAYER_BG_ALPHA) {
-				int x, y;
-
-				UI_view2d_view_to_region(&ar->v2d, 0.0f, 0.0f, &x, &y);
-				fdrawcheckerboard(x, y, x + ibuf->x * zoomx, y + ibuf->y * zoomy);
-			}
-		}
-
-		glEnable(GL_BLEND);
-
-		if (!show_render)
-			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-		else
-			glBlendFunc(GL_ONE, GL_ZERO);
-
-		glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-
-		if (ima->preview_ibuf)
-			draw_image_buffer(C, sima, ar, scene, ima->preview_ibuf, 0.0f, 0.0f, zoomx, zoomy);
-		else
-			draw_image_buffer(C, sima, ar, scene, ibuf, 0.0f, 0.0f, zoomx, zoomy);
-
-		glDisable(GL_BLEND);
-
-		if (layer) {
-			if (layer->background & IMA_LAYER_BG_ALPHA)
-				glDisable(GL_BLEND);
-		}
-	}
 	}
 	else {
 
@@ -1035,8 +922,116 @@ void draw_image_main(const bContext *C, ARegion *ar)
 			draw_image_buffer_repeated(C, sima, ar, scene, ima, ibuf, zoomx, zoomy);
 		else if (ima && (ima->tpageflag & IMA_TILES))
 			draw_image_buffer_tiled(sima, ar, scene, ima, ibuf, 0.0f, 0.0, zoomx, zoomy);
-		else
-			draw_image_buffer(C, sima, ar, scene, ibuf, 0.0f, 0.0f, zoomx, zoomy);
+		else if (ima && !show_render && (sima->mode == SI_MODE_PAINT)) {
+			next_ibuf = NULL;
+			ima->use_layers = true;
+			layer = (ImageLayer*)ima->imlayers.last;
+
+			b_x = ibuf->x;
+			b_y = ibuf->y;
+
+			background = layer->background;
+
+			if (ima->preview_ibuf) {
+				p_ibuf = ima->preview_ibuf;
+				if ((p_ibuf->channels == 4) || (background & IMA_LAYER_BG_ALPHA)) {
+					UI_view2d_view_to_region(&ar->v2d, 0.0f, 0.0f, &x, &y);
+					fdrawcheckerboard(x, y, x + p_ibuf->x * zoomx, y + p_ibuf->y * zoomy);
+				}
+				glEnable(GL_BLEND);
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+				draw_layer_buffer(C, sima, ar, scene, p_ibuf, 0.0f, 0.0f, zoomx, zoomy);
+				glDisable(GL_BLEND);
+				b_x = p_ibuf->x;
+				b_y = p_ibuf->y;
+			}
+			else {
+				for (layer = (ImageLayer*)ima->imlayers.last; layer; layer = layer->prev) {
+					if ((!first) || (layer->preview_ibuf)) {
+						if ((layer->opacity != 1.0f) || (ibuf->channels == 4) || (background & IMA_LAYER_BG_ALPHA)) {
+							UI_view2d_view_to_region(&ar->v2d, 0.0f, 0.0f, &x, &y);
+							if (layer->preview_ibuf)
+								fdrawcheckerboard(x, y, x + layer->preview_ibuf->x * zoomx, y + layer->preview_ibuf->y * zoomy);
+							else
+								fdrawcheckerboard(x, y, x + ibuf->x * zoomx, y + ibuf->y * zoomy);
+							first = 1;
+						}
+					}
+
+					if (layer->visible & IMA_LAYER_VISIBLE) {
+						if (layer->preview_ibuf)
+							ibuf_l = layer->preview_ibuf;
+						else
+							ibuf_l = (ImBuf*)layer->ibufs.first;
+
+						if (ibuf_l) {
+							result_ibuf = imalayer_blend(next_ibuf, ibuf_l, layer->opacity, layer->mode, background);
+
+							if (next_ibuf)
+								IMB_freeImBuf(next_ibuf);
+
+							next_ibuf = IMB_dupImBuf(result_ibuf);
+							sp_x = 0.0f;
+							sp_y = 0.0f;
+
+							glEnable(GL_BLEND);
+							glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+							glColor4f(1.0f, 1.0f, 1.0f, layer->opacity);
+							draw_layer_buffer(C, sima, ar, scene, result_ibuf, sp_x, sp_y, zoomx, zoomy);
+							glDisable(GL_BLEND);
+
+							if (result_ibuf)
+								IMB_freeImBuf(result_ibuf);
+						}
+					}
+
+					if (UI_GetThemeValue(TH_SHOW_BOUNDARY_LAYER)) {
+						if (layer->select & IMA_LAYER_SEL_CURRENT) {
+							if (ibuf_l) {
+								b_x = ibuf_l->x;
+								b_y = ibuf_l->y;
+							}
+						}
+					}
+				}
+			}
+			glDisable(GL_BLEND);
+			if (UI_GetThemeValue(TH_SHOW_BOUNDARY_LAYER))
+				layer_draw_boundary(x, y, b_x, b_y, zoomx, zoomy);
+		}
+		else {
+			if (ima->imlayers.last) {
+				layer = ima->imlayers.last;
+				if (layer->background & IMA_LAYER_BG_ALPHA) {
+					int x, y;
+
+					UI_view2d_view_to_region(&ar->v2d, 0.0f, 0.0f, &x, &y);
+					fdrawcheckerboard(x, y, x + ibuf->x * zoomx, y + ibuf->y * zoomy);
+				}
+			}
+
+			glEnable(GL_BLEND);
+
+			if (!show_render)
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+			else
+				glBlendFunc(GL_ONE, GL_ZERO);
+
+			glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+
+			if (ima->preview_ibuf)
+				draw_image_buffer(C, sima, ar, scene, ima->preview_ibuf, 0.0f, 0.0f, zoomx, zoomy);
+			else
+				draw_image_buffer(C, sima, ar, scene, ibuf, 0.0f, 0.0f, zoomx, zoomy);
+
+			glDisable(GL_BLEND);
+
+			if (layer) {
+				if (layer->background & IMA_LAYER_BG_ALPHA)
+					glDisable(GL_BLEND);
+			}
+		}
 		
 		if (sima->flag & SI_DRAW_METADATA) {
 			int x, y;

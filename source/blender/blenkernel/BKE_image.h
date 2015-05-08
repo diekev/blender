@@ -208,9 +208,7 @@ void BKE_image_user_file_path(struct ImageUser *iuser, struct Image *ima, char *
 void BKE_image_update_frame(const struct Main *bmain, int cfra);
 
 /* sets index offset for multilayer files */
-struct RenderPass *BKE_render_multilayer_index(struct RenderResult *rr, struct ImageUser *iuser);
-
-struct ImageLayer *BKE_image_multilayer_index(struct Image *ima, struct ImageUser *iuser);
+struct RenderPass *BKE_image_multilayer_index(struct RenderResult *rr, struct ImageUser *iuser);
 
 /* sets index offset for multiview files */
 void BKE_image_multiview_index(struct Image *ima, struct ImageUser *iuser);

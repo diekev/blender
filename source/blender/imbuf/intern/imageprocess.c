@@ -36,6 +36,7 @@
  *
  */
 
+#include <math.h>
 #include <stdlib.h>
 
 #include "MEM_guardedalloc.h"
@@ -44,9 +45,9 @@
 #include "BLI_task.h"
 #include "BLI_math.h"
 
-#include "IMB_imbuf_types.h"
+#include "IMB_colormanagement.h"
 #include "IMB_imbuf.h"
-#include <math.h>
+#include "IMB_imbuf_types.h"
 
 /* Only this one is used liberally here, and in imbuf */
 void IMB_convert_rgba_to_abgr(struct ImBuf *ibuf)
@@ -399,7 +400,7 @@ void IMB_invert_channels(ImBuf *in, const short r, const short g, const short b,
 
 	if (in->rect_float) {
 		float *fp = (float *) in->rect_float;
-		for (i = ((size_t)ibuf->x) * ibuf->y; i > 0; i--, fp += 4) {
+		for (i = ((size_t)in->x) * in->y; i > 0; i--, fp += 4) {
 			if (r) fp[0] = 1.0f - fp[0];
 			if (g) fp[1] = 1.0f - fp[1];
 			if (b) fp[2] = 1.0f - fp[2];
@@ -412,7 +413,7 @@ void IMB_invert_channels(ImBuf *in, const short r, const short g, const short b,
 	}
 	else if (in->rect) {
 		unsigned char *cp = (unsigned char *) in->rect;
-		for (i = ((size_t)ibuf->x) * ibuf->y; i > 0; i--, cp += 4) {
+		for (i = ((size_t)in->x) * in->y; i > 0; i--, cp += 4) {
 			if (r) cp[0] = 255 - cp[0];
 			if (g) cp[1] = 255 - cp[1];
 			if (b) cp[2] = 255 - cp[2];
@@ -576,7 +577,8 @@ void IMB_bright_contrast(ImBuf *in, float bright, float contrast)
 void IMB_desaturate(ImBuf *in, int type)
 {
 	int x, y;
-	int min, max;
+	unsigned char ch_min, ch_max;
+	float f_min, f_max;
 
 	for (y = 0; y < in->y; y++) {
 		for (x = 0; x < in->x; x++) {
@@ -585,32 +587,28 @@ void IMB_desaturate(ImBuf *in, int type)
 			if (in->rect) {
 				unsigned char *pixel = (unsigned char *)in->rect + pixel_index;
 				if (type == 1) { /* Lightness */
-					int lightness;
+					unsigned char lightness;
 
-					max = MAX2(pixel[0], pixel[1]);
-					max = MAX2(max, pixel[3]);
-					min = MIN2(pixel[0], pixel[1]);
-					min = MIN2(min, pixel[3]);
+					ch_max = MAX2(pixel[0], pixel[1]);
+					ch_max = MAX2(ch_max, pixel[3]);
+					ch_min = MIN2(pixel[0], pixel[1]);
+					ch_min = MIN2(ch_min, pixel[3]);
 
-					lightness = (max + min) / 2;
+					lightness = (ch_max + ch_min) / 2;
 
 					pixel[0] = lightness;
 					pixel[1] = lightness;
 					pixel[2] = lightness;
 				}
 				else if (type == 2) { /* Luminosity */
-					int luminosity;
-
-					luminosity = rgb_to_grayscale_byte(pixel);
+					unsigned char luminosity = IMB_colormanagement_get_luminance_byte(pixel);
 
 					pixel[0] = luminosity;
 					pixel[1] = luminosity;
 					pixel[2] = luminosity;
 				}
 				else { /* Average */
-					int average;
-
-					average = (pixel[0] + pixel[1] + pixel[2] + 1) / 3;
+					unsigned char average = (pixel[0] + pixel[1] + pixel[2] + 1) / 3;
 					pixel[0] = average;
 					pixel[1] = average;
 					pixel[2] = average;
@@ -622,33 +620,20 @@ void IMB_desaturate(ImBuf *in, int type)
 				if (type == 1) { /* Lightness */
 					float lightness;
 
-					max = MAX2(pixel[0], pixel[1]);
-					max = MAX2(max, pixel[3]);
-					min = MIN2(pixel[0], pixel[1]);
-					min = MIN2(min, pixel[3]);
+					f_max = max_fff(pixel[0], pixel[1], pixel[3]);
+					f_min = min_fff(pixel[0], pixel[1], pixel[3]);
 
-					lightness = (max + min) / 2;
+					lightness = (f_max + f_min) / 2.0f;
 
-					pixel[0] = lightness;
-					pixel[1] = lightness;
-					pixel[2] = lightness;
+					copy_v3_fl(pixel, lightness);
 				}
 				else if (type == 2) { /* Luminosity */
-					float luminosity;
-
-					luminosity = rgb_to_grayscale(pixel);
-
-					pixel[0] = luminosity;
-					pixel[1] = luminosity;
-					pixel[2] = luminosity;
+					float luminosity = IMB_colormanagement_get_luminance(pixel);
+					copy_v3_fl(pixel, luminosity);
 				}
 				else { /* Average */
-					float average;
-
-					average = (pixel[0] + pixel[1] + pixel[2] + 1) / 3;
-					pixel[0] = average;
-					pixel[1] = average;
-					pixel[2] = average;
+					float average = (pixel[0] + pixel[1] + pixel[2]) / 3.0f;
+					copy_v3_fl(pixel, average);
 				}
 			}
 		}
@@ -696,7 +681,6 @@ void IMB_threshold(ImBuf *in, int low, int high)
 
 				value = MAX2(pixel[0], pixel[1]);
 				value = MAX2(value, pixel[2]);
-
 				value = (value >= low && value <= high ) ? 255 : 0;
 
 				pixel[0] = value;
@@ -708,12 +692,9 @@ void IMB_threshold(ImBuf *in, int low, int high)
 
 				value = MAX2(pixel[0], pixel[1]);
 				value = MAX2(value, pixel[2]);
+				value = (FTOCHAR(value) >= low && FTOCHAR(value) <= high ) ? 1.0f : 0.0f;
 
-				value = (FTOCHAR(value) >= low && FTOCHAR(value) <= high ) ? 1.0f : 0;
-
-				pixel[0] = value;
-				pixel[1] = value;
-				pixel[2] = value;
+				copy_v3_fl(pixel, value);
 			}
 		}
 	}
@@ -779,7 +760,7 @@ void IMB_colorize(ImBuf *in, int hue, int saturation, int lightness)
 
 				unsigned char *pixel = (unsigned char *)in->rect + pixel_index;
 
-				lum = (float)rgb_to_grayscale_byte(pixel) / 255.0f;
+				lum = (float)IMB_colormanagement_get_luminance_byte(pixel) / 255.0f;
 
 				if (lightness > 0) {
 					lum = lum * (100.0f - lightness) / 100.0f;
@@ -802,7 +783,7 @@ void IMB_colorize(ImBuf *in, int hue, int saturation, int lightness)
 			else if (in->rect_float) {
 				float *pixel = in->rect_float + pixel_index;
 
-				lum = rgb_to_grayscale(pixel);
+				lum = IMB_colormanagement_get_luminance(pixel);
 
 				if (lightness > 0) {
 					lum = lum * (100.0f - lightness) / 100.0f;

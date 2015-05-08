@@ -1210,9 +1210,8 @@ void paint_2d_stroke(void *ps, const float prev_mval[2], const float mval[2], co
 	brush_painter_2d_require_imbuf(painter, (ibuf->rect_float != NULL), !is_data);
 
 	if (s->image->color_space & IMA_COL_GRAY) {
-		painter->brush->rgb[0] = rgb_to_grayscale(painter->brush->rgb);
-		painter->brush->rgb[1] = painter->brush->rgb[0];
-		painter->brush->rgb[2] = painter->brush->rgb[0];
+		float luminance = IMB_colormanagement_get_luminance(painter->brush->rgb);
+		copy_v3_fl(painter->brush->rgb, luminance);
 	}
 
 	brush_painter_2d_refresh_cache(s, painter, newuv, mval, pressure, distance, size);
