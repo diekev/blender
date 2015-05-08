@@ -379,7 +379,7 @@ void IMAGE_OT_view_pan(wmOperatorType *ot)
 	ot->poll = space_image_main_area_poll;
 
 	/* flags */
-	ot->flag = OPTYPE_BLOCKING | OPTYPE_GRAB_POINTER | OPTYPE_LOCK_BYPASS;
+	ot->flag = OPTYPE_BLOCKING | OPTYPE_GRAB_CURSOR | OPTYPE_LOCK_BYPASS;
 	
 	/* properties */
 	RNA_def_float_vector(ot->srna, "offset", 2, NULL, -FLT_MAX, FLT_MAX,
@@ -595,7 +595,7 @@ void IMAGE_OT_view_zoom(wmOperatorType *ot)
 	ot->poll = space_image_main_area_poll;
 
 	/* flags */
-	ot->flag = OPTYPE_BLOCKING | OPTYPE_GRAB_POINTER | OPTYPE_LOCK_BYPASS;
+	ot->flag = OPTYPE_BLOCKING | OPTYPE_GRAB_CURSOR | OPTYPE_LOCK_BYPASS;
 	
 	/* properties */
 	prop = RNA_def_float(ot->srna, "factor", 0.0f, -FLT_MAX, FLT_MAX, "Factor",
@@ -2537,7 +2537,7 @@ static int image_invert_exec(bContext *C, wmOperator *op)
 	const bool b = RNA_boolean_get(op->ptr, "invert_b");
 	const bool a = RNA_boolean_get(op->ptr, "invert_a");
 
-	//int i;
+	//size_t i;
 
 	ima->use_layers = false;
 	if (sima->mode == SI_MODE_PAINT) {
@@ -2557,7 +2557,7 @@ static int image_invert_exec(bContext *C, wmOperator *op)
 		/* not strictly needed, because we only imapaint_dirty_region to invalidate all tiles
 		 * but better do this right in case someone copies this for a tool that uses partial redraw better */
 		ED_imapaint_clear_partial_redraw();
-		ED_imapaint_dirty_region(ima, ibuf, 0, 0, ibuf->x, ibuf->y);
+		ED_imapaint_dirty_region(ima, ibuf, 0, 0, ibuf->x, ibuf->y, false);
 	}
 
 	IMB_invert_channels(ibuf, r, g, b, a);

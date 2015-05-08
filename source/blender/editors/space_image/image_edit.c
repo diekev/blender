@@ -104,7 +104,7 @@ void ED_space_image_set_mask(bContext *C, SpaceImage *sima, Mask *mask)
 	}
 }
 
-ImBuf *ED_space_image_acquire_buffer(SpaceImage *sima, void **lock_r)
+ImBuf *ED_space_image_acquire_buffer(SpaceImage *sima, void **r_lock)
 {
 	ImBuf *ibuf;
 
@@ -115,10 +115,10 @@ ImBuf *ED_space_image_acquire_buffer(SpaceImage *sima, void **lock_r)
 		else
 #endif
 		if (sima->mode == SI_MODE_PAINT) {
-			ibuf = BKE_image_acquire_ibuf(sima->image, &sima->iuser, lock_r, IMA_IBUF_LAYER);
+			ibuf = BKE_image_acquire_ibuf(sima->image, &sima->iuser, r_lock, IMA_IBUF_LAYER);
 		}
 		else {
-			ibuf = BKE_image_acquire_ibuf(sima->image, &sima->iuser, lock_r, IMA_IBUF_IMA);
+			ibuf = BKE_image_acquire_ibuf(sima->image, &sima->iuser, r_lock, IMA_IBUF_IMA);
 		}
 
 		if (ibuf) {
@@ -129,7 +129,7 @@ ImBuf *ED_space_image_acquire_buffer(SpaceImage *sima, void **lock_r)
 		}
 	}
 	else
-		*lock_r = NULL;
+		*r_lock = NULL;
 
 	return NULL;
 }

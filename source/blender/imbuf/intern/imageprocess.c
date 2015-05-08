@@ -343,7 +343,7 @@ void IMB_processor_apply_threaded(int buffer_lines, int handle_size, void *init_
 
 void IMB_alpha_under_color_float(float *rect_float, int x, int y, float backcol[3])
 {
-	int a = x * y;
+	size_t a = ((size_t)x) * y;
 	float *fp = rect_float;
 
 	while (a--) {
@@ -366,7 +366,7 @@ void IMB_alpha_under_color_float(float *rect_float, int x, int y, float backcol[
 
 void IMB_alpha_under_color_byte(unsigned char *rect, int x, int y, float backcol[3])
 {
-	int a = x * y;
+	size_t a = ((size_t)x) * y;
 	unsigned char *cp = rect;
 
 	while (a--) {
@@ -395,11 +395,11 @@ void IMB_alpha_under_color_byte(unsigned char *rect, int x, int y, float backcol
 
 void IMB_invert_channels(ImBuf *in, const short r, const short g, const short b, const short a)
 {
-	int i;
+	size_t i;
 
 	if (in->rect_float) {
 		float *fp = (float *) in->rect_float;
-		for (i = in->x * in->y; i > 0; i--, fp += 4) {
+		for (i = ((size_t)ibuf->x) * ibuf->y; i > 0; i--, fp += 4) {
 			if (r) fp[0] = 1.0f - fp[0];
 			if (g) fp[1] = 1.0f - fp[1];
 			if (b) fp[2] = 1.0f - fp[2];
@@ -412,7 +412,7 @@ void IMB_invert_channels(ImBuf *in, const short r, const short g, const short b,
 	}
 	else if (in->rect) {
 		unsigned char *cp = (unsigned char *) in->rect;
-		for (i = in->x * in->y; i > 0; i--, cp += 4) {
+		for (i = ((size_t)ibuf->x) * ibuf->y; i > 0; i--, cp += 4) {
 			if (r) cp[0] = 255 - cp[0];
 			if (g) cp[1] = 255 - cp[1];
 			if (b) cp[2] = 255 - cp[2];
