@@ -657,8 +657,10 @@ typedef struct RenderData {
 	/* render simplify */
 	int simplify_flag;
 	short simplify_subsurf;
-	short simplify_shadowsamples;
+	short simplify_subsurf_render;
+	short simplify_shadowsamples, pad9;
 	float simplify_particles;
+	float simplify_particles_render;
 	float simplify_aosss;
 
 	/* cineon */
@@ -1019,6 +1021,8 @@ typedef struct Sculpt {
 
 	/* scale for constant detail size */
 	float constant_detail;
+	float detail_percent;
+	float pad;
 
 	struct Object *gravity_object;
 	void *pad2;
@@ -1272,7 +1276,8 @@ typedef struct ToolSettings {
 	char proportional_mask; /* proportional edit, mask editing */
 	char proportional_action; /* proportional edit, action editor */
 	char proportional_fcurve; /* proportional edit, graph editor */
-	char pad4[6];
+	char lock_markers; /* lock marker editing */
+	char pad4[5];
 
 	char auto_normalize; /*auto normalizing mode in wpaint*/
 	char multipaint; /* paint multiple bones in wpaint */
@@ -1848,7 +1853,8 @@ typedef enum SculptFlags {
 	SCULPT_DYNTOPO_COLLAPSE = (1 << 11),
 
 	/* If set, dynamic-topology detail size will be constant in object space */
-	SCULPT_DYNTOPO_DETAIL_CONSTANT = (1 << 13)
+	SCULPT_DYNTOPO_DETAIL_CONSTANT = (1 << 13),
+	SCULPT_DYNTOPO_DETAIL_BRUSH = (1 << 14),
 } SculptFlags;
 
 typedef enum ImagePaintMode {

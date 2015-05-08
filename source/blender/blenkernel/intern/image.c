@@ -101,7 +101,7 @@ static SpinLock image_spin;
 
 /* prototypes */
 static size_t image_num_files(struct Image *ima);
-static ImBuf *image_acquire_ibuf(Image *ima, ImageUser *iuser, void **lock_r);
+static ImBuf *image_acquire_ibuf(Image *ima, ImageUser *iuser, void **r_lock);
 static void image_update_views_format(Image *ima, ImageUser *iuser);
 static void image_add_view(Image *ima, const char *viewname, const char *filepath);
 
@@ -883,12 +883,16 @@ Image *BKE_image_add_generated(Main *bmain, unsigned int width, unsigned int hei
 /* Create an image image from ibuf. The refcount of ibuf is increased,
  * caller should take care to drop its reference by calling
  * IMB_freeImBuf if needed. */
-Image *BKE_image_add_from_imbuf(ImBuf *ibuf)
+Image *BKE_image_add_from_imbuf(ImBuf *ibuf, const char *name)
 {
 	/* on save, type is changed to FILE in editsima.c */
 	Image *ima;
 
-	ima = image_alloc(G.main, BLI_path_basename(ibuf->name), IMA_SRC_FILE, IMA_TYPE_IMAGE);
+	if (name == NULL) {
+		name = BLI_path_basename(ibuf->name);
+	}
+
+	ima = image_alloc(G.main, name, IMA_SRC_FILE, IMA_TYPE_IMAGE);
 
 	if (ima) {
 		BLI_strncpy(ima->name, ibuf->name, FILE_MAX);
@@ -960,8 +964,10 @@ void BKE_image_memorypack(Image *ima)
 {
 	ImBuf *ibuf;
 
-	if ((ima->flag & IMA_IS_MULTIVIEW))
-		return image_memorypack_multiview(ima);
+	if ((ima->flag & IMA_IS_MULTIVIEW)) {
+		image_memorypack_multiview(ima);
+		return;
+	}
 
 	ibuf = image_get_cached_ibuf_for_index_frame(ima, IMA_NO_INDEX, 0);
 
@@ -2026,26 +2032,45 @@ void BKE_image_stamp_buf(
 #undef BUFF_MARGIN_Y
 }
 
-void BKE_imbuf_stamp_info(Scene *scene, Object *camera, struct ImBuf *ibuf)
+void BKE_render_result_stamp_info(Scene *scene, Object *camera, struct RenderResult *rr)
 {
-	struct StampData stamp_data;
+	struct StampData *stamp_data;
 
-	if (!ibuf) return;
+	if (!(scene && scene->r.stamp & R_STAMP_ALL))
+		return;
 
-	/* fill all the data values, no prefix */
-	stampdata(scene, camera, &stamp_data, 0);
+	if (!rr->stamp_data) {
+		stamp_data = MEM_callocN(sizeof(StampData), "RenderResult.stamp_data");
+	}
+	else {
+		stamp_data = rr->stamp_data;
+	}
 
-	if (stamp_data.file[0]) IMB_metadata_change_field(ibuf, "File",        stamp_data.file);
-	if (stamp_data.note[0]) IMB_metadata_change_field(ibuf, "Note",        stamp_data.note);
-	if (stamp_data.date[0]) IMB_metadata_change_field(ibuf, "Date",        stamp_data.date);
-	if (stamp_data.marker[0]) IMB_metadata_change_field(ibuf, "Marker",    stamp_data.marker);
-	if (stamp_data.time[0]) IMB_metadata_change_field(ibuf, "Time",        stamp_data.time);
-	if (stamp_data.frame[0]) IMB_metadata_change_field(ibuf, "Frame",      stamp_data.frame);
-	if (stamp_data.camera[0]) IMB_metadata_change_field(ibuf, "Camera",    stamp_data.camera);
-	if (stamp_data.cameralens[0]) IMB_metadata_change_field(ibuf, "Lens",  stamp_data.cameralens);
-	if (stamp_data.scene[0]) IMB_metadata_change_field(ibuf, "Scene",      stamp_data.scene);
-	if (stamp_data.strip[0]) IMB_metadata_change_field(ibuf, "Strip",      stamp_data.strip);
-	if (stamp_data.rendertime[0]) IMB_metadata_change_field(ibuf, "RenderTime", stamp_data.rendertime);
+	stampdata(scene, camera, stamp_data, 0);
+
+	if (!rr->stamp_data) {
+		rr->stamp_data = stamp_data;
+	}
+}
+
+
+void BKE_imbuf_stamp_info(RenderResult *rr, struct ImBuf *ibuf)
+{
+	struct StampData *stamp_data = rr->stamp_data;
+
+	if (!ibuf || !stamp_data) return;
+
+	if (stamp_data->file[0]) IMB_metadata_change_field(ibuf, "File",        stamp_data->file);
+	if (stamp_data->note[0]) IMB_metadata_change_field(ibuf, "Note",        stamp_data->note);
+	if (stamp_data->date[0]) IMB_metadata_change_field(ibuf, "Date",        stamp_data->date);
+	if (stamp_data->marker[0]) IMB_metadata_change_field(ibuf, "Marker",    stamp_data->marker);
+	if (stamp_data->time[0]) IMB_metadata_change_field(ibuf, "Time",        stamp_data->time);
+	if (stamp_data->frame[0]) IMB_metadata_change_field(ibuf, "Frame",      stamp_data->frame);
+	if (stamp_data->camera[0]) IMB_metadata_change_field(ibuf, "Camera",    stamp_data->camera);
+	if (stamp_data->cameralens[0]) IMB_metadata_change_field(ibuf, "Lens",  stamp_data->cameralens);
+	if (stamp_data->scene[0]) IMB_metadata_change_field(ibuf, "Scene",      stamp_data->scene);
+	if (stamp_data->strip[0]) IMB_metadata_change_field(ibuf, "Strip",      stamp_data->strip);
+	if (stamp_data->rendertime[0]) IMB_metadata_change_field(ibuf, "RenderTime", stamp_data->rendertime);
 }
 
 bool BKE_imbuf_alpha_test(ImBuf *ibuf)
@@ -2240,14 +2265,13 @@ int BKE_imbuf_write_as(ImBuf *ibuf, const char *name, ImageFormatData *imf,
 	return ok;
 }
 
-int BKE_imbuf_write_stamp(Scene *scene, struct Object *camera, ImBuf *ibuf, const char *name, struct ImageFormatData *imf)
+int BKE_imbuf_write_stamp(Scene *scene, struct RenderResult *rr, ImBuf *ibuf, const char *name, struct ImageFormatData *imf)
 {
 	if (scene && scene->r.stamp & R_STAMP_ALL)
-		BKE_imbuf_stamp_info(scene, camera, ibuf);
+		BKE_imbuf_stamp_info(rr, ibuf);
 
 	return BKE_imbuf_write(ibuf, name, imf);
 }
-
 
 static void do_makepicstring(
         char *string, const char *base, const char *relbase, int frame, const char imtype,
@@ -2475,7 +2499,7 @@ static void image_init_imageuser(Image *ima, ImageUser *iuser)
 	RenderResult *rr = ima->rr;
 
 	iuser->multi_index = 0;
-	iuser->layer = iuser->pass = iuser->view = 0;
+	iuser->layer = iuser->view = 0;
 	iuser->passtype = SCE_PASS_COMBINED;
 
 	if (rr) {
@@ -2494,7 +2518,7 @@ static void image_init_imageuser(Image *ima, ImageUser *iuser)
 
 void BKE_image_init_imageuser(Image *ima, ImageUser *iuser)
 {
-	return image_init_imageuser(ima, iuser);
+	image_init_imageuser(ima, iuser);
 }
 
 void BKE_image_signal(Image *ima, ImageUser *iuser, int signal)
@@ -2649,15 +2673,14 @@ RenderPass *BKE_image_multilayer_index(RenderResult *rr, ImageUser *iuser)
 		return NULL;
 
 	if (iuser) {
-		short index = 0, rv_index, rl_index = 0, rp_index;
+		short index = 0, rv_index, rl_index = 0;
 		bool is_stereo = (iuser->flag & IMA_SHOW_STEREO) && RE_RenderResult_is_stereo(rr);
 
 		rv_index = is_stereo ? iuser->multiview_eye : iuser->view;
+		if (RE_HasFakeLayer(rr)) rl_index += 1;
 
 		for (rl = rr->layers.first; rl; rl = rl->next, rl_index++) {
-			rp_index = 0;
-
-			for (rpass = rl->passes.first; rpass; rpass = rpass->next, index++, rp_index++) {
+			for (rpass = rl->passes.first; rpass; rpass = rpass->next, index++) {
 				if (iuser->layer == rl_index &&
 				    iuser->passtype == rpass->passtype &&
 				    rv_index == rpass->view_id)
@@ -2668,20 +2691,16 @@ RenderPass *BKE_image_multilayer_index(RenderResult *rr, ImageUser *iuser)
 			if (rpass)
 				break;
 		}
-
-		if (rpass) {
-			iuser->multi_index = index;
-			iuser->pass = rp_index;
-		}
-		else {
-			iuser->multi_index = 0;
-			iuser->pass = 0;
-		}
+		iuser->multi_index = (rpass ? index : 0);
 	}
+
 	if (rpass == NULL) {
 		rl = rr->layers.first;
 		if (rl)
 			rpass = rl->passes.first;
+
+		if (rpass && iuser)
+			iuser->passtype = rpass->passtype;
 	}
 
 	return rpass;
@@ -3503,10 +3522,11 @@ static ImBuf *image_get_ibuf_multilayer(Image *ima, ImageUser *iuser)
 /* showing RGBA result itself (from compo/sequence) or
  * like exr, using layers etc */
 /* always returns a single ibuf, also during render progress */
-static ImBuf *image_get_render_result(Image *ima, ImageUser *iuser, void **lock_r)
+static ImBuf *image_get_render_result(Image *ima, ImageUser *iuser, void **r_lock)
 {
 	Render *re;
 	RenderResult rres;
+	RenderView *rv;
 	float *rectf, *rectz;
 	unsigned int *rect;
 	float dither;
@@ -3520,7 +3540,7 @@ static ImBuf *image_get_render_result(Image *ima, ImageUser *iuser, void **lock_
 		return NULL;
 
 	/* if we the caller is not going to release the lock, don't give the image */
-	if (!lock_r)
+	if (!r_lock)
 		return NULL;
 
 	re = RE_GetRender(iuser->scene->id.name);
@@ -3538,7 +3558,7 @@ static ImBuf *image_get_render_result(Image *ima, ImageUser *iuser, void **lock_
 	}
 	else if (ima->renders[ima->render_slot]) {
 		rres = *(ima->renders[ima->render_slot]);
-		rres.have_combined = RE_RenderViewGetRectf(&rres, actview) != NULL;
+		rres.have_combined = ((RenderView *)rres.views.first)->rectf != NULL;
 	}
 	else
 		memset(&rres, 0, sizeof(RenderResult));
@@ -3549,16 +3569,30 @@ static ImBuf *image_get_render_result(Image *ima, ImageUser *iuser, void **lock_
 		return NULL;
 	}
 
-	/* release is done in BKE_image_release_ibuf using lock_r */
+	/* release is done in BKE_image_release_ibuf using r_lock */
 	if (from_render) {
 		BLI_lock_thread(LOCK_VIEWER);
-		*lock_r = re;
+		*r_lock = re;
+		rv = NULL;
+	}
+	else {
+		rv = BLI_findlink(&rres.views, actview);
+		if (rv == NULL)
+			rv = rres.views.first;
 	}
 
 	/* this gives active layer, composite or sequence result */
-	rect = (unsigned int *)rres.rect32;
-	rectf = rres.rectf;
-	rectz = rres.rectz;
+	if (rv == NULL) {
+		rect = (unsigned int *)rres.rect32;
+		rectf = rres.rectf;
+		rectz = rres.rectz;
+	}
+	else {
+		rect = (unsigned int *)rv->rect32;
+		rectf = rv->rectf;
+		rectz = rv->rectz;
+	}
+
 	dither = iuser->scene->r.dither_intensity;
 
 	/* combined layer gets added as first layer */
@@ -3589,6 +3623,15 @@ static ImBuf *image_get_render_result(Image *ima, ImageUser *iuser, void **lock_
 			if (rpass) {
 				channels = rpass->channels;
 				rectf = rpass->rect;
+
+				if (!rectf) {
+					/* Happens when Save Buffers is enabled.
+					 * Use display buffer stored in the render layer.
+					 */
+					rect = (unsigned int *) rl->display_buffer;
+					byte_buffer_in_display_space = true;
+				}
+
 				dither = 0.0f; /* don't dither passes */
 			}
 
@@ -3812,13 +3855,13 @@ BLI_INLINE bool image_quick_test(Image *ima, ImageUser *iuser)
  *
  * not thread-safe, so callee should worry about thread locks
  */
-static ImBuf *image_acquire_ibuf(Image *ima, ImageUser *iuser, void **lock_r)
+static ImBuf *image_acquire_ibuf(Image *ima, ImageUser *iuser, void **r_lock)
 {
 	ImBuf *ibuf = NULL;
 	int frame = 0, index = 0;
 
-	if (lock_r)
-		*lock_r = NULL;
+	if (r_lock)
+		*r_lock = NULL;
 
 	/* quick reject tests */
 	if (!image_quick_test(ima, iuser))
@@ -3867,14 +3910,14 @@ static ImBuf *image_acquire_ibuf(Image *ima, ImageUser *iuser, void **lock_r)
 			if (ima->type == IMA_TYPE_R_RESULT) {
 				/* always verify entirely, and potentially
 				 * returns pointer to release later */
-				ibuf = image_get_render_result(ima, iuser, lock_r);
+				ibuf = image_get_render_result(ima, iuser, r_lock);
 			}
 			else if (ima->type == IMA_TYPE_COMPOSITE) {
 				/* requires lock/unlock, otherwise don't return image */
-				if (lock_r) {
+				if (r_lock) {
 					/* unlock in BKE_image_release_ibuf */
 					BLI_lock_thread(LOCK_VIEWER);
-					*lock_r = ima;
+					*r_lock = ima;
 
 					/* XXX anim play for viewer nodes not yet supported */
 					frame = 0; // XXX iuser ? iuser->framenr : 0;
@@ -3908,13 +3951,13 @@ static ImBuf *image_acquire_ibuf(Image *ima, ImageUser *iuser, void **lock_r)
  *
  * references the result, BKE_image_release_ibuf should be used to de-reference
  */
-ImBuf *BKE_image_acquire_ibuf(Image *ima, ImageUser *iuser, void **lock_r)
+ImBuf *BKE_image_acquire_ibuf(Image *ima, ImageUser *iuser, void **r_lock)
 {
 	ImBuf *ibuf;
 
 	BLI_spin_lock(&image_spin);
 
-	ibuf = image_acquire_ibuf(ima, iuser, lock_r);
+	ibuf = image_acquire_ibuf(ima, iuser, r_lock);
 
 	BLI_spin_unlock(&image_spin);
 

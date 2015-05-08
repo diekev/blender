@@ -75,6 +75,7 @@
 #include "BKE_idprop.h"
 #include "BKE_image.h"
 #include "BKE_library.h"
+#include "BKE_linestyle.h"
 #include "BKE_main.h"
 #include "BKE_mask.h"
 #include "BKE_node.h"
@@ -82,6 +83,7 @@
 #include "BKE_paint.h"
 #include "BKE_rigidbody.h"
 #include "BKE_scene.h"
+#include "BKE_screen.h"
 #include "BKE_sequencer.h"
 #include "BKE_sound.h"
 #include "BKE_unit.h"
@@ -154,6 +156,7 @@ Scene *BKE_scene_copy(Scene *sce, int type)
 {
 	Scene *scen;
 	SceneRenderLayer *srl, *new_srl;
+	FreestyleLineSet *lineset;
 	ToolSettings *ts;
 	Base *base, *obase;
 	
@@ -237,6 +240,14 @@ Scene *BKE_scene_copy(Scene *sce, int type)
 		new_srl = scen->r.layers.first;
 		for (srl = sce->r.layers.first; srl; srl = srl->next) {
 			BKE_freestyle_config_copy(&new_srl->freestyleConfig, &srl->freestyleConfig);
+			if (type == SCE_COPY_FULL) {
+				for (lineset = new_srl->freestyleConfig.linesets.first; lineset; lineset = lineset->next) {
+					if (lineset->linestyle) {
+						id_us_plus((ID *)lineset->linestyle);
+						lineset->linestyle = BKE_linestyle_copy(G.main, lineset->linestyle);
+					}
+				}
+			}
 			new_srl = new_srl->next;
 		}
 	}
@@ -680,7 +691,7 @@ Scene *BKE_scene_add(Main *bmain, const char *name)
 
 	sce->gm.recastData.cellsize = 0.3f;
 	sce->gm.recastData.cellheight = 0.2f;
-	sce->gm.recastData.agentmaxslope = M_PI / 2;
+	sce->gm.recastData.agentmaxslope = M_PI_4;
 	sce->gm.recastData.agentmaxclimb = 0.9f;
 	sce->gm.recastData.agentheight = 2.0f;
 	sce->gm.recastData.agentradius = 0.6f;
@@ -798,33 +809,6 @@ Scene *BKE_scene_set_name(Main *bmain, const char *name)
 	return NULL;
 }
 
-static void scene_unlink_space_node(SpaceNode *snode, Scene *sce)
-{
-	if (snode->id == &sce->id) {
-		/* nasty DNA logic for SpaceNode:
-		 * ideally should be handled by editor code, but would be bad level call
-		 */
-		bNodeTreePath *path, *path_next;
-		for (path = snode->treepath.first; path; path = path_next) {
-			path_next = path->next;
-			MEM_freeN(path);
-		}
-		BLI_listbase_clear(&snode->treepath);
-		
-		snode->id = NULL;
-		snode->from = NULL;
-		snode->nodetree = NULL;
-		snode->edittree = NULL;
-	}
-}
-
-static void scene_unlink_space_buts(SpaceButs *sbuts, Scene *sce)
-{
-	if (sbuts->pinid == &sce->id) {
-		sbuts->pinid = NULL;
-	}
-}
-
 void BKE_scene_unlink(Main *bmain, Scene *sce, Scene *newsce)
 {
 	Scene *sce1;
@@ -849,24 +833,11 @@ void BKE_scene_unlink(Main *bmain, Scene *sce, Scene *newsce)
 	
 	/* all screens */
 	for (screen = bmain->screen.first; screen; screen = screen->id.next) {
-		ScrArea *area;
-		
-		if (screen->scene == sce)
+		if (screen->scene == sce) {
 			screen->scene = newsce;
-		
-		for (area = screen->areabase.first; area; area = area->next) {
-			SpaceLink *space_link;
-			for (space_link = area->spacedata.first; space_link; space_link = space_link->next) {
-				switch (space_link->spacetype) {
-					case SPACE_NODE:
-						scene_unlink_space_node((SpaceNode *)space_link, sce);
-						break;
-					case SPACE_BUTS:
-						scene_unlink_space_buts((SpaceButs *)space_link, sce);
-						break;
-				}
-			}
 		}
+
+		/* editors are handled by WM_main_remove_editor_id_reference */
 	}
 
 	BKE_libblock_free(bmain, sce);
@@ -1373,13 +1344,13 @@ typedef struct ThreadedObjectUpdateState {
 	Scene *scene_parent;
 	double base_time;
 
-	/* Execution statistics */
-	ListBase statistics[BLENDER_MAX_THREADS];
-	bool has_updated_objects;
-
 #ifdef MBALL_SINGLETHREAD_HACK
 	bool has_mballs;
 #endif
+
+	/* Execution statistics */
+	bool has_updated_objects;
+	ListBase *statistics;
 } ThreadedObjectUpdateState;
 
 static void scene_update_object_add_task(void *node, void *user_data);
@@ -1448,6 +1419,8 @@ static void scene_update_object_func(TaskPool *pool, void *taskdata, int threadi
 		if (add_to_stats) {
 			StatisicsEntry *entry;
 
+			BLI_assert(threadid < BLI_pool_get_num_threads(pool));
+
 			entry = MEM_mallocN(sizeof(StatisicsEntry), "update thread statistics");
 			entry->object = object;
 			entry->start_time = start_time;
@@ -1477,6 +1450,7 @@ static void scene_update_object_add_task(void *node, void *user_data)
 static void print_threads_statistics(ThreadedObjectUpdateState *state)
 {
 	int i, tot_thread;
+	double finish_time;
 
 	if ((G.debug & G_DEBUG_DEPSGRAPH) == 0) {
 		return;
@@ -1502,6 +1476,7 @@ static void print_threads_statistics(ThreadedObjectUpdateState *state)
 		}
 	}
 #else
+	finish_time = PIL_check_seconds_timer();
 	tot_thread = BLI_system_thread_count();
 
 	for (i = 0; i < tot_thread; i++) {
@@ -1530,6 +1505,9 @@ static void print_threads_statistics(ThreadedObjectUpdateState *state)
 		}
 
 		BLI_freelistN(&state->statistics[i]);
+	}
+	if (state->has_updated_objects) {
+		printf("Scene update in %f sec\n", finish_time - state->base_time);
 	}
 #endif
 }
@@ -1576,7 +1554,9 @@ static void scene_update_objects(EvaluationContext *eval_ctx, Main *bmain, Scene
 
 	/* Those are only needed when blender is run with --debug argument. */
 	if (G.debug & G_DEBUG_DEPSGRAPH) {
-		memset(state.statistics, 0, sizeof(state.statistics));
+		const int tot_thread = BLI_task_scheduler_num_threads(task_scheduler);
+		state.statistics = MEM_callocN(tot_thread * sizeof(*state.statistics),
+		                               "scene update objects stats");
 		state.has_updated_objects = false;
 		state.base_time = PIL_check_seconds_timer();
 	}
@@ -1593,6 +1573,7 @@ static void scene_update_objects(EvaluationContext *eval_ctx, Main *bmain, Scene
 
 	if (G.debug & G_DEBUG_DEPSGRAPH) {
 		print_threads_statistics(&state);
+		MEM_freeN(state.statistics);
 	}
 
 	/* We do single thread pass to update all the objects which are in cyclic dependency.
@@ -1958,20 +1939,30 @@ bool BKE_scene_remove_render_view(Scene *scene, SceneRenderView *srv)
 
 /* render simplification */
 
-int get_render_subsurf_level(const RenderData *r, int lvl)
+int get_render_subsurf_level(const RenderData *r, int lvl, bool for_render)
 {
-	if (r->mode & R_SIMPLIFY)
-		return min_ii(r->simplify_subsurf, lvl);
-	else
+	if (r->mode & R_SIMPLIFY)  {
+		if (for_render)
+			return min_ii(r->simplify_subsurf_render, lvl);
+		else
+			return min_ii(r->simplify_subsurf, lvl);
+	}
+	else {
 		return lvl;
+	}
 }
 
-int get_render_child_particle_number(const RenderData *r, int num)
+int get_render_child_particle_number(const RenderData *r, int num, bool for_render)
 {
-	if (r->mode & R_SIMPLIFY)
-		return (int)(r->simplify_particles * num);
-	else
+	if (r->mode & R_SIMPLIFY) {
+		if (for_render)
+			return (int)(r->simplify_particles_render * num);
+		else
+			return (int)(r->simplify_particles * num);
+	}
+	else {
 		return num;
+	}
 }
 
 int get_render_shadow_samples(const RenderData *r, int samples)
@@ -2018,6 +2009,12 @@ bool BKE_scene_use_new_shading_nodes(const Scene *scene)
 {
 	const RenderEngineType *type = RE_engines_find(scene->r.engine);
 	return (type && type->flag & RE_USE_SHADING_NODES);
+}
+
+bool BKE_scene_use_shading_nodes_custom(Scene *scene)
+{
+	   RenderEngineType *type = RE_engines_find(scene->r.engine);
+	   return (type && type->flag & RE_USE_SHADING_NODES_CUSTOM);
 }
 
 bool BKE_scene_uses_blender_internal(const  Scene *scene)

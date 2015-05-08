@@ -100,7 +100,7 @@ class VIEW3D_PT_tools_object(View3DPanel, Panel):
                 row.operator("object.shade_smooth", text="Smooth")
                 row.operator("object.shade_flat", text="Flat")
 
-            if obj_type in {'MESH'}:
+            if obj_type == 'MESH':
                 col = layout.column(align=True)
                 col.label(text="Data Transfer:")
                 row = col.row(align=True)
@@ -1075,7 +1075,7 @@ class TEXTURE_UL_texpaintslots(UIList):
             if (not mat.use_nodes) and context.scene.render.engine in {'BLENDER_RENDER', 'BLENDER_GAME'}:
                 mtex_index = mat.texture_paint_slots[index].index
                 layout.prop(mat, "use_textures", text="", index=mtex_index)
-        elif self.layout_type in {'GRID'}:
+        elif self.layout_type == 'GRID':
             layout.alignment = 'CENTER'
             layout.label(text="")
 
@@ -1471,6 +1471,8 @@ class VIEW3D_PT_sculpt_dyntopo(Panel, View3DPaintPanel):
             row = sub.row(align=True)
             row.prop(sculpt, "constant_detail")
             row.operator("sculpt.sample_detail_size", text="", icon='EYEDROPPER')
+        elif (sculpt.detail_type_method == 'BRUSH'):
+            sub.prop(sculpt, "detail_percent")
         else:
             sub.prop(sculpt, "detail_size")
         sub.prop(sculpt, "detail_refine_method", text="")
@@ -1698,6 +1700,25 @@ class VIEW3D_PT_tools_imagepaint_external(Panel, View3DPaintPanel):
         col.operator("paint.project_image", text="Apply Camera Image")
 
 
+class VIEW3D_PT_tools_imagepaint_symmetry(Panel, View3DPaintPanel):
+    bl_category = "Tools"
+    bl_context = "imagepaint"
+    bl_label = "Symmetry"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+
+        toolsettings = context.tool_settings
+        ipaint = toolsettings.image_paint
+
+        col = layout.column(align=True)
+        row = col.row(align=True)
+        row.prop(ipaint, "use_symmetry_x", text="X", toggle=True)
+        row.prop(ipaint, "use_symmetry_y", text="Y", toggle=True)
+        row.prop(ipaint, "use_symmetry_z", text="Z", toggle=True)
+
+
 class VIEW3D_PT_tools_projectpaint(View3DPaintPanel, Panel):
     bl_category = "Options"
     bl_context = "imagepaint"
@@ -1858,7 +1879,7 @@ class VIEW3D_PT_tools_history(View3DPanel, Panel):
         row = col.row(align=True)
         row.operator("ed.undo")
         row.operator("ed.redo")
-        if obj is None or obj.mode not in {'SCULPT'}:
+        if obj is None or obj.mode != 'SCULPT':
             # Sculpt mode does not generate an undo menu it seems...
             col.operator("ed.undo_history")
 

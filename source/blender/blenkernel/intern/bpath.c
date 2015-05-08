@@ -370,6 +370,9 @@ static bool rewrite_path_fixed_dirfile(char path_dir[FILE_MAXDIR],
 
 	BLI_join_dirfile(path_src, sizeof(path_src), path_dir, path_file);
 
+	/* so functions can check old value */
+	BLI_strncpy(path_dst, path_src, FILE_MAX);
+
 	if (absbase) {
 		BLI_path_abs(path_src, absbase);
 	}
@@ -595,7 +598,7 @@ void BKE_bpath_traverse_id(Main *bmain, ID *id, BPathVisitor visit_cb, const int
 						}
 						else if ((seq->type == SEQ_TYPE_IMAGE) && se) {
 							/* might want an option not to loop over all strips */
-							unsigned int len = (unsigned int)MEM_allocN_len(se) / sizeof(*se);
+							unsigned int len = (unsigned int)MEM_allocN_len(se) / (unsigned int)sizeof(*se);
 							unsigned int i;
 
 							if (flag & BKE_BPATH_TRAVERSE_SKIP_MULTIFILE) {

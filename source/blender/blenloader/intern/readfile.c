@@ -2431,12 +2431,13 @@ static void direct_link_animdata(FileData *fd, AnimData *adt)
 	link_list(fd, &adt->nla_tracks);
 	direct_link_nladata(fd, &adt->nla_tracks);
 	
-	/* relink active strip - even though strictly speaking this should only be used
+	/* relink active track/strip - even though strictly speaking this should only be used
 	 * if we're in 'tweaking mode', we need to be able to have this loaded back for
 	 * undo, but also since users may not exit tweakmode before saving (#24535)
 	 */
 	// TODO: it's not really nice that anyone should be able to save the file in this
 	//		state, but it's going to be too hard to enforce this single case...
+	adt->act_track = newdataadr(fd, adt->act_track);
 	adt->actstrip = newdataadr(fd, adt->actstrip);
 }	
 
@@ -2638,7 +2639,7 @@ static void lib_verify_nodetree(Main *main, int UNUSED(open))
 				 * New file versions already have input/output nodes with duplicate links,
 				 * in that case just remove the invalid links.
 				 */
-				int create_io_nodes = (ntree->flag & NTREE_DO_VERSIONS_CUSTOMNODES_GROUP_CREATE_INTERFACE);
+				const bool create_io_nodes = (ntree->flag & NTREE_DO_VERSIONS_CUSTOMNODES_GROUP_CREATE_INTERFACE) != 0;
 				
 				float input_locx = 1000000.0f, input_locy = 0.0f;
 				float output_locx = -1000000.0f, output_locy = 0.0f;
@@ -3531,7 +3532,7 @@ static void direct_link_curve(FileData *fd, Curve *cu)
 		nu->bp = newdataadr(fd, nu->bp);
 		nu->knotsu = newdataadr(fd, nu->knotsu);
 		nu->knotsv = newdataadr(fd, nu->knotsv);
-		if (cu->vfont == NULL) nu->charidx= nu->mat_nr;
+		if (cu->vfont == NULL) nu->charidx = 0;
 		
 		if (fd->flags & FD_FLAGS_SWITCH_ENDIAN) {
 			switch_endian_knots(nu);
@@ -5824,6 +5825,12 @@ static void direct_link_windowmanager(FileData *fd, wmWindowManager *wm)
 		win->lastcursor  = 0;
 		win->modalcursor = 0;
 		win->stereo3d_format = newdataadr(fd, win->stereo3d_format);
+
+		/* multiview always fallback to anaglyph at file opening
+		 * otherwise quadbuffer saved files can break Blender */
+		if (win->stereo3d_format) {
+			win->stereo3d_format->display_mode = S3D_DISPLAY_ANAGLYPH;
+		}
 	}
 	
 	BLI_listbase_clear(&wm->timers);
@@ -5974,6 +5981,9 @@ static void lib_link_screen(FileData *fd, Main *main)
 					else if (sl->spacetype == SPACE_BUTS) {
 						SpaceButs *sbuts = (SpaceButs *)sl;
 						sbuts->pinid = newlibadr(fd, sc->id.lib, sbuts->pinid);
+						if (sbuts->pinid == NULL) {
+							sbuts->flag &= ~SB_PIN_CONTEXT;
+						}
 					}
 					else if (sl->spacetype == SPACE_FILE) {
 						;
@@ -6303,6 +6313,9 @@ void blo_lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *cursc
 				else if (sl->spacetype == SPACE_BUTS) {
 					SpaceButs *sbuts = (SpaceButs *)sl;
 					sbuts->pinid = restore_pointer_by_name(newmain, sbuts->pinid, USER_IGNORE);
+					if (sbuts->pinid == NULL) {
+						sbuts->flag &= ~SB_PIN_CONTEXT;
+					}
 
 					/* TODO: restore path pointers: T40046
 					 * (complicated because this contains data pointers too, not just ID)*/
@@ -7080,7 +7093,7 @@ static void direct_link_moviePlaneTracks(FileData *fd, ListBase *plane_tracks_ba
 		int i;
 
 		plane_track->point_tracks = newdataadr(fd, plane_track->point_tracks);
-
+		test_pointer_array(fd, (void**)&plane_track->point_tracks);
 		for (i = 0; i < plane_track->point_tracksnr; i++) {
 			plane_track->point_tracks[i] = newdataadr(fd, plane_track->point_tracks[i]);
 		}
@@ -7804,12 +7817,12 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 	if (G.debug & G_DEBUG) {
 		char build_commit_datetime[32];
 		time_t temp_time = main->build_commit_timestamp;
-		struct tm *tm = gmtime(&temp_time);
+		struct tm *tm = (temp_time) ? gmtime(&temp_time) : NULL;
 		if (LIKELY(tm)) {
 			strftime(build_commit_datetime, sizeof(build_commit_datetime), "%Y-%m-%d %H:%M", tm);
 		}
 		else {
-			BLI_strncpy(build_commit_datetime, "date-unknown", sizeof(build_commit_datetime));
+			BLI_strncpy(build_commit_datetime, "unknown", sizeof(build_commit_datetime));
 		}
 
 		printf("read file %s\n  Version %d sub %d date %s hash %s\n",
@@ -9240,7 +9253,6 @@ static void give_base_to_groups(Main *mainvar, Scene *scene)
 			/* assign the group */
 			ob->dup_group = group;
 			ob->transflag |= OB_DUPLIGROUP;
-			rename_id(&ob->id, group->id.name + 2);
 			copy_v3_v3(ob->loc, scene->cursor);
 		}
 	}

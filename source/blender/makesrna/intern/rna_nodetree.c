@@ -1578,7 +1578,7 @@ static bNodeSocket *rna_Node_outputs_new(ID *id, bNode *node, ReportList *report
 	sock = nodeAddSocket(ntree, node, SOCK_OUT, type, identifier, name);
 	
 	if (sock == NULL) {
-		BKE_reportf(reports, RPT_ERROR, "Unable to create socket");
+		BKE_report(reports, RPT_ERROR, "Unable to create socket");
 	}
 	else {
 		ntreeUpdateTree(G.main, ntree);
@@ -2258,8 +2258,13 @@ static void rna_NodeSocketStandard_value_update(struct bContext *C, PointerRNA *
 		nodeFindNode(ntree, sock, &node, NULL);
 	}
 	
-	if (node)
+	if (node) {
 		nodeSynchronizeID(node, true);
+
+		/* extra update for sockets that get synced to material */
+		if (node->id && ELEM(node->type, SH_NODE_MATERIAL, SH_NODE_MATERIAL_EXT))
+			WM_main_add_notifier(NC_MATERIAL | ND_SHADING_DRAW, node->id);
+	}
 }
 
 

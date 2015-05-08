@@ -162,8 +162,8 @@ void Camera::update()
 		     transform_perspective(&rastertocamera, make_float3(0, 0, 0));
 	}
 	else {
-		dx = make_float3(0, 0, 0);
-		dy = make_float3(0, 0, 0);
+		dx = make_float3(0.0f, 0.0f, 0.0f);
+		dy = make_float3(0.0f, 0.0f, 0.0f);
 	}
 
 	dx = transform_direction(&cameratoworld, dx);
@@ -400,7 +400,7 @@ BoundBox Camera::viewplane_bounds_get()
 		bounds.grow(transform_raster_to_world((float)width, (float)height));
 		bounds.grow(transform_raster_to_world((float)width, 0.0f));
 		if(type == CAMERA_PERSPECTIVE) {
-			/* Center point has the most distancei in local Z axis,
+			/* Center point has the most distance in local Z axis,
 			 * use it to construct bounding box/
 			 */
 			bounds.grow(transform_raster_to_world(0.5f*width, 0.5f*height));
