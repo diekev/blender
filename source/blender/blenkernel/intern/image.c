@@ -75,6 +75,7 @@
 #include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_packedFile.h"
+#include "BKE_report.h"
 #include "BKE_scene.h"
 #include "BKE_node.h"
 #include "BKE_sequencer.h" /* seq_foreground_frame_get() */
@@ -1027,6 +1028,21 @@ void BKE_image_packfiles(ReportList *reports, Image *ima, const char *basepath)
 			imapf->packedfile = newPackedFile(reports, iv->filepath, basepath);
 			BLI_strncpy(imapf->filepath, iv->filepath, sizeof(imapf->filepath));
 		}
+	}
+}
+
+void BKE_image_packfiles_from_mem(ReportList *reports, Image *ima, char *data, const size_t data_len)
+{
+	const size_t totfiles = image_num_files(ima);
+
+	if (totfiles != 1) {
+		BKE_report(reports, RPT_ERROR, "Cannot pack multiview images from raw data currently...");
+	}
+	else {
+		ImagePackedFile *imapf = MEM_mallocN(sizeof(ImagePackedFile), __func__);
+		BLI_addtail(&ima->packedfiles, imapf);
+		imapf->packedfile = newPackedFileMemory(data, data_len);
+		BLI_strncpy(imapf->filepath, ima->name, sizeof(imapf->filepath));
 	}
 }
 
@@ -2398,6 +2414,7 @@ static void image_viewer_create_views(const RenderData *rd, Image *ima)
 void BKE_image_verify_viewer_views(const RenderData *rd, Image *ima, ImageUser *iuser)
 {
 	bool do_reset;
+	const bool is_multiview = (rd->scemode & R_MULTIVIEW) != 0;
 
 	BLI_lock_thread(LOCK_DRAW_IMAGE);
 
@@ -2413,7 +2430,9 @@ void BKE_image_verify_viewer_views(const RenderData *rd, Image *ima, ImageUser *
 
 	/* see if all scene render views are in the image view list */
 	do_reset = (BKE_scene_multiview_num_views_get(rd) != BLI_listbase_count(&ima->views));
-	if (!do_reset) {
+
+	/* multiview also needs to be sure all the views are synced */
+	if (is_multiview && !do_reset) {
 		SceneRenderView *srv;
 		ImageView *iv;
 

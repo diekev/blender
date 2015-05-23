@@ -176,15 +176,25 @@ typedef struct uiSelectContextStore {
 	int elems_len;
 	bool do_free;
 	bool is_enabled;
+	/* When set, simply copy values (don't apply difference).
+	 * Rules are:
+	 * - dragging numbers uses delta.
+	 * - typing in values will assign to all. */
+	bool is_copy;
 } uiSelectContextStore;
 
 static bool ui_selectcontext_begin(
         bContext *C, uiBut *but, struct uiSelectContextStore *selctx_data);
+static void ui_selectcontext_end(
+        uiBut *but, uiSelectContextStore *selctx_data);
 static void ui_selectcontext_apply(
         bContext *C, uiBut *but, struct uiSelectContextStore *selctx_data,
         const double value, const double value_orig);
 
 #define IS_ALLSELECT_EVENT(event) ((event)->alt != 0)
+
+/* just show a tinted color so users know its activated */
+#define UI_BUT_IS_SELECT_CONTEXT UI_BUT_NODE_ACTIVE
 
 #endif  /* USE_ALLSELECT */
 
@@ -1421,7 +1431,23 @@ finally:
 	/* caller can clear */
 	selctx_data->do_free = true;
 
+	if (success) {
+		but->flag |= UI_BUT_IS_SELECT_CONTEXT;
+	}
+
 	return success;
+}
+
+static void ui_selectcontext_end(
+        uiBut *but, uiSelectContextStore *selctx_data)
+{
+	if (selctx_data->do_free) {
+		if (selctx_data->elems) {
+			MEM_freeN(selctx_data->elems);
+		}
+	}
+
+	but->flag &= ~UI_BUT_IS_SELECT_CONTEXT;
 }
 
 static void ui_selectcontext_apply(
@@ -1433,6 +1459,7 @@ static void ui_selectcontext_apply(
 		PropertyRNA *lprop = but->rnaprop;
 		int index = but->rnaindex;
 		int i;
+		const bool use_delta = (selctx_data->is_copy == false);
 
 		union {
 			bool  b;
@@ -1444,10 +1471,10 @@ static void ui_selectcontext_apply(
 		const int rna_type = RNA_property_type(prop);
 
 		if (rna_type == PROP_FLOAT) {
-			delta.f = value - value_orig;
+			delta.f = use_delta ? (value - value_orig) : value;
 		}
 		else if (rna_type == PROP_INT) {
-			delta.i = (int)value - (int)value_orig;
+			delta.i = use_delta ? ((int)value - (int)value_orig) : (int)value;
 		}
 		else if (rna_type == PROP_ENUM) {
 			delta.i = RNA_property_enum_get(&but->rnapoin, prop);  /* not a delta infact */
@@ -1466,10 +1493,10 @@ static void ui_selectcontext_apply(
 			PointerRNA lptr = other->ptr;
 			if (is_array) {
 				if (rna_type == PROP_FLOAT) {
-					RNA_property_float_set_index(&lptr, lprop, index, other->val_f + delta.f);
+					RNA_property_float_set_index(&lptr, lprop, index, use_delta ? (other->val_f + delta.f) : delta.f);
 				}
 				else if (rna_type == PROP_INT) {
-					RNA_property_int_set_index(&lptr, lprop, index, other->val_i + delta.i);
+					RNA_property_int_set_index(&lptr, lprop, index, use_delta ? (other->val_i + delta.i) : delta.i);
 				}
 				else if (rna_type == PROP_BOOLEAN) {
 					RNA_property_boolean_set_index(&lptr, lprop, index, delta.b);
@@ -1477,10 +1504,10 @@ static void ui_selectcontext_apply(
 			}
 			else {
 				if (rna_type == PROP_FLOAT) {
-					RNA_property_float_set(&lptr, lprop, other->val_f + delta.f);
+					RNA_property_float_set(&lptr, lprop, use_delta ? (other->val_f + delta.f) : delta.f);
 				}
 				else if (rna_type == PROP_INT) {
-					RNA_property_int_set(&lptr, lprop, other->val_i + delta.i);
+					RNA_property_int_set(&lptr, lprop, use_delta ? (other->val_i + delta.i) : delta.i);
 				}
 				else if (rna_type == PROP_BOOLEAN) {
 					RNA_property_boolean_set(&lptr, lprop, delta.b);
@@ -1884,6 +1911,12 @@ static void ui_apply_but(bContext *C, uiBlock *block, uiBut *but, uiHandleButton
 		}
 
 #ifdef USE_ALLSELECT
+#  ifdef USE_DRAG_MULTINUM
+		if (but->flag & UI_BUT_DRAG_MULTI) {
+			/* pass */
+		}
+		else
+#  endif
 		if (data->select_others.elems_len == 0) {
 			wmWindow *win = CTX_wm_window(C);
 			/* may have been enabled before activating */
@@ -2820,6 +2853,8 @@ static void ui_textedit_begin(bContext *C, uiBut *but, uiHandleButtonData *data)
 	if (is_num_but) {
 		if (IS_ALLSELECT_EVENT(win->eventstate)) {
 			data->select_others.is_enabled = true;
+			data->select_others.is_copy = true;
+
 		}
 	}
 #endif
@@ -3101,6 +3136,9 @@ static void ui_do_but_textedit(bContext *C, uiBlock *block, uiBut *but, uiHandle
 					ui_searchbox_event(C, data->searchbox, but, event);
 					break;
 				}
+				if (event->type == WHEELDOWNMOUSE) {
+					break;
+				}
 				/* fall-through */
 			case ENDKEY:
 				ui_textedit_move(but, data, STRCUR_DIR_NEXT,
@@ -3114,6 +3152,9 @@ static void ui_do_but_textedit(bContext *C, uiBlock *block, uiBut *but, uiHandle
 					ui_mouse_motion_keynav_init(&data->searchbox_keynav_state, event);
 #endif
 					ui_searchbox_event(C, data->searchbox, but, event);
+					break;
+				}
+				if (event->type == WHEELUPMOUSE) {
 					break;
 				}
 				/* fall-through */
@@ -3441,8 +3482,8 @@ int ui_but_menu_direction(uiBut *but)
 }
 
 /**
- * Hack for uiList UI_BTYPE_LISTROW buttons to "give" events to overlaying UI_BTYPE_TEXT buttons
- * (cltr-clic rename feature & co).
+ * Hack for #uiList #UI_BTYPE_LISTROW buttons to "give" events to overlaying #UI_BTYPE_TEXT buttons
+ * (Ctrl-Click rename feature & co).
  */
 static uiBut *ui_but_list_row_text_activate(
         bContext *C, uiBut *but, uiHandleButtonData *data, const wmEvent *event,
@@ -3692,7 +3733,7 @@ static int ui_do_but_TOG(bContext *C, uiBut *but, uiHandleButtonData *data, cons
 			button_activate_state(C, but, BUTTON_STATE_EXIT);
 			return WM_UI_HANDLER_BREAK;
 		}
-		else if (ELEM(event->type, WHEELDOWNMOUSE, WHEELUPMOUSE) && event->alt) {
+		else if (ELEM(event->type, WHEELDOWNMOUSE, WHEELUPMOUSE) && event->ctrl) {
 			/* Support alt+wheel on expanded enum rows */
 			if (but->type == UI_BTYPE_ROW) {
 				const int direction = (event->type == WHEELDOWNMOUSE) ? -1 : 1;
@@ -4042,11 +4083,11 @@ static int ui_do_but_NUM(bContext *C, uiBlock *block, uiBut *but, uiHandleButton
 		/* XXX hardcoded keymap check.... */
 		if (type == MOUSEPAN && event->alt)
 			retval = WM_UI_HANDLER_BREAK; /* allow accumulating values, otherwise scrolling gets preference */
-		else if (type == WHEELDOWNMOUSE && event->alt) {
+		else if (type == WHEELDOWNMOUSE && event->ctrl) {
 			mx = but->rect.xmin;
 			click = 1;
 		}
-		else if (type == WHEELUPMOUSE && event->alt) {
+		else if (type == WHEELUPMOUSE && event->ctrl) {
 			mx = but->rect.xmax;
 			click = 1;
 		}
@@ -4331,11 +4372,11 @@ static int ui_do_but_SLI(bContext *C, uiBlock *block, uiBut *but, uiHandleButton
 		/* XXX hardcoded keymap check.... */
 		if (type == MOUSEPAN && event->alt)
 			retval = WM_UI_HANDLER_BREAK; /* allow accumulating values, otherwise scrolling gets preference */
-		else if (type == WHEELDOWNMOUSE && event->alt) {
+		else if (type == WHEELDOWNMOUSE && event->ctrl) {
 			mx = but->rect.xmin;
 			click = 2;
 		}
-		else if (type == WHEELUPMOUSE && event->alt) {
+		else if (type == WHEELUPMOUSE && event->ctrl) {
 			mx = but->rect.xmax;
 			click = 2;
 		}
@@ -4344,6 +4385,7 @@ static int ui_do_but_SLI(bContext *C, uiBlock *block, uiBut *but, uiHandleButton
 				button_activate_state(C, but, BUTTON_STATE_TEXT_EDITING);
 				retval = WM_UI_HANDLER_BREAK;
 			}
+#ifndef USE_ALLSELECT
 			/* alt-click on sides to get "arrows" like in UI_BTYPE_NUM buttons, and match wheel usage above */
 			else if (event->type == LEFTMOUSE && event->alt) {
 				int halfpos = BLI_rctf_cent_x(&but->rect);
@@ -4353,6 +4395,7 @@ static int ui_do_but_SLI(bContext *C, uiBlock *block, uiBut *but, uiHandleButton
 				else
 					mx = but->rect.xmax;
 			}
+#endif
 			else if (event->type == LEFTMOUSE) {
 				data->dragstartx = mx;
 				data->draglastx = mx;
@@ -4639,7 +4682,7 @@ static int ui_do_but_BLOCK(bContext *C, uiBut *but, uiHandleButtonData *data, co
 			return WM_UI_HANDLER_BREAK;
 		}
 		else if (but->type == UI_BTYPE_MENU) {
-			if (ELEM(event->type, WHEELDOWNMOUSE, WHEELUPMOUSE) && event->alt) {
+			if (ELEM(event->type, WHEELDOWNMOUSE, WHEELUPMOUSE) && event->ctrl) {
 				const int direction = (event->type == WHEELDOWNMOUSE) ? -1 : 1;
 
 				data->value = ui_but_menu_step(but, direction);
@@ -4814,7 +4857,7 @@ static int ui_do_but_COLOR(bContext *C, uiBut *but, uiHandleButtonData *data, co
 			button_activate_state(C, but, BUTTON_STATE_MENU_OPEN);
 			return WM_UI_HANDLER_BREAK;
 		}
-		else if (ELEM(event->type, MOUSEPAN, WHEELDOWNMOUSE, WHEELUPMOUSE) && event->alt) {
+		else if (ELEM(event->type, MOUSEPAN, WHEELDOWNMOUSE, WHEELUPMOUSE) && event->ctrl) {
 			ColorPicker *cpicker = but->custom_data;
 			float hsv_static[3] = {0.0f};
 			float *hsv = cpicker ? cpicker->color_data : hsv_static;
@@ -7598,11 +7641,7 @@ static void button_activate_exit(
 		MEM_freeN(data->origstr);
 
 #ifdef USE_ALLSELECT
-	if (data->select_others.do_free) {
-		if (data->select_others.elems) {
-			MEM_freeN(data->select_others.elems);
-		}
-	}
+	ui_selectcontext_end(but, &data->select_others);
 #endif
 
 	/* redraw (data is but->active!) */
@@ -8155,7 +8194,7 @@ static int ui_handle_list_event(bContext *C, const wmEvent *event, ARegion *ar)
 
 	if (val == KM_PRESS) {
 		if (ELEM(type, UPARROWKEY, DOWNARROWKEY) ||
-		    ((ELEM(type, WHEELUPMOUSE, WHEELDOWNMOUSE) && event->alt)))
+		    ((ELEM(type, WHEELUPMOUSE, WHEELDOWNMOUSE) && event->ctrl)))
 		{
 			const int value_orig = RNA_property_int_get(&but->rnapoin, but->rnaprop);
 			int value, min, max, inc;
@@ -9050,6 +9089,9 @@ static int ui_handle_menu_return_submenu(bContext *C, const wmEvent *event, uiPo
 	block = ar->uiblocks.first;
 
 	but = ui_but_find_active_in_region(ar);
+
+	BLI_assert(but);
+
 	data = but->active;
 	submenu = data->menu;
 
