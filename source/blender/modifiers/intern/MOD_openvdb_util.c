@@ -151,22 +151,6 @@ typedef struct ExportMeshData {
 	int *vert_origindex;
 	int *poly_origindex;
 	int *loop_origindex;
-
-	/* Objects and derived meshes of left and cutter operands.
-	 * Used for custom data merge and interpolation.
-	 */
-	Object *ob_left;
-	Object *ob_cutter;
-	DerivedMesh *dm_left;
-	DerivedMesh *dm_cutter;
-	MVert *mvert_left;
-	MLoop *mloop_left;
-	MPoly *mpoly_left;
-	MVert *mvert_cutter;
-	MLoop *mloop_cutter;
-	MPoly *mpoly_cutter;
-
-	float left_to_cutter_mat[4][4];
 } ExportMeshData;
 
 /* Create new external mesh */
@@ -174,31 +158,11 @@ static void exporter_InitGeomArrays(ExportMeshData *export_data,
 									int num_verts, int num_loops, int num_polys)
 {
 	DerivedMesh *dm = CDDM_new(num_verts, 0, 0, num_loops, num_polys);
-	DerivedMesh *dm_left = export_data->dm_left;
-//				*dm_cutter = export_data->dm_cutter;
-
-	/* Mask for custom data layers to be merged from operands. */
-	CustomDataMask merge_mask = CD_MASK_DERIVEDMESH & ~CD_MASK_ORIGINDEX;
 
 	export_data->dm = dm;
 	export_data->mvert = dm->getVertArray(dm);
 	export_data->mloop = dm->getLoopArray(dm);
 	export_data->mpoly = dm->getPolyArray(dm);
-
-	/* Merge custom data layers from operands.
-	 *
-	 * Will only create custom data layers for all the layers which appears in
-	 * the operand. Data for those layers will not be allocated or initialized.
-	 */
-
-	CustomData_merge(&dm_left->loopData, &dm->loopData, merge_mask, CD_DEFAULT, num_loops);
-	CustomData_merge(&dm_left->polyData, &dm->polyData, merge_mask, CD_DEFAULT, num_polys);
-
-//	if (dm_cutter != NULL) {
-//		CustomData_merge(&dm_cutter->loopData, &dm->loopData, merge_mask, CD_DEFAULT, num_loops);
-//		CustomData_merge(&dm_cutter->polyData, &dm->polyData, merge_mask, CD_DEFAULT, num_polys);
-//	}
-
 	export_data->vert_origindex = dm->getVertDataArray(dm, CD_ORIGINDEX);
 	export_data->poly_origindex = dm->getPolyDataArray(dm, CD_ORIGINDEX);
 	export_data->loop_origindex = dm->getLoopDataArray(dm, CD_ORIGINDEX);
@@ -224,21 +188,11 @@ static void exporter_SetPoly(ExportMeshData *export_data,
 							 int poly_index, int start_loop, int num_loops)
 {
 	DerivedMesh *dm = export_data->dm;
-	DerivedMesh *dm_orig;
 	MPoly *mpoly = &export_data->mpoly[poly_index];
-
-	/* Poly is always to be either from left or cutter operand. */
-	dm_orig = export_data->dm_left;
 
 	BLI_assert(poly_index >= 0 && poly_index < dm->getNumPolys(dm));
 	BLI_assert(start_loop >= 0 && start_loop <= dm->getNumLoops(dm) - num_loops);
 	BLI_assert(num_loops >= 3);
-	BLI_assert(dm_orig != NULL);
-	//BLI_assert(orig_poly_index >= 0 && orig_poly_index < dm_orig->getNumPolys(dm_orig));
-
-	/* Copy all poly layers, including mpoly. */
-//	mpoly = export_data->mpoly_left;
-//	CustomData_copy_data(&dm_orig->polyData, &dm->polyData, ORIGINDEX_NONE, poly_index, 1);
 
 	/* Set original index of the poly. */
 	if (export_data->poly_origindex) {
@@ -248,8 +202,6 @@ static void exporter_SetPoly(ExportMeshData *export_data,
 	/* Set poly data itself. */
 	mpoly->loopstart = start_loop;
 	mpoly->totloop = num_loops;
-
-	/* XXX this is supposed to be set by the user in the UI */
 	mpoly->flag |= ME_SMOOTH;
 }
 
@@ -257,20 +209,10 @@ static void exporter_SetPoly(ExportMeshData *export_data,
 static void exporter_SetLoop(ExportMeshData *export_data, int loop_index, int vertex)
 {
 	DerivedMesh *dm = export_data->dm;
-//	DerivedMesh *dm_orig;
 	MLoop *mloop = &export_data->mloop[loop_index];
 
 	BLI_assert(loop_index >= 0 && loop_index < dm->getNumLoops(dm));
 	BLI_assert(vertex >= 0 && vertex < dm->getNumVerts(dm));
-
-//	dm_orig = export_data->dm_left;
-//	if (dm_orig) {
-//		BLI_assert(orig_loop_index >= 0 && orig_loop_index < dm_orig->getNumLoops(dm_orig));
-
-//		/* Copy all loop layers, including mloop. */
-//		mloop = export_data->mloop_left;
-//		CustomData_copy_data(&dm_orig->loopData, &dm->loopData, ORIGINDEX_NONE, loop_index, 1);
-//	}
 
 	/* Set original index of the loop. */
 	if (export_data->loop_origindex) {
@@ -287,56 +229,19 @@ static VDBMeshExporter MeshExporter = {
 	exporter_SetLoop,
 };
 
-static void prepare_import_data(Object *object,
-								DerivedMesh *dm,
-								const DMArrays *dm_arrays,
-								ImportMeshData *import_data)
-{
-	import_data->dm = dm;
-	copy_m4_m4(import_data->obmat, object->obmat);
-	import_data->mvert = dm_arrays->mvert;
-	import_data->mloop = dm_arrays->mloop;
-	import_data->mpoly = dm_arrays->mpoly;
-}
-
 static struct VDBMeshDescr *vdb_mesh_from_dm(Object *object,
 											 DerivedMesh *dm,
 											 const DMArrays *dm_arrays)
 {
 	ImportMeshData import_data;
-	prepare_import_data(object, dm, dm_arrays, &import_data);
+
+	import_data.dm = dm;
+	copy_m4_m4(import_data.obmat, object->obmat);
+	import_data.mvert = dm_arrays->mvert;
+	import_data.mloop = dm_arrays->mloop;
+	import_data.mpoly = dm_arrays->mpoly;
+
 	return VDB_addMesh(&import_data, &MeshImporter);
-}
-
-static void prepare_export_data(Object *object, DerivedMesh *dm, const DMArrays *dm_arrays,								
-								Object *object_cutter, DerivedMesh *dm_cutter, const DMArrays *dm_cutter_arrays,
-								ExportMeshData *export_data)
-{
-	float object_cutter_imat[4][4];
-
-	invert_m4_m4(export_data->obimat, object->obmat);
-
-	export_data->ob_left = object;
-
-	export_data->dm_left = dm;
-
-	export_data->mvert_left = dm_arrays->mvert;
-	export_data->mloop_left = dm_arrays->mloop;
-	export_data->mpoly_left = dm_arrays->mpoly;
-
-	if (dm_cutter != NULL) {
-		export_data->dm_cutter = dm_cutter;
-		export_data->mvert_cutter = dm_cutter_arrays->mvert;
-		export_data->mloop_cutter = dm_cutter_arrays->mloop;
-		export_data->mpoly_cutter = dm_cutter_arrays->mpoly;
-
-		/* Matrix to convert coord from left object's local space to
-		 * cutter object's local space.
-		 */
-		invert_m4_m4(object_cutter_imat, object_cutter->obmat);
-		mul_m4_m4m4(export_data->left_to_cutter_mat, object->obmat,
-					object_cutter_imat);
-	}
 }
 
 static void populate_particle_list(ParticleMesherModifierData *pmmd, Scene *scene, Object *ob)
@@ -408,7 +313,7 @@ DerivedMesh *NewParticleDerivedMesh(DerivedMesh *dm, struct Object *ob,
 	LevelSetFilter *filter = NULL;
 	DerivedMesh *output_dm = NULL;
 	DMArrays dm_arrays, cutter_dm_arrays;
-	bool result;
+//	bool result;
 
 	if (dm == NULL) {
 		return NULL;
@@ -441,18 +346,13 @@ DerivedMesh *NewParticleDerivedMesh(DerivedMesh *dm, struct Object *ob,
 	                       pmmd->generate_trails, pmmd->trail_size);
 
 	/* Apply some filters to the level set */
-
-	filter = pmmd->filters.first;
-
-	while (filter) {
+	for (filter = pmmd->filters.first; filter; filter = filter->next) {
 		if (!(filter->flag & LVLSETFILTER_MUTE)) {
 			OpenVDB_filter_level_set(pmmd->level_set, filter_mask,
 			                         filter->accuracy, filter->type,
 			                         filter->iterations, filter->width,
 			                         filter->offset);
 		}
-
-		filter = filter->next;
 	}
 
 	/* Convert the level set to a mesh and output it */
@@ -468,15 +368,11 @@ DerivedMesh *NewParticleDerivedMesh(DerivedMesh *dm, struct Object *ob,
 	if (true) {
 		ExportMeshData export_data;
 
-		prepare_export_data(ob, dm, &dm_arrays,
-							cutter_ob, cutter_dm, &cutter_dm_arrays,
-							&export_data);
+		invert_m4_m4(export_data.obimat, ob->obmat);
 
 		VDB_exportMesh(output, &MeshExporter, &export_data);
 		output_dm = export_data.dm;
-
 		CDDM_calc_edges(output_dm);
-
 		output_dm->cd_flag |= dm->cd_flag;
 		output_dm->dirty |= DM_DIRTY_NORMALS;
 		VDB_deleteMesh(output);
