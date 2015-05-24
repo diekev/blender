@@ -31,62 +31,68 @@ extern "C" {
 
 #include "openvdb_capi.h"
 #include "openvdb_intern.h"
+#include "openvdb_primitive.h"
 
 using namespace openvdb;
 
-void OpenVDB_filter_level_set(FloatGrid::Ptr level_set, FloatGrid::Ptr filter_mask,
-							  std::vector<LevelSetFilterSettings> &settings)
+namespace internal {
+
+void OpenVDB_filter_level_set(OpenVDBPrimitive *level_set,
+                              OpenVDBPrimitive *filter_mask,
+                              int accuracy, int type, int iterations,
+                              int width, float offset)
 {
+	FloatGrid::Ptr ls_grid = gridPtrCast<FloatGrid>(level_set->getGridPtr());
+	FloatGrid::Ptr mask_grid = gridPtrCast<FloatGrid>(filter_mask->getGridPtr());
+
 	typedef FloatGrid Mask;
 	typedef tools::LevelSetFilter<FloatGrid, Mask> Filter;
-	const Mask *mask = filter_mask.get();
+	const Mask *mask = mask_grid.get();
 
-	Filter filter(*level_set);
+	Filter filter(*ls_grid);
 
 	filter.setTemporalScheme(math::TVD_RK1);
 
-	for (int i = 0; i < settings.size(); ++i) {
-		LevelSetFilterSettings &lsfs = settings[i];
-
-		switch (lsfs.accuracy) {
-			case MOD_PART_MESH_ACC_FISRT: filter.setSpatialScheme(math::FIRST_BIAS); break;
-			case MOD_PART_MESH_ACC_SECOND: filter.setSpatialScheme(math::SECOND_BIAS); break;
-			case MOD_PART_MESH_ACC_THIRD: filter.setSpatialScheme(math::THIRD_BIAS); break;
-			case MOD_PART_MESH_ACC_WENO5: filter.setSpatialScheme(math::WENO5_BIAS); break;
-			case MOD_PART_MESH_ACC_HJWENO5: filter.setSpatialScheme(math::HJWENO5_BIAS); break;
-		}
-
-		switch (lsfs.type) {
-			case MOD_PART_MESH_MEDIAN:
-				for (int i = 0; i < lsfs.iterations; ++i) {
-					filter.median(lsfs.width, mask);
-				}
-				break;
-			case MOD_PART_MESH_MEAN:
-				for (int i = 0; i < lsfs.iterations; ++i) {
-					filter.mean(lsfs.width, mask);
-				}
-				break;
-			case MOD_PART_MESH_GAUSSIAN:
-				for (int i = 0; i < lsfs.iterations; ++i) {
-					filter.gaussian(lsfs.width, mask);
-				}
-				break;
-			case MOD_PART_MESH_MEAN_CURV:
-				for (int i = 0; i < lsfs.iterations; ++i) {
-					filter.meanCurvature(mask);
-				}
-				break;
-			case MOD_PART_MESH_LAPLACIAN:
-				for (int i = 0; i < lsfs.iterations; ++i) {
-					filter.laplacian(mask);
-				}
-				break;
-			case MOD_PART_MESH_OFFSET:
-				for (int i = 0; i < lsfs.iterations; ++i) {
-					filter.offset(lsfs.offset, mask);
-				}
-				break;
-		}
+	switch (accuracy) {
+		case MOD_PART_MESH_ACC_FISRT:   filter.setSpatialScheme(math::FIRST_BIAS);   break;
+		case MOD_PART_MESH_ACC_SECOND:  filter.setSpatialScheme(math::SECOND_BIAS);  break;
+		case MOD_PART_MESH_ACC_THIRD:   filter.setSpatialScheme(math::THIRD_BIAS);   break;
+		case MOD_PART_MESH_ACC_WENO5:   filter.setSpatialScheme(math::WENO5_BIAS);   break;
+		case MOD_PART_MESH_ACC_HJWENO5: filter.setSpatialScheme(math::HJWENO5_BIAS); break;
 	}
+
+	switch (type) {
+		case MOD_PART_MESH_MEDIAN:
+			for (int i = 0; i < iterations; ++i) {
+				filter.median(width, mask);
+			}
+			break;
+		case MOD_PART_MESH_MEAN:
+			for (int i = 0; i < iterations; ++i) {
+				filter.mean(width, mask);
+			}
+			break;
+		case MOD_PART_MESH_GAUSSIAN:
+			for (int i = 0; i < iterations; ++i) {
+				filter.gaussian(width, mask);
+			}
+			break;
+		case MOD_PART_MESH_MEAN_CURV:
+			for (int i = 0; i < iterations; ++i) {
+				filter.meanCurvature(mask);
+			}
+			break;
+		case MOD_PART_MESH_LAPLACIAN:
+			for (int i = 0; i < iterations; ++i) {
+				filter.laplacian(mask);
+			}
+			break;
+		case MOD_PART_MESH_OFFSET:
+			for (int i = 0; i < iterations; ++i) {
+				filter.offset(offset, mask);
+			}
+			break;
+	}
+}
+
 }

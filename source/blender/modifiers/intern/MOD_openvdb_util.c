@@ -28,8 +28,14 @@
 #include "BLI_math.h"
 
 #include "BKE_cdderivedmesh.h"
+#include "BKE_lattice.h"
+#include "BKE_particle.h"
+#include "BKE_scene.h"
 
 #include "DNA_object_types.h"
+#include "DNA_modifier_types.h"
+#include "DNA_particle_types.h"
+#include "DNA_scene_types.h"
 
 #include "MOD_openvdb_util.h"
 
@@ -324,26 +330,85 @@ static void prepare_export_data(Object *object, DerivedMesh *dm, const DMArrays 
 		export_data->mloop_cutter = dm_cutter_arrays->mloop;
 		export_data->mpoly_cutter = dm_cutter_arrays->mpoly;
 
-		/* Matrix to convert coord from left object's loca; space to
+		/* Matrix to convert coord from left object's local space to
 		 * cutter object's local space.
 		 */
 		invert_m4_m4(object_cutter_imat, object_cutter->obmat);
 		mul_m4_m4m4(export_data->left_to_cutter_mat, object->obmat,
 					object_cutter_imat);
+	}
+}
 
+static void populate_particle_list(ParticleMesherModifierData *pmmd, Scene *scene, Object *ob)
+{
+	ParticleSystem *psys = pmmd->psys;
+
+	if (psys) {
+		ParticleSimulationData sim;
+		ParticleKey state;
+		int p;
+
+		if (psys->part->size > 0.0f) {
+//			part_list.has_radius(true);
+		}
+
+		/* TODO(kevin): this isn't right at all */
+		if (psys->part->normfac > 0.0f) {
+//			part_list.has_velocity(true);
+		}
+
+		sim.scene = scene;
+		sim.ob = ob;
+		sim.psys = psys;
+
+		psys->lattice_deform_data = psys_create_lattice_deform_data(&sim);
+
+		for (p = 0; p < psys->totpart; p++) {
+			float pos[3], vel[3];
+
+			if (psys->particles[p].flag & (PARS_NO_DISP | PARS_UNEXIST)) {
+				continue;
+			}
+
+			state.time = BKE_scene_frame_get(scene);
+
+			if (psys_get_particle_state(&sim, p, &state, 0) == 0) {
+				continue;
+			}
+
+			/* location */
+			copy_v3_v3(pos, state.co);
+
+			/* velocity */
+			sub_v3_v3v3(vel, state.co, psys->particles[p].prev_state.co);
+
+			mul_v3_fl(vel, psys->part->normfac);
+
+			OpenVDB_add_particle(pmmd->part_list,
+			                     pmmd->level_set,
+			                     pos,
+			                     psys->particles[p].size,
+			                     vel);
+		}
+
+		if (psys->lattice_deform_data) {
+			end_latt_deform(psys->lattice_deform_data);
+			psys->lattice_deform_data = NULL;
+		}
 	}
 }
 
 DerivedMesh *NewParticleDerivedMesh(DerivedMesh *dm, struct Object *ob,
 									DerivedMesh *cutter_dm, struct Object *cutter_ob,
-									struct ParticleMesherModifierData *pmmd,
-									struct Scene *scene)
+									ParticleMesherModifierData *pmmd, Scene *scene)
 {
 
 	struct VDBMeshDescr *mask_mesh = NULL, *output = NULL;
+	struct OpenVDBPrimitive *filter_mask = NULL, *mesher_mask = NULL;
+	LevelSetFilter *filter = NULL;
 	DerivedMesh *output_dm = NULL;
-	bool result;
 	DMArrays dm_arrays, cutter_dm_arrays;
+	bool result;
 
 	if (dm == NULL) {
 		return NULL;
@@ -357,10 +422,50 @@ DerivedMesh *NewParticleDerivedMesh(DerivedMesh *dm, struct Object *ob,
 		mask_mesh = vdb_mesh_from_dm(cutter_ob, cutter_dm, &cutter_dm_arrays);
 	}
 
-	result = OpenVDB_performParticleSurfacing(scene, ob, pmmd, mask_mesh, &output);
+	pmmd->level_set = create_level_set(pmmd->voxel_size, pmmd->half_width);
+
+	/* Generate a particle list */
+
+	pmmd->part_list = OpenVDB_create_part_list(pmmd->psys->totpart,
+	                                           pmmd->part_scale_factor,
+	                                           pmmd->part_vel_factor);
+
+	populate_particle_list(pmmd, scene, ob);
+
+	filter_mask = create_level_set(pmmd->voxel_size, pmmd->half_width);
+
+	/* Create a level set from the particle list */
+
+	OpenVDB_from_particles(pmmd->level_set, filter_mask, pmmd->part_list,
+	                       pmmd->generate_mask, pmmd->mask_width, pmmd->min_part_radius,
+	                       pmmd->generate_trails, pmmd->trail_size);
+
+	/* Apply some filters to the level set */
+
+	filter = pmmd->filters.first;
+
+	while (filter) {
+		if (!(filter->flag & LVLSETFILTER_MUTE)) {
+			OpenVDB_filter_level_set(pmmd->level_set, filter_mask,
+			                         filter->accuracy, filter->type,
+			                         filter->iterations, filter->width,
+			                         filter->offset);
+		}
+
+		filter = filter->next;
+	}
+
+	/* Convert the level set to a mesh and output it */
+
+	if (mask_mesh) {
+		mesher_mask = OpenVDB_from_polygons(mask_mesh, pmmd->voxel_size, pmmd->int_band, pmmd->ext_band);
+	}
+
+	output = OpenVDB_to_polygons(pmmd->level_set, mesher_mask, pmmd->isovalue, pmmd->adaptivity, pmmd->mask_offset, pmmd->invert_mask);
+
 	VDB_deleteMesh(mask_mesh);
 
-	if (result) {
+	if (true) {
 		ExportMeshData export_data;
 
 		prepare_export_data(ob, dm, &dm_arrays,

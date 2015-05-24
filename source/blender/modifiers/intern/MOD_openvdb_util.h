@@ -31,7 +31,6 @@
 #ifndef __MOD_OPENVDB_UTIL_H__
 #define __MOD_OPENVDB_UTIL_H__
 
-struct Scene;
 struct Object;
 struct Base;
 struct DerivedMesh;
@@ -41,7 +40,6 @@ struct ParticleMesherModifierData;
  * On failure returns NULL. */
 DerivedMesh *NewParticleDerivedMesh(DerivedMesh *dm, struct Object *ob,
 									DerivedMesh *cutter_dm, struct Object *cutter_ob,
-									struct ParticleMesherModifierData *pmmd,
-									struct Scene *scene);
+									struct ParticleMesherModifierData *pmmd, Scene *scene);
 
 #endif  /* __MOD_OPENVDB_UTIL_H__ */

@@ -30,78 +30,62 @@
 extern "C" {
 #endif
 
-int OpenVDB_getVersionHex(void);
-
-struct DerivedMesh;
+struct ExportMeshData;
 struct ImportMeshData;
-struct Object;
+struct OpenVDBPrimitive;
+struct ParticleList;
 struct ParticleMesherModifierData;
-struct Scene;
 struct VDBMeshDescr;
 
-// Get number of vertices.
-typedef int (*VDBImporter_GetNumVerts) (struct ImportMeshData *import_data);
-
-// Get number of loops.
-typedef int (*VDBImporter_GetNumLoops) (struct ImportMeshData *import_data);
-
-// Get number of polys.
-typedef int (*VDBImporter_GetNumPolys) (struct ImportMeshData *import_data);
-
-// Get 3D coordinate of vertex with given index.
-typedef void (*VDBImporter_GetVertCoord) (struct ImportMeshData *import_data, int vert_index, float coord[3]);
-
-// Get number of adjacent vertices to the poly specified by its index.
-typedef int (*VDBImporter_GetPolyNumVerts) (struct ImportMeshData *import_data, int poly_index);
-
-// Get list of adjacent vertices to the poly specified by its index.
-typedef void (*VDBImporter_GetPolyVerts) (struct ImportMeshData *import_data, int poly_index, int *verts);
+/* Importer from external storage to VDB module */
 
 typedef struct VDBMeshImporter {
-	VDBImporter_GetNumVerts getNumVerts;
-	VDBImporter_GetNumLoops getNumLoops;
-	VDBImporter_GetNumPolys getNumPolys;
-	VDBImporter_GetVertCoord getVertCoord;
-	VDBImporter_GetPolyNumVerts getPolyNumVerts;
-	VDBImporter_GetPolyVerts getPolyVerts;
+	int (*getNumVerts) (struct ImportMeshData *import_data);
+	int (*getNumLoops) (struct ImportMeshData *import_data);
+	int (*getNumPolys) (struct ImportMeshData *import_data);
+	void (*getVertCoord) (struct ImportMeshData *import_data, int vert_index, float coord[3]);
+	int (*getPolyNumVerts) (struct ImportMeshData *import_data, int poly_index);
+	void (*getPolyVerts) (struct ImportMeshData *import_data, int poly_index, int *verts);
 } VDBMeshImporter;
 
 struct VDBMeshDescr *VDB_addMesh(struct ImportMeshData *import_data,
 								 VDBMeshImporter *mesh_importer);
 
-//
-// Exporter from VDB module to external storage
-//
-
-struct ExportMeshData;
-
-// Initialize arrays for geometry.
-typedef void (*VDBExporter_InitGeomArrays) (struct ExportMeshData *export_data,
-											int num_verts, int num_loops, int num_polys);
-
-// Set coordinate of vertex with given index.
-typedef void (*VDBExporter_SetVert) (struct ExportMeshData *export_data,
-									 int vert_index, float coord[3]);
-
-// Set adjacent loops to the poly specified by its index.
-typedef void (*VDBExporter_SetPoly) (struct ExportMeshData *export_data,
-									 int poly_index, int start_loop, int num_loops);
-
-// Set vertex which is adjacent to the loop with given index.
-typedef void (*VDBExporter_SetLoop) (struct ExportMeshData *export_data,
-									 int loop_index, int vertex);
+/* Exporter from VDB module to external storage */
 
 typedef struct VDBMeshExporter {
-	VDBExporter_InitGeomArrays initGeomArrays;
-	VDBExporter_SetVert setVert;
-	VDBExporter_SetPoly setPoly;
-	VDBExporter_SetLoop setLoop;
+	void (*initGeomArrays) (struct ExportMeshData *export_data, int num_verts, int num_loops, int num_polys);
+	void (*setVert) (struct ExportMeshData *export_data, int vert_index, float coord[3]);
+	void (*setPoly) (struct ExportMeshData *export_data, int poly_index, int start_loop, int num_loops);
+	void (*setLoop) (struct ExportMeshData *export_data, int loop_index, int vertex);
 } VDBMeshExporter;
 
-bool OpenVDB_performParticleSurfacing(struct Scene *scene, struct Object *ob,
+int OpenVDB_getVersionHex(void);
+
+bool OpenVDB_performParticleSurfacing(struct OpenVDBPrimitive *level_set,
 									  struct ParticleMesherModifierData *pmmd,
 									  struct VDBMeshDescr *mask_mesh,
 									  struct VDBMeshDescr **output_mesh);
+
+void OpenVDB_filter_level_set(struct OpenVDBPrimitive *level_set,
+                              struct OpenVDBPrimitive *filter_mask,
+                              int accuracy, int type, int iterations,
+                              int width, float offset);
+
+
+void OpenVDB_from_particles(struct OpenVDBPrimitive *level_set,
+                            struct OpenVDBPrimitive *mask_grid,
+                            struct ParticleList *Pa, bool mask, float mask_width, float min_radius, bool trail, float trail_size);
+
+
+
+struct OpenVDBPrimitive *OpenVDB_from_polygons(struct VDBMeshDescr *dm,
+                                               float voxel_size, float int_band, float ext_band);
+
+struct VDBMeshDescr *OpenVDB_to_polygons(struct OpenVDBPrimitive *level_set,
+										 struct OpenVDBPrimitive *mask_grid,
+                                         float isovalue, float adaptivity,
+                                         float mask_offset, bool invert_mask);
 
 void VDB_deleteMesh(struct VDBMeshDescr *mesh_descr);
 
@@ -109,8 +93,28 @@ void VDB_exportMesh(struct VDBMeshDescr *mesh_descr,
 					struct VDBMeshExporter *mesh_exporter,
 					struct ExportMeshData *export_data);
 
+struct ParticleList *OpenVDB_create_part_list(size_t totpart, float rad_scale, float vel_scale);
+void OpenVDB_part_list_free(struct ParticleList *part_list);
+void OpenVDB_add_particle(struct ParticleList *part_list, struct OpenVDBPrimitive *vdb_prim, float pos[3], float rad, float vel[3]);
+
+enum {
+	VDB_GRID_INVALID = 0,
+    VDB_GRID_FLOAT   = 1,
+    VDB_GRID_DOUBLE  = 2,
+    VDB_GRID_INT32   = 3,
+    VDB_GRID_INT64   = 4,
+    VDB_GRID_BOOL    = 5,
+    VDB_GRID_VEC3F   = 6,
+    VDB_GRID_VEC3D   = 7,
+    VDB_GRID_VEC3I   = 8,
+};
+
+struct OpenVDBPrimitive *create(int grid_type);
+struct OpenVDBPrimitive *create_level_set(float voxel_size, float half_width);
+void OpenVDBPrimitive_free(struct OpenVDBPrimitive *vdb_prim);
+
 #ifdef __cplusplus
 }
 #endif
 
-#endif // __OPENVDB_CAPI_H__
+#endif /* __OPENVDB_CAPI_H__ */

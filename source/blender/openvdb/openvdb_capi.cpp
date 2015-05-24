@@ -35,6 +35,7 @@ extern "C" {
 
 #include "openvdb_capi.h"
 #include "openvdb_intern.h"
+#include "openvdb_primitive.h"
 #include "particlelist.h"
 
 using namespace openvdb;
@@ -42,63 +43,6 @@ using namespace openvdb;
 int OpenVDB_getVersionHex()
 {
 	return OPENVDB_LIBRARY_VERSION;
-}
-
-/* TODO(kevin): these templates aren't that nice... */
-template<typename Settings>
-LevelSetFilterSettings get_level_set_filter_settings(Settings *settings)
-{
-	LevelSetFilterSettings lsfs;
-
-	lsfs.accuracy = settings->accuracy;
-	lsfs.iterations = settings->iterations;
-	lsfs.type = settings->type;
-	lsfs.width = settings->width;
-	lsfs.offset = settings->offset;
-
-	return lsfs;
-}
-
-template<typename Settings>
-MeshToVolumeSettings get_mesh_to_volume_settings(Settings *settings)
-{
-	MeshToVolumeSettings mtvs;
-
-	mtvs.ext_band = settings->ext_band;
-	mtvs.int_band = settings->int_band;
-
-	return mtvs;
-}
-
-template<typename Settings>
-ParticlesToLevelSetSettings get_particles_level_set_settings(Settings *settings)
-{
-	ParticlesToLevelSetSettings ptlss;
-
-	ptlss.voxel_size = settings->voxel_size;
-	ptlss.min_part_radius = settings->min_part_radius;
-	ptlss.half_width = settings->half_width;
-	ptlss.part_scale_factor = settings->part_scale_factor;
-	ptlss.part_vel_factor = settings->part_vel_factor;
-	ptlss.trail_size = settings->trail_size;
-	ptlss.mask_width = settings->mask_width;
-	ptlss.generate_mask = settings->generate_mask;
-	ptlss.generate_trails = settings->generate_trails;
-
-	return ptlss;
-}
-
-template<typename Settings>
-VolumeToMeshSettings get_volume_to_mesh_settings(Settings *settings)
-{
-	VolumeToMeshSettings vtms;
-
-	vtms.isovalue = settings->isovalue;
-	vtms.adaptivity = settings->adaptivity;
-	vtms.mask_offset = settings->mask_offset;
-	vtms.invert_mask = settings->invert_mask;
-
-	return vtms;
 }
 
 VDBMeshDescr *VDB_addMesh(struct ImportMeshData *import_data,
@@ -178,10 +122,10 @@ void VDB_exportMesh(VDBMeshDescr *mesh_descr,
 	const int num_loops = mesh_descr->polys.size() * 4 + mesh_descr->tris.size() * 3;
 	const int num_polys = mesh_descr->polys.size() + mesh_descr->tris.size();
 
-	// Initialize arrays for geometry in exported mesh.
+	/* Initialize arrays for geometry in exported mesh. */
 	mesh_exporter->initGeomArrays(export_data, num_verts, num_loops, num_polys);
 
-	// Export all the vertices.
+	/* Export all the vertices. */
 	for (int i = 0; i < num_verts; ++i) {
 		openvdb::Vec3s vertex = mesh_descr->points[i];
 
@@ -192,7 +136,7 @@ void VDB_exportMesh(VDBMeshDescr *mesh_descr,
 
 	int loop_index = 0, poly_index = 0;
 
-	// Export all the quads.
+	/* Export all the quads. */
 	for (unsigned int i = 0; i < mesh_descr->polys.size(); ++i, ++poly_index) {
 		int start_loop_index = loop_index;
 		openvdb::Vec4I poly = mesh_descr->polys[i];
@@ -204,7 +148,7 @@ void VDB_exportMesh(VDBMeshDescr *mesh_descr,
 		mesh_exporter->setPoly(export_data, poly_index, start_loop_index, 4);
 	}
 
-	// Export all the tris, if adaptive meshing.
+	/* Export all the tris, if adaptive meshing. */
 	for (unsigned int i = 0; i < mesh_descr->tris.size(); ++i, ++poly_index) {
 		int start_loop_index = loop_index;
 		openvdb::Vec3I triangle = mesh_descr->tris[i];
@@ -222,60 +166,15 @@ void VDB_deleteMesh(VDBMeshDescr *mesh_descr)
 	delete mesh_descr;
 }
 
-bool OpenVDB_performParticleSurfacing(Scene *scene, Object *ob,
+bool OpenVDB_performParticleSurfacing(OpenVDBPrimitive *level_set,
 									  ParticleMesherModifierData *pmmd,
 									  VDBMeshDescr *mask_mesh,
 									  VDBMeshDescr **output_mesh)
 {
-	/* Init OpenVDB lib */
-	initialize();
-
 	*output_mesh = NULL;
 	VDBMeshDescr *output_descr = NULL;
 
 	try {
-		math::Transform::Ptr transform = math::Transform::createLinearTransform(pmmd->voxel_size);
-
-		FloatGrid::Ptr level_set = createLevelSet<FloatGrid>(pmmd->voxel_size, pmmd->half_width);
-		FloatGrid::Ptr filter_mask = createLevelSet<FloatGrid>(pmmd->voxel_size, pmmd->half_width);
-
-		/* Convert the particles to a level set */
-
-		ParticleList part_list = create_particle_list(scene, ob, pmmd->psys, transform,
-													  pmmd->part_scale_factor,
-													  pmmd->part_vel_factor);
-
-		ParticlesToLevelSetSettings part_settings = get_particles_level_set_settings(pmmd);
-
-		OpenVDB_from_particles(level_set, filter_mask, part_settings, part_list);
-
-		/* Apply some filters to the level set */
-
-		LevelSetFilter *mod_filter = (LevelSetFilter *)pmmd->filters.first;
-		std::vector<LevelSetFilterSettings> filter_settings_list;
-
-		while (mod_filter) {
-			if (!(mod_filter->flag & LVLSETFILTER_MUTE)) {
-				LevelSetFilterSettings filter_settings = get_level_set_filter_settings(mod_filter);
-				filter_settings_list.push_back(filter_settings);
-			}
-			mod_filter = mod_filter->next;
-		}
-
-		OpenVDB_filter_level_set(level_set, filter_mask, filter_settings_list);
-
-		/* Convert the level set to a mesh and output it */
-		FloatGrid::Ptr mesher_mask;
-
-		if (mask_mesh) {
-			MeshToVolumeSettings voxelizer_settings = get_mesh_to_volume_settings(pmmd);
-
-			mesher_mask = OpenVDB_from_polygons(mask_mesh, voxelizer_settings, transform);
-		}
-
-		VolumeToMeshSettings mesher_settings = get_volume_to_mesh_settings(pmmd);
-
-		output_descr = OpenVDB_to_polygons(level_set, mesher_mask, transform, mesher_settings);
 	}
 	catch (std::exception &e) {
 		std::cerr << "OpenVDB exception " << e.what() << std::endl;
@@ -287,4 +186,115 @@ bool OpenVDB_performParticleSurfacing(Scene *scene, Object *ob,
 	*output_mesh = output_descr;
 
 	return output_descr != NULL;
+}
+
+/* ****************************** Particle List ****************************** */
+
+ParticleList *OpenVDB_create_part_list(size_t totpart, float rad_scale, float vel_scale)
+{
+	return new ParticleList(totpart, rad_scale, vel_scale);
+}
+
+void OpenVDB_part_list_free(ParticleList *part_list)
+{
+	delete part_list;
+	part_list = NULL;
+}
+
+void OpenVDB_add_particle(ParticleList *part_list, OpenVDBPrimitive *vdb_prim,
+                          float pos[3], float rad, float vel[3])
+{
+	openvdb::Vec3R nvel(vel), npos(pos);
+	float nrad = rad * part_list->radius_scale();
+	nvel *= part_list->velocity_scale();
+
+	if (vdb_prim) {
+		npos = vdb_prim->getGrid().transform().worldToIndex(npos);
+	}
+
+	part_list->add(npos, nrad, nvel);
+}
+
+void OpenVDB_from_particles(OpenVDBPrimitive *level_set, OpenVDBPrimitive *mask_grid,
+                            ParticleList *Pa, bool mask, float mask_width,
+                            float min_radius, bool trail, float trail_size)
+{
+	internal::OpenVDB_from_particles(level_set, mask_grid, *Pa, mask, mask_width,
+	                                 min_radius, trail, trail_size);
+}
+
+/* **************************** OpenVDB Primitive **************************** */
+
+OpenVDBPrimitive *create(int grid_type)
+{
+	OpenVDBPrimitive *vdb_prim = new OpenVDBPrimitive();
+	openvdb::GridBase::Ptr grid;
+
+	switch (grid_type) {
+		case VDB_GRID_FLOAT:
+			grid = openvdb::FloatGrid::create(0.0f);
+			break;
+		case VDB_GRID_DOUBLE:
+			grid = openvdb::DoubleGrid::create(0.0);
+			break;
+		case VDB_GRID_INT32:
+			grid = openvdb::Int32Grid::create(0);
+			break;
+		case VDB_GRID_INT64:
+			grid = openvdb::Int64Grid::create(0);
+			break;
+		case VDB_GRID_BOOL:
+			grid = openvdb::BoolGrid::create(false);
+			break;
+		case VDB_GRID_VEC3F:
+			grid = openvdb::Vec3fGrid::create(openvdb::Vec3f(0.0f));
+			break;
+		case VDB_GRID_VEC3D:
+			grid = openvdb::Vec3dGrid::create(openvdb::Vec3d(0.0));
+			break;
+		case VDB_GRID_VEC3I:
+			grid = openvdb::Vec3IGrid::create(openvdb::Vec3I(0));
+			break;
+	}
+
+	vdb_prim->setGrid(grid);
+
+	return vdb_prim;
+}
+
+OpenVDBPrimitive *create_level_set(float voxel_size, float half_width)
+{
+	using namespace openvdb;
+
+	OpenVDBPrimitive *vdb_prim = new OpenVDBPrimitive();
+
+	FloatGrid::Ptr grid = createLevelSet<FloatGrid>(voxel_size, half_width);
+	grid->setTransform(math::Transform::createLinearTransform(voxel_size));
+	vdb_prim->setGrid(grid);
+
+	return vdb_prim;
+}
+
+void OpenVDBPrimitive_free(OpenVDBPrimitive *vdb_prim)
+{
+	delete vdb_prim;
+	vdb_prim = NULL;
+}
+
+void OpenVDB_filter_level_set(OpenVDBPrimitive *level_set, OpenVDBPrimitive *filter_mask,
+                              int accuracy, int type, int iterations, int width, float offset)
+{
+	internal::OpenVDB_filter_level_set(level_set, filter_mask, accuracy, type, iterations, width, offset);
+}
+
+
+OpenVDBPrimitive *OpenVDB_from_polygons(VDBMeshDescr *dm, float voxel_size, float int_band, float ext_band)
+{
+	return internal::OpenVDB_from_polygons(dm, voxel_size, int_band, ext_band);
+}
+
+
+VDBMeshDescr *OpenVDB_to_polygons(OpenVDBPrimitive *level_set, OpenVDBPrimitive *mask_grid, float isovalue, float adaptivity, float mask_offset, bool invert_mask)
+{
+	return internal::OpenVDB_to_polygons(level_set, mask_grid, isovalue, adaptivity, mask_offset, invert_mask);
 }

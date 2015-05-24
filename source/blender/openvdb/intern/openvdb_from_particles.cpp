@@ -23,95 +23,17 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-extern "C" {
-#include "MEM_guardedalloc.h"
-
-#include "BLI_math.h"
-
-#include "BKE_lattice.h"
-#include "BKE_particle.h"
-#include "BKE_scene.h"
-
-#include "DNA_modifier_types.h"
-#include "DNA_scene_types.h"
-}
-
 #include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/tools/ParticlesToLevelSet.h>
 
 #include "openvdb_intern.h"
+#include "openvdb_primitive.h"
 #include "particlelist.h"
 
-ParticleList create_particle_list(Scene *scene, Object *ob, ParticleSystem *psys,
-								  math::Transform::Ptr transform,
-								  float radius_scale, float velocity_scale)
-{
-	ParticleList part_list(psys->totpart, radius_scale, velocity_scale);
-	int valid_particles = 0;
-
-	if (psys) {
-		ParticleSimulationData sim;
-		ParticleKey state;
-
-		if (psys->part->size > 0.0f) {
-			part_list.has_radius(true);
-		}
-
-		/* TODO(kevin): this isn't right at all */
-		if (psys->part->normfac > 0.0f) {
-			part_list.has_velocity(true);
-		}
-
-		sim.scene = scene;
-		sim.ob = ob;
-		sim.psys = psys;
-
-		psys->lattice_deform_data = psys_create_lattice_deform_data(&sim);
-
-		for (int p = 0; p < psys->totpart; p++) {
-			if (psys->particles[p].flag & (PARS_NO_DISP | PARS_UNEXIST)) {
-				continue;
-			}
-
-			state.time = BKE_scene_frame_get(scene);
-
-			if (psys_get_particle_state(&sim, p, &state, 0) == 0) {
-				continue;
-			}
-
-			float pos[3], vel[3];
-
-			/* location */
-			copy_v3_v3(pos, state.co);
-
-			/* velocity */
-			sub_v3_v3v3(vel, state.co, psys->particles[p].prev_state.co);
-
-			Vec3f npos(pos[0], pos[1], pos[2]);
-			npos = transform->worldToIndex(npos);
-
-			Vec3f nvel(vel[0], vel[1], vel[2]);
-
-			part_list.add(npos,
-						  psys->particles[p].size * part_list.radius_scale(),
-						  nvel * psys->part->normfac * part_list.velocity_scale());
-
-			valid_particles++;
-		}
-
-		if (psys->lattice_deform_data) {
-			end_latt_deform(psys->lattice_deform_data);
-			psys->lattice_deform_data = NULL;
-		}
-
-		BLI_assert(valid_particles == part_list.size());
-	}
-
-	return part_list;
-}
+namespace internal {
 
 static void convert_to_levelset(ParticleList part_list, FloatGrid::Ptr grid,
-								const ParticlesToLevelSetSettings &settings)
+								float min_radius, bool trail, float trail_size)
 {
 	/* Note: the second template argument here is the particles' attributes type,
 	 * if any. As this function will later call ParticleList::getAtt(index, attribute),
@@ -124,11 +46,11 @@ static void convert_to_levelset(ParticleList part_list, FloatGrid::Ptr grid,
 	tools::ParticlesToLevelSet<FloatGrid, void> raster(*grid);
 	/* a grain size of zero disables threading */
 	raster.setGrainSize(1);
-	raster.setRmin(settings.min_part_radius);
+	raster.setRmin(min_radius);
 	raster.setRmax(1e15f);
 
-	if (settings.generate_trails && part_list.has_velocity()) {
-		raster.rasterizeTrails(part_list, settings.trail_size);
+	if (trail && part_list.has_velocity()) {
+		raster.rasterizeTrails(part_list, trail_size);
 	}
 	else {
 		raster.rasterizeSpheres(part_list);
@@ -146,39 +68,43 @@ static void convert_to_levelset(ParticleList part_list, FloatGrid::Ptr grid,
 	}
 }
 
-void OpenVDB_from_particles(FloatGrid::Ptr level_set, FloatGrid::Ptr mask_grid,
-							const ParticlesToLevelSetSettings &settings, ParticleList Pa)
+void OpenVDB_from_particles(OpenVDBPrimitive *level_set,
+                            OpenVDBPrimitive *&mask_grid,
+                            ParticleList Pa, bool mask, float mask_width,
+                            float min_radius, bool trail, float trail_size)
 {
-	FloatGrid::Ptr mask_grid_min;
-	math::Transform::Ptr transform = math::Transform::createLinearTransform(settings.voxel_size);
-	const float background = settings.voxel_size * settings.half_width;
+	FloatGrid::Ptr ls_grid = gridPtrCast<FloatGrid>(level_set->getGridPtr());
 
-	level_set->setTransform(transform);
+	convert_to_levelset(Pa, ls_grid, min_radius, trail, trail_size);
 
-	convert_to_levelset(Pa, level_set, settings);
+	if (mask) {
+		FloatGrid::Ptr mask = gridPtrCast<FloatGrid>(mask_grid->getGridPtr());
 
-	if (settings.generate_mask) {
-		if (!mask_grid) {
-			mask_grid = FloatGrid::create(background);
-			mask_grid->setGridClass(GRID_LEVEL_SET);
+		if (mask == NULL) {
+			mask = FloatGrid::create(ls_grid->background());
+			mask->setGridClass(GRID_LEVEL_SET);
 		}
-		if (settings.mask_width > 0.0f) {
+
+		if (mask_width > 0.0f) {
 			std::cout << "Generating mask from level set\n";
-			mask_grid->setTransform(transform->copy());
-			Pa.radius_scale() *= (1.0f + settings.mask_width);
-			convert_to_levelset(Pa, mask_grid, settings);
+			mask->setTransform(ls_grid->transform().copy());
+			Pa.radius_scale() *= (1.0f + mask_width);
+			convert_to_levelset(Pa, mask, min_radius, trail, trail_size);
 
-			if (settings.mask_width < 1.0f) {
-				mask_grid_min = FloatGrid::create(background);
+			if (mask_width < 1.0f) {
+				FloatGrid::Ptr mask_grid_min = FloatGrid::create(ls_grid->background());
 				mask_grid_min->setGridClass(GRID_LEVEL_SET);
-				mask_grid_min->setTransform(transform->copy());
-				Pa.radius_scale() *= (1.0f - settings.mask_width) / (1.0f + settings.mask_width);
-				convert_to_levelset(Pa, mask_grid_min, settings);
+				mask_grid_min->setTransform(ls_grid->transform().copy());
+				Pa.radius_scale() *= (1.0f - mask_width) / (1.0f + mask_width);
+				convert_to_levelset(Pa, mask_grid_min, min_radius, trail, trail_size);
 
-				tools::csgDifference(*mask_grid, *mask_grid_min);
+				tools::csgDifference(*mask, *mask_grid_min);
 			}
 		}
 
-		tools::sdfToFogVolume(*mask_grid);
+		tools::sdfToFogVolume(*mask);
+		mask_grid->setGrid(mask);
 	}
+}
+
 }

@@ -43,12 +43,14 @@
 #include "MOD_openvdb_util.h"
 
 #include "depsgraph_private.h"
+#include "openvdb_capi.h"
 
 static void initData(ModifierData *md)
 {
 	ParticleMesherModifierData *pmmd = (ParticleMesherModifierData *) md;
 
 	pmmd->psys = NULL;
+	pmmd->part_list = NULL;
 	pmmd->mesher_mask_ob = NULL;
 	pmmd->voxel_size = 0.2f;
 	pmmd->min_part_radius = 1.5f;
@@ -179,6 +181,10 @@ static void freeData(ModifierData *md)
 
 	for (; filter; filter = filter->next) {
 		MEM_freeN(filter);
+	}
+
+	if (pmmd->part_list) {
+		OpenVDB_part_list_free(pmmd->part_list);
 	}
 }
 

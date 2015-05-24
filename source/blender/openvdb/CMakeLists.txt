@@ -55,6 +55,7 @@ if(WITH_OPENVDB)
 		intern/openvdb_filter_level_set.cpp
 		intern/openvdb_from_particles.cpp
 		intern/openvdb_mesh_convert.cpp
+		intern/openvdb_primitive.cpp
 		openvdb_capi.cpp
 
 		particlelist.h

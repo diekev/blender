@@ -49,7 +49,7 @@ public:
 	/* Required for bucketing */
 	typedef Vec3R value_type;
 
-	ParticleList(int size, Real rad_scale = 1.0, Real vel_scale = 1.0)
+	ParticleList(size_t size, Real rad_scale = 1.0, Real vel_scale = 1.0)
 		: m_radius_scale(rad_scale)
 		, m_velocity_scale(vel_scale)
 	{

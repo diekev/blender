@@ -29,24 +29,39 @@
 
 #include "openvdb_capi.h"
 #include "openvdb_intern.h"
+#include "openvdb_primitive.h"
 
 using namespace openvdb;
 
+namespace internal {
+
 /* TODO(kevin): - figure out how/when to use tools::MeshToVoxelEdgeData, would
  *				probably need vertex normals.
- *				- handle case where we'd want a density grid instead of a plain
- *				level set (tools::sdfToFogVolume).
+ *				- handle case where we'd want a fog volume instead of a plain
+ *				level set.
  */
-FloatGrid::Ptr OpenVDB_from_polygons(VDBMeshDescr *mesh_descr,
-									 const MeshToVolumeSettings &settings,
-									 math::Transform::Ptr transform)
+OpenVDBPrimitive *OpenVDB_from_polygons(VDBMeshDescr *mesh_descr,
+                                        float voxel_size, float int_band, float ext_band)
 {
+	math::Transform::Ptr transform = math::Transform::createLinearTransform(voxel_size);
 	tools::MeshToVolume<FloatGrid> voxelizer(transform);
 
-	voxelizer.convertToLevelSet(mesh_descr->points, mesh_descr->polys,
-								settings.ext_band, settings.int_band);
+	/* Convert vertices to the grid's index space */
+	std::vector<openvdb::Vec3s> points;
+	const size_t num_points = mesh_descr->points.size();
+	points.reserve(num_points);
+
+	for (size_t i = 0; i < num_points; ++i) {
+		openvdb::Vec3s vert = mesh_descr->points[i];
+		points.push_back(transform->worldToIndex(vert));
+	}
+
+	voxelizer.convertToLevelSet(points, mesh_descr->polys, int_band, ext_band);
 
 	FloatGrid::Ptr grid = voxelizer.distGridPtr();
+
+	OpenVDBPrimitive *vdb_prim = new OpenVDBPrimitive();
+	vdb_prim->setGrid(grid);
 
 	io::File file("/home/kevin/parts2.vdb");
 	GridPtrVec grids;
@@ -54,26 +69,28 @@ FloatGrid::Ptr OpenVDB_from_polygons(VDBMeshDescr *mesh_descr,
 	file.write(grids);
 	file.close();
 
-	return grid;
+	return vdb_prim;
 }
 
-struct VDBMeshDescr *OpenVDB_to_polygons(FloatGrid::Ptr level_set,
-										 FloatGrid::Ptr mask_grid,
-										 math::Transform::Ptr transform,
-										 const VolumeToMeshSettings &settings)
+struct VDBMeshDescr *OpenVDB_to_polygons(OpenVDBPrimitive *level_set,
+                                         OpenVDBPrimitive *mask_grid,
+                                         float isovalue, float adaptivity,
+                                         float mask_offset, bool invert_mask)
 {
 	VDBMeshDescr *mesh_descr = new VDBMeshDescr;
+	FloatGrid::Ptr ls_grid = gridPtrCast<FloatGrid>(level_set->getGridPtr());
+	math::Transform::Ptr transform = ls_grid->transformPtr();
 
-	tools::VolumeToMesh mesher(settings.isovalue, settings.adaptivity);
+	tools::VolumeToMesh mesher(isovalue, adaptivity);
 
 	if (mask_grid) {
 		std::cout << "Generating surface mask\n";
-		FloatGrid::ConstPtr grid = gridConstPtrCast<FloatGrid>(mask_grid);
-		mesher.setSurfaceMask(tools::sdfInteriorMask(*grid, settings.mask_offset),
-							  settings.invert_mask);
+		FloatGrid::ConstPtr grid = gridConstPtrCast<FloatGrid>(mask_grid->getConstGridPtr());
+		mesher.setSurfaceMask(tools::sdfInteriorMask(*grid, mask_offset),
+		                      invert_mask);
 	}
 
-	mesher(*level_set);
+	mesher(*ls_grid);
 
 	const tools::PointList &points = mesher.pointList();
 	tools::PolygonPoolList &polygonPoolList = mesher.polygonPoolList();
@@ -96,4 +113,6 @@ struct VDBMeshDescr *OpenVDB_to_polygons(FloatGrid::Ptr level_set,
 	}
 
 	return mesh_descr;
+}
+
 }
