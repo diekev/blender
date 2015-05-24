@@ -91,7 +91,25 @@ static void foreachObjectLink(ModifierData *md, Object *ob, ObjectWalkFunc walk,
 {
 	ParticleMesherModifierData *pmmd = (ParticleMesherModifierData *) md;
 
-	walk(userData, ob, &pmmd->mesher_mask_ob);
+	if (pmmd->mesher_mask_ob) {
+		walk(userData, ob, &pmmd->mesher_mask_ob);
+	}
+}
+
+static void updateDepsgraph(ModifierData *md,
+                            struct Main *bmain,
+                            struct Scene *scene,
+                            Object *ob,
+                            struct DepsNodeHandle *node)
+{
+	ParticleMesherModifierData *pmmd = (ParticleMesherModifierData *) md;
+
+	if (pmmd->mesher_mask_ob != NULL) {
+		DEG_add_object_relation(node, pmmd->mesher_mask_ob, DEG_OB_COMP_TRANSFORM,
+		                        "Particle Mesher Modifier");
+	}
+
+	UNUSED_VARS(bmain, scene, ob);
 }
 
 static void updateDepgraph(ModifierData *md, DagForest *forest,
@@ -185,6 +203,7 @@ ModifierTypeInfo modifierType_ParticleMesher = {
 	/* freeData */          freeData,
     /* isDisabled */        isDisabled,
     /* updateDepgraph */    updateDepgraph,
+    /* updateDepsgraph */   updateDepsgraph,
     /* dependsOnTime */     NULL,
     /* dependsOnNormals */  NULL,
     /* foreachObjectLink */ foreachObjectLink,
