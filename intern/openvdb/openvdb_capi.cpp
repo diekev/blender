@@ -34,7 +34,7 @@ extern "C" {
 #include "openvdb_capi.h"
 #include "openvdb_intern.h"
 #include "openvdb_primitive.h"
-#include "particlelist.h"
+#include "particle_tools.h"
 
 using namespace openvdb;
 
@@ -199,6 +199,11 @@ void OpenVDB_from_particles(OpenVDBPrimitive *level_set, OpenVDBPrimitive *mask_
 	                                 min_radius, trail, trail_size);
 }
 
+void OpenVDB_set_part_list_flags(struct ParticleList *part_list, const bool has_radius, const bool has_velocity)
+{
+	part_list->set_flags(has_radius, has_velocity);
+}
+
 /* **************************** OpenVDB Primitive **************************** */
 
 OpenVDBPrimitive *create(int grid_type)
@@ -263,12 +268,10 @@ void OpenVDB_filter_level_set(OpenVDBPrimitive *level_set, OpenVDBPrimitive *fil
 	internal::OpenVDB_filter_level_set(level_set, filter_mask, accuracy, type, iterations, width, offset);
 }
 
-
 OpenVDBPrimitive *OpenVDB_from_polygons(VDBMeshDescr *dm, float voxel_size, float int_band, float ext_band)
 {
 	return internal::OpenVDB_from_polygons(dm, voxel_size, int_band, ext_band);
 }
-
 
 VDBMeshDescr *OpenVDB_to_polygons(OpenVDBPrimitive *level_set, OpenVDBPrimitive *mask_grid, float isovalue, float adaptivity, float mask_offset, bool invert_mask)
 {

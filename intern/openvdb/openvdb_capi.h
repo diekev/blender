@@ -34,7 +34,6 @@ struct ExportMeshData;
 struct ImportMeshData;
 struct OpenVDBPrimitive;
 struct ParticleList;
-struct ParticleMesherModifierData;
 struct VDBMeshDescr;
 
 /* Importer from external storage to VDB module */
@@ -60,12 +59,24 @@ typedef struct VDBMeshExporter {
 	void (*setLoop) (struct ExportMeshData *export_data, int loop_index, int vertex);
 } VDBMeshExporter;
 
-int OpenVDB_getVersionHex(void);
+enum {
+	LEVEL_FILTER_MEDIAN    = 0,
+	LEVEL_FILTER_MEAN      = 1,
+	LEVEL_FILTER_GAUSSIAN  = 2,
+	LEVEL_FILTER_MEAN_CURV = 3,
+	LEVEL_FILTER_LAPLACIAN = 4,
+	LEVEL_FILTER_OFFSET    = 5,
+};
 
-bool OpenVDB_performParticleSurfacing(struct OpenVDBPrimitive *level_set,
-									  struct ParticleMesherModifierData *pmmd,
-									  struct VDBMeshDescr *mask_mesh,
-									  struct VDBMeshDescr **output_mesh);
+enum {
+	LEVEL_FILTER_ACC_FISRT   = 0,
+	LEVEL_FILTER_ACC_SECOND  = 1,
+	LEVEL_FILTER_ACC_THIRD   = 2,
+	LEVEL_FILTER_ACC_WENO5   = 3,
+	LEVEL_FILTER_ACC_HJWENO5 = 4,
+};
+
+int OpenVDB_getVersionHex(void);
 
 void OpenVDB_filter_level_set(struct OpenVDBPrimitive *level_set,
                               struct OpenVDBPrimitive *filter_mask,
@@ -96,6 +107,7 @@ void VDB_exportMesh(struct VDBMeshDescr *mesh_descr,
 struct ParticleList *OpenVDB_create_part_list(size_t totpart, float rad_scale, float vel_scale);
 void OpenVDB_part_list_free(struct ParticleList *part_list);
 void OpenVDB_add_particle(struct ParticleList *part_list, struct OpenVDBPrimitive *vdb_prim, float pos[3], float rad, float vel[3]);
+void OpenVDB_set_part_list_flags(struct ParticleList *part_list, const bool has_radius, const bool has_velocity);
 
 enum {
 	VDB_GRID_INVALID = 0,

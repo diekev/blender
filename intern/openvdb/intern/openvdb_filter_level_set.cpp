@@ -54,40 +54,40 @@ void OpenVDB_filter_level_set(OpenVDBPrimitive *level_set,
 	filter.setTemporalScheme(math::TVD_RK1);
 
 	switch (accuracy) {
-		case MOD_PART_MESH_ACC_FISRT:   filter.setSpatialScheme(math::FIRST_BIAS);   break;
-		case MOD_PART_MESH_ACC_SECOND:  filter.setSpatialScheme(math::SECOND_BIAS);  break;
-		case MOD_PART_MESH_ACC_THIRD:   filter.setSpatialScheme(math::THIRD_BIAS);   break;
-		case MOD_PART_MESH_ACC_WENO5:   filter.setSpatialScheme(math::WENO5_BIAS);   break;
-		case MOD_PART_MESH_ACC_HJWENO5: filter.setSpatialScheme(math::HJWENO5_BIAS); break;
+		case LEVEL_FILTER_ACC_FISRT:   filter.setSpatialScheme(math::FIRST_BIAS);   break;
+		case LEVEL_FILTER_ACC_SECOND:  filter.setSpatialScheme(math::SECOND_BIAS);  break;
+		case LEVEL_FILTER_ACC_THIRD:   filter.setSpatialScheme(math::THIRD_BIAS);   break;
+		case LEVEL_FILTER_ACC_WENO5:   filter.setSpatialScheme(math::WENO5_BIAS);   break;
+		case LEVEL_FILTER_ACC_HJWENO5: filter.setSpatialScheme(math::HJWENO5_BIAS); break;
 	}
 
 	switch (type) {
-		case MOD_PART_MESH_MEDIAN:
+		case LEVEL_FILTER_MEDIAN:
 			for (int i = 0; i < iterations; ++i) {
 				filter.median(width, mask);
 			}
 			break;
-		case MOD_PART_MESH_MEAN:
+		case LEVEL_FILTER_MEAN:
 			for (int i = 0; i < iterations; ++i) {
 				filter.mean(width, mask);
 			}
 			break;
-		case MOD_PART_MESH_GAUSSIAN:
+		case LEVEL_FILTER_GAUSSIAN:
 			for (int i = 0; i < iterations; ++i) {
 				filter.gaussian(width, mask);
 			}
 			break;
-		case MOD_PART_MESH_MEAN_CURV:
+		case LEVEL_FILTER_MEAN_CURV:
 			for (int i = 0; i < iterations; ++i) {
 				filter.meanCurvature(mask);
 			}
 			break;
-		case MOD_PART_MESH_LAPLACIAN:
+		case LEVEL_FILTER_LAPLACIAN:
 			for (int i = 0; i < iterations; ++i) {
 				filter.laplacian(mask);
 			}
 			break;
-		case MOD_PART_MESH_OFFSET:
+		case LEVEL_FILTER_OFFSET:
 			for (int i = 0; i < iterations; ++i) {
 				filter.offset(offset, mask);
 			}

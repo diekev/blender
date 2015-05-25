@@ -88,6 +88,7 @@
 #include "WM_types.h"
 
 #include "object_intern.h"
+#include "openvdb_capi.h"
 
 static void modifier_skin_customdata_delete(struct Object *ob);
 
@@ -2322,13 +2323,13 @@ static LevelSetFilter *levelset_filter_new(void)
 
 	filter = MEM_callocN(sizeof(LevelSetFilter), "LevelSetFilter");
 	filter->iterations = 3;
-	filter->accuracy = MOD_PART_MESH_ACC_FISRT;
-	filter->type = MOD_PART_MESH_MEDIAN;
+	filter->accuracy = LEVEL_FILTER_ACC_FISRT;
+	filter->type = LEVEL_FILTER_MEDIAN;
 	filter->width = 1;
 	filter->offset = 1.0f;
 
 	BLI_strncpy(filter->name,
-	            part_mesher_filter_items[filter->type - 1].name,
+	            part_mesher_filter_items[filter->type].name,
 				sizeof(filter->name));
 
 	return filter;

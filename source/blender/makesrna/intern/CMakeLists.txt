@@ -300,6 +300,13 @@ if(WITH_FREESTYLE)
 	add_definitions(-DWITH_FREESTYLE)
 endif()
 
+if(WITH_OPENVDB)
+	add_definitions(-DWITH_OPENVDB)
+	list(APPEND INC
+		../../../../intern/openvdb
+	)
+endif()
+
 # Build makesrna executable
 blender_include_dirs(
 	.

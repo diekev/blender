@@ -61,6 +61,8 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
+#include "openvdb_capi.h"
+
 EnumPropertyItem modifier_type_items[] = {
 	{0, "", 0, N_("Modify"), ""},
 	{eModifierType_DataTransfer, "DATA_TRANSFER", ICON_MOD_DATA_TRANSFER, "Data Transfer", ""},
@@ -257,12 +259,12 @@ EnumPropertyItem DT_layers_select_dst_items[] = {
 };
 
 EnumPropertyItem part_mesher_filter_items[] = {
-	{MOD_PART_MESH_MEDIAN, "MEDIAN", 0, "Median", ""},
-	{MOD_PART_MESH_MEAN, "MEAN", 0, "Mean", ""},
-	{MOD_PART_MESH_GAUSSIAN, "GAUSSIAN", 0, "Gaussian", ""},
-	{MOD_PART_MESH_MEAN_CURV, "MEAN_CURV", 0, "Mean Curvature", ""},
-	{MOD_PART_MESH_LAPLACIAN, "LAPLACIAN", 0, "Laplacian", ""},
-	{MOD_PART_MESH_OFFSET, "OFFSET", 0, "Offset", ""},
+	{LEVEL_FILTER_MEDIAN, "MEDIAN", 0, "Median", ""},
+	{LEVEL_FILTER_MEAN, "MEAN", 0, "Mean", ""},
+	{LEVEL_FILTER_GAUSSIAN, "GAUSSIAN", 0, "Gaussian", ""},
+	{LEVEL_FILTER_MEAN_CURV, "MEAN_CURV", 0, "Mean Curvature", ""},
+	{LEVEL_FILTER_LAPLACIAN, "LAPLACIAN", 0, "Laplacian", ""},
+	{LEVEL_FILTER_OFFSET, "OFFSET", 0, "Offset", ""},
 	{0, NULL, 0, NULL, NULL}
 };
 
@@ -4633,11 +4635,11 @@ static void rna_def_level_set_filter(BlenderRNA *brna)
 	StructRNA *srna;
 	PropertyRNA *prop;
 	static EnumPropertyItem part_mesher_filter_accur_items[] = {
-		{MOD_PART_MESH_ACC_FISRT, "FIRST_BIAS", 0, "First-order accuracy", ""},
-		{MOD_PART_MESH_ACC_SECOND, "SECOND_BIAS", 0, "Second-order accuracy", ""},
-		{MOD_PART_MESH_ACC_THIRD, "THIRD_BIAS", 0, "Third-order accuracy", ""},
-		{MOD_PART_MESH_ACC_WENO5, "WENO_BIAS", 0, "Fifth-order Weno", ""},
-		{MOD_PART_MESH_ACC_HJWENO5, "HJ_WENO_BIAS", 0, "Fifth-order HJ Weno", ""},
+		{LEVEL_FILTER_ACC_FISRT, "FIRST_BIAS", 0, "First-order accuracy", ""},
+		{LEVEL_FILTER_ACC_SECOND, "SECOND_BIAS", 0, "Second-order accuracy", ""},
+		{LEVEL_FILTER_ACC_THIRD, "THIRD_BIAS", 0, "Third-order accuracy", ""},
+		{LEVEL_FILTER_ACC_WENO5, "WENO_BIAS", 0, "Fifth-order Weno", ""},
+		{LEVEL_FILTER_ACC_HJWENO5, "HJ_WENO_BIAS", 0, "Fifth-order HJ Weno", ""},
 		{0, NULL, 0, NULL, NULL}
 	};
 

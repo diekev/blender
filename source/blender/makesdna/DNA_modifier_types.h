@@ -1565,21 +1565,4 @@ typedef struct ParticleMesherModifierData {
 	short pad;
 } ParticleMesherModifierData;
 
-enum {
-	MOD_PART_MESH_MEDIAN	= (1 << 0),
-	MOD_PART_MESH_MEAN		= (1 << 1),
-	MOD_PART_MESH_GAUSSIAN	= (1 << 2),
-	MOD_PART_MESH_MEAN_CURV	= (1 << 3),
-	MOD_PART_MESH_LAPLACIAN	= (1 << 4),
-	MOD_PART_MESH_OFFSET	= (1 << 5),
-};
-
-enum {
-	MOD_PART_MESH_ACC_FISRT		= (1 << 0),
-	MOD_PART_MESH_ACC_SECOND	= (1 << 1),
-	MOD_PART_MESH_ACC_THIRD		= (1 << 2),
-	MOD_PART_MESH_ACC_WENO5		= (1 << 3),
-	MOD_PART_MESH_ACC_HJWENO5	= (1 << 4),
-};
-
 #endif  /* __DNA_MODIFIER_TYPES_H__ */

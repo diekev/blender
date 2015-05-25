@@ -28,12 +28,125 @@
 
 #include "openvdb_intern.h"
 #include "openvdb_primitive.h"
-#include "particlelist.h"
+
+#include "particle_tools.h"
+
+using namespace openvdb;
+
+ParticleList::ParticleList(size_t size, Real rad_scale, Real vel_scale)
+    : m_radius_scale(rad_scale)
+    , m_velocity_scale(vel_scale)
+{
+	m_has_radius = false;
+	m_has_velocity = false;
+	m_particle_list.reserve(size);
+}
+
+void ParticleList::add(const Vec3R &p, const Real &r, const Vec3R &v)
+{
+	Particle pa;
+	pa.pos = p;
+	pa.rad = r;
+	pa.vel = v;
+	m_particle_list.push_back(pa);
+}
+
+Real &ParticleList::radius_scale()
+{
+	return m_radius_scale;
+}
+
+const Real &ParticleList::radius_scale() const
+{
+	return m_radius_scale;
+}
+
+Real &ParticleList::velocity_scale()
+{
+	return m_velocity_scale;
+}
+
+bool ParticleList::has_radius() const
+{
+	return m_has_radius;
+}
+
+bool ParticleList::has_velocity() const
+{
+	return m_has_velocity;
+}
+
+void ParticleList::set_flags(const bool has_radius, const bool has_velocity)
+{
+	m_has_radius = has_radius;
+	m_has_velocity = has_velocity;
+}
+
+CoordBBox ParticleList::getBBox(const GridBase &grid)
+{
+	CoordBBox bbox;
+	Coord &min = bbox.min(), &max = bbox.max();
+
+	for (int n = 0, e = this->size(); n < e; ++n) {
+		const Vec3d xyz = grid.worldToIndex(this->pos(n));
+		const Real r = this->radius(n) / grid.voxelSize()[0];
+
+		for (int i = 0; i < 3; ++i) {
+			min[i] = math::Min(min[i], math::Floor(xyz[i] - r));
+			max[i] = math::Max(max[i], math::Ceil(xyz[i] + r));
+		}
+	}
+
+	return bbox;
+}
+
+Vec3R ParticleList::pos(int n) const
+{
+	return m_particle_list[n].pos;
+}
+
+Vec3R ParticleList::vel(int n) const
+{
+	return m_velocity_scale * m_particle_list[n].vel;
+}
+
+Real ParticleList::radius(int n) const
+{
+	return m_radius_scale * m_particle_list[n].rad;
+}
+
+int ParticleList::size() const
+{
+	return m_particle_list.size();
+}
+
+void ParticleList::getPos(size_t n, Vec3R &pos) const
+{
+	pos = m_particle_list[n].pos;
+}
+
+void ParticleList::getPosRad(size_t n, Vec3R &pos, Real &rad) const
+{
+	pos = m_particle_list[n].pos;
+	rad = m_radius_scale * m_particle_list[n].rad;
+}
+
+void ParticleList::getPosRadVel(size_t n, Vec3R &pos, Real &rad, Vec3R &vel) const
+{
+	pos = m_particle_list[n].pos;
+	rad = m_radius_scale * m_particle_list[n].rad;
+	vel = m_velocity_scale * m_particle_list[n].vel;
+}
+
+void ParticleList::getAtt(size_t n, Index32 &att) const
+{
+	att = Index32(n);
+}
 
 namespace internal {
 
 static void convert_to_levelset(ParticleList part_list, FloatGrid::Ptr grid,
-								float min_radius, bool trail, float trail_size)
+                                float min_radius, bool trail, float trail_size)
 {
 	/* Note: the second template argument here is the particles' attributes type,
 	 * if any. As this function will later call ParticleList::getAtt(index, attribute),

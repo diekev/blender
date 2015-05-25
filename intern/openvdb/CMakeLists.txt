@@ -50,12 +50,12 @@ if(WITH_OPENVDB)
 
 	list(APPEND SRC
 		intern/openvdb_filter_level_set.cpp
-		intern/openvdb_from_particles.cpp
 		intern/openvdb_mesh_convert.cpp
 		intern/openvdb_primitive.cpp
+		intern/particle_tools.cpp
 		openvdb_capi.cpp
 
-		particlelist.h
+		intern/particle_tools.h
 		openvdb_intern.h
 	)
 endif()
