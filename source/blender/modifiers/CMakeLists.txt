@@ -159,7 +159,7 @@ if(WITH_MOD_PARTMESHER)
 		intern/MOD_openvdb_util.c
 	)
 	list(APPEND INC
-		../openvdb
+		../../../intern/openvdb
 	)
 endif()
 

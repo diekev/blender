@@ -27,8 +27,6 @@
 #include <vector>
 
 extern "C" {
-#include "BKE_DerivedMesh.h"
-
 #include "DNA_modifier_types.h"
 #include "DNA_scene_types.h"
 }
@@ -164,28 +162,6 @@ void VDB_exportMesh(VDBMeshDescr *mesh_descr,
 void VDB_deleteMesh(VDBMeshDescr *mesh_descr)
 {
 	delete mesh_descr;
-}
-
-bool OpenVDB_performParticleSurfacing(OpenVDBPrimitive *level_set,
-									  ParticleMesherModifierData *pmmd,
-									  VDBMeshDescr *mask_mesh,
-									  VDBMeshDescr **output_mesh)
-{
-	*output_mesh = NULL;
-	VDBMeshDescr *output_descr = NULL;
-
-	try {
-	}
-	catch (std::exception &e) {
-		std::cerr << "OpenVDB exception " << e.what() << std::endl;
-	}
-	catch (...) {
-		std::cerr << "Unknown error in OpenVDB library" << std::endl;
-	}
-
-	*output_mesh = output_descr;
-
-	return output_descr != NULL;
 }
 
 /* ****************************** Particle List ****************************** */
