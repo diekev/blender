@@ -56,6 +56,7 @@ BF_OPENEXR_LIB = 'Half IlmImf Iex Imath '
 BF_OPENEXR_LIB_STATIC = '${BF_OPENEXR}/lib/libHalf.a ${BF_OPENEXR}/lib/libIlmImf.a ${BF_OPENEXR}/lib/libIex.a ${BF_OPENEXR}/lib/libImath.a ${BF_OPENEXR}/lib/libIlmThread.a'
 # BF_OPENEXR_LIBPATH = '${BF_OPENEXR}/lib'
 
+
 WITH_BF_DDS = True
 
 WITH_BF_JPEG = True
