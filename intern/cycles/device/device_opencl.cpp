@@ -1675,8 +1675,6 @@ public:
 	OpenCLDeviceSplitKernel(DeviceInfo& info, Stats &stats, bool background_)
 	: OpenCLDeviceBase(info, stats, background_)
 	{
-
-		info.use_split_kernel = true;
 		background = background_;
 
 		/* Initialize kernels. */
@@ -2331,7 +2329,7 @@ public:
 			/* Object motion. */
 			ob_tfm_sd = mem_alloc(num_global_elements * sizeof(Transform));
 			ob_tfm_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(Transform));
-			ob_itfm_sd = mem_alloc(num_global_elements * sizeof(float3));
+			ob_itfm_sd = mem_alloc(num_global_elements * sizeof(Transform));
 			ob_itfm_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(Transform));
 
 			closure_sd = mem_alloc(num_global_elements * ShaderClosure_size);
@@ -3327,6 +3325,7 @@ Device *device_opencl_create(DeviceInfo& info, Stats &stats, bool background)
 		{
 			/* If the device is an AMD GPU, take split kernel path. */
 			VLOG(1) << "Using split kernel";
+			info.use_split_kernel = true;
 			return new OpenCLDeviceSplitKernel(info, stats, background);
 		} else {
 			/* For any other device, take megakernel path. */

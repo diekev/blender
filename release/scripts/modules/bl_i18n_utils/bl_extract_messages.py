@@ -64,7 +64,7 @@ def _gen_check_ctxt(settings):
 
 
 def _diff_check_ctxt(check_ctxt, minus_check_ctxt):
-    """Returns check_ctxt - minus_check_ctxt"""
+    """Removes minus_check_ctxt from check_ctxt"""
     for key in check_ctxt:
         if isinstance(check_ctxt[key], set):
             for warning in minus_check_ctxt[key]:
@@ -576,8 +576,9 @@ def dump_py_messages_from_files(msgs, reports, files, settings):
     #print(func_translate_args)
 
     # Break recursive nodes look up on some kind of nodes.
-    # E.g. we don’t want to get strings inside subscripts (blah["foo"])!
-    stopper_nodes = {ast.Subscript}
+    # E.g. we don't want to get strings inside subscripts (blah["foo"])!
+    #      we don't want to get strings from comparisons (foo.type == 'BAR').
+    stopper_nodes = {ast.Subscript, ast.Compare}
     # Consider strings separate: ("a" if test else "b")
     separate_nodes = {ast.IfExp}
 
@@ -897,7 +898,7 @@ def dump_addon_messages(module_name, do_checks, settings):
             del msgs[key]
 
     if check_ctxt:
-        check_ctxt = _diff_check_ctxt(check_ctxt, minus_check_ctxt)
+        _diff_check_ctxt(check_ctxt, minus_check_ctxt)
 
     # and we are done with those!
     del minus_pot
