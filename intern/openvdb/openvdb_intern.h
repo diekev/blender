@@ -50,13 +50,14 @@ void OpenVDB_from_particles(OpenVDBPrimitive *level_set,
                             ParticleList Pa, bool mask, float mask_width,
                             float min_radius, bool trail, float trail_size);
 
-OpenVDBPrimitive *OpenVDB_from_polygons(struct VDBMeshDescr *dm,
+OpenVDBPrimitive *OpenVDB_from_polygons(OpenVDBGeom *geom,
+                                        OpenVDBPrimitive *input_prim,
                                         float voxel_size, float int_band, float ext_band);
 
-struct VDBMeshDescr *OpenVDB_to_polygons(OpenVDBPrimitive *level_set,
-										 OpenVDBPrimitive *mask_grid,
-                                         float isovalue, float adaptivity,
-                                         float mask_offset, bool invert_mask);
+OpenVDBGeom *OpenVDB_to_polygons(OpenVDBPrimitive *level_set,
+                                 OpenVDBPrimitive *mask_grid,
+                                 float isovalue, float adaptivity,
+                                 float mask_offset, bool invert_mask);
 
 }
 

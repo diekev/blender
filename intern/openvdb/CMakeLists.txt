@@ -26,7 +26,6 @@
 set(INC
 	.
 	intern
-	../../source/blender/makesdna
 )
 
 set(INC_SYS

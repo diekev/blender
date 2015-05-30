@@ -26,38 +26,15 @@
 #ifndef __OPENVDB_CAPI_H__
 #define __OPENVDB_CAPI_H__
 
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-struct ExportMeshData;
-struct ImportMeshData;
+struct OpenVDBGeom;
 struct OpenVDBPrimitive;
 struct ParticleList;
-struct VDBMeshDescr;
-
-/* Importer from external storage to VDB module */
-
-typedef struct VDBMeshImporter {
-	int (*getNumVerts) (struct ImportMeshData *import_data);
-	int (*getNumLoops) (struct ImportMeshData *import_data);
-	int (*getNumPolys) (struct ImportMeshData *import_data);
-	void (*getVertCoord) (struct ImportMeshData *import_data, int vert_index, float coord[3]);
-	int (*getPolyNumVerts) (struct ImportMeshData *import_data, int poly_index);
-	void (*getPolyVerts) (struct ImportMeshData *import_data, int poly_index, int *verts);
-} VDBMeshImporter;
-
-struct VDBMeshDescr *VDB_addMesh(struct ImportMeshData *import_data,
-								 VDBMeshImporter *mesh_importer);
-
-/* Exporter from VDB module to external storage */
-
-typedef struct VDBMeshExporter {
-	void (*initGeomArrays) (struct ExportMeshData *export_data, int num_verts, int num_loops, int num_polys);
-	void (*setVert) (struct ExportMeshData *export_data, int vert_index, float coord[3]);
-	void (*setPoly) (struct ExportMeshData *export_data, int poly_index, int start_loop, int num_loops);
-	void (*setLoop) (struct ExportMeshData *export_data, int loop_index, int vertex);
-} VDBMeshExporter;
 
 enum {
 	LEVEL_FILTER_MEDIAN    = 0,
@@ -90,19 +67,14 @@ void OpenVDB_from_particles(struct OpenVDBPrimitive *level_set,
 
 
 
-struct OpenVDBPrimitive *OpenVDB_from_polygons(struct VDBMeshDescr *dm,
+struct OpenVDBPrimitive *OpenVDB_from_polygons(struct OpenVDBGeom *geom,
+                                               struct OpenVDBPrimitive *level_set,
                                                float voxel_size, float int_band, float ext_band);
 
-struct VDBMeshDescr *OpenVDB_to_polygons(struct OpenVDBPrimitive *level_set,
-										 struct OpenVDBPrimitive *mask_grid,
-                                         float isovalue, float adaptivity,
-                                         float mask_offset, bool invert_mask);
-
-void VDB_deleteMesh(struct VDBMeshDescr *mesh_descr);
-
-void VDB_exportMesh(struct VDBMeshDescr *mesh_descr,
-					struct VDBMeshExporter *mesh_exporter,
-					struct ExportMeshData *export_data);
+struct OpenVDBGeom *OpenVDB_to_polygons(struct OpenVDBPrimitive *level_set,
+                                        struct OpenVDBPrimitive *mask_grid,
+                                        float isovalue, float adaptivity,
+                                        float mask_offset, bool invert_mask);
 
 struct ParticleList *OpenVDB_create_part_list(size_t totpart, float rad_scale, float vel_scale);
 void OpenVDB_part_list_free(struct ParticleList *part_list);
@@ -121,9 +93,22 @@ enum {
     VDB_GRID_VEC3I   = 8,
 };
 
-struct OpenVDBPrimitive *create(int grid_type);
-struct OpenVDBPrimitive *create_level_set(float voxel_size, float half_width);
+struct OpenVDBPrimitive *OpenVDBPrimitive_create(int grid_type);
+struct OpenVDBPrimitive *OpenVDBPrimitive_create_level_set(float voxel_size, float half_width);
 void OpenVDBPrimitive_free(struct OpenVDBPrimitive *vdb_prim);
+void OpenVDBPrimitive_set_transform(struct OpenVDBPrimitive *vdb_prim, float mat[4][4]);
+
+struct OpenVDBGeom *OpenVDBGeom_create(size_t num_points, size_t num_polys);
+void OpenVDBGeom_free(struct OpenVDBGeom *geom);
+void OpenVDBGeom_add_point(struct OpenVDBGeom *geom, const float point[3]);
+void OpenVDBGeom_add_quad(struct OpenVDBGeom *geom, const int quad[4]);
+void OpenVDBGeom_addTriangle(struct OpenVDBGeom *geom, const int tri[3]);
+void OpenVDBGeom_get_point(struct OpenVDBGeom *geom, const size_t idx, float r_point[3]);
+void OpenVDBGeom_get_quad(struct OpenVDBGeom *geom, const size_t idx, int r_quad[4]);
+void OpenVDBGeom_get_triangle(struct OpenVDBGeom *geom, const size_t idx, int r_triangle[3]);
+size_t OpenVDBGeom_get_num_points(struct OpenVDBGeom *geom);
+size_t OpenVDBGeom_get_num_quads(struct OpenVDBGeom *geom);
+size_t OpenVDBGeom_get_num_tris(struct OpenVDBGeom *geom);
 
 #ifdef __cplusplus
 }

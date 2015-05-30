@@ -23,10 +23,6 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-extern "C" {
-#include "DNA_modifier_types.h"
-}
-
 #include <openvdb/tools/LevelSetFilter.h>
 
 #include "openvdb_capi.h"
