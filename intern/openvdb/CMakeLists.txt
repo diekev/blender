@@ -29,7 +29,7 @@ set(INC
 )
 
 set(INC_SYS
-
+	${GLEW_INCLUDE_PATH}
 )
 
 set(SRC
@@ -51,6 +51,7 @@ if(WITH_OPENVDB)
 		intern/openvdb_filter_level_set.cpp
 		intern/openvdb_mesh_convert.cpp
 		intern/openvdb_primitive.cpp
+		intern/openvdb_render.cpp
 		intern/particle_tools.cpp
 		openvdb_capi.cpp
 

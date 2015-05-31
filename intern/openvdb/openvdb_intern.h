@@ -32,12 +32,6 @@
 
 class ParticleList;
 
-typedef struct VDBMeshDescr {
-	std::vector<openvdb::Vec3s> points;
-	std::vector<openvdb::Vec3I> tris;
-	std::vector<openvdb::Vec4I> polys;
-} VDBMeshDescr;
-
 namespace internal {
 
 void OpenVDB_filter_level_set(OpenVDBPrimitive *level_set,
@@ -58,6 +52,12 @@ OpenVDBGeom *OpenVDB_to_polygons(OpenVDBPrimitive *level_set,
                                  OpenVDBPrimitive *mask_grid,
                                  float isovalue, float adaptivity,
                                  float mask_offset, bool invert_mask);
+
+void OpenVDBPrimitive_draw_tree(struct OpenVDBPrimitive *vdb_prim,
+                                const bool draw_root,
+	                            const bool draw_level_1,
+	                            const bool draw_level_2,
+	                            const bool draw_leaves);
 
 }
 

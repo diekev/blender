@@ -1562,7 +1562,14 @@ typedef struct ParticleMesherModifierData {
 	short invert_mask;
 
 	/* Padding */
-	short pad;
+	short draw_vdb_tree;
 } ParticleMesherModifierData;
+
+enum {
+	VDB_DRAW_ROOT    = (1 << 0),
+	VDB_DRAW_LEVEL_1 = (1 << 1),
+	VDB_DRAW_LEVEL_2 = (1 << 2),
+	VDB_DRAW_LEAVES  = (1 << 3),
+};
 
 #endif  /* __DNA_MODIFIER_TYPES_H__ */

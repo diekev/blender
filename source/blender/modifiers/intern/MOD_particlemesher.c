@@ -67,6 +67,7 @@ static void initData(ModifierData *md)
 	pmmd->invert_mask = false;
 	pmmd->ext_band = 3.0f;
 	pmmd->int_band = 3.0f;
+	pmmd->draw_vdb_tree = (VDB_DRAW_LEAVES | VDB_DRAW_LEVEL_1 | VDB_DRAW_LEVEL_2 | VDB_DRAW_ROOT);
 }
 
 static void copyData(ModifierData *md, ModifierData *target)
@@ -185,6 +186,10 @@ static void freeData(ModifierData *md)
 
 	if (pmmd->part_list) {
 		OpenVDB_part_list_free(pmmd->part_list);
+	}
+
+	if (pmmd->level_set) {
+		OpenVDBPrimitive_free(pmmd->level_set);
 	}
 }
 

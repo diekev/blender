@@ -1508,6 +1508,12 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
             if filter.type in {'OFFSET'}:
                 col.prop(filter, "offset")
 
+        layout.label(text="Draw OpenVDB Tree")
+        layout.prop(md, "draw_root_node")
+        layout.prop(md, "draw_level_1_node")
+        layout.prop(md, "draw_level_2_node")
+        layout.prop(md, "draw_leaf_node")
+
 
 if __name__ == "__main__":  # only for live edit.
     bpy.utils.register_module(__name__)

@@ -101,6 +101,8 @@
 #include "WM_api.h"
 #include "BLF_api.h"
 
+#include "openvdb_capi.h"
+
 #include "view3d_intern.h"  /* bad level include */
 
 /* Workaround for sequencer scene render mode.
@@ -8065,6 +8067,21 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 				draw_smoke_heat(smd->domain, ob);
 #endif
 			}
+		}
+	}
+
+	if ((md = modifiers_findByType(ob, eModifierType_ParticleMesher)) &&
+	    (modifier_isEnabled(scene, md, eModifierMode_Realtime)))
+	{
+		ParticleMesherModifierData *pmmd = (ParticleMesherModifierData *)md;
+
+		if (pmmd && pmmd->level_set) {
+			const bool draw_root    = (pmmd->draw_vdb_tree & VDB_DRAW_ROOT);
+			const bool draw_level_1 = (pmmd->draw_vdb_tree & VDB_DRAW_LEVEL_1);
+			const bool draw_level_2 = (pmmd->draw_vdb_tree & VDB_DRAW_LEVEL_2);
+			const bool draw_leaves  = (pmmd->draw_vdb_tree & VDB_DRAW_LEAVES);
+
+			OpenVDB_draw_primitive(pmmd->level_set, draw_root, draw_level_1, draw_level_2, draw_leaves);
 		}
 	}
 

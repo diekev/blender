@@ -223,3 +223,12 @@ size_t OpenVDBGeom_get_num_tris(struct OpenVDBGeom *geom)
 {
 	return geom->numTriangles();
 }
+
+void OpenVDB_draw_primitive(struct OpenVDBPrimitive *vdb_prim,
+                            const bool draw_root,
+                            const bool draw_level_1,
+                            const bool draw_level_2,
+                            const bool draw_leaves)
+{
+	internal::OpenVDBPrimitive_draw_tree(vdb_prim, draw_root, draw_level_1, draw_level_2, draw_leaves);
+}

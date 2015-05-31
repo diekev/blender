@@ -110,6 +110,12 @@ size_t OpenVDBGeom_get_num_points(struct OpenVDBGeom *geom);
 size_t OpenVDBGeom_get_num_quads(struct OpenVDBGeom *geom);
 size_t OpenVDBGeom_get_num_tris(struct OpenVDBGeom *geom);
 
+void OpenVDB_draw_primitive(struct OpenVDBPrimitive *vdb_prim,
+                            const bool draw_root,
+                            const bool draw_level_1,
+                            const bool draw_level_2,
+                            const bool draw_leaves);
+
 #ifdef __cplusplus
 }
 #endif

@@ -121,14 +121,12 @@ static void compute_vdb_prim_matrix(struct Object *ob,
 
 	copy_v3_fl(cell_size, voxel_size);
 	size_to_mat4(level_set_mat, cell_size);
-	copy_v3_v3(level_set_mat[3], bbox_min);
-
 	mul_m4_m4m4(level_set_mat, ob->obmat, level_set_mat);
 
 	OpenVDBPrimitive_set_transform(level_set, level_set_mat);
 }
 
-static struct OpenVDBGeom *VDBGeom_from_DerivedMesh(DerivedMesh *dm)
+static struct OpenVDBGeom *VDBGeom_from_DerivedMesh(Object *ob, DerivedMesh *dm)
 {
 	struct OpenVDBGeom *geom = NULL;
 	MVert *mverts;
@@ -142,7 +140,9 @@ static struct OpenVDBGeom *VDBGeom_from_DerivedMesh(DerivedMesh *dm)
 
 	mverts = dm->getVertArray(dm);
 	for (i = 0; i < num_verts; i++) {
-		OpenVDBGeom_add_point(geom, mverts[i].co);
+		float coord[3];
+		mul_v3_m4v3(coord, ob->obmat,  mverts[i].co);
+		OpenVDBGeom_add_point(geom, coord);
 	}
 
 	mpolys = dm->getPolyArray(dm);
@@ -163,7 +163,7 @@ static struct OpenVDBGeom *VDBGeom_from_DerivedMesh(DerivedMesh *dm)
 	return geom;
 }
 
-static DerivedMesh *DerivedMesh_from_VDBGeom(struct OpenVDBGeom *geom)
+static DerivedMesh *DerivedMesh_from_VDBGeom(struct OpenVDBGeom *geom, Object *ob)
 {
 	DerivedMesh *dm = NULL;
 	MVert *mverts;
@@ -182,7 +182,9 @@ static DerivedMesh *DerivedMesh_from_VDBGeom(struct OpenVDBGeom *geom)
 	mloops = dm->getLoopArray(dm);
 
 	for (i = 0; i < num_verts; i++) {
-		OpenVDBGeom_get_point(geom, i, mverts[i].co);
+		float coord[3];
+		OpenVDBGeom_get_point(geom, i, coord);
+		mul_v3_m4v3(mverts[i].co, ob->imat,  coord);
 	}
 
 	for (i = 0; i < num_quads; i++, poly_index++) {
@@ -239,6 +241,7 @@ DerivedMesh *NewParticleDerivedMesh(DerivedMesh *dm, struct Object *ob,
 	}
 
 	pmmd->level_set = OpenVDBPrimitive_create_level_set(pmmd->voxel_size, pmmd->half_width);
+	compute_vdb_prim_matrix(ob, pmmd->level_set, pmmd->voxel_size);
 
 	/* Generate a particle list */
 	pmmd->part_list = OpenVDB_create_part_list(pmmd->psys->totpart,
@@ -269,7 +272,7 @@ DerivedMesh *NewParticleDerivedMesh(DerivedMesh *dm, struct Object *ob,
 
 	/* Convert the level set to a mesh and output it */
 	if (cutter_dm != NULL) {
-		mask_geom = VDBGeom_from_DerivedMesh(cutter_dm);
+		mask_geom = VDBGeom_from_DerivedMesh(cutter_ob, cutter_dm);
 
 		mesher_mask = OpenVDBPrimitive_create(VDB_GRID_FLOAT);
 		compute_vdb_prim_matrix(cutter_ob, mesher_mask, pmmd->voxel_size);
@@ -277,7 +280,7 @@ DerivedMesh *NewParticleDerivedMesh(DerivedMesh *dm, struct Object *ob,
 	}
 
 	output_geom = OpenVDB_to_polygons(pmmd->level_set, mesher_mask, pmmd->isovalue, pmmd->adaptivity, pmmd->mask_offset, pmmd->invert_mask);
-	output_dm = DerivedMesh_from_VDBGeom(output_geom);
+	output_dm = DerivedMesh_from_VDBGeom(output_geom, ob);
 	OpenVDBGeom_free(output_geom);
 
 	output_dm->cd_flag |= dm->cd_flag;
@@ -290,8 +293,6 @@ DerivedMesh *NewParticleDerivedMesh(DerivedMesh *dm, struct Object *ob,
 	if (pmmd->generate_mask) {
 		OpenVDBPrimitive_free(filter_mask);
 	}
-
-	OpenVDBPrimitive_free(pmmd->level_set);
 
 	return output_dm;
 }
