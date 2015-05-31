@@ -51,6 +51,8 @@ static void initData(ModifierData *md)
 
 	pmmd->psys = NULL;
 	pmmd->part_list = NULL;
+	pmmd->level_set = NULL;
+	pmmd->mesher_mask = NULL;
 	pmmd->mesher_mask_ob = NULL;
 	pmmd->voxel_size = 0.2f;
 	pmmd->min_part_radius = 1.5f;
@@ -190,6 +192,10 @@ static void freeData(ModifierData *md)
 
 	if (pmmd->level_set) {
 		OpenVDBPrimitive_free(pmmd->level_set);
+	}
+
+	if (pmmd->mesher_mask) {
+		OpenVDBPrimitive_free(pmmd->mesher_mask);
 	}
 }
 

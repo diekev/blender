@@ -1538,7 +1538,7 @@ typedef struct ParticleMesherModifierData {
 
 	struct ParticleSystem *psys;
 	struct ParticleList *part_list; /* OpenVDB particle list */
-	struct OpenVDBPrimitive *level_set;
+	struct OpenVDBPrimitive *level_set, *mesher_mask;
 	struct Object *mesher_mask_ob;
 	ListBase filters;
 
