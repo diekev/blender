@@ -53,18 +53,8 @@ OpenVDBPrimitive *OpenVDB_from_polygons(OpenVDBGeom *geom,
 		transform = math::Transform::createLinearTransform(voxel_size);
 	}
 
-	/* Convert vertices to the grid's index space */
-	std::vector<openvdb::Vec3s> points;
-	const size_t num_points = geom->numPoints();
-	points.reserve(num_points);
-
-	for (size_t i = 0; i < num_points; ++i) {
-		openvdb::Vec3s vert = geom->point(i);
-		points.push_back(vert);
-	}
-
 	tools::MeshToVolume<FloatGrid> voxelizer(transform);
-	voxelizer.convertToLevelSet(points, geom->getPolys(), int_band, ext_band);
+	voxelizer.convertToLevelSet(geom->m_points, geom->m_polys, int_band, ext_band);
 
 	OpenVDBPrimitive *vdb_prim = new OpenVDBPrimitive();
 	vdb_prim->setGrid(voxelizer.distGridPtr());
@@ -97,21 +87,22 @@ OpenVDBGeom *OpenVDB_to_polygons(OpenVDBPrimitive *level_set,
 	const tools::PointList &points = mesher.pointList();
 	tools::PolygonPoolList &polygonPoolList = mesher.polygonPoolList();
 
-	OpenVDBGeom *geom = new OpenVDBGeom(mesher.pointListSize(), 0);
+	OpenVDBGeom *geom = new OpenVDBGeom;
+	geom->m_points.reserve(mesher.pointListSize());
 
 	for (size_t i = 0; i < mesher.pointListSize(); ++i) {
-		geom->addPoint(points[i]);
+		geom->m_points.push_back(points[i]);
 	}
 
 	for (size_t i = 0; i < mesher.polygonPoolListSize(); ++i) {
 		tools::PolygonPool &polygons = polygonPoolList[i];
 
 		for (size_t j = 0; j < polygons.numQuads(); ++j) {
-			geom->addQuad(polygons.quad(j));
+			geom->m_polys.push_back(polygons.quad(j));
 		}
 
 		for (size_t j = 0; j < polygons.numTriangles(); ++j) {
-			geom->addTriangle(polygons.triangle(j));
+			geom->m_tris.push_back(polygons.triangle(j));
 		}
 	}
 

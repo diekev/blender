@@ -156,7 +156,11 @@ OpenVDBGeom *OpenVDB_to_polygons(OpenVDBPrimitive *level_set, OpenVDBPrimitive *
 
 struct OpenVDBGeom *OpenVDBGeom_create(size_t num_points, size_t num_polys)
 {
-	return new OpenVDBGeom(num_points, num_polys);
+	OpenVDBGeom *geom = new OpenVDBGeom;
+	geom->m_points.reserve(num_points);
+	geom->m_polys.reserve(num_polys);
+
+	return geom;
 }
 
 void OpenVDBGeom_free(struct OpenVDBGeom *geom)
@@ -167,22 +171,22 @@ void OpenVDBGeom_free(struct OpenVDBGeom *geom)
 
 void OpenVDBGeom_add_point(OpenVDBGeom *geom, const float point[3])
 {
-	geom->addPoint(point);
+	geom->m_points.push_back(point);
 }
 
 void OpenVDBGeom_add_quad(OpenVDBGeom *geom, const int quad[4])
 {
-	geom->addQuad(quad);
+	geom->m_polys.push_back(quad);
 }
 
 void OpenVDBGeom_addTriangle(OpenVDBGeom *geom, const int tri[3])
 {
-	geom->addTriangle(tri);
+	geom->m_tris.push_back(tri);
 }
 
 void OpenVDBGeom_get_point(OpenVDBGeom *geom, const size_t idx, float r_point[3])
 {
-	Vec3s point = geom->point(idx);
+	Vec3s point = geom->m_points[idx];
 	r_point[0] = point.x();
 	r_point[1] = point.y();
 	r_point[2] = point.z();
@@ -190,7 +194,7 @@ void OpenVDBGeom_get_point(OpenVDBGeom *geom, const size_t idx, float r_point[3]
 
 void OpenVDBGeom_get_quad(OpenVDBGeom *geom, const size_t idx, int r_quad[4])
 {
-	Vec4I quad = geom->quad(idx);
+	Vec4I quad = geom->m_polys[idx];
 	r_quad[0] = quad.x();
 	r_quad[1] = quad.y();
 	r_quad[2] = quad.z();
@@ -199,7 +203,7 @@ void OpenVDBGeom_get_quad(OpenVDBGeom *geom, const size_t idx, int r_quad[4])
 
 void OpenVDBGeom_get_triangle(OpenVDBGeom *geom, const size_t idx, int r_triangle[3])
 {
-	Vec3I triangle = geom->triangle(idx);
+	Vec3I triangle = geom->m_tris[idx];
 	r_triangle[0] = triangle.x();
 	r_triangle[1] = triangle.y();
 	r_triangle[2] = triangle.z();
@@ -207,17 +211,17 @@ void OpenVDBGeom_get_triangle(OpenVDBGeom *geom, const size_t idx, int r_triangl
 
 size_t OpenVDBGeom_get_num_points(OpenVDBGeom *geom)
 {
-	return geom->numPoints();
+	return geom->m_points.size();
 }
 
 size_t OpenVDBGeom_get_num_quads(OpenVDBGeom *geom)
 {
-	return geom->numQuads();
+	return geom->m_polys.size();
 }
 
 size_t OpenVDBGeom_get_num_tris(struct OpenVDBGeom *geom)
 {
-	return geom->numTriangles();
+	return geom->m_tris.size();
 }
 
 void OpenVDB_draw_primitive(struct OpenVDBPrimitive *vdb_prim,
