@@ -4987,6 +4987,7 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 
 			pmmd->psys = newdataadr(fd, pmmd->psys);
 			link_list(fd, &pmmd->filters);
+			pmmd->mesher_mask = NULL;
 		}
 	}
 }
