@@ -60,31 +60,19 @@ OpenVDBPrimitive *OpenVDB_from_polygons(OpenVDBGeom *geom,
 
 	for (size_t i = 0; i < num_points; ++i) {
 		openvdb::Vec3s vert = geom->point(i);
-		points.push_back(transform->worldToIndex(vert));
+		points.push_back(vert);
 	}
-
-//	int_band /= voxel_size;
-//	ext_band /= voxel_size;
 
 	tools::MeshToVolume<FloatGrid> voxelizer(transform);
 	voxelizer.convertToLevelSet(points, geom->getPolys(), int_band, ext_band);
 
-	FloatGrid::Ptr grid = voxelizer.distGridPtr();
+	OpenVDBPrimitive *vdb_prim = new OpenVDBPrimitive();
+	vdb_prim->setGrid(voxelizer.distGridPtr());
 
 	/* XXX - should be done in a better way */
 	if (input_prim) {
 		delete input_prim;
 	}
-
-	OpenVDBPrimitive *vdb_prim = new OpenVDBPrimitive();
-	vdb_prim->setGrid(grid);
-
-	io::File file("/home/kevin/parts2.vdb");
-	file.setCompression(io::COMPRESS_ACTIVE_MASK | io::COMPRESS_ZIP);
-	GridPtrVec grids;
-	grids.push_back(grid);
-	file.write(grids);
-	file.close();
 
 	return vdb_prim;
 }
@@ -95,7 +83,6 @@ OpenVDBGeom *OpenVDB_to_polygons(OpenVDBPrimitive *level_set,
                                  float mask_offset, bool invert_mask)
 {
 	FloatGrid::Ptr ls_grid = gridPtrCast<FloatGrid>(level_set->getGridPtr());
-	math::Transform::Ptr transform = ls_grid->transformPtr();
 
 	tools::VolumeToMesh mesher(isovalue, adaptivity);
 
@@ -113,7 +100,7 @@ OpenVDBGeom *OpenVDB_to_polygons(OpenVDBPrimitive *level_set,
 	OpenVDBGeom *geom = new OpenVDBGeom(mesher.pointListSize(), 0);
 
 	for (size_t i = 0; i < mesher.pointListSize(); ++i) {
-		geom->addPoint(transform->indexToWorld(points[i]));
+		geom->addPoint(points[i]);
 	}
 
 	for (size_t i = 0; i < mesher.polygonPoolListSize(); ++i) {

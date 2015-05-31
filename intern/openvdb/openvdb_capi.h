@@ -78,7 +78,7 @@ struct OpenVDBGeom *OpenVDB_to_polygons(struct OpenVDBPrimitive *level_set,
 
 struct ParticleList *OpenVDB_create_part_list(size_t totpart, float rad_scale, float vel_scale);
 void OpenVDB_part_list_free(struct ParticleList *part_list);
-void OpenVDB_add_particle(struct ParticleList *part_list, struct OpenVDBPrimitive *vdb_prim, float pos[3], float rad, float vel[3]);
+void OpenVDB_add_particle(struct ParticleList *part_list, float pos[3], float rad, float vel[3]);
 void OpenVDB_set_part_list_flags(struct ParticleList *part_list, const bool has_radius, const bool has_velocity);
 
 enum {

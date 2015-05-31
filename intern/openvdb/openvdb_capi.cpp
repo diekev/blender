@@ -50,18 +50,14 @@ void OpenVDB_part_list_free(ParticleList *part_list)
 	part_list = NULL;
 }
 
-void OpenVDB_add_particle(ParticleList *part_list, OpenVDBPrimitive *vdb_prim,
+void OpenVDB_add_particle(ParticleList *part_list,
                           float pos[3], float rad, float vel[3])
 {
-	Vec3R nvel(vel), npos(pos);
+	Vec3R nvel(vel);
 	float nrad = rad * part_list->radius_scale();
 	nvel *= part_list->velocity_scale();
 
-	if (vdb_prim) {
-		npos = vdb_prim->getGrid().transform().worldToIndex(npos);
-	}
-
-	part_list->add(npos, nrad, nvel);
+	part_list->add(pos, nrad, nvel);
 }
 
 void OpenVDB_from_particles(OpenVDBPrimitive *level_set, OpenVDBPrimitive *mask_grid,
