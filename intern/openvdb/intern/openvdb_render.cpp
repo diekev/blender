@@ -37,10 +37,6 @@ void OpenVDBPrimitive_draw_tree(OpenVDBPrimitive *vdb_prim, const bool draw_root
 	using namespace openvdb::math;
 
 	FloatGrid::Ptr grid = gridPtrCast<FloatGrid>(vdb_prim->getGridPtr());
-	Transform::Ptr transform = grid->transform().copy();
-
-	/* XXX? */
-	transform->postScale(transform->voxelSize()[0]);
 
 	math::Vec3d wmin, wmax;
 	math::Vec3s color(0.0f);
@@ -62,8 +58,8 @@ void OpenVDBPrimitive_draw_tree(OpenVDBPrimitive *vdb_prim, const bool draw_root
 		const Vec3d min(bbox.min().x() - 0.5, bbox.min().y() - 0.5, bbox.min().z() - 0.5);
 		const Vec3d max(bbox.max().x() + 0.5, bbox.max().y() + 0.5, bbox.max().z() + 0.5);
 
-		wmin = transform->indexToWorld(min);
-		wmax = transform->indexToWorld(max);
+		wmin = grid->indexToWorld(min);
+		wmax = grid->indexToWorld(max);
 
 		const int level = node_iter.getLevel();
 

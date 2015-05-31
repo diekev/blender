@@ -8082,6 +8082,10 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 			const bool draw_leaves  = (pmmd->draw_vdb_tree & VDB_DRAW_LEAVES);
 
 			OpenVDB_draw_primitive(pmmd->level_set, draw_root, draw_level_1, draw_level_2, draw_leaves);
+
+			if (pmmd->mesher_mask) {
+				OpenVDB_draw_primitive(pmmd->mesher_mask, draw_root, draw_level_1, draw_level_2, draw_leaves);
+			}
 		}
 	}
 
