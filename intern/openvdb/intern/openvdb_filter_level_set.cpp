@@ -39,11 +39,15 @@ void OpenVDB_filter_level_set(OpenVDBPrimitive *level_set,
                               int width, float offset)
 {
 	FloatGrid::Ptr ls_grid = gridPtrCast<FloatGrid>(level_set->getGridPtr());
-	FloatGrid::Ptr mask_grid = gridPtrCast<FloatGrid>(filter_mask->getGridPtr());
 
 	typedef FloatGrid Mask;
 	typedef tools::LevelSetFilter<FloatGrid, Mask> Filter;
-	const Mask *mask = mask_grid.get();
+	Mask *mask = NULL;
+
+	if (filter_mask) {
+		FloatGrid::Ptr mask_grid = gridPtrCast<FloatGrid>(filter_mask->getGridPtr());
+		mask = mask_grid.get();
+	}
 
 	Filter filter(*ls_grid);
 
