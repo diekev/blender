@@ -32,11 +32,12 @@ extern "C" {
 
 struct bNode;
 struct bNodeTree;
+struct FluidRetimer;
 struct OpenVDBReader;
 struct OpenVDBWriter;
 
 int OpenVDB_getVersionHex(void);
-
+void OpenVDB_copy_file(const char *from, const char *to);
 void OpenVDB_get_grid_names_and_types(const char *filename, char **grid_names, char **grid_types, int *num_grids);
 
 enum {
@@ -109,6 +110,12 @@ void OpenVDBReader_get_meta_int(struct OpenVDBReader *reader, const char *name, 
 void OpenVDBReader_get_meta_v3(struct OpenVDBReader *reader, const char *name, float value[3]);
 void OpenVDBReader_get_meta_v3_int(struct OpenVDBReader *reader, const char *name, int value[3]);
 void OpenVDBReader_get_meta_mat4(struct OpenVDBReader *reader, const char *name, float value[4][4]);
+
+struct FluidRetimer *FluidRetimer_create(int steps, float dt, float shutter);
+void FluidRetimer_free(struct FluidRetimer *retimer);
+void FluidRetimer_ignore_grid(struct FluidRetimer *retimer, const char *name);
+void FluidRetimer_set_time_scale(struct FluidRetimer *retimer, const float dt);
+void FluidRetimer_process(struct FluidRetimer *retimer, const char *previous, const char *cur, const char *to);
 
 #ifdef __cplusplus
 }

@@ -360,6 +360,29 @@ static void rna_def_openvdb_cache(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "File Compression",
 	                         "Select what type of compression to use when writing the files");
 	RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Smoke_reset");
+
+	prop = RNA_def_property(srna, "shutter_speed", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "shutter_speed");
+	RNA_def_property_range(prop, 0.0, 1.0);
+	RNA_def_property_ui_range(prop, 0.0, 1.0, 0.01, 2);
+	RNA_def_property_ui_text(prop, "Shutter Speed",
+	                         "Value used to smooth out noise produced by the retiming process");
+	RNA_def_property_update(prop, NC_OBJECT | ND_POINTCACHE, NULL);
+
+	prop = RNA_def_property(srna, "num_steps", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "num_steps");
+	RNA_def_property_range(prop, 0, 10);
+	RNA_def_property_ui_text(prop, "Steps",
+	                         "Number of time to execute the retime loop");
+	RNA_def_property_update(prop, NC_OBJECT | ND_POINTCACHE, NULL);
+
+	prop = RNA_def_property(srna, "time_scale", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "time_scale");
+	RNA_def_property_range(prop, 0.0, 1.0);
+	RNA_def_property_ui_range(prop, 0.0, 1.0, 0.01, 2);
+	RNA_def_property_ui_text(prop, "Time Scale",
+	                         "Define new speed of the simulation");
+	RNA_def_property_update(prop, NC_OBJECT | ND_POINTCACHE, NULL);
 }
 
 static void rna_def_smoke_domain_settings(BlenderRNA *brna)

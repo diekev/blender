@@ -165,6 +165,12 @@ typedef struct OpenVDBCache {
 	char name[64];
 	int startframe, endframe;
 	short flag, compression, pad[2];
+
+	/* Retimer params */
+	float time_scale;
+	float shutter_speed;
+	int num_steps;
+	int pad1;
 } OpenVDBCache;
 
 enum {

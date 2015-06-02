@@ -23,6 +23,7 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+#include "fluid_retimer.h"
 #include "openvdb_capi.h"
 #include "openvdb_dense_convert.h"
 #include "openvdb_util.h"
@@ -32,6 +33,19 @@ using namespace openvdb;
 int OpenVDB_getVersionHex()
 {
     return OPENVDB_LIBRARY_VERSION;
+}
+
+void OpenVDB_copy_file(const char *from, const char *to)
+{
+	initialize();
+	io::File file_from(from), file_to(to);
+	file_from.open();
+
+	file_to.setCompression(file_from.compression());
+	file_to.write(*file_from.getGrids(), *file_from.getMetadata());
+	file_to.close();
+
+	file_from.close();
 }
 
 void OpenVDB_get_grid_names_and_types(const char *filename,
@@ -178,7 +192,6 @@ void OpenVDBWriter_write(OpenVDBWriter *writer, const char *filename)
 {
 	writer->write(filename);
 }
-
 OpenVDBReader *OpenVDBReader_create(const char *filename)
 {
 	return new OpenVDBReader(filename);
@@ -213,4 +226,30 @@ void OpenVDBReader_get_meta_v3_int(OpenVDBReader *reader, const char *name, int 
 void OpenVDBReader_get_meta_mat4(OpenVDBReader *reader, const char *name, float value[4][4])
 {
 	reader->mat4sMeta(name, value);
+}
+
+FluidRetimer *FluidRetimer_create(int steps, float dt, float shutter)
+{
+	return new FluidRetimer(steps, dt, shutter);
+}
+
+void FluidRetimer_free(FluidRetimer *retimer)
+{
+	delete retimer;
+	retimer = NULL;
+}
+
+void FluidRetimer_ignore_grid(FluidRetimer *retimer, const char *name)
+{
+	retimer->addIgnoredGrid(name);
+}
+
+void FluidRetimer_set_time_scale(FluidRetimer *retimer, const float dt)
+{
+	retimer->setTimeScale(dt);
+}
+
+void FluidRetimer_process(FluidRetimer *retimer, const char *previous, const char *cur, const char *to)
+{
+	retimer->retime(previous, cur, to);
 }

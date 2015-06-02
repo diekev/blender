@@ -48,6 +48,7 @@ if(WITH_OPENVDB)
 	)
 
 	list(APPEND SRC
+		intern/fluid_retimer.cpp
 		intern/openvdb_reader.cpp
 		intern/openvdb_dense_convert.cpp
 		intern/openvdb_writer.cpp

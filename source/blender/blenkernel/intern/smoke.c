@@ -3443,6 +3443,76 @@ void smokeModifier_OpenVDB_update_transform(SmokeModifierData *smd,
 	scene->r.cfra = orig_frame;
 }
 
+void smokeModifier_retime_fluid(SmokeModifierData *smd, Scene *scene, Object *ob,
+                                update_cb update, void *update_cb_data)
+{
+	SmokeDomainSettings *sds = smd->domain;
+	OpenVDBCache *cache, *retime_cache;
+	struct FluidRetimer *fluid_retimer = NULL;
+	int startframe, endframe, fr, cancel, retime_fr;
+	int time_step, time_step_tmp = 0;
+	char file_cur[FILE_MAX], file_next[FILE_MAX], file_retime[FILE_MAX];
+	const char *relbase = modifier_path_relbase(ob);
+	float progress;
+
+	cache = BKE_openvdb_get_current_cache(sds);
+
+	/* Create new cache */
+	retime_cache = BKE_openvdb_duplicate_cache(cache);
+	sprintf(retime_cache->name, "%s%s", cache->name, "retime_");
+	BLI_addtail(&sds->vdb_caches, retime_cache);
+
+	startframe = cache->startframe;
+	endframe = cache->endframe;
+	retime_fr = startframe;
+	time_step = cache->time_scale * 100;
+
+	fluid_retimer = FluidRetimer_create(cache->num_steps, cache->time_scale, cache->shutter_speed);
+
+	/* A few grids to ignore as it doesn't make any sense to retime them */
+	FluidRetimer_ignore_grid(fluid_retimer, "Color"); // XXX - retimer does not support vector grids yet
+	FluidRetimer_ignore_grid(fluid_retimer, "Color High"); // XXX - retimer does not support vector grids yet
+	FluidRetimer_ignore_grid(fluid_retimer, "Obstacles");
+	FluidRetimer_ignore_grid(fluid_retimer, "Shadow");
+	FluidRetimer_ignore_grid(fluid_retimer, "Texture Coordinates");
+	FluidRetimer_ignore_grid(fluid_retimer, "Velocity"); // should be exposed in the UI?
+
+	for (fr = startframe; fr < endframe; fr++) {
+		if (time_step_tmp % 100 == 0) {
+			/* This retimed frame corresponds to an "existing" frame, so just copy it */
+			cache_filename(file_cur, cache->path, cache->name, relbase, fr);
+			cache_filename(file_retime, retime_cache->path, retime_cache->name, relbase, retime_fr++);
+
+			OpenVDB_copy_file(file_cur, file_retime);
+
+			time_step_tmp += time_step;
+		}
+
+		cache_filename(file_cur, cache->path, cache->name, relbase, fr);
+		cache_filename(file_next, cache->path, cache->name, relbase, fr + 1);
+		cache_filename(file_retime, retime_cache->path, retime_cache->name, relbase, retime_fr++);
+
+		FluidRetimer_set_time_scale(fluid_retimer, (time_step_tmp % 100) * 0.01f);
+		FluidRetimer_process(fluid_retimer, file_cur, file_next, file_retime);
+
+		time_step_tmp += time_step;
+
+		progress = (fr - startframe) / (float)endframe;
+		update(update_cb_data, progress, &cancel);
+
+		if (cancel) {
+			return;
+		}
+	}
+
+	/* set the endframe of the retimed cache to be the number of generated frames */
+	retime_cache->endframe = retime_fr;
+
+	FluidRetimer_free(fluid_retimer);
+
+	UNUSED_VARS(scene);
+}
+
 #endif /* WITH_OPENVDB */
 
 #endif /* WITH_SMOKE */
@@ -3462,6 +3532,12 @@ void smokeModifier_OpenVDB_import(SmokeModifierData *smd, Scene *scene, Object *
 
 void smokeModifier_OpenVDB_update_transform(SmokeModifierData *smd, Scene *scene,
                                             Object *ob, update_cb update, void *update_cb_data)
+{
+	UNUSED_VARS(smd, scene, ob, update, update_cb_data);
+}
+
+void smokeModifier_retime_fluid(SmokeModifierData *smd, Scene *scene, Object *ob,
+                                update_cb update, void *update_cb_data)
 {
 	UNUSED_VARS(smd, scene, ob, update, update_cb_data);
 }

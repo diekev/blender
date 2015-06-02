@@ -2500,10 +2500,33 @@ static OpenVDBCache *openvdb_cache_new(void)
 	cache->startframe = 1;
 	cache->endframe = 250;
 	cache->compression = VDB_COMPRESSION_ZIP;
+	cache->shutter_speed = 1.0f;
+	cache->num_steps = 10;
+	cache->time_scale = 1.0f;
 
-	BLI_strncpy(cache->name, "openvdb_smoke_export_", sizeof(cache->name));
+	BLI_strncpy(cache->name, "openvdb_cache_", sizeof(cache->name));
 
 	return cache;
+}
+
+OpenVDBCache *BKE_openvdb_duplicate_cache(OpenVDBCache *cache)
+{
+	OpenVDBCache *dup_cache = NULL;
+
+	dup_cache = MEM_callocN(sizeof(OpenVDBCache), "OpenVDBCache");
+	dup_cache->reader = NULL;
+	dup_cache->writer = NULL;
+	dup_cache->startframe = cache->startframe;
+	dup_cache->endframe = cache->endframe;
+	dup_cache->compression = cache->compression;
+	dup_cache->shutter_speed = cache->shutter_speed;
+	dup_cache->num_steps = cache->num_steps;
+	dup_cache->time_scale = cache->time_scale;
+
+	BLI_strncpy(dup_cache->name, cache->name, sizeof(dup_cache->name));
+	BLI_strncpy(dup_cache->path, cache->path, sizeof(dup_cache->path));
+
+	return dup_cache;
 }
 
 static int openvdb_cache_add_exec(bContext *C, wmOperator *op)
@@ -2654,4 +2677,115 @@ void OBJECT_OT_openvdb_cache_move(wmOperatorType *ot)
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 	ot->prop = RNA_def_enum(ot->srna, "direction", cache_move, VDB_CACHE_MOVE_UP, "Direction", "");
+}
+
+/* ************************* fluid retimer operator ************************* */
+
+typedef struct CacheRetimeJob {
+	/* from wmJob */
+	void *owner;
+	short *stop, *do_update;
+	float *progress;
+	struct SmokeModifierData *smd;
+	struct Scene *scene;
+	struct Object *ob;
+	struct DerivedMesh *dm;
+} CacheRetimeJob;
+
+static void cache_retime_free(void *customdata)
+{
+	CacheRetimeJob *crj = customdata;
+	MEM_freeN(crj);
+}
+
+/* called by smoke export, only to check job 'stop' value */
+static int cache_retime_breakjob(void *customdata)
+{
+	return G.is_break;
+	UNUSED_VARS(customdata);
+}
+
+/* called by smokeModifier_retime_fluid, wmJob sends notifier */
+static void cache_retime_update(void *customdata, float progress, int *cancel)
+{
+	CacheRetimeJob *crj = customdata;
+
+	if (cache_retime_breakjob(crj)) {
+		*cancel = true;
+	}
+
+	*(crj->do_update) = true;
+	*(crj->progress) = progress;
+}
+
+static void cache_retime_startjob(void *customdata, short *stop, short *do_update, float *progress)
+{
+	CacheRetimeJob *crj = customdata;
+
+	crj->stop = stop;
+	crj->do_update = do_update;
+	crj->progress = progress;
+
+	G.is_break = false;
+
+	smokeModifier_retime_fluid(crj->smd, crj->scene, crj->ob, cache_retime_update, (void *)crj);
+
+	*do_update = true;
+	*stop = false;
+}
+
+static void cache_retime_endjob(void *customdata)
+{
+	CacheRetimeJob *crj = customdata;
+	Object *ob = crj->ob;
+
+	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
+	WM_main_add_notifier(NC_OBJECT | ND_MODIFIER, ob);
+}
+
+static int cache_retime_exec(bContext *C, wmOperator *op)
+{
+	Object *ob = ED_object_active_context(C);
+	SmokeModifierData *smd = (SmokeModifierData *)modifiers_findByType(ob, eModifierType_Smoke);
+	Scene *scene = CTX_data_scene(C);
+	wmJob *wm_job;
+	CacheRetimeJob *crj;
+
+	if (!smd) {
+		return OPERATOR_CANCELLED;
+	}
+
+	/* setup job */
+	wm_job = WM_jobs_get(CTX_wm_manager(C), CTX_wm_window(C), scene, "Cache Retimer",
+	                     WM_JOB_PROGRESS, WM_JOB_TYPE_CACHE_RETIME);
+
+	crj = MEM_callocN(sizeof(CacheRetimeJob), "fluid retime job");
+	crj->smd = smd;
+	crj->scene = scene;
+	crj->ob = ob;
+	crj->dm = ob->derivedDeform;
+
+	WM_jobs_customdata_set(wm_job, crj, cache_retime_free);
+	WM_jobs_timer(wm_job, 0.1, NC_OBJECT | ND_MODIFIER, NC_OBJECT | ND_MODIFIER);
+	WM_jobs_callbacks(wm_job, cache_retime_startjob, NULL, NULL, cache_retime_endjob);
+
+	WM_jobs_start(CTX_wm_manager(C), wm_job);
+
+	return OPERATOR_FINISHED;
+	UNUSED_VARS(op);
+}
+
+void OBJECT_OT_cache_retime(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Retime";
+	ot->description = "Start the retiming process";
+	ot->idname = "OBJECT_OT_cache_retime";
+
+	/* api callbacks */
+	ot->poll = ED_operator_object_active_editable;
+	ot->exec = cache_retime_exec;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
 }

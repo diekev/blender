@@ -369,8 +369,19 @@ class PHYSICS_PT_smoke_openvdb(PhysicButtonsPanel, Panel):
             row.prop(cache, "frame_start")
             row.prop(cache, "frame_end")
 
+        layout.separator()
         layout.operator("object.smoke_vdb_export")
         layout.operator("object.smoke_vdb_transform_update")
+
+        layout.separator()
+        layout.label(text="Retimer:")
+        split = layout.split()
+        col = split.column()
+        col.prop(cache, "time_scale")
+        col.prop(cache, "num_steps")
+        col = split.column()
+        col.prop(cache, "shutter_speed")
+        layout.operator("object.cache_retime")
 
 
 class PHYSICS_PT_smoke_field_weights(PhysicButtonsPanel, Panel):
