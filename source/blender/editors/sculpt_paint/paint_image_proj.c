@@ -1680,13 +1680,14 @@ static ProjPixel *project_paint_uvpixel_init(
 }
 
 static bool line_clip_rect2f(
+        const rctf *cliprect,
         const rctf *rect,
         const float l1[2], const float l2[2],
         float l1_clip[2], float l2_clip[2])
 {
 	/* first account for horizontal, then vertical lines */
 	/* horiz */
-	if (fabsf(l1[1] - l2[1]) < PROJ_GEOM_TOLERANCE) {
+	if (fabsf(l1[1] - l2[1]) < PROJ_PIXEL_TOLERANCE) {
 		/* is the line out of range on its Y axis? */
 		if (l1[1] < rect->ymin || l1[1] > rect->ymax) {
 			return 0;
@@ -1697,7 +1698,7 @@ static bool line_clip_rect2f(
 		}
 
 
-		if (fabsf(l1[0] - l2[0]) < PROJ_GEOM_TOLERANCE) { /* this is a single point  (or close to)*/
+		if (fabsf(l1[0] - l2[0]) < PROJ_PIXEL_TOLERANCE) { /* this is a single point  (or close to)*/
 			if (BLI_rctf_isect_pt_v(rect, l1)) {
 				copy_v2_v2(l1_clip, l1);
 				copy_v2_v2(l2_clip, l2);
@@ -1714,7 +1715,7 @@ static bool line_clip_rect2f(
 		CLAMP(l2_clip[0], rect->xmin, rect->xmax);
 		return 1;
 	}
-	else if (fabsf(l1[0] - l2[0]) < PROJ_GEOM_TOLERANCE) {
+	else if (fabsf(l1[0] - l2[0]) < PROJ_PIXEL_TOLERANCE) {
 		/* is the line out of range on its X axis? */
 		if (l1[0] < rect->xmin || l1[0] > rect->xmax) {
 			return 0;
@@ -1725,7 +1726,7 @@ static bool line_clip_rect2f(
 			return 0;
 		}
 
-		if (fabsf(l1[1] - l2[1]) < PROJ_GEOM_TOLERANCE) { /* this is a single point  (or close to)*/
+		if (fabsf(l1[1] - l2[1]) < PROJ_PIXEL_TOLERANCE) { /* this is a single point  (or close to)*/
 			if (BLI_rctf_isect_pt_v(rect, l1)) {
 				copy_v2_v2(l1_clip, l1);
 				copy_v2_v2(l2_clip, l2);
@@ -1764,7 +1765,7 @@ static bool line_clip_rect2f(
 		if (ok1 && ok2) return 1;
 
 		/* top/bottom */
-		if (line_isect_y(l1, l2, rect->ymin, &isect) && (isect >= rect->xmin) && (isect <= rect->xmax)) {
+		if (line_isect_y(l1, l2, rect->ymin, &isect) && (isect >= cliprect->xmin) && (isect <= cliprect->xmax)) {
 			if (l1[1] < l2[1]) { /* line 1 is outside */
 				l1_clip[0] = isect;
 				l1_clip[1] = rect->ymin;
@@ -1779,7 +1780,7 @@ static bool line_clip_rect2f(
 
 		if (ok1 && ok2) return 1;
 
-		if (line_isect_y(l1, l2, rect->ymax, &isect) && (isect >= rect->xmin) && (isect <= rect->xmax)) {
+		if (line_isect_y(l1, l2, rect->ymax, &isect) && (isect >= cliprect->xmin) && (isect <= cliprect->xmax)) {
 			if (l1[1] > l2[1]) { /* line 1 is outside */
 				l1_clip[0] = isect;
 				l1_clip[1] = rect->ymax;
@@ -1795,7 +1796,7 @@ static bool line_clip_rect2f(
 		if (ok1 && ok2) return 1;
 
 		/* left/right */
-		if (line_isect_x(l1, l2, rect->xmin, &isect) && (isect >= rect->ymin) && (isect <= rect->ymax)) {
+		if (line_isect_x(l1, l2, rect->xmin, &isect) && (isect >= cliprect->ymin) && (isect <= cliprect->ymax)) {
 			if (l1[0] < l2[0]) { /* line 1 is outside */
 				l1_clip[0] = rect->xmin;
 				l1_clip[1] = isect;
@@ -1810,7 +1811,7 @@ static bool line_clip_rect2f(
 
 		if (ok1 && ok2) return 1;
 
-		if (line_isect_x(l1, l2, rect->xmax, &isect) && (isect >= rect->ymin) && (isect <= rect->ymax)) {
+		if (line_isect_x(l1, l2, rect->xmax, &isect) && (isect >= cliprect->ymin) && (isect <= cliprect->ymax)) {
 			if (l1[0] > l2[0]) { /* line 1 is outside */
 				l1_clip[0] = rect->xmax;
 				l1_clip[1] = isect;
@@ -2108,6 +2109,7 @@ static bool line_rect_clip(
 
 static void project_bucket_clip_face(
         const bool is_ortho, const bool is_flip_object,
+        const rctf *cliprect,
         const rctf *bucket_bounds,
         const float *v1coSS, const float *v2coSS, const float *v3coSS,
         const float *uv1co, const float *uv2co, const float *uv3co,
@@ -2272,21 +2274,21 @@ static void project_bucket_clip_face(
 		if (inside_bucket_flag & ISECT_3) { copy_v2_v2(isectVCosSS[*tot], v3coSS); (*tot)++; }
 
 		if ((inside_bucket_flag & (ISECT_1 | ISECT_2)) != (ISECT_1 | ISECT_2)) {
-			if (line_clip_rect2f(bucket_bounds, v1coSS, v2coSS, v1_clipSS, v2_clipSS)) {
+			if (line_clip_rect2f(cliprect, bucket_bounds, v1coSS, v2coSS, v1_clipSS, v2_clipSS)) {
 				if ((inside_bucket_flag & ISECT_1) == 0) { copy_v2_v2(isectVCosSS[*tot], v1_clipSS); (*tot)++; }
 				if ((inside_bucket_flag & ISECT_2) == 0) { copy_v2_v2(isectVCosSS[*tot], v2_clipSS); (*tot)++; }
 			}
 		}
 
 		if ((inside_bucket_flag & (ISECT_2 | ISECT_3)) != (ISECT_2 | ISECT_3)) {
-			if (line_clip_rect2f(bucket_bounds, v2coSS, v3coSS, v1_clipSS, v2_clipSS)) {
+			if (line_clip_rect2f(cliprect, bucket_bounds, v2coSS, v3coSS, v1_clipSS, v2_clipSS)) {
 				if ((inside_bucket_flag & ISECT_2) == 0) { copy_v2_v2(isectVCosSS[*tot], v1_clipSS); (*tot)++; }
 				if ((inside_bucket_flag & ISECT_3) == 0) { copy_v2_v2(isectVCosSS[*tot], v2_clipSS); (*tot)++; }
 			}
 		}
 
 		if ((inside_bucket_flag & (ISECT_3 | ISECT_1)) != (ISECT_3 | ISECT_1)) {
-			if (line_clip_rect2f(bucket_bounds, v3coSS, v1coSS, v1_clipSS, v2_clipSS)) {
+			if (line_clip_rect2f(cliprect, bucket_bounds, v3coSS, v1coSS, v1_clipSS, v2_clipSS)) {
 				if ((inside_bucket_flag & ISECT_3) == 0) { copy_v2_v2(isectVCosSS[*tot], v1_clipSS); (*tot)++; }
 				if ((inside_bucket_flag & ISECT_1) == 0) { copy_v2_v2(isectVCosSS[*tot], v2_clipSS); (*tot)++; }
 			}
@@ -2488,7 +2490,7 @@ static bool IsectPoly2Df_twoside(const float pt[2], float uv[][2], const int tot
 static void project_paint_face_init(
         const ProjPaintState *ps,
         const int thread_index, const int bucket_index, const int face_index, const int image_index,
-        const rctf *bucket_bounds, ImBuf *ibuf, ImBuf **tmpibuf,
+        const rctf *clip_rect, const rctf *bucket_bounds, ImBuf *ibuf, ImBuf **tmpibuf,
         const bool clamp_u, const bool clamp_v)
 {
 	/* Projection vars, to get the 3D locations into screen space  */
@@ -2533,8 +2535,6 @@ static void project_paint_face_init(
 	const float ibuf_xf = (float)ibuf->x, ibuf_yf = (float)ibuf->y;
 
 	int has_x_isect = 0, has_isect = 0; /* for early loop exit */
-
-	int i1, i2, i3;
 
 	float uv_clip[8][2];
 	int uv_clip_tot;
@@ -2584,6 +2584,8 @@ static void project_paint_face_init(
 	}
 
 	do {
+		int i1, i2, i3;
+
 		if (side == 1) {
 			i1 = 0; i2 = 2; i3 = 3;
 		}
@@ -2602,7 +2604,7 @@ static void project_paint_face_init(
 		/* This funtion gives is a concave polyline in UV space from the clipped quad and tri*/
 		project_bucket_clip_face(
 		        is_ortho, is_flip_object,
-		        bucket_bounds,
+		        clip_rect, bucket_bounds,
 		        v1coSS, v2coSS, v3coSS,
 		        uv1co, uv2co, uv3co,
 		        uv_clip, &uv_clip_tot,
@@ -2742,7 +2744,7 @@ static void project_paint_face_init(
 			int fidx1, fidx2; /* face edge pairs - loop throuh these ((0,1), (1,2), (2,3), (3,0)) or ((0,1), (1,2), (2,0)) for a tri */
 
 			float seam_subsection[4][2];
-			float fac1, fac2, ftot;
+			float fac1, fac2;
 
 			if (outset_uv[0][0] == FLT_MAX) /* first time initialize */
 				uv_image_outset(tf_uv_pxoffset, outset_uv, ps->seam_bleed_px, ibuf->x, ibuf->y, mf->v4 != 0, (ps->faceWindingFlags[face_index] & PROJ_FACE_WINDING_CW) == 0);
@@ -2774,19 +2776,16 @@ static void project_paint_face_init(
 				else        fidx2 = (fidx1 == 2) ? 0 : fidx1 + 1;  /* next fidx in the face (0,1,2) -> (1,2,0) */
 
 				if ((face_seam_flag & (1 << fidx1)) && /* 1<<fidx1 -> PROJ_FACE_SEAM# */
-				    line_clip_rect2f(bucket_bounds, vCoSS[fidx1], vCoSS[fidx2], bucket_clip_edges[0], bucket_clip_edges[1]))
+				    line_clip_rect2f(clip_rect, bucket_bounds, vCoSS[fidx1], vCoSS[fidx2], bucket_clip_edges[0], bucket_clip_edges[1]))
 				{
-
-					ftot = len_v2v2(vCoSS[fidx1], vCoSS[fidx2]); /* screenspace edge length */
-
-					if (ftot > 0.0f) { /* avoid div by zero */
+					if (len_squared_v2v2(vCoSS[fidx1], vCoSS[fidx2]) > FLT_EPSILON) { /* avoid div by zero */
 						if (mf->v4) {
-							if (fidx1 == 2 || fidx2 == 2) side = 1;
+							if (fidx1 == 3 || fidx2 == 3) side = 1;
 							else side = 0;
 						}
 
-						fac1 = len_v2v2(vCoSS[fidx1], bucket_clip_edges[0]) / ftot;
-						fac2 = len_v2v2(vCoSS[fidx1], bucket_clip_edges[1]) / ftot;
+						fac1 = line_point_factor_v2(bucket_clip_edges[0], vCoSS[fidx1], vCoSS[fidx2]);
+						fac2 = line_point_factor_v2(bucket_clip_edges[1], vCoSS[fidx1], vCoSS[fidx2]);
 
 						interp_v2_v2v2(seam_subsection[0], tf_uv_pxoffset[fidx1], tf_uv_pxoffset[fidx2], fac1);
 						interp_v2_v2v2(seam_subsection[1], tf_uv_pxoffset[fidx1], tf_uv_pxoffset[fidx2], fac2);
@@ -2828,11 +2827,8 @@ static void project_paint_face_init(
 
 										/* Since this is a seam we need to work out where on the line this pixel is */
 										//fac = line_point_factor_v2(uv, uv_seam_quad[0], uv_seam_quad[1]);
-
-										fac = line_point_factor_v2(uv, seam_subsection[0], seam_subsection[1]);
-										if      (fac < 0.0f) { copy_v3_v3(pixelScreenCo, edge_verts_inset_clip[0]); }
-										else if (fac > 1.0f) { copy_v3_v3(pixelScreenCo, edge_verts_inset_clip[1]); }
-										else                 { interp_v3_v3v3(pixelScreenCo, edge_verts_inset_clip[0], edge_verts_inset_clip[1], fac); }
+										fac = resolve_quad_u_v2(uv, UNPACK4(seam_subsection));
+										interp_v3_v3v3(pixelScreenCo, edge_verts_inset_clip[0], edge_verts_inset_clip[1], fac);
 
 										if (!is_ortho) {
 											pixelScreenCo[3] = 1.0f;
@@ -2847,24 +2843,20 @@ static void project_paint_face_init(
 										{
 											/* Only bother calculating the weights if we intersect */
 											if (ps->do_mask_normal || ps->dm_mtface_clone) {
-#if 1
+												const float uv_fac = fac1 + (fac * (fac2 - fac1));
+#if 0
 												/* get the UV on the line since we want to copy the pixels from there for bleeding */
 												float uv_close[2];
-												float uv_fac = closest_to_line_v2(uv_close, uv, tf_uv_pxoffset[fidx1], tf_uv_pxoffset[fidx2]);
-												if      (uv_fac < 0.0f) copy_v2_v2(uv_close, tf_uv_pxoffset[fidx1]);
-												else if (uv_fac > 1.0f) copy_v2_v2(uv_close, tf_uv_pxoffset[fidx2]);
-
+												interp_v2_v2v2(uv_close, tf_uv_pxoffset[fidx1], tf_uv_pxoffset[fidx2], uv_fac);
 												if (side) {
 													barycentric_weights_v2(tf_uv_pxoffset[0], tf_uv_pxoffset[2], tf_uv_pxoffset[3], uv_close, w);
 												}
 												else {
 													barycentric_weights_v2(tf_uv_pxoffset[0], tf_uv_pxoffset[1], tf_uv_pxoffset[2], uv_close, w);
 												}
-#else											/* this is buggy with quads, don't use for now */
+#else
 
 												/* Cheat, we know where we are along the edge so work out the weights from that */
-												uv_fac = fac1 + (uv_fac * (fac2 - fac1));
-
 												w[0] = w[1] = w[2] = 0.0;
 												if (side) {
 													w[fidx1 ? fidx1 - 1 : 0] = 1.0f - uv_fac;
@@ -2879,8 +2871,8 @@ static void project_paint_face_init(
 
 											/* a pity we need to get the worldspace pixel location here */
 											if (do_clip || do_3d_mapping) {
-												if (side) interp_v3_v3v3v3(wco, ps->dm_mvert[mf->v1].co, ps->dm_mvert[mf->v3].co, ps->dm_mvert[mf->v4].co, w);
-												else      interp_v3_v3v3v3(wco, ps->dm_mvert[mf->v1].co, ps->dm_mvert[mf->v2].co, ps->dm_mvert[mf->v3].co, w);
+												if (side) interp_v3_v3v3v3(wco, vCo[0], vCo[2], vCo[3], w);
+												else      interp_v3_v3v3v3(wco, vCo[0], vCo[1], vCo[2], w);
 
 												if (do_clip && ED_view3d_clipping_test(ps->rv3d, wco, true)) {
 													continue; /* Watch out that no code below this needs to run */
@@ -2957,7 +2949,7 @@ static void project_bucket_bounds(const ProjPaintState *ps, const int bucket_x, 
 /* Fill this bucket with pixels from the faces that intersect it.
  *
  * have bucket_bounds as an argument so we don't need to give bucket_x/y the rect function needs */
-static void project_bucket_init(const ProjPaintState *ps, const int thread_index, const int bucket_index, const rctf *bucket_bounds)
+static void project_bucket_init(const ProjPaintState *ps, const int thread_index, const int bucket_index, const rctf *clip_rect, const rctf *bucket_bounds)
 {
 	LinkNode *node;
 	int face_index, image_index = 0;
@@ -2974,7 +2966,7 @@ static void project_bucket_init(const ProjPaintState *ps, const int thread_index
 		for (node = ps->bucketFaces[bucket_index]; node; node = node->next) {
 			project_paint_face_init(
 			        ps, thread_index, bucket_index, GET_INT_FROM_POINTER(node->link), 0,
-			        bucket_bounds, ibuf, &tmpibuf,
+			        clip_rect, bucket_bounds, ibuf, &tmpibuf,
 			        (ima->tpageflag & IMA_CLAMP_U) != 0, (ima->tpageflag & IMA_CLAMP_V) != 0);
 		}
 	}
@@ -3001,7 +2993,7 @@ static void project_bucket_init(const ProjPaintState *ps, const int thread_index
 
 			project_paint_face_init(
 			        ps, thread_index, bucket_index, face_index, image_index,
-			        bucket_bounds, ibuf, &tmpibuf,
+			        clip_rect, bucket_bounds, ibuf, &tmpibuf,
 			        (ima->tpageflag & IMA_CLAMP_U) != 0, (ima->tpageflag & IMA_CLAMP_V) != 0);
 		}
 	}
@@ -3776,7 +3768,7 @@ static void project_paint_prepare_all_faces(
         const bool is_multi_view)
 {
 	/* Image Vars - keep track of images we have used */
-	LinkNode *image_LinkList = NULL;
+	LinkNodePair image_LinkList = {NULL, NULL};
 
 	Image *tpage_last = NULL, *tpage;
 	TexPaintSlot *slot_last = NULL;
@@ -3851,7 +3843,7 @@ static void project_paint_prepare_all_faces(
 
 			if (tpage_last != tpage) {
 
-				image_index = BLI_linklist_index(image_LinkList, tpage);
+				image_index = BLI_linklist_index(image_LinkList.list, tpage);
 
 				if (image_index == -1 && BKE_image_has_ibuf(tpage, NULL, IMA_IBUF_LAYER)) { /* MemArena dosnt have an append func */
 					BLI_linklist_append(&image_LinkList, tpage);
@@ -3872,11 +3864,11 @@ static void project_paint_prepare_all_faces(
 
 	/* build an array of images we use*/
 	if (ps->is_shared_user == false) {
-		project_paint_build_proj_ima(ps, arena, image_LinkList);
+		project_paint_build_proj_ima(ps, arena, image_LinkList.list);
 	}
 
 	/* we have built the array, discard the linked list */
-	BLI_linklist_free(image_LinkList, NULL);
+	BLI_linklist_free(image_LinkList.list, NULL);
 }
 
 /* run once per stroke before projection painting */
@@ -4573,8 +4565,13 @@ static void *do_projectpaint_thread(void *ph_v)
 
 		/* Check this bucket and its faces are initialized */
 		if (ps->bucketFlags[bucket_index] == PROJ_BUCKET_NULL) {
+			rctf clip_rect = bucket_bounds;
+			clip_rect.xmin -= PROJ_PIXEL_TOLERANCE;
+			clip_rect.xmax += PROJ_PIXEL_TOLERANCE;
+			clip_rect.ymin -= PROJ_PIXEL_TOLERANCE;
+			clip_rect.ymax += PROJ_PIXEL_TOLERANCE;
 			/* No pixels initialized */
-			project_bucket_init(ps, thread_index, bucket_index, &bucket_bounds);
+			project_bucket_init(ps, thread_index, bucket_index, &clip_rect, &bucket_bounds);
 		}
 
 		if (ps->source != PROJ_SRC_VIEW) {
@@ -4672,7 +4669,9 @@ static void *do_projectpaint_thread(void *ph_v)
 							rgb_straight[3] = projPixel->origColor.f_pt[3];
 							straight_to_premul_v4_v4(projPixel->pixel.f_pt, rgb_straight);
 						}
-						else projPixel->pixel.ch_pt[3] = projPixel->origColor.ch_pt[3];
+						else {
+							projPixel->pixel.ch_pt[3] = projPixel->origColor.ch_pt[3];
+						}
 					}
 
 					last_partial_redraw_cell = last_projIma->partRedrawRect + projPixel->bb_cell_index;
@@ -4723,7 +4722,7 @@ static void *do_projectpaint_thread(void *ph_v)
 				if (dist_sq <= brush_radius_sq) {
 					dist = sqrtf(dist_sq);
 
-					falloff = BKE_brush_curve_strength(ps->brush, dist, brush_radius);
+					falloff = BKE_brush_curve_strength_clamped(ps->brush, dist, brush_radius);
 
 					if (falloff > 0.0f) {
 						float texrgb[3];
@@ -4847,7 +4846,9 @@ static void *do_projectpaint_thread(void *ph_v)
 									rgb_straight[3] = projPixel->origColor.f_pt[3];
 									straight_to_premul_v4_v4(projPixel->pixel.f_pt, rgb_straight);
 								}
-								else projPixel->pixel.ch_pt[3] = projPixel->origColor.ch_pt[3];
+								else {
+									projPixel->pixel.ch_pt[3] = projPixel->origColor.ch_pt[3];
+								}
 							}
 						}
 
@@ -5084,7 +5085,7 @@ static void project_state_init(bContext *C, Object *ob, ProjPaintState *ps, int 
 		ps->blend = brush->blend;
 		/* only check for inversion for the soften tool, elsewhere, a resident brush inversion flag can cause issues */
 		if (brush->imagepaint_tool == PAINT_TOOL_SOFTEN) {
-			ps->mode = ((ps->mode == BRUSH_STROKE_INVERT) ^ ((brush->flag & BRUSH_DIR_IN) != 0) ?
+			ps->mode = (((ps->mode == BRUSH_STROKE_INVERT) ^ ((brush->flag & BRUSH_DIR_IN) != 0)) ?
 			            BRUSH_STROKE_INVERT : BRUSH_STROKE_NORMAL);
 
 			ps->blurkernel = paint_new_blur_kernel(brush, true);

@@ -84,6 +84,8 @@
 #  include "FRS_freestyle.h"
 #endif
 
+#include "DEG_depsgraph.h"
+
 /* internal */
 #include "render_result.h"
 #include "render_types.h"
@@ -119,6 +121,17 @@
  *
  */
 
+/* Freestyle needs the whole frame to be merged into memory prior to
+ * doing stroke rendering. This conflicts a bit with multiview save
+ * buffers behavior which does a merge of exr files after all the
+ * views are rendered.
+ *
+ * For until a proper solution is implemented we'll just merge single
+ * view image prior to freestyle stroke rendering, which is how this
+ * worked prior to multiview. Multiview+freestyle+save buffers are
+ * considered unsupported for the time being.
+ */
+#define FREESTYLR_SAVEBUFFERS_WORKAROUND
 
 /* ********* globals ******** */
 
@@ -193,21 +206,8 @@ void RE_FreeRenderResult(RenderResult *res)
 
 float *RE_RenderLayerGetPass(volatile RenderLayer *rl, int passtype, const char *viewname)
 {
-	RenderPass *rpass;
-	float *rect = NULL;
-
-	for (rpass = rl->passes.last; rpass; rpass = rpass->prev) {
-		if (rpass->passtype == passtype) {
-			rect = rpass->rect;
-
-			if (viewname == NULL)
-				break;
-			else if (STREQ(rpass->view, viewname))
-				break;
-		}
-	}
-
-	return rect;
+	RenderPass *rpass = RE_pass_find_by_type(rl, passtype, viewname);
+	return rpass ? rpass->rect : NULL;
 }
 
 RenderLayer *RE_GetRenderLayer(RenderResult *rr, const char *name)
@@ -467,8 +467,7 @@ Render *RE_NewRender(const char *name)
 		BLI_strncpy(re->name, name, RE_MAXNAME);
 		BLI_rw_mutex_init(&re->resultmutex);
 		BLI_rw_mutex_init(&re->partsmutex);
-		re->eval_ctx = MEM_callocN(sizeof(EvaluationContext), "re->eval_ctx");
-		re->eval_ctx->mode = DAG_EVAL_RENDER;
+		re->eval_ctx = DEG_evaluation_context_new(DAG_EVAL_RENDER);
 	}
 	
 	RE_InitRenderCB(re);
@@ -508,7 +507,8 @@ void RE_FreeRender(Render *re)
 	BLI_rw_mutex_end(&re->partsmutex);
 
 	BLI_freelistN(&re->r.layers);
-	
+	BLI_freelistN(&re->r.views);
+
 	/* main dbase can already be invalid now, some database-free code checks it */
 	re->main = NULL;
 	re->scene = NULL;
@@ -655,8 +655,10 @@ void RE_InitState(Render *re, Render *source, RenderData *rd,
 
 	/* copy render data and render layers for thread safety */
 	BLI_freelistN(&re->r.layers);
+	BLI_freelistN(&re->r.views);
 	re->r = *rd;
 	BLI_duplicatelist(&re->r.layers, &rd->layers);
+	BLI_duplicatelist(&re->r.views, &rd->views);
 
 	if (source) {
 		/* reuse border flags from source renderer */
@@ -865,6 +867,10 @@ void render_update_anim_renderdata(Render *re, RenderData *rd)
 	/* render layers */
 	BLI_freelistN(&re->r.layers);
 	BLI_duplicatelist(&re->r.layers, &rd->layers);
+
+	/* render views */
+	BLI_freelistN(&re->r.views);
+	BLI_duplicatelist(&re->r.views, &rd->views);
 }
 
 void RE_SetWindow(Render *re, rctf *viewplane, float clipsta, float clipend)
@@ -1118,13 +1124,28 @@ static bool find_next_pano_slice(Render *re, int *slice, int *minx, rctf *viewpl
 	return found;
 }
 
-static RenderPart *find_next_part(Render *re, int minx)
+typedef struct SortRenderPart {
+	RenderPart *pa;
+	long long int dist;
+} SortRenderPart;
+
+static int sort_render_part(const void *pa1, const void *pa2) {
+	const SortRenderPart *rpa1 = pa1;
+	const SortRenderPart *rpa2 = pa2;
+
+	if (rpa1->dist > rpa2->dist) return 1;
+	else if (rpa1->dist < rpa2->dist) return -1;
+
+	return 0;
+}
+
+static int sort_and_queue_parts(Render *re, int minx, ThreadQueue *workqueue)
 {
-	RenderPart *pa, *best = NULL;
+	RenderPart *pa;
 
 	/* long long int's needed because of overflow [#24414] */
 	long long int centx = re->winx / 2, centy = re->winy / 2, tot = 1;
-	long long int mindist = (long long int)re->winx * (long long int)re->winy;
+	int totsort = 0;
 	
 	/* find center of rendered parts, image center counts for 1 too */
 	for (pa = re->parts.first; pa; pa = pa->next) {
@@ -1133,31 +1154,48 @@ static RenderPart *find_next_part(Render *re, int minx)
 			centy += BLI_rcti_cent_y(&pa->disprect);
 			tot++;
 		}
+		else if (pa->status == PART_STATUS_NONE && pa->nr == 0) {
+			if (!(re->r.mode & R_PANORAMA) || pa->disprect.xmin == minx) {
+				totsort++;
+			}
+		}
 	}
 	centx /= tot;
 	centy /= tot;
 	
-	/* closest of the non-rendering parts */
-	for (pa = re->parts.first; pa; pa = pa->next) {
-		if (pa->status == PART_STATUS_NONE && pa->nr == 0) {
-			long long int distx = centx - BLI_rcti_cent_x(&pa->disprect);
-			long long int disty = centy - BLI_rcti_cent_y(&pa->disprect);
-			distx = (long long int)sqrt(distx * distx + disty * disty);
-			if (distx < mindist) {
-				if (re->r.mode & R_PANORAMA) {
-					if (pa->disprect.xmin == minx) {
-						best = pa;
-						mindist = distx;
-					}
-				}
-				else {
-					best = pa;
-					mindist = distx;
+	if (totsort > 0) {
+		SortRenderPart *sortlist = MEM_mallocN(sizeof(*sortlist) * totsort, "renderpartsort");
+		long int i = 0;
+
+		/* prepare the list */
+		for (pa = re->parts.first; pa; pa = pa->next) {
+			if (pa->status == PART_STATUS_NONE && pa->nr == 0) {
+				if (!(re->r.mode & R_PANORAMA) || pa->disprect.xmin == minx) {
+					long long int distx = centx - BLI_rcti_cent_x(&pa->disprect);
+					long long int disty = centy - BLI_rcti_cent_y(&pa->disprect);
+					sortlist[i].dist = (long long int)sqrt(distx * distx + disty * disty);
+					sortlist[i].pa = pa;
+					i++;
 				}
 			}
 		}
+
+		/* Now sort it */
+		qsort(sortlist, totsort, sizeof(*sortlist), sort_render_part);
+
+		/* Finally flush it to the workqueue */
+		for (i = 0; i < totsort; i++) {
+			pa = sortlist[i].pa;
+			pa->nr = i + 1; /* for nicest part, and for stats */
+			BLI_thread_queue_push(workqueue, pa);
+		}
+
+		MEM_freeN(sortlist);
+
+		return totsort;
 	}
-	return best;
+
+	return 0;
 }
 
 static void print_part_stats(Render *re, RenderPart *pa)
@@ -1269,11 +1307,7 @@ static void threaded_tile_processor(Render *re)
 	/* for panorama we loop over slices */
 	while (find_next_pano_slice(re, &slice, &minx, &viewplane)) {
 		/* gather parts into queue */
-		while ((pa = find_next_part(re, minx))) {
-			pa->nr = totpart + 1; /* for nicest part, and for stats */
-			totpart++;
-			BLI_thread_queue_push(workqueue, pa);
-		}
+		totpart = sort_and_queue_parts(re, minx, workqueue);
 		
 		BLI_thread_queue_nowait(workqueue);
 		
@@ -1369,6 +1403,7 @@ static void threaded_tile_processor(Render *re)
 }
 
 #ifdef WITH_FREESTYLE
+static void init_freestyle(Render *re);
 static void add_freestyle(Render *re, int render);
 static void free_all_freestyle_renders(void);
 #endif
@@ -1386,8 +1421,8 @@ void RE_TileProcessor(Render *re)
 	/* Freestyle */
 	if (re->r.mode & R_EDGE_FRS) {
 		if (!re->test_break(re->tbh)) {
+			init_freestyle(re);
 			add_freestyle(re, 1);
-	
 			free_all_freestyle_renders();
 			
 			re->i.lastframetime = PIL_check_seconds_timer() - re->i.starttime;
@@ -1402,6 +1437,9 @@ void RE_TileProcessor(Render *re)
 
 static void do_render_3d(Render *re)
 {
+#ifdef FREESTYLR_SAVEBUFFERS_WORKAROUND
+	const bool do_early_result_merge = (re->r.scemode & R_MULTIVIEW) == 0;
+#endif
 	RenderView *rv;
 	int cfra_backup;
 
@@ -1421,6 +1459,12 @@ static void do_render_3d(Render *re)
 
 	/* init main render result */
 	main_render_result_new(re);
+
+#ifdef WITH_FREESTYLE
+	if (re->r.mode & R_EDGE_FRS) {
+		init_freestyle(re);
+	}
+#endif
 
 	/* we need a new database for each view */
 	for (rv = re->result->views.first; rv; rv = rv->next) {
@@ -1443,7 +1487,13 @@ static void do_render_3d(Render *re)
 			re->draw_lock(re->dlh, 0);
 	
 		threaded_tile_processor(re);
-	
+
+#ifdef FREESTYLR_SAVEBUFFERS_WORKAROUND
+		if (do_early_result_merge) {
+			main_render_result_end(re);
+		}
+#endif
+
 #ifdef WITH_FREESTYLE
 		/* Freestyle */
 		if (re->r.mode & R_EDGE_FRS)
@@ -1460,7 +1510,13 @@ static void do_render_3d(Render *re)
 		RE_Database_Free(re);
 	}
 
+#ifdef FREESTYLR_SAVEBUFFERS_WORKAROUND
+	if (!do_early_result_merge) {
+		main_render_result_end(re);
+	}
+#else
 	main_render_result_end(re);
+#endif
 
 	re->scene->r.cfra = cfra_backup;
 	re->scene->r.subframe = 0.f;
@@ -2057,6 +2113,23 @@ static void render_composit_stats(void *UNUSED(arg), const char *str)
 }
 
 #ifdef WITH_FREESTYLE
+/* init Freestyle renderer */
+static void init_freestyle(Render *re)
+{
+	re->freestyle_bmain = BKE_main_new();
+
+	/* We use the same window manager for freestyle bmain as
+	* real bmain uses. This is needed because freestyle's
+	* bmain could be used to tag scenes for update, which
+	* implies call of ED_render_scene_update in some cases
+	* and that function requires proper window manager
+	* to present (sergey)
+	*/
+	re->freestyle_bmain->wm = re->main->wm;
+
+	FRS_init_stroke_renderer(re);
+}
+
 /* invokes Freestyle stroke rendering */
 static void add_freestyle(Render *re, int render)
 {
@@ -2067,18 +2140,7 @@ static void add_freestyle(Render *re, int render)
 
 	actsrl = BLI_findlink(&re->r.layers, re->r.actlay);
 
-	re->freestyle_bmain = BKE_main_new();
-
-	/* We use the same window manager for freestyle bmain as
-	 * real bmain uses. This is needed because freestyle's
-	 * bmain could be used to tag scenes for update, which
-	 * implies call of ED_render_scene_update in some cases
-	 * and that function requires proper window manager
-	 * to present (sergey)
-	 */
-	re->freestyle_bmain->wm = re->main->wm;
-
-	FRS_init_stroke_rendering(re);
+	FRS_begin_stroke_rendering(re);
 
 	for (srl = (SceneRenderLayer *)re->r.layers.first; srl; srl = srl->next) {
 		if (do_link) {
@@ -2094,7 +2156,7 @@ static void add_freestyle(Render *re, int render)
 		}
 	}
 
-	FRS_finish_stroke_rendering(re);
+	FRS_end_stroke_rendering(re);
 
 	/* restore the global R value (invalidated by nested execution of the internal renderer) */
 	R = *re;
@@ -2104,28 +2166,32 @@ static void add_freestyle(Render *re, int render)
 static void composite_freestyle_renders(Render *re, int sample)
 {
 	Render *freestyle_render;
+	RenderView *rv;
 	SceneRenderLayer *srl, *actsrl;
 	LinkData *link;
 
 	actsrl = BLI_findlink(&re->r.layers, re->r.actlay);
 
 	link = (LinkData *)re->freestyle_renders.first;
-	for (srl= (SceneRenderLayer *)re->r.layers.first; srl; srl= srl->next) {
-		if ((re->r.scemode & R_SINGLE_LAYER) && srl != actsrl)
-			continue;
 
-		if (FRS_is_freestyle_enabled(srl)) {
-			freestyle_render = (Render *)link->data;
+	for (rv = re->result->views.first; rv; rv = rv->next) {
+		for (srl = (SceneRenderLayer *)re->r.layers.first; srl; srl = srl->next) {
+			if ((re->r.scemode & R_SINGLE_LAYER) && srl != actsrl)
+				continue;
 
-			/* may be NULL in case of empty render layer */
-			if (freestyle_render) {
-				render_result_exr_file_read_sample(freestyle_render, sample);
-				FRS_composite_result(re, srl, freestyle_render);
-				RE_FreeRenderResult(freestyle_render->result);
-				freestyle_render->result = NULL;
+			if (FRS_is_freestyle_enabled(srl)) {
+				freestyle_render = (Render *)link->data;
+
+				/* may be NULL in case of empty render layer */
+				if (freestyle_render) {
+					render_result_exr_file_read_sample(freestyle_render, sample);
+					FRS_composite_result(re, srl, freestyle_render);
+					RE_FreeRenderResult(freestyle_render->result);
+					freestyle_render->result = NULL;
+				}
 			}
+			link = link->next;
 		}
-		link = link->next;
 	}
 }
 
@@ -2367,8 +2433,10 @@ void RE_MergeFullSample(Render *re, Main *bmain, Scene *sce, bNodeTree *ntree)
 	re->display_clear(re->dch, re->result);
 	
 #ifdef WITH_FREESTYLE
-	if (re->r.mode & R_EDGE_FRS)
+	if (re->r.mode & R_EDGE_FRS) {
+		init_freestyle(re);
 		add_freestyle(re, 0);
+	}
 #endif
 
 	do_merge_fullsample(re, ntree);
@@ -2887,6 +2955,13 @@ bool RE_is_rendering_allowed(Scene *scene, Object *camera_override, ReportList *
 			BKE_report(reports, RPT_ERROR, "Fields not supported in Freestyle");
 			return false;
 		}
+
+#  ifdef FREESTYLR_SAVEBUFFERS_WORKAROUND
+		if ((scene->r.scemode & R_MULTIVIEW) != 0 && (scene->r.scemode & R_EXR_TILE_FILE) != 0) {
+			BKE_report(reports, RPT_ERROR, "Multi-View combined with Save Buffers not supported in Freestyle");
+			return false;
+		}
+#  endif
 	}
 #endif
 
@@ -3087,6 +3162,7 @@ void RE_RenderFreestyleExternal(Render *re)
 	if (!re->test_break(re->tbh)) {
 		RE_Database_FromScene(re, re->main, re->scene, re->lay, 1);
 		RE_Database_Preprocess(re);
+		init_freestyle(re);
 		add_freestyle(re, 1);
 		RE_Database_Free(re);
 	}
@@ -3159,14 +3235,14 @@ bool RE_WriteRenderViewsImage(ReportList *reports, RenderResult *rr, Scene *scen
 					ibuf->planes = 24;
 
 					IMB_colormanagement_imbuf_for_write(ibuf, true, false, &scene->view_settings,
-					                                    &scene->display_settings, &rd->im_format);
+					                                    &scene->display_settings, &imf);
 
 					if (stamp) {
 						/* writes the name of the individual cameras */
-						ok = BKE_imbuf_write_stamp(scene, rr, ibuf, name, &rd->im_format);
+						ok = BKE_imbuf_write_stamp(scene, rr, ibuf, name, &imf);
 					}
 					else {
-						ok = BKE_imbuf_write(ibuf, name, &rd->im_format);
+						ok = BKE_imbuf_write(ibuf, name, &imf);
 					}
 					printf("Saved: %s\n", name);
 				}
@@ -3865,14 +3941,18 @@ bool RE_layers_have_name(struct RenderResult *rr)
 	return false;
 }
 
-RenderPass *RE_pass_find_by_type(RenderLayer *rl, int passtype, const char *viewname)
+RenderPass *RE_pass_find_by_type(volatile RenderLayer *rl, int passtype, const char *viewname)
 {
-	RenderPass *rp;
-	for (rp = rl->passes.first; rp; rp = rp->next) {
+	RenderPass *rp = NULL;
+
+	for (rp = rl->passes.last; rp; rp = rp->prev) {
 		if (rp->passtype == passtype) {
-			if (STREQ(rp->view, viewname))
-				return rp;
+
+			if (viewname == NULL || viewname[0] == '\0')
+				break;
+			else if (STREQ(rp->view, viewname))
+				break;
 		}
 	}
-	return NULL;
+	return rp;
 }

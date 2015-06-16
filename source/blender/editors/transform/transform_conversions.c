@@ -3188,7 +3188,7 @@ static void posttrans_gpd_clean(bGPdata *gpd)
 		bGPDframe *gpf, *gpfn;
 		bool is_double = false;
 
-		BLI_listbase_sort_r(&gpl->frames, &is_double, gpf_cmp_frame);
+		BLI_listbase_sort_r(&gpl->frames, gpf_cmp_frame, &is_double);
 
 		if (is_double) {
 			for (gpf = gpl->frames.first; gpf; gpf = gpfn) {
@@ -3215,7 +3215,7 @@ static void posttrans_mask_clean(Mask *mask)
 		MaskLayerShape *masklay_shape, *masklay_shape_next;
 		bool is_double = false;
 
-		BLI_listbase_sort_r(&masklay->splines_shapes, &is_double, masklay_shape_cmp_frame);
+		BLI_listbase_sort_r(&masklay->splines_shapes, masklay_shape_cmp_frame, &is_double);
 
 		if (is_double) {
 			for (masklay_shape = masklay->splines_shapes.first; masklay_shape; masklay_shape = masklay_shape_next) {
@@ -5362,7 +5362,9 @@ static void set_trans_object_base_flags(TransInfo *t)
 	}
 
 	/* all recalc flags get flushed to all layers, so a layer flip later on works fine */
+#ifdef WITH_LEGACY_DEPSGRAPH
 	DAG_scene_flush_update(G.main, t->scene, -1, 0);
+#endif
 
 	/* and we store them temporal in base (only used for transform code) */
 	/* this because after doing updates, the object->recalc is cleared */
@@ -5439,7 +5441,9 @@ static int count_proportional_objects(TransInfo *t)
 
 	/* all recalc flags get flushed to all layers, so a layer flip later on works fine */
 	DAG_scene_relations_update(G.main, t->scene);
+#ifdef WITH_LEGACY_DEPSGRAPH
 	DAG_scene_flush_update(G.main, t->scene, -1, 0);
+#endif
 
 	/* and we store them temporal in base (only used for transform code) */
 	/* this because after doing updates, the object->recalc is cleared */

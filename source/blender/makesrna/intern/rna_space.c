@@ -1932,7 +1932,7 @@ static void rna_def_space_image_uv(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "show_metadata", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", SI_DRAW_METADATA);
-	RNA_def_property_ui_text(prop, "Draw Metadata", "Draw metadata properties of the image");
+	RNA_def_property_ui_text(prop, "Show Metadata", "Draw metadata properties of the image");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_IMAGE, NULL);
 
 	prop = RNA_def_property(srna, "show_texpaint", PROP_BOOLEAN, PROP_NONE);
@@ -4408,6 +4408,11 @@ static void rna_def_space_clip(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "show_disabled", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_ui_text(prop, "Show Disabled", "Show disabled tracks from the footage");
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", SC_HIDE_DISABLED);
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_CLIP, NULL);
+
+	prop = RNA_def_property(srna, "show_metadata", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", 	SC_SHOW_METADATA);
+	RNA_def_property_ui_text(prop, "Show Metadata", "Show metadata of clip");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_CLIP, NULL);
 
 	/* scopes */

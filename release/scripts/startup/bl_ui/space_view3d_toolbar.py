@@ -315,7 +315,7 @@ class VIEW3D_PT_tools_meshedit(View3DPanel, Panel):
         row.operator("transform.vert_slide", text="Vertex")
         col.operator("mesh.noise")
         col.operator("mesh.vertices_smooth")
-        col.operator("object.vertex_random")
+        col.operator("transform.vertex_random")
 
         col = layout.column(align=True)
         col.label(text="Add:")
@@ -327,6 +327,7 @@ class VIEW3D_PT_tools_meshedit(View3DPanel, Panel):
         col.operator("mesh.edge_face_add")
         col.operator("mesh.subdivide")
         col.operator("mesh.loopcut_slide")
+        col.operator("mesh.offset_edge_loops_slide")
         col.operator("mesh.duplicate_move", text="Duplicate")
         row = col.row(align=True)
         row.operator("mesh.spin")
@@ -523,7 +524,7 @@ class VIEW3D_PT_tools_curveedit(View3DPanel, Panel):
         col.operator("curve.extrude_move", text="Extrude")
         col.operator("curve.subdivide")
         col.operator("curve.smooth")
-        col.operator("object.vertex_random")
+        col.operator("transform.vertex_random")
 
 
 class VIEW3D_PT_tools_add_curve_edit(View3DPanel, Panel):
@@ -573,11 +574,12 @@ class VIEW3D_PT_tools_surfaceedit(View3DPanel, Panel):
         col = layout.column(align=True)
         col.label(text="Modeling:")
         col.operator("curve.extrude", text="Extrude")
+        col.operator("curve.spin")
         col.operator("curve.subdivide")
 
         col = layout.column(align=True)
         col.label(text="Deform:")
-        col.operator("object.vertex_random")
+        col.operator("transform.vertex_random")
 
 
 class VIEW3D_PT_tools_add_surface_edit(View3DPanel, Panel):
@@ -654,7 +656,7 @@ class VIEW3D_PT_tools_armatureedit(View3DPanel, Panel):
 
         col = layout.column(align=True)
         col.label(text="Deform:")
-        col.operator("object.vertex_random")
+        col.operator("transform.vertex_random")
 
 
 class VIEW3D_PT_tools_armatureedit_options(View3DPanel, Panel):
@@ -687,7 +689,7 @@ class VIEW3D_PT_tools_mballedit(View3DPanel, Panel):
 
         col = layout.column(align=True)
         col.label(text="Deform:")
-        col.operator("object.vertex_random")
+        col.operator("transform.vertex_random")
 
 
 class VIEW3D_PT_tools_add_mball_edit(View3DPanel, Panel):
@@ -725,7 +727,7 @@ class VIEW3D_PT_tools_latticeedit(View3DPanel, Panel):
 
         col = layout.column(align=True)
         col.label(text="Deform:")
-        col.operator("object.vertex_random")
+        col.operator("transform.vertex_random")
 
 
 # ********** default tools for pose-mode ****************

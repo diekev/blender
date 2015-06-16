@@ -99,6 +99,8 @@ typedef struct RenderPass {
 
 enum {
 	RENDER_PASS_DEBUG_BVH_TRAVERSAL_STEPS = 0,
+	RENDER_PASS_DEBUG_BVH_TRAVERSED_INSTANCES = 1,
+	RENDER_PASS_DEBUG_RAY_BOUNCES = 2,
 };
 
 /* a renderlayer is a full image, but with all passes and samples */
@@ -321,7 +323,7 @@ int RE_seq_render_active(struct Scene *scene, struct RenderData *rd);
 
 bool RE_layers_have_name(struct RenderResult *result);
 
-struct RenderPass *RE_pass_find_by_type(struct RenderLayer *rl, int passtype, const char *viewname);
+struct RenderPass *RE_pass_find_by_type(volatile struct RenderLayer *rl, int passtype, const char *viewname);
 
 /* shaded view or baking options */
 #define RE_BAKE_LIGHT				0	/* not listed in rna_scene.c -> can't be enabled! */

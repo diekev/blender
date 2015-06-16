@@ -1923,6 +1923,8 @@ bool SubsurfaceScatteringNode::has_bssrdf_bump()
 EmissionNode::EmissionNode()
 : ShaderNode("emission")
 {
+	special_type = SHADER_SPECIAL_TYPE_EMISSION;
+
 	add_input("Color", SHADER_SOCKET_COLOR, make_float3(0.8f, 0.8f, 0.8f));
 	add_input("Strength", SHADER_SOCKET_FLOAT, 10.0f);
 	add_input("SurfaceMixWeight", SHADER_SOCKET_FLOAT, 0.0f, ShaderInput::USE_SVM);
@@ -3931,6 +3933,8 @@ BumpNode::BumpNode()
 : ShaderNode("bump")
 {
 	invert = false;
+
+	special_type = SHADER_SPECIAL_TYPE_BUMP;
 
 	/* this input is used by the user, but after graph transform it is no longer
 	 * used and moved to sampler center/x/y instead */

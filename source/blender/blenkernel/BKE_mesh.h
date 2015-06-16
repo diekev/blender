@@ -276,7 +276,7 @@ int BKE_mesh_recalc_tessellation(
         struct CustomData *fdata, struct CustomData *ldata, struct CustomData *pdata,
         struct MVert *mvert,
         int totface, int totloop, int totpoly,
-        const bool do_face_normals);
+        const bool do_face_nor_copy);
 int BKE_mesh_mpoly_to_mface(
         struct CustomData *fdata, struct CustomData *ldata,
         struct CustomData *pdata, int totface, int totloop, int totpoly);
@@ -359,6 +359,13 @@ void BKE_mesh_strip_loose_edges(struct Mesh *me);
 
 void BKE_mesh_calc_edges_legacy(struct Mesh *me, const bool use_old);
 void BKE_mesh_calc_edges(struct Mesh *mesh, bool update, const bool select);
+
+/* **** Depsgraph evaluation **** */
+
+struct EvaluationContext;
+
+void BKE_mesh_eval_geometry(struct EvaluationContext *eval_ctx,
+                            struct Mesh *mesh);
 
 #ifdef __cplusplus
 }

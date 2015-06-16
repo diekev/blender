@@ -1104,7 +1104,7 @@ static void filelist_from_library(struct FileList *filelist)
 		previews = NULL;
 		nprevs = 0;
 		names = BLO_blendhandle_get_linkable_groups(filelist->libfiledata);
-		nnames = BLI_linklist_length(names);
+		nnames = BLI_linklist_count(names);
 	}
 
 	filelist->numfiles = nnames + 1;
@@ -1234,7 +1234,7 @@ static void filelist_from_main(struct FileList *filelist)
 
 		files = filelist->filelist;
 
-		if (!filelist->filter_data.hide_parent) {
+		if (files && !filelist->filter_data.hide_parent) {
 			memset(&(filelist->filelist[0]), 0, sizeof(struct direntry));
 			filelist->filelist[0].relname = BLI_strdup(FILENAME_PARENT);
 			filelist->filelist[0].type |= S_IFDIR;
@@ -1246,7 +1246,7 @@ static void filelist_from_main(struct FileList *filelist)
 		for (id = lb->first; id; id = id->next) {
 			ok = 1;
 			if (ok) {
-				if (!filelist->filter_data.hide_dot || id->name[2] != '.') {
+				if (files && (!filelist->filter_data.hide_dot || id->name[2] != '.')) {
 					memset(files, 0, sizeof(struct direntry));
 					if (id->lib == NULL) {
 						files->relname = BLI_strdup(id->name + 2);

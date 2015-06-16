@@ -94,7 +94,7 @@ void Device::draw_pixels(device_memory& rgba, int y, int w, int h, int dx, int d
 		}
 
 		if(GLEW_VERSION_1_5) {
-			if (!vertex_buffer)
+			if(!vertex_buffer)
 				glGenBuffers(1, &vertex_buffer);
 
 			glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
@@ -110,7 +110,7 @@ void Device::draw_pixels(device_memory& rgba, int y, int w, int h, int dx, int d
 			vp = vbuffer;
 		}
 
-		if (vp) {
+		if(vp) {
 			/* texture coordinate - vertex pair */
 			vp[0] = 0.0f;
 			vp[1] = 0.0f;
@@ -132,7 +132,7 @@ void Device::draw_pixels(device_memory& rgba, int y, int w, int h, int dx, int d
 			vp[14] = dx;
 			vp[15] = (float)height + dy;
 
-			if (vertex_buffer)
+			if(vertex_buffer)
 				glUnmapBuffer(GL_ARRAY_BUFFER);
 		}
 
@@ -163,7 +163,7 @@ void Device::draw_pixels(device_memory& rgba, int y, int w, int h, int dx, int d
 		/* fallback for old graphics cards that don't support GLSL, half float,
 		 * and non-power-of-two textures */
 		glPixelZoom((float)width/(float)w, (float)height/(float)h);
-		glRasterPos2f(0, dy);
+		glRasterPos2f(dx, dy);
 
 		uint8_t *pixels = (uint8_t*)rgba.data_pointer;
 
@@ -327,13 +327,10 @@ string Device::device_capabilities()
 #endif
 
 #ifdef WITH_OPENCL
-	/* TODO(sergey): Needs proper usable implementation. */
-	/*
 	if(device_opencl_init()) {
 		capabilities += "\nOpenCL device capabilities:\n";
 		capabilities += device_opencl_capabilities();
 	}
-	*/
 #endif
 
 	return capabilities;

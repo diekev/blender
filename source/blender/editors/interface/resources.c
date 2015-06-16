@@ -834,8 +834,9 @@ static void ui_theme_space_init_handles_color(ThemeSpace *theme_space)
 	rgba_char_args_set(theme_space->act_spline, 0xdb, 0x25, 0x12, 255);
 }
 
-/* initialize default theme
- * Note: when you add new colors, created & saved themes need initialized
+/**
+ * initialize default theme
+ * \note: when you add new colors, created & saved themes need initialized
  * use function below, init_userdef_do_versions()
  */
 void ui_theme_init_default(void)
@@ -1625,8 +1626,8 @@ void init_userdef_do_versions(void)
 		U.tw_size = 25;          /* percentage of window size */
 		U.tw_handlesize = 16;    /* percentage of widget radius */
 	}
-	if (U.pad_rot_angle == 0)
-		U.pad_rot_angle = 15;
+	if (U.pad_rot_angle == 0.0f)
+		U.pad_rot_angle = 15.0f;
 	
 	/* graph editor - unselected F-Curve visibility */
 	if (U.fcu_inactive_alpha == 0) {
@@ -2633,7 +2634,14 @@ void init_userdef_do_versions(void)
 		}
 	}
 
-	if (U.versionfile < 274 || (U.versionfile == 274 && U.subversionfile < 6)) {
+	if (U.versionfile < 275 || (U.versionfile == 275 && U.subversionfile < 1)) {
+		bTheme *btheme;
+		for (btheme = U.themes.first; btheme; btheme = btheme->next) {
+			copy_v4_v4_char(btheme->tclip.metadatatext, btheme->tseq.text_hi);
+		}
+	}
+
+	if (U.versionfile < 275 || (U.versionfile == 275 && U.subversionfile < 1)) {
 		bTheme *btheme;
 		for (btheme = U.themes.first; btheme; btheme = btheme->next) {
 			btheme->tima.show_boundary_layer = TH_IMAGE_LAYER_BOUNDARY;
@@ -2641,7 +2649,7 @@ void init_userdef_do_versions(void)
 			rgba_char_args_set_fl(btheme->tima.col2_boundary_layer, 1.0, 0.0, 1.0, 1.0);
 		}
 	}
-		
+
 	if (U.pixelsize == 0.0f)
 		U.pixelsize = 1.0f;
 	

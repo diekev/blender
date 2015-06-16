@@ -111,6 +111,7 @@
 
 #include "BLF_translation.h"
 
+#include "BKE_action.h"
 #include "BKE_armature.h"
 #include "BKE_brush.h"
 #include "BKE_cloth.h"
@@ -1536,6 +1537,7 @@ void blo_make_packed_pointer_map(FileData *fd, Main *oldmain)
 	
 	for (ima = oldmain->image.first; ima; ima = ima->id.next) {
 		ImagePackedFile *imapf;
+
 		if (ima->packedfile)
 			insert_packedmap(fd, ima->packedfile);
 
@@ -1577,6 +1579,7 @@ void blo_end_packed_pointer_map(FileData *fd, Main *oldmain)
 	
 	for (ima = oldmain->image.first; ima; ima = ima->id.next) {
 		ImagePackedFile *imapf;
+
 		ima->packedfile = newpackedadr(fd, ima->packedfile);
 
 		for (imapf = ima->packedfiles.first; imapf; imapf = imapf->next)
@@ -1994,7 +1997,7 @@ static void direct_link_script(FileData *UNUSED(fd), Script *script)
 static PackedFile *direct_link_packedfile(FileData *fd, PackedFile *oldpf)
 {
 	PackedFile *pf = newpackedadr(fd, oldpf);
-	
+
 	if (pf) {
 		pf->data = newpackedadr(fd, pf->data);
 	}
@@ -3010,7 +3013,7 @@ static void lib_link_pose(FileData *fd, Main *bmain, Object *ob, bPose *pose)
 	
 	if (rebuild) {
 		DAG_id_tag_update_ex(bmain, &ob->id, OB_RECALC_OB | OB_RECALC_DATA | OB_RECALC_TIME);
-		pose->flag |= POSE_RECALC;
+		BKE_pose_tag_recalc(bmain, pose);
 	}
 }
 
@@ -3438,11 +3441,20 @@ static void direct_link_image(FileData *fd, Image *ima)
 	link_list(fd, &(ima->views));
 	link_list(fd, &(ima->packedfiles));
 
-	for (imapf = ima->packedfiles.first; imapf; imapf = imapf->next) {
-		imapf->packedfile = direct_link_packedfile(fd, imapf->packedfile);
+	if (ima->packedfiles.first) {
+		for (imapf = ima->packedfiles.first; imapf; imapf = imapf->next) {
+			imapf->packedfile = direct_link_packedfile(fd, imapf->packedfile);
+		}
+		ima->packedfile = NULL;
+	}
+	else {
+		ima->packedfile = direct_link_packedfile(fd, ima->packedfile);
 	}
 
 	ima->anims.first = ima->anims.last = NULL;
+	ima->preview = direct_link_preview_image(fd, ima->preview);
+	ima->stereo3d_format = newdataadr(fd, ima->stereo3d_format);
+	ima->ok = 1;
 	ima->packedfile = direct_link_packedfile(fd, ima->packedfile);
 	//ima->colorspace_settings = newdataadr(fd, &ima->colorspace_settings);
 	link_list(fd, &ima->imlayers);
@@ -3457,10 +3469,6 @@ static void direct_link_image(FileData *fd, Image *ima)
 			ibuf->rect = newdataadr(fd, ibuf->rect);
 		}
 	}
-
-	ima->preview = direct_link_preview_image(fd, ima->preview);
-	ima->stereo3d_format = newdataadr(fd, ima->stereo3d_format);
-	ima->ok = 1;
 }
 
 
@@ -5582,6 +5590,7 @@ static void direct_link_scene(FileData *fd, Scene *sce)
 	SceneRenderLayer *srl;
 	
 	sce->theDag = NULL;
+	sce->depsgraph = NULL;
 	sce->obedit = NULL;
 	sce->stats = NULL;
 	sce->fps_info = NULL;

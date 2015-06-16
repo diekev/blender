@@ -689,7 +689,13 @@ typedef struct RenderData {
 	struct BakeData bake;
 
 	int preview_start_resolution;
-	int pad;
+
+	/* Type of the debug pass to use.
+	 * Only used when built with debug passes support.
+	 */
+	short debug_pass_type;
+
+	short pad;
 
 	/* MultiView */
 	ListBase views;
@@ -1394,13 +1400,15 @@ typedef struct Scene {
 	ListBase transform_spaces;
 	
 	void *sound_scene;
-	void *sound_scene_handle;
+	void *playback_handle;
 	void *sound_scrub_handle;
 	void *speaker_handles;
 	
 	void *fps_info;					/* (runtime) info/cache used for presenting playback framerate info to the user */
 	
 	/* none of the dependency graph  vars is mean to be saved */
+	struct Depsgraph *depsgraph;
+	void *pad1;
 	struct  DagForest *theDag;
 	short dagflags;
 	short recalc;				/* recalc = counterpart of ob->recalc */
