@@ -624,10 +624,8 @@ void IMB_desaturate(ImBuf *in, int type)
 				if (type == 1) { /* Lightness */
 					unsigned char lightness;
 
-					ch_max = MAX2(pixel[0], pixel[1]);
-					ch_max = MAX2(ch_max, pixel[3]);
-					ch_min = MIN2(pixel[0], pixel[1]);
-					ch_min = MIN2(ch_min, pixel[3]);
+					ch_max = MAX3(pixel[0], pixel[1], pixel[3]);
+					ch_min = MIN3(pixel[0], pixel[1], pixel[3]);
 
 					lightness = (ch_max + ch_min) / 2;
 
@@ -687,16 +685,16 @@ void IMB_posterize(ImBuf *in, int levels)
 			if (in->rect) {
 				unsigned char *pixel = (unsigned char *)in->rect + pixel_index;
 
-				pixel[0] = FTOCHAR(round((float)pixel[0] / 255.0f * levels) / levels);
-				pixel[1] = FTOCHAR(round((float)pixel[1] / 255.0f * levels) / levels);
-				pixel[2] = FTOCHAR(round((float)pixel[2] / 255.0f * levels) / levels);
+				pixel[0] = FTOCHAR(roundf((float)pixel[0] / 255.0f * levels) / levels);
+				pixel[1] = FTOCHAR(roundf((float)pixel[1] / 255.0f * levels) / levels);
+				pixel[2] = FTOCHAR(roundf((float)pixel[2] / 255.0f * levels) / levels);
 			}
 			else if (in->rect_float) {
 				float *pixel = in->rect_float + pixel_index;
 
-				pixel[0] = round(pixel[0] * levels) / levels;
-				pixel[1] = round(pixel[1] * levels) / levels;
-				pixel[2] = round(pixel[2] * levels) / levels;
+				pixel[0] = roundf(pixel[0] * levels) / levels;
+				pixel[1] = roundf(pixel[1] * levels) / levels;
+				pixel[2] = roundf(pixel[2] * levels) / levels;
 			}
 		}
 	}
@@ -725,9 +723,8 @@ void IMB_threshold(ImBuf *in, int low, int high)
 			else if (in->rect_float) {
 				float *pixel = in->rect_float + pixel_index;
 
-				value = MAX2(pixel[0], pixel[1]);
-				value = MAX2(value, pixel[2]);
-				value = (FTOCHAR(value) >= low && FTOCHAR(value) <= high ) ? 1.0f : 0.0f;
+				value = max_fff(pixel[0], pixel[1], pixel[2]);
+				value = (value >= low && value <= high ) ? 1.0f : 0.0f;
 
 				copy_v3_fl(pixel, value);
 			}
