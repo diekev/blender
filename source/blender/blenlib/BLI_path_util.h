@@ -132,6 +132,8 @@ bool BLI_parent_dir(char *path) ATTR_NONNULL();
 bool BLI_path_abs(char *path, const char *basepath)  ATTR_NONNULL();
 bool BLI_path_frame(char *path, int frame, int digits) ATTR_NONNULL();
 bool BLI_path_frame_range(char *path, int sta, int end, int digits) ATTR_NONNULL();
+bool BLI_path_frame_get(char *path, int *r_frame, int *numdigits) ATTR_NONNULL();
+void BLI_path_frame_strip(char *path, bool setsharp, char *ext) ATTR_NONNULL();
 bool BLI_path_frame_check_chars(const char *path) ATTR_NONNULL();
 bool BLI_path_cwd(char *path) ATTR_NONNULL();
 void BLI_path_rel(char *file, const char *relfile) ATTR_NONNULL();
@@ -154,8 +156,6 @@ bool BLI_path_suffix(char *string, size_t maxlen, const char *suffix, const char
 #  define BLI_path_cmp strcmp
 #  define BLI_path_ncmp strncmp
 #endif
-
-void BLI_char_switch(char *string, char from, char to) ATTR_NONNULL();
 
 #ifdef WITH_ICONV
 void BLI_string_to_utf8(char *original, char *utf_8, const char *code);

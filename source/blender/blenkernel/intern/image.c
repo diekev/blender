@@ -1400,7 +1400,7 @@ char BKE_imtype_valid_depths(const char imtype)
 		case R_IMF_IMTYPE_OPENEXR:
 			return R_IMF_CHAN_DEPTH_16 | R_IMF_CHAN_DEPTH_32;
 		case R_IMF_IMTYPE_MULTILAYER:
-			return R_IMF_CHAN_DEPTH_32;
+			return R_IMF_CHAN_DEPTH_16 | R_IMF_CHAN_DEPTH_32;
 		/* eeh, cineon does some strange 10bits per channel */
 		case R_IMF_IMTYPE_DPX:
 			return R_IMF_CHAN_DEPTH_8 | R_IMF_CHAN_DEPTH_10 | R_IMF_CHAN_DEPTH_12 | R_IMF_CHAN_DEPTH_16;
@@ -1839,7 +1839,7 @@ static void stampdata(Scene *scene, Object *camera, StampData *stamp_data, int d
 		RenderStats *stats = re ? RE_GetStats(re) : NULL;
 
 		if (stats && (scene->r.stamp & R_STAMP_RENDERTIME)) {
-			BLI_timestr(stats->lastframetime, text, sizeof(text));
+			BLI_timecode_string_from_time_simple(text, sizeof(text), stats->lastframetime);
 
 			BLI_snprintf(stamp_data->rendertime, sizeof(stamp_data->rendertime), do_prefix ? "RenderTime %s" : "%s", text);
 		}
@@ -2079,41 +2079,43 @@ void BKE_render_result_stamp_info(Scene *scene, Object *camera, struct RenderRes
 	}
 }
 
+void BKE_stamp_info_callback(void *data, const struct StampData *stamp_data, StampCallback callback)
+{
+	if (!callback || !stamp_data) {
+		return;
+	}
+
+#define CALL(member, value_str) \
+	if (stamp_data->member[0]) { \
+		callback(data, value_str, stamp_data->member); \
+	} ((void)0)
+
+	CALL(file, "File");
+	CALL(note, "Note");
+	CALL(date, "Date");
+	CALL(marker, "Marker");
+	CALL(time, "Time");
+	CALL(frame, "Frame");
+	CALL(camera, "Camera");
+	CALL(cameralens, "Lens");
+	CALL(scene, "Scene");
+	CALL(strip, "Strip");
+	CALL(rendertime, "RenderTime");
+
+#undef CALL
+}
+
+/* wrap for callback only */
+static void metadata_change_field(void *data, const char *propname, const char *propvalue)
+{
+	IMB_metadata_change_field(data, propname, propvalue);
+}
 
 void BKE_imbuf_stamp_info(RenderResult *rr, struct ImBuf *ibuf)
 {
 	struct StampData *stamp_data = rr->stamp_data;
 
-	if (!ibuf || !stamp_data) return;
-
-	if (stamp_data->file[0]) IMB_metadata_change_field(ibuf, "File",        stamp_data->file);
-	if (stamp_data->note[0]) IMB_metadata_change_field(ibuf, "Note",        stamp_data->note);
-	if (stamp_data->date[0]) IMB_metadata_change_field(ibuf, "Date",        stamp_data->date);
-	if (stamp_data->marker[0]) IMB_metadata_change_field(ibuf, "Marker",    stamp_data->marker);
-	if (stamp_data->time[0]) IMB_metadata_change_field(ibuf, "Time",        stamp_data->time);
-	if (stamp_data->frame[0]) IMB_metadata_change_field(ibuf, "Frame",      stamp_data->frame);
-	if (stamp_data->camera[0]) IMB_metadata_change_field(ibuf, "Camera",    stamp_data->camera);
-	if (stamp_data->cameralens[0]) IMB_metadata_change_field(ibuf, "Lens",  stamp_data->cameralens);
-	if (stamp_data->scene[0]) IMB_metadata_change_field(ibuf, "Scene",      stamp_data->scene);
-	if (stamp_data->strip[0]) IMB_metadata_change_field(ibuf, "Strip",      stamp_data->strip);
-	if (stamp_data->rendertime[0]) IMB_metadata_change_field(ibuf, "RenderTime", stamp_data->rendertime);
-}
-
-void BKE_stamp_info_callback(void *data, const struct StampData *stamp_data, StampCallback callback)
-{
-	if (!callback || !stamp_data) return;
-
-	if (stamp_data->file[0])       callback(data, "File",       stamp_data->file);
-	if (stamp_data->note[0])       callback(data, "Note",       stamp_data->note);
-	if (stamp_data->date[0])       callback(data, "Date",       stamp_data->date);
-	if (stamp_data->marker[0])     callback(data, "Marker",     stamp_data->marker);
-	if (stamp_data->time[0])       callback(data, "Time",       stamp_data->time);
-	if (stamp_data->frame[0])      callback(data, "Frame",      stamp_data->frame);
-	if (stamp_data->camera[0])     callback(data, "Camera",     stamp_data->camera);
-	if (stamp_data->cameralens[0]) callback(data, "Lens",       stamp_data->cameralens);
-	if (stamp_data->scene[0])      callback(data, "Scene",      stamp_data->scene);
-	if (stamp_data->strip[0])      callback(data, "Strip",      stamp_data->strip);
-	if (stamp_data->rendertime[0]) callback(data, "RenderTime", stamp_data->rendertime);
+	BKE_stamp_info_callback(ibuf, stamp_data, metadata_change_field);
 }
 
 
@@ -3394,9 +3396,11 @@ static ImBuf *load_image_single(
 		flag |= imbuf_alpha_flags_for_image(ima);
 
 		imapf = BLI_findlink(&ima->packedfiles, view_id);
-		ibuf = IMB_ibImageFromMemory(
-		       (unsigned char *)imapf->packedfile->data, imapf->packedfile->size, flag,
-		       ima->colorspace_settings.name, "<packed data>");
+		if (imapf->packedfile) {
+			ibuf = IMB_ibImageFromMemory(
+			       (unsigned char *)imapf->packedfile->data, imapf->packedfile->size, flag,
+			       ima->colorspace_settings.name, "<packed data>");
+		}
 	}
 	else {
 		ImageUser iuser_t;
@@ -3437,7 +3441,9 @@ static ImBuf *load_image_single(
 				ibuf = NULL;
 			}
 		}
-		else {
+		else
+#endif
+		{
 			image_initialize_after_load(ima, ibuf);
 			*r_assign = true;
 
@@ -3453,10 +3459,6 @@ static ImBuf *load_image_single(
 				imapf->packedfile = newPackedFile(NULL, filepath, ID_BLEND_PATH(G.main, &ima->id));
 			}
 		}
-#else
-		image_initialize_after_load(ima, ibuf);
-		*r_assign = true;
-#endif
 	}
 	else {
 		ima->ok = 0;
@@ -3499,16 +3501,20 @@ static ImBuf *image_load_image_file(Image *ima, ImageUser *iuser, int cfra)
 		const size_t totviews = BLI_listbase_count(&ima->views);
 		BLI_assert(totviews > 0);
 
-		ibuf_arr = MEM_mallocN(sizeof(ImBuf *) * totviews, "Image Views Imbufs");
+		ibuf_arr = MEM_callocN(sizeof(ImBuf *) * totviews, "Image Views Imbufs");
 
 		for (i = 0; i < totfiles; i++)
 			ibuf_arr[i] = load_image_single(ima, iuser, cfra, i, has_packed, &assign);
 
-		if ((ima->flag & IMA_IS_STEREO) && ima->views_format == R_IMF_VIEWS_STEREO_3D)
+		/* multi-views/multi-layers OpenEXR files directly populate ima, and return NULL ibuf... */
+		if ((ima->flag & IMA_IS_STEREO) && ima->views_format == R_IMF_VIEWS_STEREO_3D &&
+		    ibuf_arr[0] && totfiles == 1 && totviews >= 2)
+		{
 			IMB_ImBufFromStereo3d(ima->stereo3d_format, ibuf_arr[0], &ibuf_arr[0], &ibuf_arr[1]);
+		}
 
 		/* return the original requested ImBuf */
-		i = iuser && iuser->multi_index < totviews ? iuser->multi_index : 0;
+		i = (iuser && iuser->multi_index < totviews) ? iuser->multi_index : 0;
 		ibuf = ibuf_arr[i];
 
 		if (assign) {
@@ -4589,7 +4595,7 @@ static void image_update_views_format(Image *ima, ImageUser *iuser)
 		/* R_IMF_VIEWS_INDIVIDUAL */
 		char prefix[FILE_MAX] = {'\0'};
 		char *name = ima->name;
-		char *ext = NULL;
+		const char *ext = NULL;
 
 		BKE_scene_multiview_view_prefix_get(scene, name, prefix, &ext);
 
