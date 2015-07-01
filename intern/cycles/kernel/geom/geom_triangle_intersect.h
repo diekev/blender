@@ -57,15 +57,17 @@ ccl_device_noinline
 ccl_device_inline
 #    endif  /* __CUDA_ARCH__ > 500 */
 #  else  /* (defined(i386) || defined(_M_IX86)) */
-#    if defined(__KERNEL_EXPERIMENTAL__) && (__CUDA_ARCH__ == 500)
+#    if defined(__KERNEL_EXPERIMENTAL__) && (__CUDA_ARCH__ >= 500)
 ccl_device_noinline
 #    else
 ccl_device_inline
 #    endif
 #  endif  /* (defined(i386) || defined(_M_IX86)) */
-#else  /* defined(__KERNEL_CUDA__) */
+#elif defined(__KERNEL_OPENCL_APPLE__)
+ccl_device_noinline
+#else  /* defined(__KERNEL_OPENCL_APPLE__) */
 ccl_device_inline
-#endif  /* defined(__KERNEL_CUDA__) */
+#endif  /* defined(__KERNEL_OPENCL_APPLE__) */
 void triangle_intersect_precalc(float3 dir,
                                 IsectPrecalc *isect_precalc)
 {
