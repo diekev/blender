@@ -75,6 +75,7 @@ void smokeModifier_retime_fluid(struct SmokeModifierData *smd,
 void smokeModifier_OpenVDB_import(struct SmokeModifierData *smd, struct Scene *scene, struct Object *ob, struct OpenVDBCache *cache);
 
 struct OpenVDBCache *BKE_openvdb_get_current_cache(struct SmokeDomainSettings *sds);
+struct OpenVDBCache *BKE_openvdb_duplicate_cache(struct OpenVDBCache *cache);
 void BKE_openvdb_cache_filename(char *r_filename, const char *path, const char *fname, const char *relbase, int frame);
 struct OpenVDBDrawData *BKE_openvdb_draw_data_create(void);
 

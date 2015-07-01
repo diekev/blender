@@ -3520,17 +3520,17 @@ void smokeModifier_retime_fluid(SmokeModifierData *smd, Scene *scene, Object *ob
 	for (fr = startframe; fr < endframe; fr++) {
 		if (time_step_tmp % 100 == 0) {
 			/* This retimed frame corresponds to an "existing" frame, so just copy it */
-			cache_filename(file_cur, cache->path, cache->name, relbase, fr);
-			cache_filename(file_retime, retime_cache->path, retime_cache->name, relbase, retime_fr++);
+			BKE_openvdb_cache_filename(file_cur, cache->path, cache->name, relbase, fr);
+			BKE_openvdb_cache_filename(file_retime, retime_cache->path, retime_cache->name, relbase, retime_fr++);
 
 			OpenVDB_copy_file(file_cur, file_retime);
 
 			time_step_tmp += time_step;
 		}
 
-		cache_filename(file_cur, cache->path, cache->name, relbase, fr);
-		cache_filename(file_next, cache->path, cache->name, relbase, fr + 1);
-		cache_filename(file_retime, retime_cache->path, retime_cache->name, relbase, retime_fr++);
+		BKE_openvdb_cache_filename(file_cur, cache->path, cache->name, relbase, fr);
+		BKE_openvdb_cache_filename(file_next, cache->path, cache->name, relbase, fr + 1);
+		BKE_openvdb_cache_filename(file_retime, retime_cache->path, retime_cache->name, relbase, retime_fr++);
 
 		FluidRetimer_set_time_scale(fluid_retimer, (time_step_tmp % 100) * 0.01f);
 		FluidRetimer_process(fluid_retimer, file_cur, file_next, file_retime);
@@ -3616,4 +3616,24 @@ OpenVDBDrawData *BKE_openvdb_draw_data_create(void)
 	data->flags |= DRAW_VOXELS;
 
 	return data;
+}
+
+OpenVDBCache *BKE_openvdb_duplicate_cache(OpenVDBCache *cache)
+{
+	OpenVDBCache *dup_cache = NULL;
+
+	dup_cache = MEM_callocN(sizeof(OpenVDBCache), "OpenVDBCache");
+	dup_cache->reader = NULL;
+	dup_cache->writer = NULL;
+	dup_cache->startframe = cache->startframe;
+	dup_cache->endframe = cache->endframe;
+	dup_cache->compression = cache->compression;
+	dup_cache->shutter_speed = cache->shutter_speed;
+	dup_cache->num_steps = cache->num_steps;
+	dup_cache->time_scale = cache->time_scale;
+
+	BLI_strncpy(dup_cache->name, cache->name, sizeof(dup_cache->name));
+	BLI_strncpy(dup_cache->path, cache->path, sizeof(dup_cache->path));
+
+	return dup_cache;
 }

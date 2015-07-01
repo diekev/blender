@@ -2564,26 +2564,6 @@ static OpenVDBCache *openvdb_cache_new(void)
 	return cache;
 }
 
-OpenVDBCache *BKE_openvdb_duplicate_cache(OpenVDBCache *cache)
-{
-	OpenVDBCache *dup_cache = NULL;
-
-	dup_cache = MEM_callocN(sizeof(OpenVDBCache), "OpenVDBCache");
-	dup_cache->reader = NULL;
-	dup_cache->writer = NULL;
-	dup_cache->startframe = cache->startframe;
-	dup_cache->endframe = cache->endframe;
-	dup_cache->compression = cache->compression;
-	dup_cache->shutter_speed = cache->shutter_speed;
-	dup_cache->num_steps = cache->num_steps;
-	dup_cache->time_scale = cache->time_scale;
-
-	BLI_strncpy(dup_cache->name, cache->name, sizeof(dup_cache->name));
-	BLI_strncpy(dup_cache->path, cache->path, sizeof(dup_cache->path));
-
-	return dup_cache;
-}
-
 static int openvdb_cache_add_exec(bContext *C, wmOperator *op)
 {
 	Object *ob = CTX_data_active_object(C);
