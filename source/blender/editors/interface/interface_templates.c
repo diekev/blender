@@ -187,10 +187,10 @@ static uiBlock *id_search_menu(bContext *C, ARegion *ar, void *arg_litem)
 	/* preview thumbnails */
 	if (template.prv_rows > 0 && template.prv_cols > 0) {
 		int w = 4 * U.widget_unit * template.prv_cols;
-		int h = 4 * U.widget_unit * template.prv_rows + U.widget_unit;
+		int h = 5 * U.widget_unit * template.prv_rows;
 		
 		/* fake button, it holds space for search items */
-		uiDefBut(block, UI_BTYPE_LABEL, 0, "", 10, 15, w, h, NULL, 0, 0, 0, 0, NULL);
+		uiDefBut(block, UI_BTYPE_LABEL, 0, "", 10, 26, w, h, NULL, 0, 0, 0, 0, NULL);
 		
 		but = uiDefSearchBut(block, search, 0, ICON_VIEWZOOM, sizeof(search), 10, 0, w, UI_UNIT_Y,
 		                     template.prv_rows, template.prv_cols, "");
@@ -370,35 +370,7 @@ static const char *template_id_browse_tip(StructRNA *type)
 static const char *template_id_context(StructRNA *type)
 {
 	if (type) {
-		switch (RNA_type_to_ID_code(type)) {
-			case ID_SCE: return BLF_I18NCONTEXT_ID_SCENE;
-			case ID_OB:  return BLF_I18NCONTEXT_ID_OBJECT;
-			case ID_ME:  return BLF_I18NCONTEXT_ID_MESH;
-			case ID_CU:  return BLF_I18NCONTEXT_ID_CURVE;
-			case ID_MB:  return BLF_I18NCONTEXT_ID_METABALL;
-			case ID_MA:  return BLF_I18NCONTEXT_ID_MATERIAL;
-			case ID_TE:  return BLF_I18NCONTEXT_ID_TEXTURE;
-			case ID_IM:  return BLF_I18NCONTEXT_ID_IMAGE;
-			case ID_LS:  return BLF_I18NCONTEXT_ID_FREESTYLELINESTYLE;
-			case ID_LT:  return BLF_I18NCONTEXT_ID_LATTICE;
-			case ID_LA:  return BLF_I18NCONTEXT_ID_LAMP;
-			case ID_CA:  return BLF_I18NCONTEXT_ID_CAMERA;
-			case ID_WO:  return BLF_I18NCONTEXT_ID_WORLD;
-			case ID_SCR: return BLF_I18NCONTEXT_ID_SCREEN;
-			case ID_TXT: return BLF_I18NCONTEXT_ID_TEXT;
-			case ID_SPK: return BLF_I18NCONTEXT_ID_SPEAKER;
-			case ID_SO:  return BLF_I18NCONTEXT_ID_SOUND;
-			case ID_AR:  return BLF_I18NCONTEXT_ID_ARMATURE;
-			case ID_AC:  return BLF_I18NCONTEXT_ID_ACTION;
-			case ID_NT:  return BLF_I18NCONTEXT_ID_NODETREE;
-			case ID_BR:  return BLF_I18NCONTEXT_ID_BRUSH;
-			case ID_PA:  return BLF_I18NCONTEXT_ID_PARTICLESETTINGS;
-			case ID_GD:  return BLF_I18NCONTEXT_ID_GPENCIL;
-			case ID_MC:  return BLF_I18NCONTEXT_ID_MOVIECLIP;
-			case ID_MSK: return BLF_I18NCONTEXT_ID_MASK;
-			case ID_PAL: return BLF_I18NCONTEXT_ID_PALETTE;
-			case ID_PC:  return BLF_I18NCONTEXT_ID_PAINTCURVE;
-		}
+		return BKE_idcode_to_translation_context(RNA_type_to_ID_code(type));
 	}
 	return BLF_I18NCONTEXT_DEFAULT;
 }
@@ -1668,7 +1640,7 @@ static uiBlock *ui_icon_view_menu_cb(bContext *C, ARegion *ar, void *arg_litem)
 		int x, y;
 		/* XXX hardcoded size to 5 units */
 		const int w = UI_UNIT_X * 5;
-		const int h = args.show_labels ? (int)(6.25f * UI_UNIT_Y) : UI_UNIT_Y * 5;
+		const int h = args.show_labels ? 6 * UI_UNIT_Y : UI_UNIT_Y * 5;
 
 		x = (a % 8) * w;
 		y = (a / 8) * h;

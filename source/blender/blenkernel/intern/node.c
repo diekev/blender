@@ -62,6 +62,7 @@
 #include "BKE_node.h"
 
 #include "BLI_ghash.h"
+#include "BLI_threads.h"
 #include "RNA_access.h"
 #include "RNA_define.h"
 
@@ -287,6 +288,7 @@ void ntreeSetTypes(const struct bContext *C, bNodeTree *ntree)
 static GHash *nodetreetypes_hash = NULL;
 static GHash *nodetypes_hash = NULL;
 static GHash *nodesockettypes_hash = NULL;
+static SpinLock spin;
 
 bNodeTreeType *ntreeTypeFind(const char *idname)
 {
@@ -739,6 +741,92 @@ void nodeRemoveAllSockets(bNodeTree *ntree, bNode *node)
 	node->update |= NODE_UPDATE;
 }
 
+static bNodeSocket *node_socket_find_match(bNodeSocket *newsock, ListBase *oldsocklist)
+{
+	bNodeSocket *sock;
+	
+	for (sock = oldsocklist->first; sock; sock = sock->next)
+		if (STREQ(sock->name, newsock->name))
+			return sock;
+	return NULL;
+}
+
+static bNodeSocket *node_socket_relink(ListBase *newsocklist, bNodeSocket *oldsock, int oldindex, bool use_index_fallback)
+{
+	bNodeSocket *sock;
+	
+	/* first try to find matching socket name */
+	for (sock = newsocklist->first; sock; sock = sock->next)
+		if (STREQ(sock->name, oldsock->name))
+			return sock;
+	
+	if (use_index_fallback)
+		/* no matching name, simply link to same index */
+		return BLI_findlink(newsocklist, oldindex);
+	else
+		return NULL;
+}
+
+static void node_sync_sockets(bNodeTree *ntree, bNode *node, ListBase *socklist, CreateSocketsCB create_sockets_cb, SyncSocketCB sync_socket_cb, void *userdata)
+{
+	bNodeSocket *newsock, *oldsock, *oldsock_next;
+	ListBase oldsocklist;
+	int oldindex;
+	bNodeLink *link;
+	
+	/* store current nodes in oldsocklist, then clear socket list */
+	oldsocklist = *socklist;
+	BLI_listbase_clear(socklist);
+	
+	/* create new sockets for the node */
+	create_sockets_cb(userdata, ntree, node);
+	
+	/* copy settings from the old to the new socket, if necessary */
+	if (sync_socket_cb) {
+		for (newsock = socklist->first; newsock; newsock = newsock->next) {
+			oldsock = node_socket_find_match(newsock, &oldsocklist);
+			if (oldsock)
+				sync_socket_cb(userdata, node, newsock, oldsock);
+		}
+	}
+	
+	/* move links to new socket */
+	for (oldsock = oldsocklist.first, oldindex = 0; oldsock; oldsock = oldsock->next, ++oldindex) {
+		/* XXX falling back on index mapping does not appear to be very useful
+		 * for dynamically changing sockets, so it's disabled for now
+		 */
+		newsock = node_socket_relink(socklist, oldsock, oldindex, false);
+		if (newsock) {
+			for (link = ntree->links.first; link; link = link->next) {
+				if (link->fromsock == oldsock)
+					link->fromsock = newsock;
+			}
+		}
+	}
+	
+	/* delete old sockets
+	 * XXX oldsock is not actually in the socklist any more,
+	 * but the nodeRemoveSocket function works anyway. In future this
+	 * should become part of the core code, so can take care of this behavior.
+	 */
+	for (oldsock = oldsocklist.first; oldsock; oldsock = oldsock_next) {
+		oldsock_next = oldsock->next;
+		if (oldsock->storage)
+			MEM_freeN(oldsock->storage);
+		nodeRemoveSocket(ntree, node, oldsock);
+	}
+}
+
+void nodeSyncInputs(bNodeTree *ntree, bNode *node, CreateSocketsCB create_inputs_cb, SyncSocketCB sync_input_cb, void *userdata)
+{
+	node_sync_sockets(ntree, node, &node->inputs, create_inputs_cb, sync_input_cb, userdata);
+}
+
+void nodeSyncOutputs(bNodeTree *ntree, bNode *node, CreateSocketsCB create_outputs_cb, SyncSocketCB sync_output_cb, void *userdata)
+{
+	node_sync_sockets(ntree, node, &node->outputs, create_outputs_cb, sync_output_cb, userdata);
+}
+
 /* finds a node based on its name */
 bNode *nodeFindNodebyName(bNodeTree *ntree, const char *name)
 {
@@ -1109,7 +1197,7 @@ bNodeTree *ntreeAddTree(Main *bmain, const char *name, const char *idname)
  * copying for internal use (threads for eg), where you wont want it to modify the
  * scene data.
  */
-static bNodeTree *ntreeCopyTree_internal(bNodeTree *ntree, Main *bmain, bool do_id_user, bool do_make_extern, bool copy_previews)
+static bNodeTree *ntreeCopyTree_internal(bNodeTree *ntree, Main *bmain, bool skip_database, bool do_id_user, bool do_make_extern, bool copy_previews)
 {
 	bNodeTree *newtree;
 	bNode *node /*, *nnode */ /* UNUSED */, *last;
@@ -1119,7 +1207,7 @@ static bNodeTree *ntreeCopyTree_internal(bNodeTree *ntree, Main *bmain, bool do_
 	if (ntree == NULL) return NULL;
 	
 	/* is ntree part of library? */
-	if (bmain && BLI_findindex(&bmain->nodetree, ntree) >= 0) {
+	if (bmain && !skip_database && BLI_findindex(&bmain->nodetree, ntree) >= 0) {
 		newtree = BKE_libblock_copy(&ntree->id);
 	}
 	else {
@@ -1131,6 +1219,8 @@ static bNodeTree *ntreeCopyTree_internal(bNodeTree *ntree, Main *bmain, bool do_
 
 	/* in case a running nodetree is copied */
 	newtree->execdata = NULL;
+
+	newtree->duplilock = NULL;
 	
 	BLI_listbase_clear(&newtree->nodes);
 	BLI_listbase_clear(&newtree->links);
@@ -1211,7 +1301,7 @@ static bNodeTree *ntreeCopyTree_internal(bNodeTree *ntree, Main *bmain, bool do_
 
 bNodeTree *ntreeCopyTree_ex(bNodeTree *ntree, Main *bmain, const bool do_id_user)
 {
-	return ntreeCopyTree_internal(ntree, bmain, do_id_user, true, true);
+	return ntreeCopyTree_internal(ntree, bmain, false, do_id_user, true, true);
 }
 bNodeTree *ntreeCopyTree(bNodeTree *ntree)
 {
@@ -1775,6 +1865,9 @@ void ntreeFreeTree_ex(bNodeTree *ntree, const bool do_id_user)
 	if (ntree->previews) {
 		BKE_node_instance_hash_free(ntree->previews, (bNodeInstanceValueFP)BKE_node_preview_free);
 	}
+
+	if (ntree->duplilock)
+		BLI_mutex_free(ntree->duplilock);
 	
 	/* if ntree is not part of library, free the libblock data explicitly */
 	for (tntree = G.main->nodetree.first; tntree; tntree = tntree->id.next)
@@ -1962,56 +2055,67 @@ bNodeTree *ntreeLocalize(bNodeTree *ntree)
 	if (ntree) {
 		bNodeTree *ltree;
 		bNode *node;
-		
+		AnimData *adt;
+
 		bAction *action_backup = NULL, *tmpact_backup = NULL;
-		
+
+		BLI_spin_lock(&spin);
+		if (!ntree->duplilock) {
+			ntree->duplilock = BLI_mutex_alloc();
+		}
+		BLI_spin_unlock(&spin);
+
+		BLI_mutex_lock(ntree->duplilock);
+
 		/* Workaround for copying an action on each render!
 		 * set action to NULL so animdata actions don't get copied */
-		AnimData *adt = BKE_animdata_from_id(&ntree->id);
-	
+		adt = BKE_animdata_from_id(&ntree->id);
+
 		if (adt) {
 			action_backup = adt->action;
 			tmpact_backup = adt->tmpact;
-	
+
 			adt->action = NULL;
 			adt->tmpact = NULL;
 		}
-	
+
 		/* Make full copy.
 		 * Note: previews are not copied here.
 		 */
-		ltree = ntreeCopyTree_internal(ntree, NULL, false, false, false);
+		ltree = ntreeCopyTree_internal(ntree, G.main, true, false, false, false);
 		ltree->flag |= NTREE_IS_LOCALIZED;
-		
+
 		for (node = ltree->nodes.first; node; node = node->next) {
 			if (node->type == NODE_GROUP && node->id) {
 				node->id = (ID *)ntreeLocalize((bNodeTree *)node->id);
 			}
 		}
-		
+
 		if (adt) {
 			AnimData *ladt = BKE_animdata_from_id(&ltree->id);
-	
+
 			adt->action = ladt->action = action_backup;
 			adt->tmpact = ladt->tmpact = tmpact_backup;
-	
+
 			if (action_backup) action_backup->id.us++;
 			if (tmpact_backup) tmpact_backup->id.us++;
-			
+
 		}
 		/* end animdata uglyness */
-	
+
 		/* ensures only a single output node is enabled */
 		ntreeSetOutput(ntree);
-	
+
 		for (node = ntree->nodes.first; node; node = node->next) {
 			/* store new_node pointer to original */
 			node->new_node->new_node = node;
 		}
-	
+
 		if (ntree->typeinfo->localize)
 			ntree->typeinfo->localize(ltree, ntree);
-	
+
+		BLI_mutex_unlock(ntree->duplilock);
+
 		return ltree;
 	}
 	else
@@ -3631,6 +3735,7 @@ void init_nodesystem(void)
 	nodetreetypes_hash = BLI_ghash_str_new("nodetreetypes_hash gh");
 	nodetypes_hash = BLI_ghash_str_new("nodetypes_hash gh");
 	nodesockettypes_hash = BLI_ghash_str_new("nodesockettypes_hash gh");
+	BLI_spin_init(&spin);
 
 	register_undefined_types();
 

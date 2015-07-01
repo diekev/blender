@@ -57,6 +57,7 @@
 #  include <shlobj.h>
 #  include "BLI_winstuff.h"
 #  include "MEM_guardedalloc.h"
+#  include "BLI_alloca.h"
 #else
 #  include "unistd.h"
 #endif /* WIN32 */
@@ -622,8 +623,8 @@ void BLI_path_rel(char *file, const char *relfile)
 	BLI_strncpy(temp, relfile, FILE_MAX);
 #endif
 
-	BLI_char_switch(temp + BLI_path_unc_prefix_len(temp), '\\', '/');
-	BLI_char_switch(file + BLI_path_unc_prefix_len(file), '\\', '/');
+	BLI_str_replace_char(temp + BLI_path_unc_prefix_len(temp), '\\', '/');
+	BLI_str_replace_char(file + BLI_path_unc_prefix_len(file), '\\', '/');
 	
 	/* remove /./ which confuse the following slash counting... */
 	BLI_cleanup_path(NULL, file);
@@ -684,7 +685,7 @@ void BLI_path_rel(char *file, const char *relfile)
 		r += BLI_strcpy_rlen(r, q + 1);
 		
 #ifdef  WIN32
-		BLI_char_switch(res + 2, '/', '\\');
+		BLI_str_replace_char(res + 2, '/', '\\');
 #endif
 		strcpy(file, res);
 	}
@@ -858,6 +859,111 @@ bool BLI_path_frame_range(char *path, int sta, int end, int digits)
 }
 
 /**
+ * Get the frame from a filename formatted by blender's frame scheme
+ */
+bool BLI_path_frame_get(char *path, int *r_frame, int *r_numdigits)
+{
+	if (path && *path) {
+		char *file = (char *)BLI_last_slash(path);
+		char *c;
+		int len, numdigits;
+
+		numdigits = *r_numdigits = 0;
+
+		if (file == NULL)
+			file = path;
+
+		/* first get the extension part */
+		len = strlen(file);
+
+		c = file + len;
+
+		/* isolate extension */
+		while (--c != file) {
+			if (*c == '.') {
+				c--;
+				break;
+			}
+		}
+
+		/* find start of number */
+		while (c != (file - 1) && isdigit(*c)) {
+			c--;
+			numdigits++;
+		}
+
+		if (numdigits) {
+			char prevchar;
+
+			c++;
+			prevchar = c[numdigits];
+			c[numdigits] = 0;
+
+			/* was the number really an extension? */
+			*r_frame = atoi(c);
+			c[numdigits] = prevchar;
+
+			*r_numdigits = numdigits;
+
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void BLI_path_frame_strip(char *path, bool setsharp, char *ext)
+{
+	if (path && *path) {
+		char *file = (char *)BLI_last_slash(path);
+		char *c, *suffix;
+		int len;
+		int numdigits = 0;
+
+		if (file == NULL)
+			file = path;
+
+		/* first get the extension part */
+		len = strlen(file);
+
+		c = file + len;
+
+		/* isolate extension */
+		while (--c != file) {
+			if (*c == '.') {
+				c--;
+				break;
+			}
+		}
+
+		suffix = c + 1;
+
+		/* find start of number */
+		while (c != (file - 1) && isdigit(*c)) {
+			c--;
+			numdigits++;
+		}
+
+		c++;
+
+		if (numdigits) {
+			/* replace the number with the suffix and terminate the string */
+			while (numdigits--) {
+				if (ext) *ext++ = *suffix;
+
+				if (setsharp) *c++ = '#';
+				else *c++ = *suffix;
+
+				suffix++;
+			}
+			*c = 0;
+			if (ext) *ext = 0;
+		}
+	}
+}
+
+
+/**
  * Check if we have '#' chars, usable for #BLI_path_frame, #BLI_path_frame_range
  */
 bool BLI_path_frame_check_chars(const char *path)
@@ -926,7 +1032,7 @@ bool BLI_path_abs(char *path, const char *basepath)
 	 * For UNC paths the first characters containing the UNC prefix
 	 * shouldn't be switched as we need to distinguish them from
 	 * paths relative to the .blend file -elubie */
-	BLI_char_switch(tmp + BLI_path_unc_prefix_len(tmp), '\\', '/');
+	BLI_str_replace_char(tmp + BLI_path_unc_prefix_len(tmp), '\\', '/');
 
 	/* Paths starting with // will get the blend file as their base,
 	 * this isn't standard in any os but is used in blender all over the place */
@@ -937,7 +1043,7 @@ bool BLI_path_abs(char *path, const char *basepath)
 		/* file component is ignored, so don't bother with the trailing slash */
 		BLI_cleanup_path(NULL, base);
 		lslash = BLI_last_slash(base);
-		BLI_char_switch(base + BLI_path_unc_prefix_len(base), '\\', '/');
+		BLI_str_replace_char(base + BLI_path_unc_prefix_len(base), '\\', '/');
 
 		if (lslash) {
 			const int baselen = (int) (lslash - base) + 1;  /* length up to and including last "/" */
@@ -965,7 +1071,7 @@ bool BLI_path_abs(char *path, const char *basepath)
 	 * // will be retained, rest will be nice and
 	 * shiny win32 backward slashes :) -jesterKing
 	 */
-	BLI_char_switch(path + 2, '/', '\\');
+	BLI_str_replace_char(path + 2, '/', '\\');
 #endif
 
 	/* ensure this is after correcting for path switch */
@@ -1033,31 +1139,36 @@ bool BLI_path_program_extensions_add_win32(char *name, const size_t maxlen)
 
 	type = BLI_exists(name);
 	if ((type == 0) || S_ISDIR(type)) {
-		char filename[FILE_MAX];
-		char ext[FILE_MAX];
-		const char *extensions = getenv("PATHEXT");
-		if (extensions) {
-			const char *temp;
-			do {
-				strcpy(filename, name);
-				temp = strchr(extensions, ';');
-				if (temp) {
-					strncpy(ext, extensions, temp - extensions);
-					ext[temp - extensions] = 0;
-					extensions = temp + 1;
-					strcat(filename, ext);
-				}
-				else {
-					strcat(filename, extensions);
-				}
+		/* typically 3-5, ".EXE", ".BAT"... etc */
+		const int ext_max = 12;
+		const char *ext = getenv("PATHEXT");
+		if (ext) {
+			const int name_len = strlen(name);
+			char *filename = alloca(name_len + ext_max);
+			char *filename_ext;
+			const char *ext_next;
 
-				type = BLI_exists(filename);
-				if (type && (!S_ISDIR(type))) {
-					retval = true;
-					BLI_strncpy(name, filename, maxlen);
-					break;
+			/* null terminated in the loop */
+			memcpy(filename, name, name_len);
+			filename_ext = filename + name_len;
+
+			do {
+				int ext_len;
+				ext_next = strchr(ext, ';');
+				ext_len = ext_next ? ((ext_next++) - ext) : strlen(ext);
+
+				if (LIKELY(ext_len < ext_max)) {
+					memcpy(filename_ext, ext, ext_len);
+					filename_ext[ext_len] = '\0';
+
+					type = BLI_exists(filename);
+					if (type && (!S_ISDIR(type))) {
+						retval = true;
+						BLI_strncpy(name, filename, maxlen);
+						break;
+					}
 				}
-			} while (temp);
+			} while ((ext = ext_next));
 		}
 	}
 	else {
@@ -1193,22 +1304,6 @@ void BLI_setenv_if_new(const char *env, const char *val)
 }
 
 /**
- * Change every \a from in \a string into \a to. The
- * result will be in \a string
- *
- * \param string The string to work on
- * \param from The character to replace
- * \param to The character to replace with
- */
-void BLI_char_switch(char *string, char from, char to) 
-{
-	while (*string != 0) {
-		if (*string == from) *string = to;
-		string++;
-	}
-}
-
-/**
  * Strips off nonexistent (or non-accessible) subdirectories from the end of *dir, leaving the path of
  * the lowest-level directory that does exist and we can read.
  */
@@ -1271,9 +1366,9 @@ void BLI_make_file_string(const char *relabase, char *string, const char *dir, c
 	 * any mess with slashes later on. -jesterKing */
 	/* constant strings can be passed for those parameters - don't change them - elubie */
 #if 0
-	BLI_char_switch(relabase, '\\', '/');
-	BLI_char_switch(dir, '\\', '/');
-	BLI_char_switch(file, '\\', '/');
+	BLI_str_replace_char(relabase, '\\', '/');
+	BLI_str_replace_char(dir, '\\', '/');
+	BLI_str_replace_char(file, '\\', '/');
 #endif
 
 	/* Resolve relative references */
@@ -1800,10 +1895,10 @@ void BLI_path_native_slash(char *path)
 {
 #ifdef WIN32
 	if (path && BLI_strnlen(path, 3) > 2) {
-		BLI_char_switch(path + 2, '/', '\\');
+		BLI_str_replace_char(path + 2, '/', '\\');
 	}
 #else
-	BLI_char_switch(path + BLI_path_unc_prefix_len(path), '\\', '/');
+	BLI_str_replace_char(path + BLI_path_unc_prefix_len(path), '\\', '/');
 #endif
 }
 

@@ -26,9 +26,15 @@
 #include "fluid_retimer.h"
 #include "openvdb_capi.h"
 #include "openvdb_dense_convert.h"
+#include "openvdb_primitive.h"
+#include "openvdb_render.h"
 #include "openvdb_util.h"
 
 using namespace openvdb;
+
+struct OpenVDBFloatGrid { int unused; };
+struct OpenVDBIntGrid { int unused; };
+struct OpenVDBVectorGrid { int unused; };
 
 int OpenVDB_getVersionHex()
 {
@@ -48,26 +54,29 @@ void OpenVDB_copy_file(const char *from, const char *to)
 	file_from.close();
 }
 
-void OpenVDB_get_grid_names_and_types(const char *filename,
-                                      char **grid_names,
-                                      char **grid_types,
-                                      int *num_grids)
+
+void OpenVDB_get_grid_info(const char *filename, OpenVDBGridInfoCallback cb, void *userdata)
 {
 	int ret = OPENVDB_NO_ERROR;
 	initialize();
-
+	
 	try {
 		io::File file(filename);
 		file.open();
-
+		
 		GridPtrVecPtr grids = file.getGrids();
-
-		*num_grids = grids->size();
-
-		for (size_t i = 0; i < *num_grids; ++i) {
+		int grid_num = grids->size();
+		
+		for (size_t i = 0; i < grid_num; ++i) {
 			GridBase::ConstPtr grid = (*grids)[i];
-			grid_names[i] = strdup(grid->getName().c_str());
-			grid_types[i] = strdup(grid->valueType().c_str());
+			
+			std::string name = grid->getName();
+			std::string value_type = grid->valueType();
+			bool is_color = false;
+			if (grid->getMetadata< TypedMetadata<bool> >("is_color"))
+				is_color = grid->metaValue<bool>("is_color");
+			
+			cb(userdata, name.c_str(), value_type.c_str(), is_color);
 		}
 	}
 	catch (...) {
@@ -89,35 +98,45 @@ void OpenVDB_update_fluid_transform(const char *filename,
 	}
 }
 
-void OpenVDB_export_grid_fl(OpenVDBWriter *writer,
-                            const char *name, float *data,
-                            const int res[3], float matrix[4][4])
+OpenVDBFloatGrid *OpenVDB_export_grid_fl(OpenVDBWriter *writer,
+                                         const char *name, float *data,
+                                         const int res[3], float matrix[4][4],
+                                         OpenVDBFloatGrid *mask)
 {
-	internal::OpenVDB_export_grid<FloatGrid>(writer, name, data, res, matrix);
+	OpenVDBFloatGrid *grid =
+	        (OpenVDBFloatGrid *)internal::OpenVDB_export_grid<FloatGrid>(writer, name, data, res, matrix, (FloatGrid *)mask);
+	return grid;
 }
 
-void OpenVDB_export_grid_ch(OpenVDBWriter *writer,
-                            const char *name, unsigned char *data,
-                            const int res[3], float matrix[4][4])
+OpenVDBIntGrid *OpenVDB_export_grid_ch(OpenVDBWriter *writer,
+                                       const char *name, unsigned char *data,
+                                       const int res[3], float matrix[4][4],
+                                       OpenVDBFloatGrid *mask)
 {
-	internal::OpenVDB_export_grid<Int32Grid>(writer, name, data, res, matrix);
+	OpenVDBIntGrid *grid =
+	        (OpenVDBIntGrid *)internal::OpenVDB_export_grid<Int32Grid>(writer, name, data, res, matrix, (FloatGrid *)mask);
+	return grid;
 }
 
-void OpenVDB_export_grid_vec(struct OpenVDBWriter *writer,
-                             const char *name,
-                             const float *data_x, const float *data_y, const float *data_z,
-                             const int res[3], float matrix[4][4], short vec_type)
+OpenVDBVectorGrid *OpenVDB_export_grid_vec(struct OpenVDBWriter *writer,
+                                           const char *name,
+                                           const float *data_x, const float *data_y, const float *data_z,
+                                           const int res[3], float matrix[4][4], short vec_type,
+                                           const bool is_color, OpenVDBFloatGrid *mask)
 {
-	internal::OpenVDB_export_vector_grid(writer, name,
+	OpenVDBVectorGrid *grid =
+	(OpenVDBVectorGrid *)internal::OpenVDB_export_vector_grid(writer, name,
 	                                     data_x, data_y, data_z, res, matrix,
-	                                     static_cast<openvdb::VecType>(vec_type));
+	                                     static_cast<openvdb::VecType>(vec_type),
+	                                     is_color, (FloatGrid *)mask);
+	return grid;
 }
 
-void OpenVDB_import_grid_fl(OpenVDBReader *reader,
+OpenVDBPrimitive *OpenVDB_import_grid_fl(OpenVDBReader *reader,
                             const char *name, float **data,
                             const int res[3])
 {
-	internal::OpenVDB_import_grid<FloatGrid>(reader, name, data, res);
+	return internal::OpenVDB_import_grid<FloatGrid>(reader, name, data, res);
 }
 
 void OpenVDB_import_grid_ch(OpenVDBReader *reader,
@@ -146,7 +165,7 @@ void OpenVDBWriter_free(OpenVDBWriter *writer)
 	writer = NULL;
 }
 
-void OpenVDBWriter_set_compression(OpenVDBWriter *writer, const int flag)
+void OpenVDBWriter_set_flags(OpenVDBWriter *writer, const int flag, const bool half)
 {
 	int compression_flags = io::COMPRESS_ACTIVE_MASK;
 
@@ -160,7 +179,7 @@ void OpenVDBWriter_set_compression(OpenVDBWriter *writer, const int flag)
 		compression_flags = io::COMPRESS_NONE;
 	}
 
-	writer->setFileCompression(compression_flags);
+	writer->setFlags(compression_flags, half);
 }
 
 void OpenVDBWriter_add_meta_fl(OpenVDBWriter *writer, const char *name, const float value)
@@ -192,15 +211,21 @@ void OpenVDBWriter_write(OpenVDBWriter *writer, const char *filename)
 {
 	writer->write(filename);
 }
-OpenVDBReader *OpenVDBReader_create(const char *filename)
+
+OpenVDBReader *OpenVDBReader_create()
 {
-	return new OpenVDBReader(filename);
+	return new OpenVDBReader();
 }
 
 void OpenVDBReader_free(OpenVDBReader *reader)
 {
 	delete reader;
 	reader = NULL;
+}
+
+void OpenVDBReader_open(OpenVDBReader *reader, const char *filename)
+{
+	reader->open(filename);
 }
 
 void OpenVDBReader_get_meta_fl(OpenVDBReader *reader, const char *name, float *value)
@@ -252,4 +277,18 @@ void FluidRetimer_set_time_scale(FluidRetimer *retimer, const float dt)
 void FluidRetimer_process(FluidRetimer *retimer, const char *previous, const char *cur, const char *to)
 {
 	retimer->retime(previous, cur, to);
+}
+
+void OpenVDB_draw_primitive(OpenVDBPrimitive *vdb_prim,
+                            const bool draw_root,
+                            const bool draw_level_1,
+                            const bool draw_level_2,
+                            const bool draw_leaves)
+{
+    internal::OpenVDBPrimitive_draw_tree(vdb_prim, draw_root, draw_level_1, draw_level_2, draw_leaves);
+}
+
+void OpenVDB_draw_primitive_values(struct OpenVDBPrimitive *vdb_prim, float tolerance, float point_size, const bool draw_box, const int lod)
+{
+	internal::OpenVDBPrimitive_draw_values(vdb_prim, tolerance, point_size, draw_box, lod);
 }

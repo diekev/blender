@@ -1062,6 +1062,7 @@ static void ui_multibut_states_create(uiBut *but_active, uiHandleButtonData *dat
 	uiBut *but;
 
 	BLI_assert(data->multi_data.init == BUTTON_MULTI_INIT_SETUP);
+	BLI_assert(data->multi_data.has_mbuts);
 
 	data->multi_data.bs_mbuts = UI_butstore_create(but_active->block);
 
@@ -1483,16 +1484,18 @@ static void ui_selectcontext_apply(
 			bool  b;
 			int   i;
 			float f;
-		} delta;
+		} delta, min, max;
 
 		const bool is_array = RNA_property_array_check(prop);
 		const int rna_type = RNA_property_type(prop);
 
 		if (rna_type == PROP_FLOAT) {
 			delta.f = use_delta ? (value - value_orig) : value;
+			RNA_property_float_range(&but->rnapoin, prop, &min.f, &max.f);
 		}
 		else if (rna_type == PROP_INT) {
 			delta.i = use_delta ? ((int)value - (int)value_orig) : (int)value;
+			RNA_property_int_range(&but->rnapoin, prop, &min.i, &max.i);
 		}
 		else if (rna_type == PROP_ENUM) {
 			delta.i = RNA_property_enum_get(&but->rnapoin, prop);  /* not a delta infact */
@@ -1542,30 +1545,40 @@ static void ui_selectcontext_apply(
 		for (i = 0; i < selctx_data->elems_len; i++) {
 			uiSelectContextElem *other = &selctx_data->elems[i];
 			PointerRNA lptr = other->ptr;
-			if (is_array) {
-				if (rna_type == PROP_FLOAT) {
-					RNA_property_float_set_index(&lptr, lprop, index, use_delta ? (other->val_f + delta.f) : delta.f);
+
+			if (rna_type == PROP_FLOAT) {
+				float other_value = use_delta ? (other->val_f + delta.f) : delta.f;
+				CLAMP(other_value, min.f, max.f);
+				if (is_array) {
+					RNA_property_float_set_index(&lptr, lprop, index, other_value);
 				}
-				else if (rna_type == PROP_INT) {
-					RNA_property_int_set_index(&lptr, lprop, index, use_delta ? (other->val_i + delta.i) : delta.i);
-				}
-				else if (rna_type == PROP_BOOLEAN) {
-					RNA_property_boolean_set_index(&lptr, lprop, index, delta.b);
+				else {
+					RNA_property_float_set(&lptr, lprop, other_value);
 				}
 			}
-			else {
-				if (rna_type == PROP_FLOAT) {
-					RNA_property_float_set(&lptr, lprop, use_delta ? (other->val_f + delta.f) : delta.f);
+			else if (rna_type == PROP_INT) {
+				int other_value = use_delta ? (other->val_i + delta.i) : delta.i;
+				CLAMP(other_value, min.i, max.i);
+				if (is_array) {
+					RNA_property_int_set_index(&lptr, lprop, index, other_value);
 				}
-				else if (rna_type == PROP_INT) {
-					RNA_property_int_set(&lptr, lprop, use_delta ? (other->val_i + delta.i) : delta.i);
+				else {
+					RNA_property_int_set(&lptr, lprop, other_value);
 				}
-				else if (rna_type == PROP_BOOLEAN) {
+			}
+			else if (rna_type == PROP_BOOLEAN) {
+				const bool other_value = delta.b;
+				if (is_array) {
+					RNA_property_boolean_set_index(&lptr, lprop, index, other_value);
+				}
+				else {
 					RNA_property_boolean_set(&lptr, lprop, delta.b);
 				}
-				else if (rna_type == PROP_ENUM) {
-					RNA_property_enum_set(&lptr, lprop, delta.i);
-				}
+			}
+			else if (rna_type == PROP_ENUM) {
+				const int other_value = delta.i;
+				BLI_assert(!is_array);
+				RNA_property_enum_set(&lptr, lprop, other_value);
 			}
 
 			RNA_property_update(C, &lptr, prop);
@@ -1629,10 +1642,11 @@ static bool ui_but_drag_init(bContext *C, uiBut *but, uiHandleButtonData *data, 
 			ar_prev = CTX_wm_region(C);
 			CTX_wm_region_set(C, data->region);
 
-			WM_event_add_ui_handler(C, &data->window->modalhandlers,
-			                        ui_handler_region_drag_toggle,
-			                        ui_handler_region_drag_toggle_remove,
-			                        drag_info, false);
+			WM_event_add_ui_handler(
+			        C, &data->window->modalhandlers,
+			        ui_handler_region_drag_toggle,
+			        ui_handler_region_drag_toggle_remove,
+			        drag_info, WM_HANDLER_BLOCKING);
 
 			CTX_wm_region_set(C, ar_prev);
 		}
@@ -6531,7 +6545,7 @@ static bool ui_but_menu(bContext *C, uiBut *but)
 			}
 		}
 		
-		if (but->flag & UI_BUT_ANIMATED) {
+		if ((but->flag & UI_BUT_ANIMATED) && (but->rnapoin.type != &RNA_NlaStrip)) {
 			if (is_array_component) {
 				uiItemBooleanO(layout, CTX_IFACE_(BLF_I18NCONTEXT_OPERATOR_DEFAULT, "Clear Keyframes"),
 				               ICON_NONE, "ANIM_OT_keyframe_clear_button", "all", 1);
@@ -7031,8 +7045,13 @@ static int ui_do_button(bContext *C, uiBlock *block, uiBut *but, const wmEvent *
 					     /* just to be sure, check we're dragging more hoz then virt */
 					     abs(event->prevx - event->x) > abs(event->prevy - event->y)))
 					{
-						ui_multibut_states_create(but, data);
-						data->multi_data.init = BUTTON_MULTI_INIT_ENABLE;
+						if (data->multi_data.has_mbuts) {
+							ui_multibut_states_create(but, data);
+							data->multi_data.init = BUTTON_MULTI_INIT_ENABLE;
+						}
+						else {
+							data->multi_data.init = BUTTON_MULTI_INIT_DISABLE;
+						}
 					}
 				}
 
@@ -7519,7 +7538,7 @@ static void button_activate_state(bContext *C, uiBut *but, uiHandleButtonState s
 	if (!(but->block->handle && but->block->handle->popup)) {
 		if (button_modal_state(state)) {
 			if (!button_modal_state(data->state))
-				WM_event_add_ui_handler(C, &data->window->modalhandlers, ui_handler_region_menu, NULL, data, false);
+				WM_event_add_ui_handler(C, &data->window->modalhandlers, ui_handler_region_menu, NULL, data, 0);
 		}
 		else {
 			if (button_modal_state(data->state)) {
@@ -7908,7 +7927,7 @@ void UI_context_update_anim_flag(const bContext *C)
 
 /************** handle activating a button *************/
 
-static uiBut *uit_but_find_open_event(ARegion *ar, const wmEvent *event)
+static uiBut *ui_but_find_open_event(ARegion *ar, const wmEvent *event)
 {
 	uiBlock *block;
 	uiBut *but;
@@ -7939,7 +7958,7 @@ static int ui_handle_button_over(bContext *C, const wmEvent *event, ARegion *ar)
 		}
 	}
 	else if (event->type == EVT_BUT_OPEN) {
-		but = uit_but_find_open_event(ar, event);
+		but = ui_but_find_open_event(ar, event);
 		if (but) {
 			button_activate_init(C, ar, but, BUTTON_ACTIVATE_OVER);
 			ui_do_button(C, but->block, but, event);
@@ -9001,7 +9020,7 @@ static int ui_handle_menu_event(
 									ui_handle_button_activate(C, ar, but, BUTTON_ACTIVATE);
 								}
 								else {
-									printf("%s: error, but->menu_key type: %d\n", __func__, but->type);
+									printf("%s: error, but->menu_key type: %u\n", __func__, but->type);
 								}
 
 								break;
@@ -9835,12 +9854,12 @@ static void ui_popup_handler_remove(bContext *C, void *userdata)
 void UI_region_handlers_add(ListBase *handlers)
 {
 	WM_event_remove_ui_handler(handlers, ui_region_handler, ui_region_handler_remove, NULL, false);
-	WM_event_add_ui_handler(NULL, handlers, ui_region_handler, ui_region_handler_remove, NULL, false);
+	WM_event_add_ui_handler(NULL, handlers, ui_region_handler, ui_region_handler_remove, NULL, 0);
 }
 
-void UI_popup_handlers_add(bContext *C, ListBase *handlers, uiPopupBlockHandle *popup, const bool accept_dbl_click)
+void UI_popup_handlers_add(bContext *C, ListBase *handlers, uiPopupBlockHandle *popup, const char flag)
 {
-	WM_event_add_ui_handler(C, handlers, ui_popup_handler, ui_popup_handler_remove, popup, accept_dbl_click);
+	WM_event_add_ui_handler(C, handlers, ui_popup_handler, ui_popup_handler_remove, popup, flag);
 }
 
 void UI_popup_handlers_remove(ListBase *handlers, uiPopupBlockHandle *popup)

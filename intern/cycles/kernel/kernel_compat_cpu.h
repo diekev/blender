@@ -24,6 +24,7 @@
  */
 #if defined(__GNUC__) && defined(NDEBUG)
 #  pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#  pragma GCC diagnostic ignored "-Wuninitialized"
 #endif
 
 /* Selective nodes compilation. */
@@ -39,8 +40,8 @@
 #include "util_simd.h"
 #include "util_half.h"
 #include "util_types.h"
-#include "util_openvdb.h"
 #include "util_vector.h"
+#include "util_volume.h"
 
 #define ccl_addr_space
 

@@ -90,7 +90,10 @@
 /* #define USE_SMOKE_COLLISION_DM */
 
 #include "smoke_API.h"
-#include "openvdb_capi.h"
+
+#ifdef WITH_OPENVDB
+#  include "openvdb_capi.h"
+#endif
 
 #ifdef WITH_SMOKE
 
@@ -268,7 +271,7 @@ static void smoke_set_domain_from_derivedmesh(SmokeDomainSettings *sds, Object *
 	}
 	/* apply object scale */
 	for (i = 0; i < 3; i++) {
-		size[i] = fabs(size[i] * ob->size[i]);
+		size[i] = fabsf(size[i] * ob->size[i]);
 	}
 	copy_v3_v3(sds->global_size, size);
 	copy_v3_v3(sds->dp0, min);
@@ -348,6 +351,9 @@ static int smokeModifier_init(SmokeModifierData *smd, Object *ob, Scene *scene, 
 		if (!sds->shadow)
 			sds->shadow = MEM_callocN(sizeof(float) * sds->res[0] * sds->res[1] * sds->res[2], "SmokeDomainShadow");
 
+		sds->density = NULL;
+		sds->density_high = NULL;
+
 		return 1;
 	}
 	else if ((smd->type & MOD_SMOKE_TYPE_FLOW) && smd->flow)
@@ -402,9 +408,12 @@ static void smokeModifier_freeDomain(SmokeModifierData *smd)
 		while ((cache = BLI_pophead(&(smd->domain->vdb_caches)))) {
 #ifdef WITH_OPENVDB
 			OpenVDBWriter_free(cache->writer);
+			OpenVDBReader_free(cache->reader);
 #endif
 			MEM_freeN(cache);
 		}
+
+		MEM_freeN(smd->domain->vdb_draw_data);
 
 		MEM_freeN(smd->domain);
 		smd->domain = NULL;
@@ -576,6 +585,7 @@ void smokeModifier_createType(struct SmokeModifierData *smd)
 			smd->domain->effector_weights = BKE_add_effector_weights(NULL);
 
 			smd->domain->use_openvdb = false;
+			smd->domain->vdb_draw_data = BKE_openvdb_draw_data_create();
 		}
 		else if (smd->type & MOD_SMOKE_TYPE_FLOW)
 		{
@@ -2679,6 +2689,7 @@ static void smokeModifier_process(SmokeModifierData *smd, Scene *scene, Object *
 	{
 		SmokeDomainSettings *sds = smd->domain;
 		PointCache *cache = NULL;
+		OpenVDBCache *vdb_cache = NULL;
 		PTCacheID pid;
 		int startframe, endframe, framenr;
 		float timescale;
@@ -2715,15 +2726,20 @@ static void smokeModifier_process(SmokeModifierData *smd, Scene *scene, Object *
 			return;
 		}
 
+#if 1
 		/* try to read from openvdb cache */
-//		if (sds->use_openvdb && (sds->flags & MOD_SMOKE_OPENVDB_EXPORTED)) {
-//			smokeModifier_OpenVDB_import(smd, scene, ob);
-//			smd->time = framenr;
-//			return;
-//		}
+		vdb_cache = BKE_openvdb_get_current_cache(sds);
+		if (sds->use_openvdb && vdb_cache) {
+			//if (vdb_cache->flags & VDB_CACHE_SMOKE_EXPORTED) {
+				smokeModifier_OpenVDB_import(smd, scene, ob, vdb_cache);
+				smd->time = framenr;
+				return;
+			//}
+		}
+#endif
 
 		/* try to read from cache */
-		if (BKE_ptcache_read(&pid, (float)framenr) == PTCACHE_READ_EXACT) {
+		if (/*!sds->use_openvdb && */(BKE_ptcache_read(&pid, (float)framenr) == PTCACHE_READ_EXACT)) {
 			BKE_ptcache_validate(cache, framenr);
 			smd->time = framenr;
 			return;
@@ -3123,79 +3139,87 @@ static void OpenVDB_write_fluid_settings(SmokeDomainSettings *sds, struct OpenVD
 	OpenVDBWriter_add_meta_mat4(writer, "obmat", sds->obmat);
 }
 
-static void cache_filename(char *string, const char *path, const char *fname, const char *relbase, int frame)
+void BKE_openvdb_cache_filename(char *r_filename, const char *path, const char *fname, const char *relbase, int frame)
 {
 	char cachepath[FILE_MAX];
 
-	BLI_join_dirfile(cachepath, sizeof(cachepath), path, fname);
+	BLI_strncpy(cachepath, path, FILE_MAX - 10);
+	BLI_path_abs(cachepath, relbase);
 
-	if (string == NULL) {
-		return;
+	if (!BLI_exists(cachepath)) {
+		BLI_dir_create_recursive(cachepath);
 	}
 
-	BLI_strncpy(string, cachepath, FILE_MAX - 10);
-	BLI_path_abs(string, relbase);
-	BLI_path_frame(string, frame, 4);
-	BLI_ensure_extension(string, FILE_MAX, ".vdb");
+	BLI_join_dirfile(r_filename, sizeof(cachepath), cachepath, fname);
+	BLI_path_suffix(r_filename, FILE_MAX, "", "_");
+	BLI_path_frame(r_filename, frame, 4);
+	BLI_ensure_extension(r_filename, FILE_MAX, ".vdb");
 }
 
 static void OpenVDB_export_smoke(SmokeDomainSettings *sds, struct OpenVDBWriter *writer)
 {
 	int fluid_fields = smoke_get_data_flags(sds);
+	struct OpenVDBFloatGrid *clip_grid = NULL;
+
+	compute_fluid_matrices(sds);
 
 	OpenVDBWriter_add_meta_int(writer, "fluid_fields", fluid_fields);
 
+	if (sds->wt) {
+		struct OpenVDBFloatGrid *wt_density_grid;
+		float *dens, *react, *fuel, *flame, *tcu, *tcv, *tcw, *r, *g, *b;
+
+		smoke_turbulence_export(sds->wt, &dens, &react, &flame, &fuel, &r, &g, &b, &tcu, &tcv, &tcw);
+
+		wt_density_grid = OpenVDB_export_grid_fl(writer, "Density High", dens, sds->res_wt, sds->fluidmat_wt, NULL);
+		clip_grid = wt_density_grid;
+
+		if (fluid_fields & SM_ACTIVE_FIRE) {
+			OpenVDB_export_grid_fl(writer, "Flame High", flame, sds->res_wt, sds->fluidmat_wt, wt_density_grid);
+			OpenVDB_export_grid_fl(writer, "Fuel High", fuel, sds->res_wt, sds->fluidmat_wt, wt_density_grid);
+			OpenVDB_export_grid_fl(writer, "React High", react, sds->res_wt, sds->fluidmat_wt, wt_density_grid);
+		}
+
+		if (fluid_fields & SM_ACTIVE_COLORS) {
+			OpenVDB_export_grid_vec(writer, "Color High", r, g, b, sds->res_wt, sds->fluidmat_wt, VEC_INVARIANT, true, wt_density_grid);
+		}
+
+		OpenVDB_export_grid_vec(writer, "Texture Coordinates", tcu, tcv, tcw, sds->res, sds->fluidmat, VEC_INVARIANT, false, wt_density_grid);
+	}
+
 	if (sds->fluid) {
+		struct OpenVDBFloatGrid *density_grid;
 		float dt, dx, *dens, *react, *fuel, *flame, *heat, *heatold, *vx, *vy, *vz, *r, *g, *b;
 		unsigned char *obstacles;
 
-		compute_fluid_matrices(sds);
 		smoke_export(sds->fluid, &dt, &dx, &dens, &react, &flame, &fuel, &heat,
 		             &heatold, &vx, &vy, &vz, &r, &g, &b, &obstacles);
 
 		OpenVDBWriter_add_meta_fl(writer, "dx", dx);
 		OpenVDBWriter_add_meta_fl(writer, "dt", dt);
 
-		OpenVDB_export_grid_fl(writer, "Shadow", sds->shadow, sds->res, sds->fluidmat);
-		OpenVDB_export_grid_fl(writer, "Density", dens, sds->res, sds->fluidmat);
+		density_grid = OpenVDB_export_grid_fl(writer, "Density", dens, sds->res, sds->fluidmat, NULL);
+		clip_grid = sds->wt ? clip_grid : density_grid;
+
+		OpenVDB_export_grid_fl(writer, "Shadow", sds->shadow, sds->res, sds->fluidmat, density_grid);
 
 		if (fluid_fields & SM_ACTIVE_HEAT) {
-			OpenVDB_export_grid_fl(writer, "Heat", heat, sds->res, sds->fluidmat);
-			OpenVDB_export_grid_fl(writer, "Heat Old", heatold, sds->res, sds->fluidmat);
+			OpenVDB_export_grid_fl(writer, "Heat", heat, sds->res, sds->fluidmat, clip_grid);
+			OpenVDB_export_grid_fl(writer, "Heat Old", heatold, sds->res, sds->fluidmat, clip_grid);
 		}
 
 		if (fluid_fields & SM_ACTIVE_FIRE) {
-			OpenVDB_export_grid_fl(writer, "Flame", flame, sds->res, sds->fluidmat);
-			OpenVDB_export_grid_fl(writer, "Fuel", fuel, sds->res, sds->fluidmat);
-			OpenVDB_export_grid_fl(writer, "React", react, sds->res, sds->fluidmat);
+			OpenVDB_export_grid_fl(writer, "Flame", flame, sds->res, sds->fluidmat, density_grid);
+			OpenVDB_export_grid_fl(writer, "Fuel", fuel, sds->res, sds->fluidmat, density_grid);
+			OpenVDB_export_grid_fl(writer, "React", react, sds->res, sds->fluidmat, density_grid);
 		}
 
 		if (fluid_fields & SM_ACTIVE_COLORS) {
-			OpenVDB_export_grid_vec(writer, "Color", r, g, b, sds->res, sds->fluidmat, VEC_INVARIANT);
+			OpenVDB_export_grid_vec(writer, "Color", r, g, b, sds->res, sds->fluidmat, VEC_INVARIANT, true, density_grid);
 		}
 
-		OpenVDB_export_grid_vec(writer, "Velocity", vx, vy, vz, sds->res, sds->fluidmat, VEC_CONTRAVARIANT_RELATIVE);
-		OpenVDB_export_grid_ch(writer, "Obstacles", obstacles, sds->res, sds->fluidmat);
-	}
-
-	if (sds->wt) {
-		float *dens, *react, *fuel, *flame, *tcu, *tcv, *tcw, *r, *g, *b;
-
-		smoke_turbulence_export(sds->wt, &dens, &react, &flame, &fuel, &r, &g, &b, &tcu, &tcv, &tcw);
-
-		OpenVDB_export_grid_fl(writer, "Density High", dens, sds->res_wt, sds->fluidmat_wt);
-
-		if (fluid_fields & SM_ACTIVE_FIRE) {
-			OpenVDB_export_grid_fl(writer, "Flame High", flame, sds->res_wt, sds->fluidmat_wt);
-			OpenVDB_export_grid_fl(writer, "Fuel High", fuel, sds->res_wt, sds->fluidmat_wt);
-			OpenVDB_export_grid_fl(writer, "React High", react, sds->res_wt, sds->fluidmat_wt);
-		}
-
-		if (fluid_fields & SM_ACTIVE_COLORS) {
-			OpenVDB_export_grid_vec(writer, "Color High", r, g, b, sds->res_wt, sds->fluidmat_wt, VEC_INVARIANT);
-		}
-
-		OpenVDB_export_grid_vec(writer, "Texture Coordinates", tcu, tcv, tcw, sds->res, sds->fluidmat, VEC_INVARIANT);
+		OpenVDB_export_grid_vec(writer, "Velocity", vx, vy, vz, sds->res, sds->fluidmat, VEC_CONTRAVARIANT_RELATIVE, false, clip_grid);
+		//OpenVDB_export_grid_ch(writer, "Obstacles", obstacles, sds->res, sds->fluidmat, NULL);
 	}
 }
 
@@ -3256,7 +3280,7 @@ static void OpenVDB_import_smoke(SmokeDomainSettings *sds, struct OpenVDBReader 
 		OpenVDB_import_grid_fl(reader, "Shadow", &sds->shadow, sds->res);
 
 		if (for_low_display) {
-			OpenVDB_import_grid_fl(reader, "Density", &dens, sds->res);
+			sds->density = OpenVDB_import_grid_fl(reader, "Density", &dens, sds->res);
 		}
 
 		if (fluid_fields & SM_ACTIVE_HEAT && !for_low_display) {
@@ -3279,7 +3303,7 @@ static void OpenVDB_import_smoke(SmokeDomainSettings *sds, struct OpenVDBReader 
 
 		if (!for_low_display) {
 			OpenVDB_import_grid_vec(reader, "Velocity", &vx, &vy, &vz, sds->res);
-			OpenVDB_import_grid_ch(reader, "Obstacles", &obstacles, sds->res);
+			//OpenVDB_import_grid_ch(reader, "Obstacles", &obstacles, sds->res);
 		}
 	}
 
@@ -3290,7 +3314,7 @@ static void OpenVDB_import_smoke(SmokeDomainSettings *sds, struct OpenVDBReader 
 		smoke_turbulence_export(sds->wt, &dens, &react, &flame, &fuel, &r, &g, &b, &tcu, &tcv, &tcw);
 
 		if (for_wt_display) {
-			OpenVDB_import_grid_fl(reader, "Density High", &dens, sds->res_wt);
+			sds->density_high = OpenVDB_import_grid_fl(reader, "Density High", &dens, sds->res_wt);
 		}
 
 		if (fluid_fields & SM_ACTIVE_FIRE && for_wt_display) {
@@ -3321,6 +3345,7 @@ void smokeModifier_OpenVDB_export(SmokeModifierData *smd, Scene *scene, Object *
 	float progress;
 	const char *relbase = modifier_path_relbase(ob);
 	char filename[FILE_MAX];
+	bool save_as_half;
 
 	orig_frame = scene->r.cfra;
 
@@ -3330,16 +3355,32 @@ void smokeModifier_OpenVDB_export(SmokeModifierData *smd, Scene *scene, Object *
 		cache->writer = OpenVDBWriter_create();
 	}
 
-	OpenVDBWriter_set_compression(cache->writer, cache->compression);
+	save_as_half = ((cache->flags & VDB_CACHE_SAVE_AS_HALF) != 0);
+
+	OpenVDBWriter_set_flags(cache->writer, cache->compression, save_as_half);
 
 	for (fr = cache->startframe; fr <= cache->endframe; fr++) {
 		/* smd->time is overwritten with scene->r.cfra in smokeModifier_process,
 		 * so we can't use it here... */
 		scene->r.cfra = fr;
 
-		cache_filename(filename, cache->path, cache->name, relbase, fr);
+		BKE_openvdb_cache_filename(filename, cache->path, cache->name, relbase, fr);
 
 		smokeModifier_process(smd, scene, ob, dm, false);
+
+		/* XXX hack: for some reason the smoke sim stores zero matrix for frame 1 */
+		{
+			PTCacheID pid;
+			int ptcache_start, ptcache_end;
+			float ptcache_timescale;
+			BKE_ptcache_id_from_smoke(&pid, ob, smd);
+			BKE_ptcache_id_time(&pid, scene, fr, &ptcache_start, &ptcache_end, &ptcache_timescale);
+
+			if (fr == ptcache_start) {
+				unit_m4(sds->obmat);
+			}
+		}
+
 		OpenVDB_write_fluid_settings(sds, cache->writer);
 		OpenVDB_export_smoke(sds, cache->writer);
 
@@ -3355,15 +3396,14 @@ void smokeModifier_OpenVDB_export(SmokeModifierData *smd, Scene *scene, Object *
 		}
 	}
 
-	sds->flags |= MOD_SMOKE_OPENVDB_EXPORTED;
+	cache->flags |= VDB_CACHE_SMOKE_EXPORTED;
 
 	scene->r.cfra = orig_frame;
 }
 
-void smokeModifier_OpenVDB_import(SmokeModifierData *smd, Scene *scene, Object *ob)
+void smokeModifier_OpenVDB_import(SmokeModifierData *smd, Scene *scene, Object *ob, OpenVDBCache *cache)
 {
 	SmokeDomainSettings *sds = smd->domain;
-	OpenVDBCache *cache;
 	int startframe, endframe;
 	char filename[FILE_MAX];
 	const char *relbase = modifier_path_relbase(ob);
@@ -3378,16 +3418,16 @@ void smokeModifier_OpenVDB_import(SmokeModifierData *smd, Scene *scene, Object *
 		return;
 	}
 
+	if (cache->reader == NULL) {
+		cache->reader = OpenVDBReader_create();
+	}
+
 	for_display = true;
 
-	cache_filename(filename, cache->path, cache->name, relbase, CFRA);
-	cache->reader = OpenVDBReader_create(filename);
-
+	BKE_openvdb_cache_filename(filename, cache->path, cache->name, relbase, CFRA);
+	OpenVDBReader_open(cache->reader, filename);
 	OpenVDB_read_fluid_settings(sds, cache->reader);
 	OpenVDB_import_smoke(sds, cache->reader, for_display);
-
-	/* XXX */
-	OpenVDBReader_free(cache->reader);
 
 	if (ret == OPENVDB_IO_ERROR) {
 		/* TODO(kevin): report error "OpenVDB import error, see console for details" */
@@ -3426,7 +3466,7 @@ void smokeModifier_OpenVDB_update_transform(SmokeModifierData *smd,
 		 * so we can't use it here... */
 		scene->r.cfra = fr;
 
-		cache_filename(filename, cache->path, cache->name, relbase, fr);
+		BKE_openvdb_cache_filename(filename, cache->path, cache->name, relbase, fr);
 		compute_fluid_matrices(sds);
 		OpenVDB_update_fluid_transform(filename, sds->fluidmat, sds->fluidmat_wt);
 
@@ -3525,9 +3565,9 @@ void smokeModifier_OpenVDB_export(SmokeModifierData *smd, Scene *scene, Object *
 	UNUSED_VARS(smd, scene, ob, dm, update, update_cb_data);
 }
 
-void smokeModifier_OpenVDB_import(SmokeModifierData *smd, Scene *scene, Object *ob)
+void smokeModifier_OpenVDB_import(SmokeModifierData *smd, Scene *scene, Object *ob, OpenVDBCache *cache)
 {
-	UNUSED_VARS(smd, scene, ob);
+	UNUSED_VARS(smd, scene, ob, cache);
 }
 
 void smokeModifier_OpenVDB_update_transform(SmokeModifierData *smd, Scene *scene,
@@ -3542,4 +3582,38 @@ void smokeModifier_retime_fluid(SmokeModifierData *smd, Scene *scene, Object *ob
 	UNUSED_VARS(smd, scene, ob, update, update_cb_data);
 }
 
+void BKE_openvdb_cache_filename(char *r_filename, const char *path, const char *fname, const char *relbase, int frame)
+{
+	r_filename[0] = '\0';
+	UNUSED_VARS(path, fname, relbase, frame);
+}
+
 #endif
+
+OpenVDBCache *BKE_openvdb_get_current_cache(SmokeDomainSettings *sds)
+{
+	OpenVDBCache *cache = sds->vdb_caches.first;
+
+	for (; cache; cache = cache->next) {
+		if (cache->flags & VDB_CACHE_CURRENT) {
+			break;
+		}
+	}
+
+	return cache;
+}
+
+OpenVDBDrawData *BKE_openvdb_draw_data_create(void)
+{
+	OpenVDBDrawData *data;
+
+	data = MEM_callocN(sizeof(OpenVDBDrawData), "OpenVDBDrawData");
+
+	data->lod = 50;
+	data->point_size = 1.0f;
+	data->tolerance = 0.001f;
+	data->voxel_drawing = DRAW_VOXELS_POINT;
+	data->flags |= DRAW_VOXELS;
+
+	return data;
+}

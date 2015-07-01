@@ -869,23 +869,38 @@ static void write_nodetree(WriteData *wd, bNodeTree *ntree)
 			writestruct(wd, DATA, "bNodeLink", 1, link);
 		if (node->storage) {
 			/* could be handlerized at some point, now only 1 exception still */
-			if (ntree->type==NTREE_SHADER && (node->type==SH_NODE_CURVE_VEC || node->type==SH_NODE_CURVE_RGB))
-				write_curvemapping(wd, node->storage);
-			else if (ntree->type==NTREE_SHADER && node->type==SH_NODE_SCRIPT) {
-				NodeShaderScript *nss = (NodeShaderScript *)node->storage;
-				if (nss->bytecode)
-					writedata(wd, DATA, strlen(nss->bytecode)+1, nss->bytecode);
-				writestruct(wd, DATA, node->typeinfo->storagename, 1, node->storage);
+			if (ntree->type==NTREE_SHADER) {
+				if (node->type==SH_NODE_CURVE_VEC || node->type==SH_NODE_CURVE_RGB)
+					write_curvemapping(wd, node->storage);
+				else if (node->type==SH_NODE_SCRIPT) {
+					NodeShaderScript *nss = (NodeShaderScript *)node->storage;
+					if (nss->bytecode)
+						writedata(wd, DATA, strlen(nss->bytecode)+1, nss->bytecode);
+					writestruct(wd, DATA, node->typeinfo->storagename, 1, node->storage);
+				}
+				else if (node->type==SH_NODE_OPENVDB) {
+					NodeShaderOpenVDB *vdb = (NodeShaderOpenVDB *)node->storage;
+					writelist(wd, DATA, "OpenVDBGridInfo", &vdb->grid_info);
+					writestruct(wd, DATA, node->typeinfo->storagename, 1, node->storage);
+				}
+				else
+					writestruct(wd, DATA, node->typeinfo->storagename, 1, node->storage);
 			}
-			else if (ntree->type==NTREE_COMPOSIT && ELEM(node->type, CMP_NODE_TIME, CMP_NODE_CURVE_VEC, CMP_NODE_CURVE_RGB, CMP_NODE_HUECORRECT))
-				write_curvemapping(wd, node->storage);
-			else if (ntree->type==NTREE_TEXTURE && (node->type==TEX_NODE_CURVE_RGB || node->type==TEX_NODE_CURVE_TIME) )
-				write_curvemapping(wd, node->storage);
-			else if (ntree->type==NTREE_COMPOSIT && node->type==CMP_NODE_MOVIEDISTORTION) {
-				/* pass */
+			else if (ntree->type==NTREE_COMPOSIT) {
+				if (ELEM(node->type, CMP_NODE_TIME, CMP_NODE_CURVE_VEC, CMP_NODE_CURVE_RGB, CMP_NODE_HUECORRECT))
+					write_curvemapping(wd, node->storage);
+				else if (node->type==CMP_NODE_MOVIEDISTORTION) {
+					/* pass */
+				}
+				else
+					writestruct(wd, DATA, node->typeinfo->storagename, 1, node->storage);
 			}
-			else
-				writestruct(wd, DATA, node->typeinfo->storagename, 1, node->storage);
+			else if (ntree->type==NTREE_TEXTURE) {
+				if (node->type==TEX_NODE_CURVE_RGB || node->type==TEX_NODE_CURVE_TIME)
+					write_curvemapping(wd, node->storage);
+				else
+					writestruct(wd, DATA, node->typeinfo->storagename, 1, node->storage);
+			}
 		}
 		
 		if (node->type==CMP_NODE_OUTPUT_FILE) {
@@ -1096,7 +1111,7 @@ static void write_pointcaches(WriteData *wd, ListBase *ptcaches)
 				
 				for (i=0; i<BPHYS_TOT_DATA; i++) {
 					if (pm->data[i] && pm->data_types & (1<<i)) {
-						if (ptcache_data_struct[i][0]=='\0')
+						if (ptcache_data_struct[i][0] == '\0')
 							writedata(wd, DATA, MEM_allocN_len(pm->data[i]), pm->data[i]);
 						else
 							writestruct(wd, DATA, ptcache_data_struct[i], pm->totpoint, pm->data[i]);
@@ -1104,7 +1119,7 @@ static void write_pointcaches(WriteData *wd, ListBase *ptcaches)
 				}
 
 				for (; extra; extra=extra->next) {
-					if (ptcache_extra_struct[extra->type][0]=='\0')
+					if (ptcache_extra_struct[extra->type][0] == '\0')
 						continue;
 					writestruct(wd, DATA, "PTCacheExtra", 1, extra);
 					writestruct(wd, DATA, ptcache_extra_struct[extra->type], extra->totdata, extra->data);
@@ -1552,6 +1567,8 @@ static void write_modifiers(WriteData *wd, ListBase *modbase)
 				for (; cache; cache = cache->next) {
 					writestruct(wd, DATA, "OpenVDBCache", 1, cache);
 				}
+
+				writestruct(wd, DATA, "OpenVDBDrawData", 1, smd->domain->vdb_draw_data);
 
 			}
 			else if (smd->type & MOD_SMOKE_TYPE_FLOW)

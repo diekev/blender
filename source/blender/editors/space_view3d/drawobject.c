@@ -74,6 +74,7 @@
 #include "BKE_particle.h"
 #include "BKE_pointcache.h"
 #include "BKE_scene.h"
+#include "BKE_smoke.h"
 #include "BKE_unit.h"
 #include "BKE_tracking.h"
 
@@ -100,6 +101,10 @@
 
 #include "WM_api.h"
 #include "BLF_api.h"
+
+#ifdef WITH_OPENVDB
+#  include "openvdb_capi.h"
+#endif
 
 #include "view3d_intern.h"  /* bad level include */
 
@@ -2053,14 +2058,19 @@ static void drawcamera(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base
 	float vec[4][3], asp[2], shift[2], scale[3];
 	int i;
 	float drawsize;
-	const bool is_view = (rv3d->persp == RV3D_CAMOB && ob == v3d->camera);
 	MovieClip *clip = BKE_object_movieclip_get(scene, base->object, false);
 
+	const bool is_view = (rv3d->persp == RV3D_CAMOB && ob == v3d->camera);
+	const bool is_multiview = (scene->r.scemode & R_MULTIVIEW) != 0;
 	const bool is_stereo3d = drawcamera_is_stereo3d(scene, v3d, ob);
+	const bool is_stereo3d_view = (scene->r.views_format == SCE_VIEWS_FORMAT_STEREO_3D);
 	const bool is_stereo3d_cameras = (ob == scene->camera) &&
-	                                 (scene->r.scemode & R_MULTIVIEW) &&
-	                                 (scene->r.views_format == SCE_VIEWS_FORMAT_STEREO_3D) &&
+	                                 is_multiview &&
+	                                 is_stereo3d_view &&
 	                                 (v3d->stereo3d_flag & V3D_S3D_DISPCAMERAS);
+	const bool is_selection_camera_stereo = (G.f & G_PICKSEL) &&
+	                                        is_view && is_multiview &&
+	                                        is_stereo3d_view;
 
 	/* draw data for movie clip set as active for scene */
 	if (clip) {
@@ -2087,9 +2097,17 @@ static void drawcamera(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base
 
 	cam = ob->data;
 
-	scale[0] = 1.0f / len_v3(ob->obmat[0]);
-	scale[1] = 1.0f / len_v3(ob->obmat[1]);
-	scale[2] = 1.0f / len_v3(ob->obmat[2]);
+	/* BKE_camera_multiview_model_matrix already accounts for scale, don't do it here */
+	if (is_selection_camera_stereo) {
+		scale[0] = 1.0f;
+		scale[1] = 1.0f;
+		scale[2] = 1.0f;
+	}
+	else {
+		scale[0] = 1.0f / len_v3(ob->obmat[0]);
+		scale[1] = 1.0f / len_v3(ob->obmat[1]);
+		scale[2] = 1.0f / len_v3(ob->obmat[2]);
+	}
 
 	BKE_camera_view_frame_ex(scene, cam, cam->drawsize, is_view, scale,
 	                         asp, shift, &drawsize, vec);
@@ -2098,8 +2116,24 @@ static void drawcamera(Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base
 	glDisable(GL_CULL_FACE);
 
 	/* camera frame */
-	if (!is_stereo3d_cameras)
-		drawcamera_frame(vec, GL_LINE_LOOP);
+	if (!is_stereo3d_cameras) {
+		/* make sure selection uses the same matrix for camera as the one used while viewing */
+		if (is_selection_camera_stereo) {
+			float obmat[4][4];
+			bool is_left = v3d->multiview_eye == STEREO_LEFT_ID;
+
+			glPushMatrix();
+			glLoadMatrixf(rv3d->viewmat);
+			BKE_camera_multiview_model_matrix(&scene->r, ob, is_left ? STEREO_LEFT_NAME : STEREO_RIGHT_NAME, obmat);
+			glMultMatrixf(obmat);
+
+			drawcamera_frame(vec, GL_LINE_LOOP);
+			glPopMatrix();
+		}
+		else {
+			drawcamera_frame(vec, GL_LINE_LOOP);
+		}
+	}
 
 	if (is_view)
 		return;
@@ -5578,22 +5612,22 @@ static void draw_new_particle_system(Scene *scene, View3D *v3d, RegionView3D *rv
 						UI_ThemeColorShadeAlpha(TH_WIRE, 0, -100);
 					glEnable(GL_BLEND);
 					glBegin(GL_LINES);
-					for (i = 1; i < res[0]-1; ++i) {
-						float f = interpf(b[0], a[0], (float)i / (float)(res[0]-1));
+					for (i = 1; i < res[0] - 1; ++i) {
+						float f = interpf(b[0], a[0], (float)i / (float)(res[0] - 1));
 						glVertex3f(f, a[1], a[2]); glVertex3f(f, b[1], a[2]);
 						glVertex3f(f, b[1], a[2]); glVertex3f(f, b[1], b[2]);
 						glVertex3f(f, b[1], b[2]); glVertex3f(f, a[1], b[2]);
 						glVertex3f(f, a[1], b[2]); glVertex3f(f, a[1], a[2]);
 					}
-					for (i = 1; i < res[1]-1; ++i) {
-						float f = interpf(b[1], a[1], (float)i / (float)(res[1]-1));
+					for (i = 1; i < res[1] - 1; ++i) {
+						float f = interpf(b[1], a[1], (float)i / (float)(res[1] - 1));
 						glVertex3f(a[0], f, a[2]); glVertex3f(b[0], f, a[2]);
 						glVertex3f(b[0], f, a[2]); glVertex3f(b[0], f, b[2]);
 						glVertex3f(b[0], f, b[2]); glVertex3f(a[0], f, b[2]);
 						glVertex3f(a[0], f, b[2]); glVertex3f(a[0], f, a[2]);
 					}
-					for (i = 1; i < res[2]-1; ++i) {
-						float f = interpf(b[2], a[2], (float)i / (float)(res[2]-1));
+					for (i = 1; i < res[2] - 1; ++i) {
+						float f = interpf(b[2], a[2], (float)i / (float)(res[2] - 1));
 						glVertex3f(a[0], a[1], f); glVertex3f(b[0], a[1], f);
 						glVertex3f(b[0], a[1], f); glVertex3f(b[0], b[1], f);
 						glVertex3f(b[0], b[1], f); glVertex3f(a[0], b[1], f);
@@ -5778,7 +5812,7 @@ static void draw_ptcache_edit(Scene *scene, View3D *v3d, PTCacheEdit *edit)
 	PTCacheEditPoint *point;
 	PTCacheEditKey *key;
 	ParticleEditSettings *pset = PE_settings(scene);
-	int i, k, totpoint = edit->totpoint, timed = pset->flag & PE_FADE_TIME ? pset->fade_frames : 0;
+	int i, k, totpoint = edit->totpoint, timed = (pset->flag & PE_FADE_TIME) ? pset->fade_frames : 0;
 	int totkeys = 1;
 	float sel_col[3];
 	float nosel_col[3];
@@ -5918,7 +5952,7 @@ static void draw_ptcache_edit(Scene *scene, View3D *v3d, PTCacheEdit *edit)
 						glColor3fv(nosel_col);
 					/* has to be like this.. otherwise selection won't work, have try glArrayElement later..*/
 					glBegin(GL_POINTS);
-					glVertex3fv(key->flag & PEK_USE_WCO ? key->world_co : key->co);
+					glVertex3fv((key->flag & PEK_USE_WCO) ? key->world_co : key->co);
 					glEnd();
 				}
 			}
@@ -8000,14 +8034,16 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 		/* only draw domains */
 		if (smd->domain) {
 			SmokeDomainSettings *sds = smd->domain;
-			float p0[3], p1[3], viewnormal[3];
-			BoundBox bb;
+			float viewnormal[3];
+			bool render_volume = !sds->use_openvdb;
 
 			glLoadMatrixf(rv3d->viewmat);
 			glMultMatrixf(ob->obmat);
 
 			/* draw adaptive domain bounds */
-			if (sds->flags & MOD_SMOKE_ADAPTIVE_DOMAIN) {
+			if ((sds->flags & MOD_SMOKE_ADAPTIVE_DOMAIN) && !render_override) {
+				float p0[3], p1[3];
+				BoundBox bb;
 				/* draw domain max bounds */
 				VECSUBFAC(p0, sds->p0, sds->cell_size, sds->adapt_res);
 				VECADDFAC(p1, sds->p1, sds->cell_size, sds->adapt_res);
@@ -8019,10 +8055,70 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 				BKE_boundbox_init_from_minmax(&bb, sds->p0, sds->p1);
 				draw_box(bb.vec);
 #endif
+
+				/* draw a single voxel to hint the user about the resolution of the fluid */
+				copy_v3_v3(p0, sds->p0);
+
+				if (sds->flags & MOD_SMOKE_HIGHRES) {
+					madd_v3_v3v3fl(p1, p0, sds->cell_size, 1.0f / (sds->amplify + 1));
+				}
+				else {
+					add_v3_v3v3(p1, p0, sds->cell_size);
+				}
+
+				BKE_boundbox_init_from_minmax(&bb, p0, p1);
+				draw_box(bb.vec, false);
+
+#ifdef WITH_OPENVDB
+				{
+					OpenVDBDrawData *draw_data = sds->vdb_draw_data;
+					struct OpenVDBPrimitive *prim = NULL;
+					bool draw_root, draw_level_1, draw_level_2;
+					bool draw_leaves, draw_voxels;
+
+					/* some sort of versioning for development */
+					if (!draw_data) {
+						draw_data = sds->vdb_draw_data = BKE_openvdb_draw_data_create();
+					}
+
+					draw_root    = (draw_data->flags & DRAW_ROOT);
+					draw_level_1 = (draw_data->flags & DRAW_LEVEL_1);
+					draw_level_2 = (draw_data->flags & DRAW_LEVEL_2);
+					draw_leaves  = (draw_data->flags & DRAW_LEAVES);
+					draw_voxels  = (draw_data->flags & DRAW_VOXELS);
+
+					if (sds->density)
+						prim = sds->density;
+					else if (sds->density_high)
+						prim = sds->density_high;
+
+					glLoadMatrixf(rv3d->viewmat);
+					if (prim) {
+						OpenVDB_draw_primitive(prim, draw_root, draw_level_1, draw_level_2, draw_leaves);
+
+						if (draw_voxels && ELEM(draw_data->voxel_drawing, DRAW_VOXELS_POINT, DRAW_VOXELS_BOX)) {
+							const bool draw_as_box = (draw_data->voxel_drawing == DRAW_VOXELS_BOX);
+
+							OpenVDB_draw_primitive_values(prim, draw_data->tolerance,
+							                              draw_data->point_size,
+							                              draw_as_box, draw_data->lod);
+						}
+
+						if (draw_voxels && draw_data->voxel_drawing == DRAW_VOXELS_VOLUME)
+							render_volume = true;
+					}
+					glMultMatrixf(sds->fluidmat);
+				}
+#endif
 			}
 
 			/* don't show smoke before simulation starts, this could be made an option in the future */
-			if (smd->domain->fluid && CFRA >= smd->domain->point_cache[0]->startframe) {
+			if (render_volume && smd->domain->fluid && CFRA >= smd->domain->point_cache[0]->startframe) {
+				float p0[3], p1[3];
+
+				glLoadMatrixf(rv3d->viewmat);
+				glMultMatrixf(ob->obmat);
+
 				/* get view vector */
 				invert_m4_m4(ob->imat, ob->obmat);
 				mul_v3_mat3_m4v3(viewnormal, ob->imat, rv3d->viewinv[2]);

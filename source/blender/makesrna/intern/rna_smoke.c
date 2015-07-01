@@ -167,6 +167,31 @@ static int rna_SmokeModifier_color_grid_get_length(PointerRNA *ptr, int length[R
 	return length[0];
 }
 
+static int rna_SmokeModifier_velocity_grid_get_length(PointerRNA *ptr, int length[RNA_MAX_ARRAY_DIMENSION])
+{
+#ifdef WITH_SMOKE
+	SmokeDomainSettings *sds = (SmokeDomainSettings *)ptr->data;
+	float *vx = NULL;
+	float *vy = NULL;
+	float *vz = NULL;
+	int size = 0;
+
+	/* Velocity data is always low-resolution. */
+	if (sds->fluid) {
+		size = 3 * sds->res[0] * sds->res[1] * sds->res[2];
+		vx = smoke_get_velocity_x(sds->fluid);
+		vy = smoke_get_velocity_y(sds->fluid);
+		vz = smoke_get_velocity_z(sds->fluid);
+	}
+
+	length[0] = (vx && vy && vz) ? size : 0;
+#else
+	(void)ptr;
+	length[0] = 0;
+#endif
+	return length[0];
+}
+
 static void rna_SmokeModifier_density_grid_get(PointerRNA *ptr, float *values)
 {
 #ifdef WITH_SMOKE
@@ -186,8 +211,34 @@ static void rna_SmokeModifier_density_grid_get(PointerRNA *ptr, float *values)
 
 	BLI_rw_mutex_unlock(sds->fluid_mutex);
 #else
-	(void)ptr;
-	(void)values;
+	UNUSED_VARS(ptr, values);
+#endif
+}
+
+static void rna_SmokeModifier_velocity_grid_get(PointerRNA *ptr, float *values)
+{
+#ifdef WITH_SMOKE
+	SmokeDomainSettings *sds = (SmokeDomainSettings *)ptr->data;
+	int length[RNA_MAX_ARRAY_DIMENSION];
+	int size = rna_SmokeModifier_velocity_grid_get_length(ptr, length);
+	float *vx, *vy, *vz;
+	int i;
+
+	BLI_rw_mutex_lock(sds->fluid_mutex, THREAD_LOCK_READ);
+
+	vx = smoke_get_velocity_x(sds->fluid);
+	vy = smoke_get_velocity_y(sds->fluid);
+	vz = smoke_get_velocity_z(sds->fluid);
+
+	for (i = 0; i < size; i += 3) {
+		*(values++) = *(vx++);
+		*(values++) = *(vy++);
+		*(values++) = *(vz++);
+	}
+
+	BLI_rw_mutex_unlock(sds->fluid_mutex);
+#else
+	UNUSED_VARS(ptr, values);
 #endif
 }
 
@@ -213,8 +264,7 @@ static void rna_SmokeModifier_color_grid_get(PointerRNA *ptr, float *values)
 
 	BLI_rw_mutex_unlock(sds->fluid_mutex);
 #else
-	(void)ptr;
-	memset(values, 0, 4 * sizeof(float));
+	UNUSED_VARS(ptr, values);
 #endif
 }
 
@@ -240,8 +290,7 @@ static void rna_SmokeModifier_flame_grid_get(PointerRNA *ptr, float *values)
 
 	BLI_rw_mutex_unlock(sds->fluid_mutex);
 #else
-	(void)ptr;
-	(void)values;
+	UNUSED_VARS(ptr, values);
 #endif
 }
 
@@ -293,7 +342,7 @@ static int rna_SmokeModifier_active_openvdb_cache_index_get(PointerRNA *ptr)
     int i = 0;
 
     for (; cache; cache = cache->next, i++) {
-        if (cache->flag & VDB_CACHE_CURRENT)
+        if (cache->flags & VDB_CACHE_CURRENT)
             return i;
     }
     return 0;
@@ -307,9 +356,9 @@ static void rna_SmokeModifier_active_openvdb_cache_index_set(struct PointerRNA *
 
     for (; cache; cache = cache->next, i++) {
         if (i == value)
-            cache->flag |= VDB_CACHE_CURRENT;
+            cache->flags |= VDB_CACHE_CURRENT;
         else
-            cache->flag &= ~VDB_CACHE_CURRENT;
+            cache->flags &= ~VDB_CACHE_CURRENT;
     }
 }
 
@@ -323,7 +372,7 @@ static void rna_def_openvdb_cache(BlenderRNA *brna)
 
 	static EnumPropertyItem prop_compression_items[] = {
 		{ VDB_COMPRESSION_ZIP, "ZIP", 0, "Zip", "Slow and effective compression" },
-#if WITH_OPENVDB_BLOSC
+#ifdef WITH_OPENVDB_BLOSC
 		{ VDB_COMPRESSION_BLOSC, "BLOSC", 0, "Blosc", "Multithreaded compression, almost similar in size and quality as 'Zip'" },
 #endif
 		{ VDB_COMPRESSION_NONE, "NONE", 0, "None", "Do not use any compression" },
@@ -359,7 +408,7 @@ static void rna_def_openvdb_cache(BlenderRNA *brna)
 	RNA_def_property_enum_items(prop, prop_compression_items);
 	RNA_def_property_ui_text(prop, "File Compression",
 	                         "Select what type of compression to use when writing the files");
-	RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Smoke_reset");
+	RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, NULL);
 
 	prop = RNA_def_property(srna, "shutter_speed", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "shutter_speed");
@@ -383,6 +432,73 @@ static void rna_def_openvdb_cache(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Time Scale",
 	                         "Define new speed of the simulation");
 	RNA_def_property_update(prop, NC_OBJECT | ND_POINTCACHE, NULL);
+
+	prop = RNA_def_property(srna, "save_as_half", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", VDB_CACHE_SAVE_AS_HALF);
+	RNA_def_property_ui_text(prop, "Save as Half",
+	                         "Write all scalar (including vector) grids to the file as 16-bit half floats to reduce file size");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, NULL);
+}
+
+static void rna_def_openvdb_draw_data(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	static EnumPropertyItem vdb_draw_tree_items[] = {
+		{DRAW_ROOT,    "ROOT",    0, "Root",    "Draw root node"},
+	    {DRAW_LEVEL_1, "LEVEL_1", 0, "Level 1", "Draw level 1 node"},
+	    {DRAW_LEVEL_2, "LEVEL_2", 0, "Level 2", "Draw level 2 node"},
+	    {DRAW_LEAVES,  "LEAVES",  0, "Leaves",  "Draw leaf nodes"},
+	    {DRAW_VOXELS,  "VOXELS",  0, "Voxels",  "Draw voxels"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	static EnumPropertyItem vdb_draw_voxels_items[] = {
+		{DRAW_VOXELS_POINT,  "POINT",  0, "Point",  "Draw voxels as points"},
+	    {DRAW_VOXELS_BOX,    "BOX",    0, "Box",    "Draw voxels as boxes"},
+	    {DRAW_VOXELS_VOLUME, "VOLUME", 0, "Volume", "Draw voxels as volume"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	srna = RNA_def_struct(brna, "OpenVDBDrawData", NULL);
+	RNA_def_struct_ui_text(srna, "Draw Data", "OpenVDB Draw Data");
+
+	prop = RNA_def_property(srna, "show_tree", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "flags");
+	RNA_def_property_enum_items(prop, vdb_draw_tree_items);
+	RNA_def_property_flag(prop, PROP_ENUM_FLAG);
+	RNA_def_property_ui_text(prop, "Tree", "Draw the OpenVDB tree");
+	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+
+	prop = RNA_def_property(srna, "voxel_drawing", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_items(prop, vdb_draw_voxels_items);
+	RNA_def_property_ui_text(prop, "Voxel Drawing", "Method for drawing the voxels");
+	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
+
+	prop = RNA_def_property(srna, "tolerance", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "tolerance");
+	RNA_def_property_range(prop, 0.0, 1.0);
+	RNA_def_property_ui_range(prop, 0.0, 1.0, 1, 3);
+	RNA_def_property_ui_text(prop, "Minimum Value",
+	                         "Minimun value a voxel should have to be drawn");
+	RNA_def_property_update(prop, NC_GEOM | ND_DATA, NULL);
+
+	prop = RNA_def_property(srna, "lod", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "lod");
+	RNA_def_property_range(prop, 0, 100);
+	RNA_def_property_ui_range(prop, 0, 100, 1, -1);
+	RNA_def_property_ui_text(prop, "Level of Detail",
+	                         "Percentage of the number of voxels to draw");
+	RNA_def_property_update(prop, NC_GEOM | ND_DATA, NULL);
+
+	prop = RNA_def_property(srna, "point_size", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "point_size");
+	RNA_def_property_range(prop, 0.0, 10.0);
+	RNA_def_property_ui_range(prop, 0.0, 10.0, 50, 1);
+	RNA_def_property_ui_text(prop, "Size", "Diameter of the voxels (drawing only)");
+	RNA_def_property_update(prop, NC_GEOM | ND_DATA, NULL);
 }
 
 static void rna_def_smoke_domain_settings(BlenderRNA *brna)
@@ -569,6 +685,14 @@ static void rna_def_smoke_domain_settings(BlenderRNA *brna)
 	RNA_def_property_float_funcs(prop, "rna_SmokeModifier_density_grid_get", NULL, NULL);
 	RNA_def_property_ui_text(prop, "Density Grid", "Smoke density grid");
 
+	prop = RNA_def_property(srna, "velocity_grid", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_array(prop, 32);
+	RNA_def_property_flag(prop, PROP_DYNAMIC);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_dynamic_array_funcs(prop, "rna_SmokeModifier_velocity_grid_get_length");
+	RNA_def_property_float_funcs(prop, "rna_SmokeModifier_velocity_grid_get", NULL, NULL);
+	RNA_def_property_ui_text(prop, "Velocity Grid", "Smoke velocity grid");
+
 	prop = RNA_def_property(srna, "flame_grid", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_array(prop, 32);
 	RNA_def_property_flag(prop, PROP_DYNAMIC);
@@ -683,6 +807,11 @@ static void rna_def_smoke_domain_settings(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Active OpenVDB cache Index", "");
 
 	rna_def_openvdb_cache(brna);
+
+	prop = RNA_def_property(srna, "vdb_draw_data", PROP_POINTER, PROP_NONE);
+	RNA_def_property_struct_type(prop, "OpenVDBDrawData");
+
+	rna_def_openvdb_draw_data(brna);
 }
 
 static void rna_def_smoke_flow_settings(BlenderRNA *brna)

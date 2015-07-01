@@ -17,9 +17,9 @@
 #ifndef __VOLUMEMANAGER_H__
 #define __VOLUMEMANAGER_H__
 
-#include "util_openvdb.h"
 #include "util_string.h"
 #include "util_types.h"
+#include "util_volume.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -56,6 +56,7 @@ public:
 	~VolumeManager();
 
 	int add_volume(const string& filename, const string& name, int sampling, int grid_type);
+	int find_density_slot();
 
 	void device_update(Device *device, DeviceScene *dscene, Scene *scene, Progress& progress);
 	void device_free(Device *device, DeviceScene *dscene);

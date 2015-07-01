@@ -1996,7 +1996,7 @@ static void direct_link_script(FileData *UNUSED(fd), Script *script)
 static PackedFile *direct_link_packedfile(FileData *fd, PackedFile *oldpf)
 {
 	PackedFile *pf = newpackedadr(fd, oldpf);
-	
+
 	if (pf) {
 		pf->data = newpackedadr(fd, pf->data);
 	}
@@ -2763,7 +2763,8 @@ static void direct_link_nodetree(FileData *fd, bNodeTree *ntree)
 	
 	ntree->progress = NULL;
 	ntree->execdata = NULL;
-	
+	ntree->duplilock = NULL;
+
 	ntree->adt = newdataadr(fd, ntree->adt);
 	direct_link_animdata(fd, ntree->adt);
 	
@@ -2803,6 +2804,10 @@ static void direct_link_nodetree(FileData *fd, bNodeTree *ntree)
 				else if (node->type==SH_NODE_SCRIPT) {
 					NodeShaderScript *nss = (NodeShaderScript *) node->storage;
 					nss->bytecode = newdataadr(fd, nss->bytecode);
+				}
+				else if (node->type==SH_NODE_OPENVDB) {
+					NodeShaderOpenVDB *vdb = (NodeShaderOpenVDB *)node->storage;
+					link_list(fd, &vdb->grid_info);
 				}
 			}
 			else if (ntree->type==NTREE_COMPOSIT) {
@@ -3439,12 +3444,17 @@ static void direct_link_image(FileData *fd, Image *ima)
 	link_list(fd, &(ima->views));
 	link_list(fd, &(ima->packedfiles));
 
-	for (imapf = ima->packedfiles.first; imapf; imapf = imapf->next) {
-		imapf->packedfile = direct_link_packedfile(fd, imapf->packedfile);
+	if (ima->packedfiles.first) {
+		for (imapf = ima->packedfiles.first; imapf; imapf = imapf->next) {
+			imapf->packedfile = direct_link_packedfile(fd, imapf->packedfile);
+		}
+		ima->packedfile = NULL;
+	}
+	else {
+		ima->packedfile = direct_link_packedfile(fd, ima->packedfile);
 	}
 
-	ima->anims.first = ima->anims.last = NULL;
-	ima->packedfile = direct_link_packedfile(fd, ima->packedfile);
+	BLI_listbase_clear(&ima->anims);
 	ima->preview = direct_link_preview_image(fd, ima->preview);
 	ima->stereo3d_format = newdataadr(fd, ima->stereo3d_format);
 	ima->ok = 1;
@@ -4769,7 +4779,6 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 			SmokeModifierData *smd = (SmokeModifierData *)md;
 			
 			if (smd->type == MOD_SMOKE_TYPE_DOMAIN) {
-				OpenVDBCache *cache;
 				smd->flow = NULL;
 				smd->coll = NULL;
 				smd->domain = newdataadr(fd, smd->domain);
@@ -4805,10 +4814,16 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 					smd->domain->point_cache[1] = NULL;
 				}
 
-				link_list(fd, &smd->domain->vdb_caches);
-				for (cache = smd->domain->vdb_caches.first; cache; cache = cache->next) {
-					cache->reader = NULL;
-					cache->writer = NULL;
+				{
+					OpenVDBCache *cache;
+
+					link_list(fd, &smd->domain->vdb_caches);
+					for (cache = smd->domain->vdb_caches.first; cache; cache = cache->next) {
+						cache->reader = NULL;
+						cache->writer = NULL;
+					}
+
+					smd->domain->vdb_draw_data = newdataadr(fd, smd->domain->vdb_draw_data);
 				}
 			}
 			else if (smd->type == MOD_SMOKE_TYPE_FLOW) {
@@ -5410,7 +5425,7 @@ static void lib_link_scene(FileData *fd, Main *main)
 						seq->scene_sound = BKE_sound_add_scene_sound_defaults(sce, seq);
 					}
 				}
-				seq->anims.first = seq->anims.last = NULL;
+				BLI_listbase_clear(&seq->anims);
 
 				lib_link_sequence_modifiers(fd, sce, &seq->modifiers);
 			}

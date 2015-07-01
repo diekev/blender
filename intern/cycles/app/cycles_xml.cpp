@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <iterator>
 
+#include "background.h"
 #include "camera.h"
 #include "film.h"
 #include "graph.h"
@@ -391,6 +392,10 @@ static void xml_read_shader_graph(const XMLReadState& state, Shader *shader, pug
 	for(pugi::xml_node node = graph_node.first_child(); node; node = node.next_sibling()) {
 		ShaderNode *snode = NULL;
 
+		/* ToDo: Add missing nodes
+		 * RGBCurvesNode, VectorCurvesNode, RGBRampNode and ConvertNode (RGB -> BW).
+		 */
+
 		if(string_iequals(node.name(), "image_texture")) {
 			ImageTextureNode *img = new ImageTextureNode();
 
@@ -400,6 +405,8 @@ static void xml_read_shader_graph(const XMLReadState& state, Shader *shader, pug
 			xml_read_enum(&img->color_space, ImageTextureNode::color_space_enum, node, "color_space");
 			xml_read_enum(&img->projection, ImageTextureNode::projection_enum, node, "projection");
 			xml_read_float(&img->projection_blend, node, "projection_blend");
+
+			/* ToDo: Interpolation */
 
 			snode = img;
 		}
@@ -513,6 +520,11 @@ static void xml_read_shader_graph(const XMLReadState& state, Shader *shader, pug
 			xml_read_float3(&normal->direction, node, "direction");
 			snode = normal;
 		}
+		else if(string_iequals(node.name(), "bump")) {
+			BumpNode *bump = new BumpNode();
+			xml_read_bool(&bump->invert, node, "invert");
+			snode = bump;
+		}
 		else if(string_iequals(node.name(), "mapping")) {
 			snode = new MappingNode();
 		}
@@ -567,6 +579,9 @@ static void xml_read_shader_graph(const XMLReadState& state, Shader *shader, pug
 		else if(string_iequals(node.name(), "background")) {
 			snode = new BackgroundNode();
 		}
+		else if(string_iequals(node.name(), "holdout")) {
+			snode = new HoldoutNode();
+		}
 		else if(string_iequals(node.name(), "absorption_volume")) {
 			snode = new AbsorptionVolumeNode();
 		}
@@ -575,7 +590,14 @@ static void xml_read_shader_graph(const XMLReadState& state, Shader *shader, pug
 		}
 		else if(string_iequals(node.name(), "subsurface_scattering")) {
 			SubsurfaceScatteringNode *sss = new SubsurfaceScatteringNode();
-			//xml_read_enum(&sss->falloff, SubsurfaceScatteringNode::falloff_enum, node, "falloff");
+
+			string falloff;
+			xml_read_string(&falloff, node, "falloff");
+			if(falloff == "cubic")
+				sss->closure = CLOSURE_BSSRDF_CUBIC_ID;
+			else
+				sss->closure = CLOSURE_BSSRDF_GAUSSIAN_ID;
+
 			snode = sss;
 		}
 		else if(string_iequals(node.name(), "geometry")) {
@@ -619,6 +641,7 @@ static void xml_read_shader_graph(const XMLReadState& state, Shader *shader, pug
 			snode = new InvertNode();
 		}
 		else if(string_iequals(node.name(), "mix")) {
+			/* ToDo: Tag Mix case for optimization */
 			MixNode *mix = new MixNode();
 			xml_read_enum(&mix->type, MixNode::type_enum, node, "type");
 			xml_read_bool(&mix->use_clamp, node, "use_clamp");
@@ -835,6 +858,15 @@ static void xml_read_shader(const XMLReadState& state, pugi::xml_node node)
 
 static void xml_read_background(const XMLReadState& state, pugi::xml_node node)
 {
+	/* Background Settings */
+	Background *bg = state.scene->background;
+
+	xml_read_float(&bg->ao_distance, node, "ao_distance");
+	xml_read_float(&bg->ao_factor, node, "ao_factor");
+
+	xml_read_bool(&bg->transparent, node, "transparent");
+
+	/* Background Shader */
 	Shader *shader = state.scene->shaders[state.scene->default_background];
 	
 	xml_read_bool(&shader->heterogeneous_volume, node, "heterogeneous_volume");
@@ -881,6 +913,7 @@ static void xml_read_mesh(const XMLReadState& state, pugi::xml_node node)
 
 	/* read vertices and polygons, RIB style */
 	vector<float3> P;
+	vector<float> UV;
 	vector<int> verts, nverts;
 
 	xml_read_float3_array(P, node, "P");
@@ -951,6 +984,31 @@ static void xml_read_mesh(const XMLReadState& state, pugi::xml_node node)
 			}
 
 			index_offset += nverts[i];
+		}
+
+		if(xml_read_float_array(UV, node, "UV")) {
+			ustring name = ustring("UVMap");
+			Attribute *attr = mesh->attributes.add(ATTR_STD_UV, name);
+			float3 *fdata = attr->data_float3();
+
+			/* loop over the triangles */
+			index_offset = 0;
+			for(size_t i = 0; i < nverts.size(); i++) {
+				for(int j = 0; j < nverts[i]-2; j++) {
+					int v0 = verts[index_offset];
+					int v1 = verts[index_offset + j + 1];
+					int v2 = verts[index_offset + j + 2];
+
+					assert(v0*2+1 < (int)UV.size());
+					assert(v1*2+1 < (int)UV.size());
+					assert(v2*2+1 < (int)UV.size());
+
+					fdata[0] = make_float3(UV[v0*2], UV[v0*2+1], 0.0);
+					fdata[1] = make_float3(UV[v1*2], UV[v1*2+1], 0.0);
+					fdata[2] = make_float3(UV[v2*2], UV[v2*2+1], 0.0);
+					fdata += 3;
+				}
+			}
 		}
 	}
 

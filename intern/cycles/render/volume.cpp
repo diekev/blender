@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "openvdb.h"
+#include "volume.h"
 #include "scene.h"
 #include "util_logging.h"
 #include "util_progress.h"
@@ -25,6 +25,7 @@ CCL_NAMESPACE_BEGIN
 
 VolumeManager::VolumeManager()
 {
+#ifdef WITH_OPENVDB
 	openvdb::initialize();
 
 	scalar_grids.reserve(64);
@@ -32,26 +33,29 @@ VolumeManager::VolumeManager()
 	current_grids.reserve(64);
 	float_volumes.reserve(64);
 	float3_volumes.reserve(64);
+#endif
 
 	need_update = true;
 }
 
 VolumeManager::~VolumeManager()
 {
+#ifdef WITH_OPENVDB
 	scalar_grids.clear();
 	vector_grids.clear();
 	current_grids.clear();
 	float_volumes.clear();
 	float3_volumes.clear();
+#endif
 }
 
 static inline void catch_exceptions()
 {
+#ifdef WITH_OPENVDB
 	try {
 		throw;
 	}
-#ifdef WITH_OPENVDB
-	catch (const openvdb::IoError& e) {
+	catch(const openvdb::IoError& e) {
 		std::cerr << e.what() << "\n";
 	}
 #endif
@@ -74,7 +78,7 @@ int VolumeManager::add_volume(const string& filename, const string& name, int sa
 
 		need_update = true;
 	}
-	catch (...) {
+	catch(...) {
 		catch_exceptions();
 		need_update = false;
 		slot = -1;
@@ -111,6 +115,24 @@ int VolumeManager::find_existing_slot(const string& filename, const string& name
 		}
 	}
 
+	return -1;
+}
+
+int VolumeManager::find_density_slot()
+{
+	/* first try finding a matching grid name */
+	for(size_t i = 0; i < current_grids.size(); ++i) {
+		GridDescription grid = current_grids[i];
+		
+		if(string_iequals(grid.name, "density") || string_iequals(grid.name, "density high"))
+			return grid.slot;
+	}
+	
+	/* try using the first scalar float grid instead */
+	if(!float_volumes.empty()) {
+		return 0;
+	}
+	
 	return -1;
 }
 
@@ -153,27 +175,32 @@ size_t VolumeManager::add_openvdb_volume(const std::string& filename, const std:
 	io::File file(filename);
 	file.open();
 
+	if(!file.hasGrid(name)) return -1;
+
+	GridBase::Ptr grid = file.readGrid(name);
+	if(grid->getGridClass() == GRID_LEVEL_SET) return -1;
+
 	if(grid_type == NODE_VDB_FLOAT) {
 		slot = find_empty_slot(float_volumes);
 
 		if(slot == -1) return -1;
 
-		FloatGrid::Ptr grid = gridPtrCast<FloatGrid>(file.readGrid(name));
-		vdb_float_volume *sampler = new vdb_float_volume(grid);
+		FloatGrid::Ptr fgrid = gridPtrCast<FloatGrid>(grid);
 
+		vdb_float_volume *sampler = new vdb_float_volume(fgrid);
 		float_volumes.insert(float_volumes.begin() + slot, sampler);
-		scalar_grids.push_back(grid);
+		scalar_grids.push_back(fgrid);
 	}
 	else if(grid_type == NODE_VDB_FLOAT3) {
 		slot = find_empty_slot(float3_volumes);
 
 		if(slot == -1) return -1;
 
-		Vec3SGrid::Ptr grid = gridPtrCast<Vec3SGrid>(file.readGrid(name));
-		vdb_float3_volume *sampler = new vdb_float3_volume(grid);
+		Vec3SGrid::Ptr vgrid = gridPtrCast<Vec3SGrid>(grid);
 
+		vdb_float3_volume *sampler = new vdb_float3_volume(vgrid);
 		float3_volumes.insert(float3_volumes.begin() + slot, sampler);
-		vector_grids.push_back(grid);
+		vector_grids.push_back(vgrid);
 	}
 #else
 	(void)filename;
@@ -225,17 +252,20 @@ void VolumeManager::device_update(Device *device, DeviceScene *dscene, Scene *sc
 	}
 
 	dscene->data.tables.num_volumes = float_volumes.size() + float3_volumes.size();
+	dscene->data.tables.density_index = find_density_slot();
 
 	VLOG(1) << "Volume samplers allocate: __float_volume, " << float_volumes.size() * sizeof(float_volume) << " bytes";
 	VLOG(1) << "Volume samplers allocate: __float3_volume, " << float3_volumes.size() * sizeof(float3_volume) << " bytes";
 
+#ifdef WITH_OPENVDB
 	for(size_t i = 0; i < scalar_grids.size(); ++i) {
-		VLOG(1) << scalar_grids[i]->getName() << " memory usage: " << scalar_grids[i]->memUsage() / 1024.0f << " kilobytes.\n";
+		VLOG(1) << scalar_grids[i]->getName().c_str() << " memory usage: " << scalar_grids[i]->memUsage() / 1024.0f << " kilobytes.\n";
 	}
 
 	for(size_t i = 0; i < vector_grids.size(); ++i) {
-		VLOG(1) << vector_grids[i]->getName() << " memory usage: " << vector_grids[i]->memUsage() / 1024.0f << " kilobytes.\n";
+		VLOG(1) << vector_grids[i]->getName().c_str() << " memory usage: " << vector_grids[i]->memUsage() / 1024.0f << " kilobytes.\n";
 	}
+#endif
 
 	need_update = false;
 }

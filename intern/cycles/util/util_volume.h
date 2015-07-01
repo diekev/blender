@@ -1,7 +1,6 @@
-#ifndef __UTIL_OPENVDB_H__
-#define __UTIL_OPENVDB_H__
+#ifndef __UTIL_VOLUME_H__
+#define __UTIL_VOLUME_H__
 
-#include "util_map.h"
 #include "util_types.h"
 
 #include "kernel_types.h"
@@ -22,6 +21,7 @@ public:
 	virtual float sample(float x, float y, float z, int sampling) = 0;
 	virtual bool intersect(const Ray *ray, Intersection *isect) = 0;
 	virtual bool march(float *t0, float *t1) = 0;
+	virtual bool has_uniform_voxels() = 0;
 };
 
 class float3_volume {
@@ -30,15 +30,30 @@ public:
 	virtual float3 sample(float x, float y, float z, int sampling) = 0;
 	virtual bool intersect(const Ray *ray, Intersection *isect) = 0;
 	virtual bool march(float *t0, float *t1) = 0;
+	virtual bool has_uniform_voxels() = 0;
 };
 
 CCL_NAMESPACE_END
 
 #ifdef WITH_OPENVDB
 
+/* They are too many implicit float conversions happening in OpenVDB, disabling
+ * errors for now (kevin) */
+#ifdef __GNUC__
+#	pragma GCC diagnostic push
+#	pragma GCC diagnostic ignored "-Wfloat-conversion"
+#	pragma GCC diagnostic ignored "-Wdouble-promotion"
+#endif
+
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Interpolation.h>
 #include <openvdb/tools/RayIntersector.h>
+
+#ifdef __GNUC__
+#	pragma GCC diagnostic pop
+#endif
+
+#include "util_map.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -157,10 +172,6 @@ public:
 
 	ccl_always_inline bool intersect(const Ray *ray, Intersection */*isect*/)
 	{
-		if(!uniform_voxels) {
-			return false;
-		}
-
 		pthread_t thread = pthread_self();
 		isect_map::iterator iter = isectors.find(thread);
 		isector_t *vdb_isect;
@@ -198,41 +209,34 @@ public:
 
 	ccl_always_inline bool march(float *t0, float *t1)
 	{
-		if(!uniform_voxels) {
-			return false;
-		}
-
 		pthread_t thread = pthread_self();
 		isect_map::iterator iter = isectors.find(thread);
-		isector_t *vdb_isect;
-
-		if(iter == isectors.end()) {
-			vdb_isect = new isector_t(*main_isector);
-			pair<pthread_t, isector_t *> inter(thread, vdb_isect);
-			isectors.insert(inter);
-		}
-		else {
-			vdb_isect = iter->second;
-		}
+		isector_t *vdb_isect = iter->second;
 
 		openvdb::Real vdb_t0(*t0), vdb_t1(*t1);
 
 		if(vdb_isect->march(vdb_t0, vdb_t1)) {
-			*t0 = (float)vdb_t0;
-			*t1 = (float)vdb_t1;
+			*t0 = (float)vdb_isect->getWorldTime(vdb_t0);
+			*t1 = (float)vdb_isect->getWorldTime(vdb_t1);
 
 			return true;
 		}
 
 		return false;
 	}
+
+	ccl_always_inline bool has_uniform_voxels()
+	{
+		return uniform_voxels;
+	}
 };
 
-/* Same as above, except for vector grids */
-/* TODO(kevin): staggered velocity grid sampling */
+/* Same as above, except for vector grids, including staggered grids */
 class vdb_float3_volume : public float3_volume {
 	typedef openvdb::tools::GridSampler<openvdb::Vec3SGrid::ConstAccessor, openvdb::tools::PointSampler> point_sampler_t;
 	typedef openvdb::tools::GridSampler<openvdb::Vec3SGrid::ConstAccessor, openvdb::tools::BoxSampler> box_sampler_t;
+	typedef openvdb::tools::GridSampler<openvdb::Vec3SGrid::ConstAccessor, openvdb::tools::StaggeredPointSampler> stag_point_sampler_t;
+	typedef openvdb::tools::GridSampler<openvdb::Vec3SGrid::ConstAccessor, openvdb::tools::StaggeredBoxSampler> stag_box_sampler_t;
 
 	typedef openvdb::tools::VolumeRayIntersector<openvdb::Vec3SGrid> isector_t;
 	typedef isector_t::RayType vdb_ray_t;
@@ -241,9 +245,13 @@ class vdb_float3_volume : public float3_volume {
 	typedef unordered_map<pthread_t, isector_t *> isect_map;
 	typedef unordered_map<pthread_t, point_sampler_t *> point_map;
 	typedef unordered_map<pthread_t, box_sampler_t *> box_map;
+	typedef unordered_map<pthread_t, stag_point_sampler_t *> stag_point_map;
+	typedef unordered_map<pthread_t, stag_box_sampler_t *> stag_box_map;
 	isect_map isectors;
 	point_map point_samplers;
 	box_map box_samplers;
+	stag_point_map stag_point_samplers;
+	stag_box_map stag_box_samplers;
 
 	openvdb::Vec3SGrid::ConstAccessor *accessor;
 	openvdb::math::Transform *transfrom;
@@ -253,13 +261,14 @@ class vdb_float3_volume : public float3_volume {
 	 * generated from a copy of it. */
 	isector_t *main_isector;
 
-	bool uniform_voxels;
+	bool uniform_voxels, staggered;
 
 public:
 	vdb_float3_volume(openvdb::Vec3SGrid::Ptr grid)
 	    : transfrom(&grid->transform())
 	{
 		accessor = new openvdb::Vec3SGrid::ConstAccessor(grid->getConstAccessor());
+		staggered = (grid->getGridClass() == openvdb::GRID_STAGGERED);
 
 		/* only grids with uniform voxels can be used with VolumeRayIntersector */
 		if(grid->hasUniformVoxels()) {
@@ -288,6 +297,20 @@ public:
 			delete iter->second;
 		}
 
+		for(stag_point_map::iterator iter = stag_point_samplers.begin();
+		    iter != stag_point_samplers.end();
+		    ++iter)
+		{
+			delete iter->second;
+		}
+
+		for(stag_box_map::iterator iter = stag_box_samplers.begin();
+		    iter != stag_box_samplers.end();
+		    ++iter)
+		{
+			delete iter->second;
+		}
+
 		if(uniform_voxels) {
 			delete main_isector;
 
@@ -300,7 +323,48 @@ public:
 		}
 	}
 
-	ccl_always_inline float3 sample(float x, float y, float z, int sampling)
+	ccl_always_inline float3 sample_staggered(float x, float y, float z, int sampling)
+	{
+		openvdb::Vec3s r;
+		pthread_t thread = pthread_self();
+
+		if(sampling == OPENVDB_SAMPLE_POINT) {
+			stag_point_map::iterator iter = stag_point_samplers.find(thread);
+			stag_point_sampler_t *sampler;
+
+			if(iter == stag_point_samplers.end()) {
+				openvdb::Vec3SGrid::ConstAccessor *acc = new openvdb::Vec3SGrid::ConstAccessor(*accessor);
+				sampler = new stag_point_sampler_t(*acc, *transfrom);
+				pair<pthread_t, stag_point_sampler_t *> sampl(thread, sampler);
+				stag_point_samplers.insert(sampl);
+			}
+			else {
+				sampler = iter->second;
+			}
+
+			r = sampler->wsSample(openvdb::Vec3d(x, y, z));
+		}
+		else {
+			stag_box_map::iterator iter = stag_box_samplers.find(thread);
+			stag_box_sampler_t *sampler;
+
+			if(iter == stag_box_samplers.end()) {
+				openvdb::Vec3SGrid::ConstAccessor *acc = new openvdb::Vec3SGrid::ConstAccessor(*accessor);
+				sampler = new stag_box_sampler_t(*acc, *transfrom);
+				pair<pthread_t, stag_box_sampler_t *> sampl(thread, sampler);
+				stag_box_samplers.insert(sampl);
+			}
+			else {
+				sampler = iter->second;
+			}
+
+			r = sampler->wsSample(openvdb::Vec3d(x, y, z));
+		}
+
+		return make_float3(r.x(), r.y(), r.z());
+	}
+
+	ccl_always_inline float3 sample_ex(float x, float y, float z, int sampling)
 	{
 		openvdb::Vec3s r;
 		pthread_t thread = pthread_self();
@@ -341,12 +405,16 @@ public:
 		return make_float3(r.x(), r.y(), r.z());
 	}
 
+	ccl_always_inline float3 sample(float x, float y, float z, int sampling)
+	{
+		if(staggered)
+			return sample_staggered(x, y, z, sampling);
+		else
+			return sample_ex(x, y, z, sampling);
+	}
+
 	ccl_always_inline bool intersect(const Ray *ray, Intersection */*isect*/)
 	{
-		if(!uniform_voxels) {
-			return false;
-		}
-
 		pthread_t thread = pthread_self();
 		isect_map::iterator iter = isectors.find(thread);
 		isector_t *vdb_isect;
@@ -384,33 +452,25 @@ public:
 
 	ccl_always_inline bool march(float *t0, float *t1)
 	{
-		if(!uniform_voxels) {
-			return false;
-		}
-
 		pthread_t thread = pthread_self();
 		isect_map::iterator iter = isectors.find(thread);
-		isector_t *vdb_isect;
-
-		if(iter == isectors.end()) {
-			vdb_isect = new isector_t(*main_isector);
-			pair<pthread_t, isector_t *> inter(thread, vdb_isect);
-			isectors.insert(inter);
-		}
-		else {
-			vdb_isect = iter->second;
-		}
+		isector_t *vdb_isect = iter->second;
 
 		openvdb::Real vdb_t0(*t0), vdb_t1(*t1);
 
 		if(vdb_isect->march(vdb_t0, vdb_t1)) {
-			*t0 = (float)vdb_t0;
-			*t1 = (float)vdb_t1;
+			*t0 = (float)vdb_isect->getWorldTime(vdb_t0);
+			*t1 = (float)vdb_isect->getWorldTime(vdb_t1);
 
 			return true;
 		}
 
 		return false;
+	}
+
+	ccl_always_inline bool has_uniform_voxels()
+	{
+		return uniform_voxels;
 	}
 };
 
@@ -418,5 +478,5 @@ CCL_NAMESPACE_END
 
 #endif /* WITH_OPENVDB */
 
-#endif /* __UTIL_OPENVDB_H__ */
+#endif /* __UTIL_VOLUME_H__ */
 

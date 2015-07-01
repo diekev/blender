@@ -62,12 +62,14 @@ public:
 	}
 };
 
-void OpenVDB_export_vector_grid(OpenVDBWriter *writer,
-                                const std::string &name,
-                                const float *data_x, const float *data_y, const float *data_z,
-                                const int res[3],
-                                float fluid_mat[4][4],
-                                VecType vec_type)
+GridBase *OpenVDB_export_vector_grid(OpenVDBWriter *writer,
+                                     const std::string &name,
+                                     const float *data_x, const float *data_y, const float *data_z,
+                                     const int res[3],
+                                     float fluid_mat[4][4],
+                                     VecType vec_type,
+                                     const bool is_color,
+                                     const FloatGrid *mask)
 {
 
 	math::CoordBBox bbox(Coord(0), Coord(res[0] - 1, res[1] - 1, res[2] - 1));
@@ -84,15 +86,15 @@ void OpenVDB_export_vector_grid(OpenVDBWriter *writer,
 
 	grid[0] = FloatGrid::create(0.0f);
 	tools::Dense<const float, tools::LayoutXYZ> dense_grid_x(bbox, data_x);
-	tools::copyFromDense(dense_grid_x, grid[0]->tree(), 1e-3f, true);
+	tools::copyFromDense(dense_grid_x, grid[0]->tree(), TOLERANCE);
 
 	grid[1] = FloatGrid::create(0.0f);
 	tools::Dense<const float, tools::LayoutXYZ> dense_grid_y(bbox, data_y);
-	tools::copyFromDense(dense_grid_y, grid[1]->tree(), 1e-3f, true);
+	tools::copyFromDense(dense_grid_y, grid[1]->tree(), TOLERANCE);
 
 	grid[2] = FloatGrid::create(0.0f);
 	tools::Dense<const float, tools::LayoutXYZ> dense_grid_z(bbox, data_z);
-	tools::copyFromDense(dense_grid_z, grid[2]->tree(), 1e-3f, true);
+	tools::copyFromDense(dense_grid_z, grid[2]->tree(), TOLERANCE);
 
 	Vec3SGrid::Ptr vecgrid = Vec3SGrid::create(Vec3s(0.0f));
 
@@ -105,12 +107,21 @@ void OpenVDB_export_vector_grid(OpenVDBWriter *writer,
 	MergeScalarGrids op(&(grid[0]->tree()), &(grid[1]->tree()), &(grid[2]->tree()));
 	tools::foreach(vecgrid->beginValueOn(), op, true, false);
 
-	vecgrid->setName(name);
 	vecgrid->setTransform(transform);
+
+	if (mask) {
+		vecgrid = tools::clip(*vecgrid, *mask);
+	}
+
+	vecgrid->setName(name);
 	vecgrid->setIsInWorldSpace(false);
 	vecgrid->setVectorType(vec_type);
+	vecgrid->insertMeta("is_color", BoolMetadata(is_color));
+	vecgrid->setGridClass(GRID_STAGGERED);
 
 	writer->insert(vecgrid);
+
+	return vecgrid.get();
 }
 
 class SplitVectorGrid {

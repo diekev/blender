@@ -322,7 +322,7 @@ void UI_view2d_region_reinit(View2D *v2d, short type, int winx, int winy)
 
 			if (do_init) {
 				float panelzoom = (style) ? style->panelzoom : 1.0f;
-				float scrolw = v2d->scroll & V2D_SCROLL_RIGHT ? V2D_SCROLL_WIDTH : 0.0f;
+				float scrolw = (v2d->scroll & V2D_SCROLL_RIGHT) ? V2D_SCROLL_WIDTH : 0.0f;
 				
 				v2d->tot.xmin = 0.0f;
 				v2d->tot.xmax = winx - scrolw;
@@ -1663,7 +1663,7 @@ static void scroll_printstr(Scene *scene, float x, float y, float val, int power
 		BLI_timecode_string_from_time(timecode_str, sizeof(timecode_str), power, val, FPS, U.timecode_style);
 	}
 	else {
-		BLI_timecode_string_from_time_simple(timecode_str, sizeof(timecode_str), power, val);
+		BLI_timecode_string_from_time_seconds(timecode_str, sizeof(timecode_str), power, val);
 	}
 	
 	/* get length of string, and adjust printing location to fit it into the horizontal scrollbar */

@@ -16,11 +16,11 @@
 
 #include "image.h"
 #include "nodes.h"
-#include "openvdb.h"
 #include "svm.h"
 #include "svm_math_util.h"
 #include "osl.h"
 #include "sky_model.h"
+#include "volume.h"
 
 #include "util_foreach.h"
 #include "util_transform.h"
@@ -3935,6 +3935,8 @@ BumpNode::BumpNode()
 {
 	invert = false;
 
+	special_type = SHADER_SPECIAL_TYPE_BUMP;
+
 	/* this input is used by the user, but after graph transform it is no longer
 	 * used and moved to sampler center/x/y instead */
 	add_input("Height", SHADER_SOCKET_FLOAT);
@@ -4401,13 +4403,13 @@ void OpenVDBNode::compile(SVMCompiler& compiler)
 
 		int type = NODE_VDB_FLOAT;
 
-		if(out->type == SHADER_SOCKET_VECTOR) {
+		if(out->type == SHADER_SOCKET_VECTOR || out->type == SHADER_SOCKET_COLOR) {
 			type = NODE_VDB_FLOAT3;
 		}
 
 		grid_slot = volume_manager->add_volume(filename.string(),
-		                                    output_names[i].string(),
-		                                    sampling, type);
+		                                       output_names[i].string(),
+		                                       sampling, type);
 
 		if(grid_slot == -1) {
 			continue;

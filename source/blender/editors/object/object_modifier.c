@@ -45,6 +45,7 @@
 #include "DNA_smoke_types.h"
 
 #include "BLI_bitmap.h"
+#include "BLI_fileops.h"
 #include "BLI_math.h"
 #include "BLI_listbase.h"
 #include "BLI_string.h"
@@ -74,6 +75,7 @@
 #include "BKE_paint.h"
 #include "BKE_particle.h"
 #include "BKE_pointcache.h"
+#include "BKE_screen.h"
 #include "BKE_smoke.h"
 #include "BKE_softbody.h"
 #include "BKE_editmesh.h"
@@ -91,7 +93,10 @@
 #include "WM_types.h"
 
 #include "object_intern.h"
-#include "openvdb_capi.h"
+
+#ifdef WITH_OPENVDB
+#  include "openvdb_capi.h"
+#endif
 
 static void modifier_skin_customdata_delete(struct Object *ob);
 
@@ -252,7 +257,7 @@ static bool object_has_modifier_cb(Object *ob, void *data)
 bool ED_object_multires_update_totlevels_cb(Object *ob, void *totlevel_v)
 {
 	ModifierData *md;
-	int totlevel = *((int *)totlevel_v);
+	int totlevel = *((char *)totlevel_v);
 
 	for (md = ob->modifiers.first; md; md = md->next) {
 		if (md->type == eModifierType_Multires) {
@@ -2302,12 +2307,29 @@ void OBJECT_OT_laplaciandeform_bind(wmOperatorType *ot)
 
 /************************ OpenVDB smoke convertor operator *********************/
 
+static int openvdb_cache_poll(bContext *C)
+{
+	Object *ob = CTX_data_active_object(C);
+	SmokeModifierData *smd = NULL;
+
+	if (!ob) {
+		return false;
+	}
+
+	smd = (SmokeModifierData *)modifiers_findByType(ob, eModifierType_Smoke);
+
+	if (!smd) {
+		return false;
+	}
+
+	return true;
+}
+
 typedef struct SmokeExportJob {
 	/* from wmJob */
 	void *owner;
 	short *stop, *do_update;
 	float *progress;
-	int current_frame;
 	struct SmokeModifierData *smd;
 	struct Scene *scene;
 	struct Object *ob;
@@ -2350,6 +2372,12 @@ static void smoke_export_startjob(void *customdata, short *stop, short *do_updat
 
 	G.is_break = false;
 
+	/* XXX annoying hack: needed to prevent data corruption when changing
+	 * scene frame in separate threads
+	 */
+	G.is_rendering = true;
+	BKE_spacedata_draw_locks(true);
+
 	smokeModifier_OpenVDB_export(sej->smd, sej->scene, sej->ob, sej->dm,
 	                             smoke_export_update, (void *)sej);
 
@@ -2362,13 +2390,16 @@ static void smoke_export_endjob(void *customdata)
 	SmokeExportJob *sej = customdata;
 	Object *ob = sej->ob;
 
+	G.is_rendering = false;
+	BKE_spacedata_draw_locks(false);
+
 	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
 	WM_main_add_notifier(NC_OBJECT | ND_MODIFIER, ob);
 }
 
 static int smoke_vdb_export_exec(bContext *C, wmOperator *op)
 {
-	Object *ob = ED_object_active_context(C);
+	Object *ob = CTX_data_active_object(C);
 	SmokeModifierData *smd = (SmokeModifierData *)modifiers_findByType(ob, eModifierType_Smoke);
 	Scene *scene = CTX_data_scene(C);
 	wmJob *wm_job;
@@ -2379,7 +2410,7 @@ static int smoke_vdb_export_exec(bContext *C, wmOperator *op)
 	}
 
 	/* setup job */
-	wm_job = WM_jobs_get(CTX_wm_manager(C), CTX_wm_window(C), scene, "OpenVDB export",
+	wm_job = WM_jobs_get(CTX_wm_manager(C), CTX_wm_window(C), scene, "OpenVDB Export",
 	                     WM_JOB_PROGRESS, WM_JOB_TYPE_SMOKE_EXPORT);
 
 	sej = MEM_callocN(sizeof(SmokeExportJob), "smoke export job");
@@ -2399,13 +2430,50 @@ static int smoke_vdb_export_exec(bContext *C, wmOperator *op)
 	UNUSED_VARS(op);
 }
 
+static int smoke_vdb_export_invoke(bContext *C, wmOperator *op, const wmEvent *event)
+{
+	Object *ob = CTX_data_active_object(C);
+	SmokeModifierData *smd = (SmokeModifierData *)modifiers_findByType(ob, eModifierType_Smoke);
+	SmokeDomainSettings *sds = smd->domain;
+	OpenVDBCache *cache = BKE_openvdb_get_current_cache(sds);
+	const char *relbase = modifier_path_relbase(ob);
+	char filename[FILE_MAX];
+
+	if (!cache)
+		return OPERATOR_CANCELLED;
+
+	BKE_openvdb_cache_filename(filename, cache->path, cache->name, relbase, cache->startframe);
+
+	if (BLI_exists(filename)) {
+		if (BLI_is_file(filename)) {
+			if (BLI_file_is_writable(filename)) {
+				return WM_operator_confirm_message(C, op, "Cache target already exists! Overwrite?");
+			}
+			else {
+				BKE_reportf(op->reports, RPT_ERROR, "Cannot overwrite cache target: %200s", filename);
+				return OPERATOR_CANCELLED;
+			}
+		}
+		else {
+			BKE_reportf(op->reports, RPT_ERROR, "Invalid cache target: %200s", filename);
+			return OPERATOR_CANCELLED;
+		}
+	}
+	else {
+		return smoke_vdb_export_exec(C, op);
+	}
+
+	UNUSED_VARS(event);
+}
+
 void OBJECT_OT_smoke_vdb_export(wmOperatorType *ot)
 {
 	ot->name = "Export to OpenVDB";
 	ot->description = "Export simulation to the OpenVDB representation";
 	ot->idname = "OBJECT_OT_smoke_vdb_export";
 
-	ot->poll = ED_operator_object_active_editable;
+	ot->invoke = smoke_vdb_export_invoke;
+	ot->poll = openvdb_cache_poll;
 	ot->exec = smoke_vdb_export_exec;
 
 	/* flags */
@@ -2431,7 +2499,7 @@ static void smoke_transform_startjob(void *customdata, short *stop, short *do_up
 
 static int smoke_transform_exec(bContext *C, wmOperator *op)
 {
-	Object *ob = ED_object_active_context(C);
+	Object *ob = CTX_data_active_object(C);
 	SmokeModifierData *smd = (SmokeModifierData *)modifiers_findByType(ob, eModifierType_Smoke);
 	Scene *scene = CTX_data_scene(C);
 	wmJob *wm_job;
@@ -2442,7 +2510,7 @@ static int smoke_transform_exec(bContext *C, wmOperator *op)
 	}
 
 	/* setup job */
-	wm_job = WM_jobs_get(CTX_wm_manager(C), CTX_wm_window(C), scene, "OpenVDB export",
+	wm_job = WM_jobs_get(CTX_wm_manager(C), CTX_wm_window(C), scene, "OpenVDB Export",
 	                     WM_JOB_PROGRESS, WM_JOB_TYPE_SMOKE_EXPORT);
 
 	sej = MEM_callocN(sizeof(SmokeExportJob), "smoke export job");
@@ -2464,11 +2532,11 @@ static int smoke_transform_exec(bContext *C, wmOperator *op)
 
 void OBJECT_OT_smoke_vdb_transform_update(wmOperatorType *ot)
 {
-	ot->name = "Update transform matrix";
-	ot->description = "Update transformation matrices for all grids in the file";
+	ot->name = "Update Transformation";
+	ot->description = "Update transformation matrices for all grids in every file for this cache";
 	ot->idname = "OBJECT_OT_smoke_vdb_transform_update";
 
-	ot->poll = ED_operator_object_active_editable;
+	ot->poll = openvdb_cache_poll;
 	ot->exec = smoke_transform_exec;
 
 	/* flags */
@@ -2476,19 +2544,6 @@ void OBJECT_OT_smoke_vdb_transform_update(wmOperatorType *ot)
 }
 
 /* ************************* OpenVDB cache operators ************************* */
-
-OpenVDBCache *BKE_openvdb_get_current_cache(SmokeDomainSettings *sds)
-{
-	OpenVDBCache *cache = sds->vdb_caches.first;
-
-	for (; cache; cache = cache->next) {
-		if (cache->flag & VDB_CACHE_CURRENT) {
-			break;
-		}
-	}
-
-	return cache;
-}
 
 static OpenVDBCache *openvdb_cache_new(void)
 {
@@ -2504,7 +2559,7 @@ static OpenVDBCache *openvdb_cache_new(void)
 	cache->num_steps = 10;
 	cache->time_scale = 1.0f;
 
-	BLI_strncpy(cache->name, "openvdb_cache_", sizeof(cache->name));
+	BLI_strncpy(cache->name, "openvdb_smoke_export", sizeof(cache->name));
 
 	return cache;
 }
@@ -2531,7 +2586,7 @@ OpenVDBCache *BKE_openvdb_duplicate_cache(OpenVDBCache *cache)
 
 static int openvdb_cache_add_exec(bContext *C, wmOperator *op)
 {
-	Object *ob = ED_object_active_context(C);
+	Object *ob = CTX_data_active_object(C);
 	SmokeModifierData *smd = (SmokeModifierData *)modifiers_findByType(ob, eModifierType_Smoke);
 	SmokeDomainSettings *sds = smd->domain;
 	OpenVDBCache *cache, *cache_new;
@@ -2543,11 +2598,11 @@ static int openvdb_cache_add_exec(bContext *C, wmOperator *op)
 	cache = BKE_openvdb_get_current_cache(sds);
 
 	if (cache) {
-		cache->flag &= ~VDB_CACHE_CURRENT;
+		cache->flags &= ~VDB_CACHE_CURRENT;
 	}
 
 	cache_new = openvdb_cache_new();
-	cache_new->flag |= VDB_CACHE_CURRENT;
+	cache_new->flags |= VDB_CACHE_CURRENT;
 
 	BLI_addtail(&sds->vdb_caches, cache_new);
 
@@ -2566,7 +2621,7 @@ void OBJECT_OT_openvdb_cache_add(wmOperatorType *ot)
 	ot->idname = "OBJECT_OT_openvdb_cache_add";
 
 	/* api callbacks */
-	ot->poll = ED_operator_object_active_editable;
+	ot->poll = openvdb_cache_poll;
 	ot->exec = openvdb_cache_add_exec;
 
 	/* flags */
@@ -2575,7 +2630,7 @@ void OBJECT_OT_openvdb_cache_add(wmOperatorType *ot)
 
 static int openvdb_cache_remove_exec(bContext *C, wmOperator *op)
 {
-	Object *ob = ED_object_active_context(C);
+	Object *ob = CTX_data_active_object(C);
 	SmokeModifierData *smd = (SmokeModifierData *)modifiers_findByType(ob, eModifierType_Smoke);
 	SmokeDomainSettings *sds = smd->domain;
 	OpenVDBCache *cache, *cache_prev = NULL, *cache_next = NULL;
@@ -2594,10 +2649,10 @@ static int openvdb_cache_remove_exec(bContext *C, wmOperator *op)
 	}
 
 	if (cache_next) {
-		cache_next->flag |= VDB_CACHE_CURRENT;
+		cache_next->flags |= VDB_CACHE_CURRENT;
 	}
 	else if (cache_prev) {
-		cache_prev->flag |= VDB_CACHE_CURRENT;
+		cache_prev->flags |= VDB_CACHE_CURRENT;
 	}
 
 	WM_event_add_notifier(C, NC_OBJECT | ND_POINTCACHE, ob);
@@ -2610,12 +2665,12 @@ static int openvdb_cache_remove_exec(bContext *C, wmOperator *op)
 void OBJECT_OT_openvdb_cache_remove(wmOperatorType *ot)
 {
 	/* identifiers */
-	ot->name = "Remove OpenVDB cache";
-	ot->description = "Remove the currently selected OpenVDB cache";
+	ot->name = "Remove Cache";
+	ot->description = "Remove the currently selected cache";
 	ot->idname = "OBJECT_OT_openvdb_cache_remove";
 
 	/* api callbacks */
-	ot->poll = ED_operator_object_active_editable;
+	ot->poll = openvdb_cache_poll;
 	ot->exec = openvdb_cache_remove_exec;
 
 	/* flags */
@@ -2629,7 +2684,7 @@ enum {
 
 static int openvdb_cache_move_exec(bContext *C, wmOperator *op)
 {
-	Object *ob = ED_object_active_context(C);
+	Object *ob = CTX_data_active_object(C);
 	SmokeModifierData *smd = (SmokeModifierData *)modifiers_findByType(ob, eModifierType_Smoke);
 	SmokeDomainSettings *sds = smd->domain;
 	OpenVDBCache *cache;
@@ -2667,11 +2722,11 @@ void OBJECT_OT_openvdb_cache_move(wmOperatorType *ot)
 	    { 0, NULL, 0, NULL, NULL }
 	};
 
-	ot->name = "Move OpenVDB cache";
-	ot->description = "Move levelset filter up or down the list";
+	ot->name = "Move Cache";
+	ot->description = "Move cache up or down the list";
 	ot->idname = "OBJECT_OT_openvdb_cache_move";
 
-	ot->poll = ED_operator_object_active_editable;
+	ot->poll = openvdb_cache_poll;
 	ot->exec = openvdb_cache_move_exec;
 
 	/* flags */

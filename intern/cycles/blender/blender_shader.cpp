@@ -743,7 +743,7 @@ static ShaderNode *add_node(Scene *scene,
 		vdb_node->sampling = b_vdb_node.sampling();
 
 		/* TODO(kevin) */
-		if(b_vdb_node.source() == 1) {
+		if(b_vdb_node.source() == BL::ShaderNodeOpenVDB::source_SEQUENCE) {
 			string filename = b_vdb_node.filename();
 			string basename = filename.substr(0, filename.size() - 8);
 			stringstream ss;
@@ -925,7 +925,7 @@ static void add_nodes(Scene *scene,
 				output_map[b_output->ptr.data] = proxy->outputs[0];
 			}
 			
-			if (b_group_ntree) {
+			if(b_group_ntree) {
 				add_nodes(scene,
 				          b_engine,
 				          b_data,

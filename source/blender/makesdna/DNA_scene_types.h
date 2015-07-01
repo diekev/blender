@@ -689,7 +689,13 @@ typedef struct RenderData {
 	struct BakeData bake;
 
 	int preview_start_resolution;
-	int pad;
+
+	/* Type of the debug pass to use.
+	 * Only used when built with debug passes support.
+	 */
+	short debug_pass_type;
+
+	short pad;
 
 	/* MultiView */
 	ListBase views;
@@ -1700,6 +1706,8 @@ extern const char *RE_engine_id_CYCLES;
 #define SCE_SNAP_PEEL_OBJECT	4
 #define SCE_SNAP_PROJECT		8
 #define SCE_SNAP_NO_SELF		16
+#define SCE_SNAP_ABS_GRID		32
+
 /* toolsettings->snap_target */
 #define SCE_SNAP_TARGET_CLOSEST	0
 #define SCE_SNAP_TARGET_CENTER	1

@@ -41,7 +41,6 @@ enum {
 	MOD_SMOKE_HIGH_SMOOTH = (1 << 5),  /* -- Deprecated -- */
 	MOD_SMOKE_FILE_LOAD = (1 << 6),  /* flag for file load */
 	MOD_SMOKE_ADAPTIVE_DOMAIN = (1 << 7),
-	MOD_SMOKE_OPENVDB_EXPORTED = (1 << 8),
 };
 
 #if (DNA_DEPRECATED_GCC_POISON == 1)
@@ -155,6 +154,8 @@ typedef struct SmokeDomainSettings {
 
 	struct ListBase vdb_caches;
 	short use_openvdb, pad[3];
+	struct OpenVDBPrimitive *density, *density_high;
+	struct OpenVDBDrawData *vdb_draw_data;
 } SmokeDomainSettings;
 
 typedef struct OpenVDBCache {
@@ -164,7 +165,7 @@ typedef struct OpenVDBCache {
 	char path[1024];
 	char name[64];
 	int startframe, endframe;
-	short flag, compression, pad[2];
+	short flags, compression, pad[2];
 
 	/* Retimer params */
 	float time_scale;
@@ -173,14 +174,43 @@ typedef struct OpenVDBCache {
 	int pad1;
 } OpenVDBCache;
 
+typedef struct OpenVDBDrawData {
+	float tolerance;      /* minimun value a voxel should have to be drawn */
+	float point_size;     /* size of the voxels */
+	short flags;          /* which level of the tree to draw */
+	short voxel_drawing;  /* how to draw the voxels */
+	int lod;              /* level of detail */
+} OpenVDBDrawData;
+
 enum {
-	VDB_CACHE_CURRENT = 1,
+	VDB_CACHE_CURRENT        = (1 << 0),
+	VDB_CACHE_SMOKE_EXPORTED = (1 << 1),
+	VDB_CACHE_SAVE_AS_HALF   = (1 << 2),
 };
 
 enum {
 	VDB_COMPRESSION_ZIP   = 0,
 	VDB_COMPRESSION_BLOSC = 1,
 	VDB_COMPRESSION_NONE  = 2,
+};
+
+/* OpenVDBDrawData.flags */
+enum {
+	/* Draw the various levels of the VDB tree */
+    DRAW_ROOT    = (1 << 0),
+    DRAW_LEVEL_1 = (1 << 1),
+    DRAW_LEVEL_2 = (1 << 2),
+    DRAW_LEAVES  = (1 << 3),
+	/* Draw the voxels */
+	DRAW_VOXELS  = (1 << 4),
+};
+
+/* OpenVDBDrawData.voxel_drawing */
+enum {
+	DRAW_VOXELS_POINT  = 0,
+	DRAW_VOXELS_BOX    = 1,
+	/* unsupported at the moment, is using dense arrays */
+	DRAW_VOXELS_VOLUME = 2,
 };
 
 /* inflow / outflow */
