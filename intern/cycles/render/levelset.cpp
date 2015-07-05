@@ -59,32 +59,34 @@ void OpenVDB_file_read(const char* filename, Scene* scene)
 
 	OpenVDB_initialize();
 
-	if (!loaded_level_set.use_count())
+	if (!loaded_level_set.use_count()) {
 		try {
-		io::File file(filename);
-		file.open();
+			io::File file(filename);
+			file.open();
 
-		size_t size = file.getSize();
-		printf("Opening %s, is %lu bytes!\n", filename, size);
+			size_t size = file.getSize();
+			printf("Opening %s, is %lu bytes!\n", filename, size);
 
-		for (io::File::NameIterator iter = file.beginName(); iter != file.endName(); ++iter) {
-			printf("Reading grid %s!\n", iter.gridName().c_str());
+			for (io::File::NameIterator iter = file.beginName(); iter != file.endName(); ++iter) {
+				printf("Reading grid %s!\n", iter.gridName().c_str());
 
-			GridBase::Ptr grid = file.readGrid(iter.gridName());
-			grid->print();
+				GridBase::Ptr grid = file.readGrid(iter.gridName());
+				grid->print();
 
-			if(grid->getGridClass() != GRID_LEVEL_SET)
-				continue;
+				if(grid->getGridClass() != GRID_LEVEL_SET)
+					continue;
 
-			if (grid->isType<FloatGrid>())
-				loaded_level_set = gridPtrCast<openvdb::FloatGrid>(grid);
-			else
-				printf("No FloatGrid, ignoring!\n");
+				if (grid->isType<FloatGrid>())
+					loaded_level_set = gridPtrCast<openvdb::FloatGrid>(grid);
+				else
+					printf("No FloatGrid, ignoring!\n");
+			}
+
+			file.close();
 		}
-
-		file.close();
-	}
-	catch (...) {
+		catch (const IoError &e) {
+			std::cerr << e.what() << "\n";
+		}
 	}
 
 	scene->level_sets.push_back(new LevelSet(loaded_level_set, 0));
