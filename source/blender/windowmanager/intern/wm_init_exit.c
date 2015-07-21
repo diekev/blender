@@ -117,6 +117,10 @@
 #include "BKE_sound.h"
 #include "COM_compositor.h"
 
+#ifdef WITH_OPENSUBDIV
+#  include "opensubdiv_capi.h"
+#endif
+
 static void wm_init_reports(bContext *C)
 {
 	ReportList *reports = CTX_wm_reports(C);
@@ -171,9 +175,13 @@ void WM_init(bContext *C, int argc, const char **argv)
 	/* get the default database, plus a wm */
 	wm_homefile_read(C, NULL, G.factory_startup, NULL);
 	
+
 	BLF_lang_set(NULL);
 
 	if (!G.background) {
+		/* sets 3D mouse deadzone */
+		WM_ndof_deadzone_set(U.ndof_deadzone);
+
 		GPU_init();
 
 		GPU_set_mipmap(!(U.gameflags & USER_DISABLE_MIPMAP));
@@ -519,6 +527,10 @@ void WM_exit_ext(bContext *C, const bool do_python)
 	}
 #else
 	(void)do_python;
+#endif
+
+#ifdef WITH_OPENSUBDIV
+	openSubdiv_cleanup();
 #endif
 
 	if (!G.background) {

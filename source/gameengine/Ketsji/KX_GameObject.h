@@ -40,7 +40,7 @@
 
 #include <stddef.h>
 
-#include "ListValue.h"
+#include "EXP_ListValue.h"
 #include "SCA_IObject.h"
 #include "SG_Node.h"
 #include "MT_Transform.h"
@@ -300,6 +300,11 @@ public:
 	 * Stop playing the action on the given layer
 	 */
 	void StopAction(short layer);
+
+	/**
+	 * Remove playing tagged actions.
+	 */
+	void RemoveTaggedActions();
 
 	/**
 	 * Check if an action has finished playing
