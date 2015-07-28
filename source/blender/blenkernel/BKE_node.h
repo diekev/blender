@@ -790,7 +790,8 @@ struct ShadeResult;
 #define SH_NODE_COMBXYZ					189
 #define SH_NODE_OUTPUT_LINESTYLE		190
 #define SH_NODE_UVALONGSTROKE			191
-#define SH_NODE_OPENVDB					192
+#define SH_NODE_TEX_POINTDENSITY		192
+#define SH_NODE_OPENVDB					193
 
 /* custom defines options for Material node */
 #define SH_NODE_MAT_DIFF   1
@@ -859,6 +860,7 @@ void            ntreeUpdateOpenVDBNode(struct Main *bmain, struct bNodeTree *ntr
 #define RRES_OUT_SUBSURFACE_DIRECT		28
 #define RRES_OUT_SUBSURFACE_INDIRECT	29
 #define RRES_OUT_SUBSURFACE_COLOR		30
+#define RRES_OUT_DEBUG				31
 
 /* note: types are needed to restore callbacks, don't change values */
 #define CMP_NODE_VIEWER		201

@@ -88,7 +88,7 @@
 #include "BKE_sound.h"
 
 #ifdef WITH_AUDASPACE
-#  include "AUD_C-API.h"
+#  include AUD_SPECIAL_H
 #endif
 
 static ImBuf *seq_render_strip_stack(const SeqRenderData *context, ListBase *seqbasep, float cfra, int chanshown);
@@ -1115,6 +1115,7 @@ static const char *give_seqname_by_type(int type)
 		case SEQ_TYPE_ADJUSTMENT:    return "Adjustment";
 		case SEQ_TYPE_SPEED:         return "Speed";
 		case SEQ_TYPE_GAUSSIAN_BLUR: return "Gaussian Blur";
+		case SEQ_TYPE_TEXT:          return "Text";
 		default:
 			return NULL;
 	}
@@ -1125,7 +1126,7 @@ const char *BKE_sequence_give_name(Sequence *seq)
 	const char *name = give_seqname_by_type(seq->type);
 
 	if (!name) {
-		if (seq->type < SEQ_TYPE_EFFECT) {
+		if (!(seq->type & SEQ_TYPE_EFFECT)) {
 			return seq->strip->dir;
 		}
 		else {
@@ -1751,7 +1752,8 @@ static void seq_proxy_build_frame(const SeqRenderData *context, Sequence *seq, i
 	/* depth = 32 is intentionally left in, otherwise ALPHA channels
 	 * won't work... */
 	quality = seq->strip->proxy->quality;
-	ibuf->ftype = JPG | quality;
+	ibuf->ftype = IMB_FTYPE_JPG;
+	ibuf->foptions.quality = quality;
 
 	/* unsupported feature only confuses other s/w */
 	if (ibuf->planes == 32)
@@ -2859,12 +2861,12 @@ static ImBuf *seq_render_movie_strip(const SeqRenderData *context, Sequence *seq
 				                                seq->strip->proxy ? seq->strip->proxy->tc : IMB_TC_RECORD_RUN,
 				                                proxy_size);
 
-			/* fetching for requested proxy size failed, try fetching the original instead */
-			if (!ibuf_arr[i] && proxy_size != IMB_PROXY_NONE) {
-				ibuf_arr[i] = IMB_anim_absolute(sanim->anim, nr + seq->anim_startofs,
-				                                seq->strip->proxy ? seq->strip->proxy->tc : IMB_TC_RECORD_RUN,
-				                                IMB_PROXY_NONE);
-			}
+				/* fetching for requested proxy size failed, try fetching the original instead */
+				if (!ibuf_arr[i] && proxy_size != IMB_PROXY_NONE) {
+					ibuf_arr[i] = IMB_anim_absolute(sanim->anim, nr + seq->anim_startofs,
+					                                seq->strip->proxy ? seq->strip->proxy->tc : IMB_TC_RECORD_RUN,
+					                                IMB_PROXY_NONE);
+				}
 				if (ibuf_arr[i]) {
 					/* we don't need both (speed reasons)! */
 					if (ibuf_arr[i]->rect_float && ibuf_arr[i]->rect)
@@ -4214,7 +4216,7 @@ void BKE_sequence_single_fix(Sequence *seq)
 
 bool BKE_sequence_tx_test(Sequence *seq)
 {
-	return (seq->type < SEQ_TYPE_EFFECT) || (BKE_sequence_effect_get_num_inputs(seq->type) == 0);
+	return !(seq->type & SEQ_TYPE_EFFECT) || (BKE_sequence_effect_get_num_inputs(seq->type) == 0);
 }
 
 static bool seq_overlap(Sequence *seq1, Sequence *seq2)
@@ -5237,13 +5239,11 @@ static Sequence *seq_dupli(Scene *scene, Scene *scene_to, Sequence *seq, int dup
 		seqn->strip->stripdata =
 		        MEM_dupallocN(seq->strip->stripdata);
 	}
-	else if (seq->type >= SEQ_TYPE_EFFECT) {
-		if (seq->type & SEQ_TYPE_EFFECT) {
-			struct SeqEffectHandle sh;
-			sh = BKE_sequence_get_effect(seq);
-			if (sh.copy)
-				sh.copy(seq, seqn);
-		}
+	else if (seq->type & SEQ_TYPE_EFFECT) {
+		struct SeqEffectHandle sh;
+		sh = BKE_sequence_get_effect(seq);
+		if (sh.copy)
+			sh.copy(seq, seqn);
 
 		seqn->strip->stripdata = NULL;
 
@@ -5266,7 +5266,7 @@ static void seq_new_fix_links_recursive(Sequence *seq)
 {
 	SequenceModifierData *smd;
 
-	if (seq->type >= SEQ_TYPE_EFFECT) {
+	if (seq->type & SEQ_TYPE_EFFECT) {
 		if (seq->seq1 && seq->seq1->tmp) seq->seq1 = seq->seq1->tmp;
 		if (seq->seq2 && seq->seq2->tmp) seq->seq2 = seq->seq2->tmp;
 		if (seq->seq3 && seq->seq3->tmp) seq->seq3 = seq->seq3->tmp;

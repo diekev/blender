@@ -29,10 +29,9 @@
 #define __OPENVDB_DENSE_CONVERT_H__
 
 #include <openvdb/openvdb.h>
-#include <openvdb/tools/Dense.h>
 #include <openvdb/tools/Clip.h>
+#include <openvdb/tools/Dense.h>
 
-#include "openvdb_primitive.h"
 #include "openvdb_reader.h"
 #include "openvdb_writer.h"
 
@@ -77,10 +76,10 @@ GridType *OpenVDB_export_grid(OpenVDBWriter *writer,
 }
 
 template <typename GridType, typename T>
-OpenVDBPrimitive *OpenVDB_import_grid(OpenVDBReader *reader,
-                                      const std::string &name,
-                                      T **data,
-                                      const int res[3])
+void OpenVDB_import_grid(OpenVDBReader *reader,
+                         const std::string &name,
+                         T **data,
+                         const int res[3])
 {
 	using namespace openvdb;
 
@@ -90,7 +89,7 @@ OpenVDBPrimitive *OpenVDB_import_grid(OpenVDBReader *reader,
 	math::Coord xyz;
 	int &x = xyz[0], &y = xyz[1], &z = xyz[2];
 
-	int index = 0;
+	size_t index = 0;
 	for (z = 0; z < res[2]; ++z) {
 		for (y = 0; y < res[1]; ++y) {
 			for (x = 0; x < res[0]; ++x, ++index) {
@@ -98,11 +97,6 @@ OpenVDBPrimitive *OpenVDB_import_grid(OpenVDBReader *reader,
 			}
 		}
 	}
-
-	OpenVDBPrimitive *vdb_prim = new OpenVDBPrimitive();
-	vdb_prim->setGrid(grid);
-
-	return vdb_prim;
 }
 
 openvdb::GridBase *OpenVDB_export_vector_grid(OpenVDBWriter *writer,
@@ -120,7 +114,6 @@ void OpenVDB_import_grid_vector(OpenVDBReader *reader,
                                 float **data_x, float **data_y, float **data_z,
                                 const int res[3]);
 
-}
+}  /* namespace internal */
 
 #endif /* __OPENVDB_DENSE_CONVERT_H__ */
-

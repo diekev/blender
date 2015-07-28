@@ -872,10 +872,10 @@ static bool ConvertMaterial(
 		material->matname	=(mat->id.name);
 
 	if (tface) {
-		material->tface		= *tface;
+		ME_MTEXFACE_CPY(&material->mtexpoly, tface);
 	}
 	else {
-		memset(&material->tface, 0, sizeof(material->tface));
+		memset(&material->mtexpoly, 0, sizeof(material->mtexpoly));
 	}
 	material->material	= mat;
 	return true;
@@ -1390,16 +1390,6 @@ static void BL_CreatePhysicsObjectNew(KX_GameObject* gameobj,
 	// should we record animation for this object?
 	if ((blenderobject->gameflag & OB_RECORD_ANIMATION) != 0)
 		gameobj->SetRecordAnimation(true);
-
-	// store materialname in auxinfo, needed for touchsensors
-	if (meshobj)
-	{
-		const STR_String& matname=meshobj->GetMaterialName(0);
-		gameobj->getClientInfo()->m_auxilary_info = (matname.Length() ? (void*)(matname.ReadPtr()+2) : NULL);
-	} else
-	{
-		gameobj->getClientInfo()->m_auxilary_info = 0;
-	}
 
 	delete shapeprops;
 	delete smmaterial;
@@ -2174,8 +2164,6 @@ void BL_ConvertBlenderObjects(struct Main* maggie,
 			case PARSKEL: // skinned - ignore
 				break;
 			case PAROBJECT:
-			case PARCURVE:
-			case PARKEY:
 			case PARVERT3:
 			default:
 				// unhandled
