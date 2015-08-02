@@ -351,9 +351,6 @@ static int smokeModifier_init(SmokeModifierData *smd, Object *ob, Scene *scene, 
 		if (!sds->shadow)
 			sds->shadow = MEM_callocN(sizeof(float) * sds->res[0] * sds->res[1] * sds->res[2], "SmokeDomainShadow");
 
-		sds->density = NULL;
-		sds->density_high = NULL;
-
 		return 1;
 	}
 	else if ((smd->type & MOD_SMOKE_TYPE_FLOW) && smd->flow)
@@ -412,8 +409,6 @@ static void smokeModifier_freeDomain(SmokeModifierData *smd)
 #endif
 			MEM_freeN(cache);
 		}
-
-		MEM_freeN(smd->domain->vdb_draw_data);
 
 		MEM_freeN(smd->domain);
 		smd->domain = NULL;
@@ -584,8 +579,7 @@ void smokeModifier_createType(struct SmokeModifierData *smd)
 			smd->domain->viewsettings = MOD_SMOKE_VIEW_SHOWBIG;
 			smd->domain->effector_weights = BKE_add_effector_weights(NULL);
 
-			smd->domain->use_openvdb = false;
-			smd->domain->vdb_draw_data = BKE_openvdb_draw_data_create();
+			smd->domain->cache_type = SMOKE_CACHE_POINTCACHE;
 		}
 		else if (smd->type & MOD_SMOKE_TYPE_FLOW)
 		{
@@ -749,7 +743,8 @@ static void obstacles_from_derivedmesh(Object *coll_ob, SmokeDomainSettings *sds
 	{
 		DerivedMesh *dm = NULL;
 		MVert *mvert = NULL;
-		MFace *mface = NULL;
+		const MLoopTri *looptri;
+		const MLoop *mloop;
 		BVHTreeFromMesh treeData = {NULL};
 		int numverts, i, z;
 
@@ -764,7 +759,8 @@ static void obstacles_from_derivedmesh(Object *coll_ob, SmokeDomainSettings *sds
 		dm = CDDM_copy(scs->dm);
 		CDDM_calc_normals(dm);
 		mvert = dm->getVertArray(dm);
-		mface = dm->getTessFaceArray(dm);
+		mloop = dm->getLoopArray(dm);
+		looptri = dm->getLoopTriArray(dm);
 		numverts = dm->getNumVerts(dm);
 
 		// DG TODO
@@ -812,7 +808,7 @@ static void obstacles_from_derivedmesh(Object *coll_ob, SmokeDomainSettings *sds
 			copy_v3_v3(&scs->verts_old[i * 3], co);
 		}
 
-		if (bvhtree_from_mesh_faces(&treeData, dm, 0.0f, 4, 6)) {
+		if (bvhtree_from_mesh_looptri(&treeData, dm, 0.0f, 4, 6)) {
 #pragma omp parallel for schedule(static)
 			for (z = sds->res_min[2]; z < sds->res_max[2]; z++) {
 				int x, y;
@@ -827,13 +823,14 @@ static void obstacles_from_derivedmesh(Object *coll_ob, SmokeDomainSettings *sds
 
 						/* find the nearest point on the mesh */
 						if (BLI_bvhtree_find_nearest(treeData.tree, ray_start, &nearest, treeData.nearest_callback, &treeData) != -1) {
+							const MLoopTri *lt = &looptri[nearest.index];
 							float weights[4];
-							int v1, v2, v3, f_index = nearest.index;
+							int v1, v2, v3;
 
 							/* calculate barycentric weights for nearest point */
-							v1 = mface[f_index].v1;
-							v2 = (nearest.flags & BVH_ONQUAD) ? mface[f_index].v3 : mface[f_index].v2;
-							v3 = (nearest.flags & BVH_ONQUAD) ? mface[f_index].v4 : mface[f_index].v3;
+							v1 = mloop[lt->tri[0]].v;
+							v2 = mloop[lt->tri[1]].v;
+							v3 = mloop[lt->tri[2]].v;
 							interp_weights_face_v3(weights, mvert[v1].co, mvert[v2].co, mvert[v3].co, NULL, nearest.co);
 
 							// DG TODO
@@ -1454,10 +1451,12 @@ static void emit_from_particles(Object *flow_ob, SmokeDomainSettings *sds, Smoke
 }
 
 static void sample_derivedmesh(
-        SmokeFlowSettings *sfs, MVert *mvert, MTFace *tface, MFace *mface,
+        SmokeFlowSettings *sfs,
+        const MVert *mvert, const MLoop *mloop, const MLoopTri *mlooptri, const MLoopUV *mloopuv,
         float *influence_map, float *velocity_map, int index, const int base_res[3], float flow_center[3],
         BVHTreeFromMesh *treeData, const float ray_start[3], const float *vert_vel,
-        bool has_velocity, int defgrp_index, MDeformVert *dvert, float x, float y, float z)
+        bool has_velocity, int defgrp_index, MDeformVert *dvert,
+        float x, float y, float z)
 {
 	float ray_dir[3] = {1.0f, 0.0f, 0.0f};
 	BVHTreeRayHit hit = {0};
@@ -1508,9 +1507,9 @@ static void sample_derivedmesh(
 			sample_str = 0.0f;
 
 		/* calculate barycentric weights for nearest point */
-		v1 = mface[f_index].v1;
-		v2 = (nearest.flags & BVH_ONQUAD) ? mface[f_index].v3 : mface[f_index].v2;
-		v3 = (nearest.flags & BVH_ONQUAD) ? mface[f_index].v4 : mface[f_index].v3;
+		v1 = mloop[mlooptri[f_index].tri[0]].v;
+		v2 = mloop[mlooptri[f_index].tri[1]].v;
+		v3 = mloop[mlooptri[f_index].tri[2]].v;
 		interp_weights_face_v3(weights, mvert[v1].co, mvert[v2].co, mvert[v3].co, NULL, nearest.co);
 
 		if (sfs->flags & MOD_SMOKE_FLOW_INITVELOCITY && velocity_map) {
@@ -1558,9 +1557,14 @@ static void sample_derivedmesh(
 				tex_co[1] = ((y - flow_center[1]) / base_res[1]) / sfs->texture_size;
 				tex_co[2] = ((z - flow_center[2]) / base_res[2] - sfs->texture_offset) / sfs->texture_size;
 			}
-			else if (tface) {
-				interp_v2_v2v2v2(tex_co, tface[f_index].uv[0], tface[f_index].uv[(nearest.flags & BVH_ONQUAD) ? 2 : 1],
-				                 tface[f_index].uv[(nearest.flags & BVH_ONQUAD) ? 3 : 2], weights);
+			else if (mloopuv) {
+				const float *uv[3];
+				uv[0] = mloopuv[mlooptri[f_index].tri[0]].uv;
+				uv[1] = mloopuv[mlooptri[f_index].tri[1]].uv;
+				uv[2] = mloopuv[mlooptri[f_index].tri[2]].uv;
+
+				interp_v2_v2v2v2(tex_co, UNPACK3(uv), weights);
+
 				/* map between -1.0f and 1.0f */
 				tex_co[0] = tex_co[0] * 2.0f - 1.0f;
 				tex_co[1] = tex_co[1] * 2.0f - 1.0f;
@@ -1589,8 +1593,9 @@ static void emit_from_derivedmesh(Object *flow_ob, SmokeDomainSettings *sds, Smo
 		MDeformVert *dvert = NULL;
 		MVert *mvert = NULL;
 		MVert *mvert_orig = NULL;
-		MFace *mface = NULL;
-		MTFace *tface = NULL;
+		const MLoopTri *mlooptri = NULL;
+		const MLoopUV *mloopuv = NULL;
+		const MLoop *mloop = NULL;
 		BVHTreeFromMesh treeData = {NULL};
 		int numOfVerts, i, z;
 		float flow_center[3] = {0};
@@ -1608,10 +1613,11 @@ static void emit_from_derivedmesh(Object *flow_ob, SmokeDomainSettings *sds, Smo
 		CDDM_calc_normals(dm);
 		mvert = dm->getVertArray(dm);
 		mvert_orig = dm->dupVertArray(dm);  /* copy original mvert and restore when done */
-		mface = dm->getTessFaceArray(dm);
 		numOfVerts = dm->getNumVerts(dm);
 		dvert = dm->getVertDataArray(dm, CD_MDEFORMVERT);
-		tface = CustomData_get_layer_named(&dm->faceData, CD_MTFACE, sfs->uvlayer_name);
+		mloopuv = CustomData_get_layer_named(&dm->loopData, CD_MLOOPUV, sfs->uvlayer_name);
+		mloop = dm->getLoopArray(dm);
+		mlooptri = dm->getLoopTriArray(dm);
 
 		if (sfs->flags & MOD_SMOKE_FLOW_INITVELOCITY) {
 			vert_vel = MEM_callocN(sizeof(float) * numOfVerts * 3, "smoke_flow_velocity");
@@ -1672,7 +1678,7 @@ static void emit_from_derivedmesh(Object *flow_ob, SmokeDomainSettings *sds, Smo
 			res[i] = em->res[i] * hires_multiplier;
 		}
 
-		if (bvhtree_from_mesh_faces(&treeData, dm, 0.0f, 4, 6)) {
+		if (bvhtree_from_mesh_looptri(&treeData, dm, 0.0f, 4, 6)) {
 #pragma omp parallel for schedule(static)
 			for (z = min[2]; z < max[2]; z++) {
 				int x, y;
@@ -1688,8 +1694,11 @@ static void emit_from_derivedmesh(Object *flow_ob, SmokeDomainSettings *sds, Smo
 							int index = smoke_get_index(lx - em->min[0], em->res[0], ly - em->min[1], em->res[1], lz - em->min[2]);
 							float ray_start[3] = {((float)lx) + 0.5f, ((float)ly) + 0.5f, ((float)lz) + 0.5f};
 
-							sample_derivedmesh(sfs, mvert, tface, mface, em->influence, em->velocity, index, sds->base_res, flow_center, &treeData, ray_start,
-												vert_vel, has_velocity, defgrp_index, dvert, (float)lx, (float)ly, (float)lz);
+							sample_derivedmesh(
+							        sfs, mvert, mloop, mlooptri, mloopuv,
+							        em->influence, em->velocity, index, sds->base_res, flow_center,
+							        &treeData, ray_start,vert_vel, has_velocity, defgrp_index, dvert,
+							        (float)lx, (float)ly, (float)lz);
 						}
 
 						/* take high res samples if required */
@@ -1703,8 +1712,12 @@ static void emit_from_derivedmesh(Object *flow_ob, SmokeDomainSettings *sds, Smo
 							int index = smoke_get_index(x - min[0], res[0], y - min[1], res[1], z - min[2]);
 							float ray_start[3] = {lx + 0.5f*hr, ly + 0.5f*hr, lz + 0.5f*hr};
 
-							sample_derivedmesh(sfs, mvert, tface, mface, em->influence_high, NULL, index, sds->base_res, flow_center, &treeData, ray_start,
-												vert_vel, has_velocity, defgrp_index, dvert, lx, ly, lz); /* x,y,z needs to be always lowres */
+							sample_derivedmesh(
+							        sfs, mvert, mloop, mlooptri, mloopuv,
+							        em->influence_high, NULL, index, sds->base_res, flow_center,
+							        &treeData, ray_start, vert_vel, has_velocity, defgrp_index, dvert,
+							        /* x,y,z needs to be always lowres */
+							        lx, ly, lz);
 						}
 
 					}
@@ -2644,6 +2657,168 @@ static DerivedMesh *createDomainGeometry(SmokeDomainSettings *sds, Object *ob)
 	return result;
 }
 
+/* simulate the actual smoke (c++ code in intern/smoke) */
+static void smokeModifier_step_simulation(SmokeModifierData *smd, Scene *scene, Object *ob, DerivedMesh *dm, bool for_render, const int framenr, const int startframe)
+{
+	SmokeDomainSettings *sds = smd->domain;
+
+	/* DG: interesting commenting this + deactivating loading of noise files */
+	if (framenr != startframe){
+		if (sds->flags & MOD_SMOKE_DISSOLVE) {
+			/* low res dissolve */
+			smoke_dissolve(sds->fluid, sds->diss_speed, sds->flags & MOD_SMOKE_DISSOLVE_LOG);
+			/* high res dissolve */
+			if (sds->wt) {
+				smoke_dissolve_wavelet(sds->wt, sds->diss_speed, sds->flags & MOD_SMOKE_DISSOLVE_LOG);
+			}
+		}
+
+		step(scene, ob, smd, dm, scene->r.frs_sec / scene->r.frs_sec_base, for_render);
+	}
+
+	/* create shadows before writing cache so they get stored */
+	smoke_calc_transparency(sds, scene);
+
+	if (sds->wt) {
+		smoke_turbulence_step(sds->wt, sds->fluid);
+	}
+}
+
+static void smokeModifier_process_pointcache(SmokeModifierData *smd, Scene *scene, Object *ob, DerivedMesh *dm, bool for_render)
+{
+	SmokeDomainSettings *sds = smd->domain;
+	PointCache *cache = NULL;
+	PTCacheID pid;
+	int startframe, endframe, framenr;
+	float timescale;
+
+	framenr = scene->r.cfra;
+
+	//printf("time: %d\n", scene->r.cfra);
+
+	cache = sds->point_cache[0];
+	BKE_ptcache_id_from_smoke(&pid, ob, smd);
+	BKE_ptcache_id_time(&pid, scene, framenr, &startframe, &endframe, &timescale);
+
+	if (!smd->domain->fluid || framenr == startframe)
+	{
+		BKE_ptcache_id_reset(scene, &pid, PTCACHE_RESET_OUTDATED);
+		smokeModifier_reset_ex(smd, false);
+		BKE_ptcache_validate(cache, framenr);
+		cache->flag &= ~PTCACHE_REDO_NEEDED;
+	}
+
+	if (!smd->domain->fluid && (framenr != startframe) && (smd->domain->flags & MOD_SMOKE_FILE_LOAD) == 0 && (cache->flag & PTCACHE_BAKED) == 0)
+		return;
+
+	smd->domain->flags &= ~MOD_SMOKE_FILE_LOAD;
+	CLAMP(framenr, startframe, endframe);
+
+	/* If already viewing a pre/after frame, no need to reload */
+	if ((smd->time == framenr) && (framenr != scene->r.cfra))
+		return;
+
+	if (smokeModifier_init(smd, ob, scene, dm) == 0)
+	{
+		printf("bad smokeModifier_init\n");
+		return;
+	}
+
+	/* try to read from cache */
+	if ((BKE_ptcache_read(&pid, (float)framenr) == PTCACHE_READ_EXACT)) {
+		BKE_ptcache_validate(cache, framenr);
+		smd->time = framenr;
+		return;
+	}
+
+	/* only calculate something when we advanced a single frame */
+	if (framenr != (int)smd->time + 1)
+		return;
+
+	/* don't simulate if viewing start frame, but scene frame is not real start frame */
+	if (framenr != scene->r.cfra)
+		return;
+
+	tstart();
+
+	/* if on second frame, write cache for first frame */
+	if ((int)smd->time == startframe && (cache->flag & PTCACHE_OUTDATED || cache->last_exact == 0)) {
+		BKE_ptcache_write(&pid, startframe);
+	}
+
+	// set new time
+	smd->time = scene->r.cfra;
+
+	/* do simulation */
+	smokeModifier_step_simulation(smd, scene, ob, dm, for_render, framenr, startframe);
+
+	BKE_ptcache_validate(cache, framenr);
+	if (framenr != startframe)
+		BKE_ptcache_write(&pid, framenr);
+
+	tend();
+	// printf ( "Frame: %d, Time: %f\n\n", (int)smd->time, (float) tval() );
+}
+
+static void smokeModifier_process_openvdb(SmokeModifierData *smd, Scene *scene, Object *ob, DerivedMesh *dm, bool for_render)
+{
+	SmokeDomainSettings *sds = smd->domain;
+	OpenVDBCache *cache = cache = BKE_openvdb_get_current_cache(sds);
+	int startframe, endframe, framenr;
+
+	framenr = scene->r.cfra;
+
+	if (cache) {
+		startframe = cache->startframe;
+		endframe = cache->endframe;
+	}
+	else {
+		startframe = scene->r.sfra;
+		endframe = scene->r.efra;
+	}
+
+	if (!smd->domain->fluid || framenr == startframe) {
+		smokeModifier_reset_ex(smd, false);
+	}
+
+	if (!smd->domain->fluid && (framenr != startframe) && (smd->domain->flags & MOD_SMOKE_FILE_LOAD) == 0)
+		return;
+
+	smd->domain->flags &= ~MOD_SMOKE_FILE_LOAD;
+	CLAMP(framenr, startframe, endframe);
+
+	/* If already viewing a pre/after frame, no need to reload */
+	if ((smd->time == framenr) && (framenr != scene->r.cfra))
+		return;
+
+	if (smokeModifier_init(smd, ob, scene, dm) == 0) {
+		printf("bad smokeModifier_init\n");
+		return;
+	}
+
+	/* try to read from cache */
+	if (cache != NULL) {
+		if (smokeModifier_OpenVDB_import(smd, scene, ob, cache)) {
+			smd->time = framenr;
+			return;
+		}
+	}
+
+	/* only calculate something when we advanced a single frame */
+	if (framenr != (int)smd->time + 1)
+		return;
+
+	/* don't simulate if viewing start frame, but scene frame is not real start frame */
+	if (framenr != scene->r.cfra)
+		return;
+
+	// set new time
+	smd->time = scene->r.cfra;
+
+	/* do simulation */
+	smokeModifier_step_simulation(smd, scene, ob, dm, for_render, framenr, startframe);
+}
+
 static void smokeModifier_process(SmokeModifierData *smd, Scene *scene, Object *ob, DerivedMesh *dm, bool for_render)
 {
 	if ((smd->type & MOD_SMOKE_TYPE_FLOW))
@@ -2653,7 +2828,7 @@ static void smokeModifier_process(SmokeModifierData *smd, Scene *scene, Object *
 
 		if (smd->flow->dm) smd->flow->dm->release(smd->flow->dm);
 		smd->flow->dm = CDDM_copy(dm);
-		DM_ensure_tessface(smd->flow->dm);
+		DM_ensure_looptri(smd->flow->dm);
 
 		if (scene->r.cfra > smd->time)
 		{
@@ -2676,7 +2851,7 @@ static void smokeModifier_process(SmokeModifierData *smd, Scene *scene, Object *
 				smd->coll->dm->release(smd->coll->dm);
 
 			smd->coll->dm = CDDM_copy(dm);
-			DM_ensure_tessface(smd->coll->dm);
+			DM_ensure_looptri(smd->coll->dm);
 		}
 
 		smd->time = scene->r.cfra;
@@ -2688,114 +2863,13 @@ static void smokeModifier_process(SmokeModifierData *smd, Scene *scene, Object *
 	else if (smd->type & MOD_SMOKE_TYPE_DOMAIN)
 	{
 		SmokeDomainSettings *sds = smd->domain;
-		PointCache *cache = NULL;
-		OpenVDBCache *vdb_cache = NULL;
-		PTCacheID pid;
-		int startframe, endframe, framenr;
-		float timescale;
 
-		framenr = scene->r.cfra;
-
-		//printf("time: %d\n", scene->r.cfra);
-
-		cache = sds->point_cache[0];
-		BKE_ptcache_id_from_smoke(&pid, ob, smd);
-		BKE_ptcache_id_time(&pid, scene, framenr, &startframe, &endframe, &timescale);
-
-		if (!smd->domain->fluid || framenr == startframe)
-		{
-			BKE_ptcache_id_reset(scene, &pid, PTCACHE_RESET_OUTDATED);
-			smokeModifier_reset_ex(smd, false);
-			BKE_ptcache_validate(cache, framenr);
-			cache->flag &= ~PTCACHE_REDO_NEEDED;
+		if (sds->cache_type == SMOKE_CACHE_POINTCACHE) {
+			smokeModifier_process_pointcache(smd, scene, ob, dm, for_render);
 		}
-
-		if (!smd->domain->fluid && (framenr != startframe) && (smd->domain->flags & MOD_SMOKE_FILE_LOAD) == 0 && (cache->flag & PTCACHE_BAKED) == 0)
-			return;
-
-		smd->domain->flags &= ~MOD_SMOKE_FILE_LOAD;
-		CLAMP(framenr, startframe, endframe);
-
-		/* If already viewing a pre/after frame, no need to reload */
-		if ((smd->time == framenr) && (framenr != scene->r.cfra))
-			return;
-
-		if (smokeModifier_init(smd, ob, scene, dm) == 0)
-		{
-			printf("bad smokeModifier_init\n");
-			return;
+		else {
+			smokeModifier_process_openvdb(smd, scene, ob, dm, for_render);
 		}
-
-#if 1
-		/* try to read from openvdb cache */
-		vdb_cache = BKE_openvdb_get_current_cache(sds);
-		if (sds->use_openvdb && vdb_cache) {
-			//if (vdb_cache->flags & VDB_CACHE_SMOKE_EXPORTED) {
-				smokeModifier_OpenVDB_import(smd, scene, ob, vdb_cache);
-				smd->time = framenr;
-				return;
-			//}
-		}
-#endif
-
-		/* try to read from cache */
-		if (/*!sds->use_openvdb && */(BKE_ptcache_read(&pid, (float)framenr) == PTCACHE_READ_EXACT)) {
-			BKE_ptcache_validate(cache, framenr);
-			smd->time = framenr;
-			return;
-		}
-
-		/* only calculate something when we advanced a single frame */
-		if (framenr != (int)smd->time + 1)
-			return;
-
-		/* don't simulate if viewing start frame, but scene frame is not real start frame */
-		if (framenr != scene->r.cfra)
-			return;
-
-		tstart();
-
-		/* if on second frame, write cache for first frame */
-		if ((int)smd->time == startframe && (cache->flag & PTCACHE_OUTDATED || cache->last_exact == 0)) {
-			BKE_ptcache_write(&pid, startframe);
-		}
-
-		// set new time
-		smd->time = scene->r.cfra;
-
-		/* do simulation */
-
-		// simulate the actual smoke (c++ code in intern/smoke)
-		// DG: interesting commenting this line + deactivating loading of noise files
-		if (framenr != startframe)
-		{
-			if (sds->flags & MOD_SMOKE_DISSOLVE) {
-				/* low res dissolve */
-				smoke_dissolve(sds->fluid, sds->diss_speed, sds->flags & MOD_SMOKE_DISSOLVE_LOG);
-				/* high res dissolve */
-				if (sds->wt) {
-					smoke_dissolve_wavelet(sds->wt, sds->diss_speed, sds->flags & MOD_SMOKE_DISSOLVE_LOG);
-				}
-
-			}
-
-			step(scene, ob, smd, dm, scene->r.frs_sec / scene->r.frs_sec_base, for_render);
-		}
-
-		// create shadows before writing cache so they get stored
-		smoke_calc_transparency(sds, scene);
-
-		if (sds->wt)
-		{
-			smoke_turbulence_step(sds->wt, sds->fluid);
-		}
-
-		BKE_ptcache_validate(cache, framenr);
-		if (framenr != startframe)
-			BKE_ptcache_write(&pid, framenr);
-
-		tend();
-		// printf ( "Frame: %d, Time: %f\n\n", (int)smd->time, (float) tval() );
 	}
 }
 
@@ -3112,7 +3186,6 @@ static void OpenVDB_read_fluid_settings(SmokeDomainSettings *sds, struct OpenVDB
 	OpenVDBReader_get_meta_v3_int(reader, "min_resolution", sds->res_min);
 	OpenVDBReader_get_meta_v3_int(reader, "max_resolution", sds->res_max);
 	OpenVDBReader_get_meta_v3_int(reader, "base_resolution", sds->base_res);
-	OpenVDBReader_get_meta_fl(reader, "delta_x", &sds->dx);
 	OpenVDBReader_get_meta_v3(reader, "min_bbox", sds->p0);
 	OpenVDBReader_get_meta_v3(reader, "max_bbox", sds->p1);
 	OpenVDBReader_get_meta_v3(reader, "dp0", sds->dp0);
@@ -3129,7 +3202,6 @@ static void OpenVDB_write_fluid_settings(SmokeDomainSettings *sds, struct OpenVD
 	OpenVDBWriter_add_meta_v3_int(writer, "min_resolution", sds->res_min);
 	OpenVDBWriter_add_meta_v3_int(writer, "max_resolution", sds->res_max);
 	OpenVDBWriter_add_meta_v3_int(writer, "base_resolution", sds->base_res);
-	OpenVDBWriter_add_meta_fl(writer, "delta_x", sds->dx);
 	OpenVDBWriter_add_meta_v3(writer, "min_bbox", sds->p0);
 	OpenVDBWriter_add_meta_v3(writer, "max_bbox", sds->p1);
 	OpenVDBWriter_add_meta_v3(writer, "dp0", sds->dp0);
@@ -3219,7 +3291,7 @@ static void OpenVDB_export_smoke(SmokeDomainSettings *sds, struct OpenVDBWriter 
 		}
 
 		OpenVDB_export_grid_vec(writer, "Velocity", vx, vy, vz, sds->res, sds->fluidmat, VEC_CONTRAVARIANT_RELATIVE, false, clip_grid);
-		//OpenVDB_export_grid_ch(writer, "Obstacles", obstacles, sds->res, sds->fluidmat, NULL);
+		OpenVDB_export_grid_ch(writer, "Obstacles", obstacles, sds->res, sds->fluidmat, NULL);
 	}
 }
 
@@ -3280,10 +3352,10 @@ static void OpenVDB_import_smoke(SmokeDomainSettings *sds, struct OpenVDBReader 
 		OpenVDB_import_grid_fl(reader, "Shadow", &sds->shadow, sds->res);
 
 		if (for_low_display) {
-			sds->density = OpenVDB_import_grid_fl(reader, "Density", &dens, sds->res);
+			OpenVDB_import_grid_fl(reader, "Density", &dens, sds->res);
 		}
 
-		if (fluid_fields & SM_ACTIVE_HEAT && !for_low_display) {
+		if (fluid_fields & SM_ACTIVE_HEAT && (!for_low_display)) {
 			OpenVDB_import_grid_fl(reader, "Heat", &heat, sds->res);
 			OpenVDB_import_grid_fl(reader, "Heat Old", &heatold, sds->res);
 		}
@@ -3301,9 +3373,9 @@ static void OpenVDB_import_smoke(SmokeDomainSettings *sds, struct OpenVDBReader 
 			OpenVDB_import_grid_vec(reader, "Color", &r, &g, &b, sds->res);
 		}
 
-		if (!for_low_display) {
+		if (!for_low_display) { // should be "for_sim_cont" or so
 			OpenVDB_import_grid_vec(reader, "Velocity", &vx, &vy, &vz, sds->res);
-			//OpenVDB_import_grid_ch(reader, "Obstacles", &obstacles, sds->res);
+			OpenVDB_import_grid_ch(reader, "Obstacles", &obstacles, sds->res);
 		}
 	}
 
@@ -3314,7 +3386,7 @@ static void OpenVDB_import_smoke(SmokeDomainSettings *sds, struct OpenVDBReader 
 		smoke_turbulence_export(sds->wt, &dens, &react, &flame, &fuel, &r, &g, &b, &tcu, &tcv, &tcw);
 
 		if (for_wt_display) {
-			sds->density_high = OpenVDB_import_grid_fl(reader, "Density High", &dens, sds->res_wt);
+			OpenVDB_import_grid_fl(reader, "Density High", &dens, sds->res_wt);
 		}
 
 		if (fluid_fields & SM_ACTIVE_FIRE && for_wt_display) {
@@ -3330,7 +3402,7 @@ static void OpenVDB_import_smoke(SmokeDomainSettings *sds, struct OpenVDBReader 
 			OpenVDB_import_grid_vec(reader, "Color High", &r, &g, &b, sds->res_wt);
 		}
 
-		if (!for_wt_display) {
+		if (!for_wt_display) { // should be "for_sim_cont" or so
 			OpenVDB_import_grid_vec(reader, "Texture Coordinates", &tcu, &tcv, &tcw, sds->res);
 		}
 	}
@@ -3358,6 +3430,11 @@ void smokeModifier_OpenVDB_export(SmokeModifierData *smd, Scene *scene, Object *
 	save_as_half = ((cache->flags & VDB_CACHE_SAVE_AS_HALF) != 0);
 
 	OpenVDBWriter_set_flags(cache->writer, cache->compression, save_as_half);
+
+	/* Unset exported flag if overwriting a cache, the operator should have
+	 * received confirmation from the user */
+	if (cache->flags & VDB_CACHE_SMOKE_EXPORTED)
+		cache->flags &= ~VDB_CACHE_SMOKE_EXPORTED;
 
 	for (fr = cache->startframe; fr <= cache->endframe; fr++) {
 		/* smd->time is overwritten with scene->r.cfra in smokeModifier_process,
@@ -3401,86 +3478,38 @@ void smokeModifier_OpenVDB_export(SmokeModifierData *smd, Scene *scene, Object *
 	scene->r.cfra = orig_frame;
 }
 
-void smokeModifier_OpenVDB_import(SmokeModifierData *smd, Scene *scene, Object *ob, OpenVDBCache *cache)
+bool smokeModifier_OpenVDB_import(SmokeModifierData *smd, Scene *scene, Object *ob, OpenVDBCache *cache)
 {
 	SmokeDomainSettings *sds = smd->domain;
-	int startframe, endframe;
 	char filename[FILE_MAX];
 	const char *relbase = modifier_path_relbase(ob);
-	int ret = OPENVDB_NO_ERROR;
-	bool for_display = false;
 
 	cache = BKE_openvdb_get_current_cache(sds);
-	startframe = cache->startframe;
-	endframe = cache->endframe;
 
-	if (CFRA < startframe || CFRA > endframe) {
-		return;
+	if (!(cache->flags & VDB_CACHE_SMOKE_EXPORTED)) {
+		return false;
+	}
+
+	if (CFRA < cache->startframe || CFRA > cache->endframe) {
+		return false;
 	}
 
 	if (cache->reader == NULL) {
 		cache->reader = OpenVDBReader_create();
 	}
 
-	for_display = true;
-
 	BKE_openvdb_cache_filename(filename, cache->path, cache->name, relbase, CFRA);
+
+	/* Unlikely to happen at this point. */
+	if (!BLI_exists(filename)) {
+		return false;
+	}
+
 	OpenVDBReader_open(cache->reader, filename);
 	OpenVDB_read_fluid_settings(sds, cache->reader);
-	OpenVDB_import_smoke(sds, cache->reader, for_display);
+	OpenVDB_import_smoke(sds, cache->reader, /* for_display = */ true);
 
-	if (ret == OPENVDB_IO_ERROR) {
-		/* TODO(kevin): report error "OpenVDB import error, see console for details" */
-		return;
-	}
-
-	if (ret == OPENVDB_KEY_ERROR) {
-		/* It may happen that some grids are missing on the first frame if the
-		 * simulation hasn't started yet, so it's safe to ignore it. */
-		if (CFRA > startframe) {
-			/* TODO(kevin): report error "OpenVDB import error, see console for details" */
-			return;
-		}
-	}
-}
-
-void smokeModifier_OpenVDB_update_transform(SmokeModifierData *smd,
-                                            Scene *scene,
-                                            Object *ob,
-                                            update_cb update,
-                                            void *update_cb_data)
-{
-	SmokeDomainSettings *sds = smd->domain;
-	OpenVDBCache *cache;
-	int orig_frame, fr, cancel = 0;
-	float progress;
-	const char *relbase = modifier_path_relbase(ob);
-	char filename[FILE_MAX];
-
-	orig_frame = scene->r.cfra;
-
-	cache = BKE_openvdb_get_current_cache(sds);
-
-	for (fr = cache->startframe; fr <= cache->endframe; fr++) {
-		/* smd->time is overwritten with scene->r.cfra in smokeModifier_process,
-		 * so we can't use it here... */
-		scene->r.cfra = fr;
-
-		BKE_openvdb_cache_filename(filename, cache->path, cache->name, relbase, fr);
-		compute_fluid_matrices(sds);
-		OpenVDB_update_fluid_transform(filename, sds->fluidmat, sds->fluidmat_wt);
-
-		progress = (fr - cache->startframe) / (float)cache->endframe;
-
-		update(update_cb_data, progress, &cancel);
-
-		if (cancel) {
-			scene->r.cfra = orig_frame;
-			return;
-		}
-	}
-
-	scene->r.cfra = orig_frame;
+	return true;
 }
 
 void smokeModifier_retime_fluid(SmokeModifierData *smd, Scene *scene, Object *ob,
@@ -3565,15 +3594,10 @@ void smokeModifier_OpenVDB_export(SmokeModifierData *smd, Scene *scene, Object *
 	UNUSED_VARS(smd, scene, ob, dm, update, update_cb_data);
 }
 
-void smokeModifier_OpenVDB_import(SmokeModifierData *smd, Scene *scene, Object *ob, OpenVDBCache *cache)
+bool smokeModifier_OpenVDB_import(SmokeModifierData *smd, Scene *scene, Object *ob, OpenVDBCache *cache)
 {
 	UNUSED_VARS(smd, scene, ob, cache);
-}
-
-void smokeModifier_OpenVDB_update_transform(SmokeModifierData *smd, Scene *scene,
-                                            Object *ob, update_cb update, void *update_cb_data)
-{
-	UNUSED_VARS(smd, scene, ob, update, update_cb_data);
+	return false;
 }
 
 void smokeModifier_retime_fluid(SmokeModifierData *smd, Scene *scene, Object *ob,
@@ -3601,21 +3625,6 @@ OpenVDBCache *BKE_openvdb_get_current_cache(SmokeDomainSettings *sds)
 	}
 
 	return cache;
-}
-
-OpenVDBDrawData *BKE_openvdb_draw_data_create(void)
-{
-	OpenVDBDrawData *data;
-
-	data = MEM_callocN(sizeof(OpenVDBDrawData), "OpenVDBDrawData");
-
-	data->lod = 50;
-	data->point_size = 1.0f;
-	data->tolerance = 0.001f;
-	data->voxel_drawing = DRAW_VOXELS_POINT;
-	data->flags |= DRAW_VOXELS;
-
-	return data;
 }
 
 OpenVDBCache *BKE_openvdb_duplicate_cache(OpenVDBCache *cache)

@@ -38,14 +38,12 @@ enum {
 	MOD_SMOKE_DISSOLVE = (1 << 2),  /* let smoke dissolve */
 	MOD_SMOKE_DISSOLVE_LOG = (1 << 3),  /* using 1/x for dissolve */
 
+#ifdef DNA_DEPRECATED
 	MOD_SMOKE_HIGH_SMOOTH = (1 << 5),  /* -- Deprecated -- */
+#endif
 	MOD_SMOKE_FILE_LOAD = (1 << 6),  /* flag for file load */
 	MOD_SMOKE_ADAPTIVE_DOMAIN = (1 << 7),
 };
-
-#if (DNA_DEPRECATED_GCC_POISON == 1)
-#pragma GCC poison MOD_SMOKE_HIGH_SMOOTH
-#endif
 
 /* noise */
 #define MOD_SMOKE_NOISEWAVE (1<<0)
@@ -78,6 +76,11 @@ enum {
 #define SM_ACTIVE_FIRE		(1<<1)
 #define SM_ACTIVE_COLORS	(1<<2)
 #define SM_ACTIVE_COLOR_SET	(1<<3)
+
+enum {
+	SMOKE_CACHE_POINTCACHE = 0,
+	SMOKE_CACHE_OPENVDB    = 1,
+};
 
 typedef struct SmokeDomainSettings {
 	struct SmokeModifierData *smd; /* for fast RNA access */
@@ -153,17 +156,17 @@ typedef struct SmokeDomainSettings {
 	float flame_smoke_color[3];
 
 	struct ListBase vdb_caches;
-	short use_openvdb, pad[3];
-	struct OpenVDBPrimitive *density, *density_high;
-	struct OpenVDBDrawData *vdb_draw_data;
+	short cache_type, pad[3];
 } SmokeDomainSettings;
 
 typedef struct OpenVDBCache {
 	struct OpenVDBCache *next, *prev;
 	struct OpenVDBReader *reader;
 	struct OpenVDBWriter *writer;
+
 	char path[1024];
 	char name[64];
+
 	int startframe, endframe;
 	short flags, compression, pad[2];
 
@@ -173,14 +176,6 @@ typedef struct OpenVDBCache {
 	int num_steps;
 	int pad1;
 } OpenVDBCache;
-
-typedef struct OpenVDBDrawData {
-	float tolerance;      /* minimun value a voxel should have to be drawn */
-	float point_size;     /* size of the voxels */
-	short flags;          /* which level of the tree to draw */
-	short voxel_drawing;  /* how to draw the voxels */
-	int lod;              /* level of detail */
-} OpenVDBDrawData;
 
 enum {
 	VDB_CACHE_CURRENT        = (1 << 0),
@@ -192,25 +187,6 @@ enum {
 	VDB_COMPRESSION_ZIP   = 0,
 	VDB_COMPRESSION_BLOSC = 1,
 	VDB_COMPRESSION_NONE  = 2,
-};
-
-/* OpenVDBDrawData.flags */
-enum {
-	/* Draw the various levels of the VDB tree */
-    DRAW_ROOT    = (1 << 0),
-    DRAW_LEVEL_1 = (1 << 1),
-    DRAW_LEVEL_2 = (1 << 2),
-    DRAW_LEAVES  = (1 << 3),
-	/* Draw the voxels */
-	DRAW_VOXELS  = (1 << 4),
-};
-
-/* OpenVDBDrawData.voxel_drawing */
-enum {
-	DRAW_VOXELS_POINT  = 0,
-	DRAW_VOXELS_BOX    = 1,
-	/* unsupported at the moment, is using dense arrays */
-	DRAW_VOXELS_VOLUME = 2,
 };
 
 /* inflow / outflow */

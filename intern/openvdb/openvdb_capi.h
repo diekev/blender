@@ -34,7 +34,6 @@ struct OpenVDBReader;
 struct OpenVDBWriter;
 struct OpenVDBFloatGrid;
 struct OpenVDBIntGrid;
-struct OpenVDBPrimitive;
 struct OpenVDBVectorGrid;
 
 int OpenVDB_getVersionHex(void);
@@ -66,10 +65,6 @@ enum {
 	VEC_CONTRAVARIANT_ABSOLUTE = 4,
 };
 
-void OpenVDB_update_fluid_transform(const char *filename,
-                                    float matrix[4][4],
-                                    float matrix_high[4][4]);
-
 struct OpenVDBFloatGrid *OpenVDB_export_grid_fl(struct OpenVDBWriter *writer,
                                                 const char *name, float *data,
                                                 const int res[3], float matrix[4][4],
@@ -87,7 +82,7 @@ struct OpenVDBVectorGrid *OpenVDB_export_grid_vec(struct OpenVDBWriter *writer,
                                                   const bool is_color,
                                                   struct OpenVDBFloatGrid *mask);
 
-struct OpenVDBPrimitive *OpenVDB_import_grid_fl(struct OpenVDBReader *reader,
+void OpenVDB_import_grid_fl(struct OpenVDBReader *reader,
                             const char *name, float **data,
                             const int res[3]);
 
@@ -124,14 +119,6 @@ void FluidRetimer_free(struct FluidRetimer *retimer);
 void FluidRetimer_ignore_grid(struct FluidRetimer *retimer, const char *name);
 void FluidRetimer_set_time_scale(struct FluidRetimer *retimer, const float dt);
 void FluidRetimer_process(struct FluidRetimer *retimer, const char *previous, const char *cur, const char *to);
-
-void OpenVDB_draw_primitive(struct OpenVDBPrimitive *vdb_prim,
-                            const bool draw_root,
-                            const bool draw_level_1,
-                            const bool draw_level_2,
-                            const bool draw_leaves);
-
-void OpenVDB_draw_primitive_values(struct OpenVDBPrimitive *vdb_prim, float tolerance, float point_size, const bool draw_box, const int lod);
 
 #ifdef __cplusplus
 }

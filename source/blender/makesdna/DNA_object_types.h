@@ -192,7 +192,8 @@ typedef struct Object {
 	int dupon, dupoff, dupsta, dupend;
 
 	/* did last modifier stack generation need mapping support? */
-	int lastNeedMapping;
+	char lastNeedMapping;  /* bool */
+	char pad[3];
 
 	/* during realtime */
 
@@ -380,7 +381,9 @@ enum {
 enum {
 	PARTYPE       = (1 << 4) - 1,
 	PAROBJECT     = 0,
+#ifdef DNA_DEPRECATED
 	PARCURVE      = 1,  /* Deprecated. */
+#endif
 	PARKEY        = 2,  /* XXX Unused, deprecated? */
 
 	PARSKEL       = 4,
