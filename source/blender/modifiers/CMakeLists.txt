@@ -153,6 +153,10 @@ if(WITH_OPENNL)
 	)
 endif()
 
+if(WITH_OPENSUBDIV)
+	add_definitions(-DWITH_OPENSUBDIV)
+endif()
+
 if(WITH_MOD_PARTMESHER)
 	add_definitions(-DWITH_MOD_PARTMESHER)
 	list(APPEND SRC
