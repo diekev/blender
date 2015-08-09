@@ -110,7 +110,7 @@ ccl_device void shader_setup_from_ray(KernelGlobals *kg, ShaderData *sd,
 		triangle_dPdudv(kg, ccl_fetch(sd, prim), &ccl_fetch(sd, dPdu), &ccl_fetch(sd, dPdv));
 #endif
 	}
-	else {
+	if(!(ccl_fetch(sd, type) & PRIMITIVE_TRIANGLE) && !(ccl_fetch(sd, type) & PRIMITIVE_LEVEL_SET)) {
 		/* motion triangle */
 		motion_triangle_shader_setup(kg, sd, isect, ray, false);
 	}
