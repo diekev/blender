@@ -29,9 +29,9 @@ set(INC
 	intern
 	shader
 	texture
-	../blenfont
 	../blenkernel
 	../blenlib
+	../blentranslation
 	../gpu
 	../imbuf
 	../makesdna
@@ -295,7 +295,6 @@ endif()
 
 if(WITH_OPENVDB)
 	add_definitions(-DWITH_OPENVDB)
-	add_definitions(-DOPENVDB_USE_BLOSC)
 	list(APPEND INC
 	     ../../../intern/openvdb
 	)

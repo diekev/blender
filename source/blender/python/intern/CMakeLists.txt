@@ -25,10 +25,10 @@
 
 set(INC 
 	..
-	../../blenfont
 	../../blenkernel
 	../../blenlib
 	../../blenloader
+	../../blentranslation
 	../../editors/include
 	../../gpu
 	../../imbuf
@@ -268,7 +268,6 @@ endif()
 
 if(WITH_OPENVDB)
     add_definitions(-DWITH_OPENVDB)
-	add_definitions(-DOPENVDB_USE_BLOSC)
     list(APPEND INC
         ../../../../intern/openvdb
     )
