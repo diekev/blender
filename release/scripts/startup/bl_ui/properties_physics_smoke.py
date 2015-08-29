@@ -26,6 +26,14 @@ from bl_ui.properties_physics_common import (
         )
 
 
+def enable_panel(domain):
+    if domain.cache_type in {'POINTCACHE'}:
+        return not domain.point_cache.is_baked
+    else:
+        cache = domain.active_openvdb_cache
+        return (not cache.is_baked if cache else True)
+
+
 class PhysicButtonsPanel:
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
@@ -54,7 +62,7 @@ class PHYSICS_PT_smoke(PhysicButtonsPanel, Panel):
 
             split = layout.split()
 
-            split.enabled = not domain.point_cache.is_baked
+            split.enabled = enable_panel(domain)
 
             col = split.column()
             col.label(text="Resolution:")
@@ -176,7 +184,7 @@ class PHYSICS_PT_smoke_fire(PhysicButtonsPanel, Panel):
         domain = context.smoke.domain_settings
 
         split = layout.split()
-        split.enabled = not domain.point_cache.is_baked
+        split.enabled = enable_panel(domain)
 
         col = split.column(align=True)
         col.label(text="Reaction:")
@@ -202,8 +210,9 @@ class PHYSICS_PT_smoke_adaptive_domain(PhysicButtonsPanel, Panel):
 
     def draw_header(self, context):
         md = context.smoke.domain_settings
-
-        self.layout.prop(md, "use_adaptive_domain", text="")
+        layout = self.layout
+        layout.active = enable_panel(md)
+        layout.prop(md, "use_adaptive_domain", text="")
 
     def draw(self, context):
         layout = self.layout
@@ -212,7 +221,7 @@ class PHYSICS_PT_smoke_adaptive_domain(PhysicButtonsPanel, Panel):
         layout.active = domain.use_adaptive_domain
 
         split = layout.split()
-        split.enabled = (not domain.point_cache.is_baked)
+        split.enabled = enable_panel(domain)
 
         col = split.column(align=True)
         col.label(text="Resolution:")
@@ -236,8 +245,9 @@ class PHYSICS_PT_smoke_highres(PhysicButtonsPanel, Panel):
 
     def draw_header(self, context):
         md = context.smoke.domain_settings
-
-        self.layout.prop(md, "use_high_resolution", text="")
+        layout = self.layout
+        layout.active = enable_panel(md)
+        layout.prop(md, "use_high_resolution", text="")
 
     def draw(self, context):
         layout = self.layout
@@ -247,7 +257,7 @@ class PHYSICS_PT_smoke_highres(PhysicButtonsPanel, Panel):
         layout.active = md.use_high_resolution
 
         split = layout.split()
-        split.enabled = not md.point_cache.is_baked
+        split.enabled = enable_panel(md)
 
         col = split.column()
         col.label(text="Resolution:")
@@ -353,16 +363,19 @@ class PHYSICS_PT_smoke_cache(PhysicButtonsPanel, Panel):
                 row.prop(cache, "frame_end")
                 row = layout.row()
                 row.prop(cache, "save_as_half")
-                layout.operator("object.smoke_vdb_export", text="Bake")
+                row = layout.row()
+                row.operator("object.openvdb_cache_bake")
+                row.operator("object.openvdb_cache_free")
+                row = layout.row()
                 layout.separator()
-                layout.label(text="Retimer:")
-                split = layout.split()
+                row.label(text="Retimer:")
+                split = row.split()
                 col = split.column()
                 col.prop(cache, "time_scale")
                 col.prop(cache, "num_steps")
                 col = split.column()
                 col.prop(cache, "shutter_speed")
-                layout.operator("object.cache_retime")
+                row.operator("object.cache_retime")
 
 
 class PHYSICS_PT_smoke_field_weights(PhysicButtonsPanel, Panel):

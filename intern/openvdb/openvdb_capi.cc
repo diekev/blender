@@ -39,6 +39,10 @@ int OpenVDB_getVersionHex()
 
 void OpenVDB_copy_file(const char *from, const char *to)
 {
+	Timer(__func__);
+
+	using namespace openvdb;
+
 	initialize();
 	io::File file_from(from), file_to(to);
 	file_from.open();
@@ -50,37 +54,30 @@ void OpenVDB_copy_file(const char *from, const char *to)
 	file_from.close();
 }
 
-
 void OpenVDB_get_grid_info(const char *filename, OpenVDBGridInfoCallback cb, void *userdata)
 {
 	Timer(__func__);
 
 	using namespace openvdb;
 
-	int ret = OPENVDB_NO_ERROR;
 	initialize();
-	
-	try {
-		io::File file(filename);
-		file.open();
-		
-		GridPtrVecPtr grids = file.getGrids();
-		int grid_num = grids->size();
-		
-		for (size_t i = 0; i < grid_num; ++i) {
-			GridBase::ConstPtr grid = (*grids)[i];
-			
-			std::string name = grid->getName();
-			std::string value_type = grid->valueType();
-			bool is_color = false;
-			if (grid->getMetadata< TypedMetadata<bool> >("is_color"))
-				is_color = grid->metaValue<bool>("is_color");
-			
-			cb(userdata, name.c_str(), value_type.c_str(), is_color);
-		}
-	}
-	catch (...) {
-		catch_exception(ret);
+
+	io::File file(filename);
+	file.open();
+
+	GridPtrVecPtr grids = file.getGrids();
+	int grid_num = grids->size();
+
+	for (size_t i = 0; i < grid_num; ++i) {
+		GridBase::ConstPtr grid = (*grids)[i];
+
+		Name name = grid->getName();
+		Name value_type = grid->valueType();
+		bool is_color = false;
+		if (grid->getMetadata< TypedMetadata<bool> >("is_color"))
+			is_color = grid->metaValue<bool>("is_color");
+
+		cb(userdata, name.c_str(), value_type.c_str(), is_color);
 	}
 }
 

@@ -1138,6 +1138,23 @@ void dag_add_relation(DagForest *forest, DagNode *fob1, DagNode *fob2, short rel
 	/* parent relation is for cycle checking */
 	dag_add_parent_relation(forest, fob1, fob2, rel, name);
 
+	/* TODO(sergey): Find a better place for this. */
+#ifdef WITH_OPENSUBDIV
+	if ((rel & DAG_RL_DATA_DATA) != 0) {
+		if (fob1->type == ID_OB) {
+			if ((fob1->eval_flags & DAG_EVAL_NEED_CPU) == 0) {
+				Object *ob2 = fob2->ob;
+				if (ob2->recalc & OB_RECALC_ALL) {
+					/* Make sure object has all the data on CPU. */
+					Object *ob1 = fob1->ob;
+					ob1->recalc |= OB_RECALC_DATA;
+				}
+				fob1->eval_flags |= DAG_EVAL_NEED_CPU;
+			}
+		}
+	}
+#endif
+
 	while (itA) { /* search if relation exist already */
 		if (itA->node == fob2) {
 			itA->type |= rel;
@@ -1335,16 +1352,32 @@ void graph_print_adj_list(DagForest *dag)
  * to do their own updates based on changes... */
 static void (*EditorsUpdateIDCb)(Main *bmain, ID *id) = NULL;
 static void (*EditorsUpdateSceneCb)(Main *bmain, Scene *scene, int updated) = NULL;
+static void (*EditorsUpdateScenePreCb)(Main *bmain, Scene *scene, bool time) = NULL;
 
-void DAG_editors_update_cb(void (*id_func)(Main *bmain, ID *id), void (*scene_func)(Main *bmain, Scene *scene, int updated))
+void DAG_editors_update_cb(void (*id_func)(Main *bmain, ID *id),
+                           void (*scene_func)(Main *bmain, Scene *scene, int updated),
+                           void (*scene_pre_func)(Main *bmain, Scene *scene, bool time))
 {
 	if (DEG_depsgraph_use_legacy()) {
 		EditorsUpdateIDCb = id_func;
 		EditorsUpdateSceneCb = scene_func;
+		EditorsUpdateScenePreCb = scene_pre_func;
 	}
 	else {
 		/* New dependency graph. */
-		DEG_editors_set_update_cb(id_func, scene_func);
+		DEG_editors_set_update_cb(id_func, scene_func, scene_pre_func);
+	}
+}
+
+void DAG_editors_update_pre(Main *bmain, Scene *scene, bool time)
+{
+	if (DEG_depsgraph_use_legacy()) {
+		if (EditorsUpdateScenePreCb != NULL) {
+			EditorsUpdateScenePreCb(bmain, scene, time);
+		}
+	}
+	else {
+		DEG_editors_update_pre(bmain, scene, time);
 	}
 }
 

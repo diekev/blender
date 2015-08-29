@@ -75,6 +75,7 @@
 #include "BKE_pointcache.h"
 #include "BKE_scene.h"
 #include "BKE_smoke.h"
+#include "BKE_subsurf.h"
 #include "BKE_unit.h"
 #include "BKE_tracking.h"
 
@@ -4032,9 +4033,15 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 	}
 	
 	/* check polys instead of tessfaces because of dyntopo where tessfaces don't exist */
-	no_edges = (dm->getNumEdges(dm) == 0);
-	no_faces = (dm->getNumPolys(dm) == 0);
-	
+	if (dm->type == DM_TYPE_CCGDM) {
+		no_edges = !subsurf_has_edges(dm);
+		no_faces = !subsurf_has_faces(dm);
+	}
+	else {
+		no_edges = (dm->getNumEdges(dm) == 0);
+		no_faces = (dm->getNumPolys(dm) == 0);
+	}
+
 	/* vertexpaint, faceselect wants this, but it doesnt work for shaded? */
 	glFrontFace((ob->transflag & OB_NEG_SCALE) ? GL_CW : GL_CCW);
 
@@ -7231,6 +7238,9 @@ static void draw_bounding_volume(Object *ob, char type)
 	else if (ob->type == OB_ARMATURE) {
 		bb = BKE_armature_boundbox_get(ob);
 	}
+	else if (ob->type == OB_LATTICE) {
+		bb = BKE_lattice_boundbox_get(ob);
+	}
 	else {
 		const float min[3] = {-1.0f, -1.0f, -1.0f}, max[3] = {1.0f, 1.0f, 1.0f};
 		bb = &bb_local;
@@ -8027,6 +8037,8 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 		/* only draw domains */
 		if (smd->domain) {
 			SmokeDomainSettings *sds = smd->domain;
+			BoundBox bb;
+			float p0[3], p1[3];
 			float viewnormal[3];
 
 			glLoadMatrixf(rv3d->viewmat);
@@ -8034,8 +8046,6 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 
 			/* draw adaptive domain bounds */
 			if ((sds->flags & MOD_SMOKE_ADAPTIVE_DOMAIN) && !render_override) {
-				float p0[3], p1[3];
-				BoundBox bb;
 				/* draw domain max bounds */
 				VECSUBFAC(p0, sds->p0, sds->cell_size, sds->adapt_res);
 				VECADDFAC(p1, sds->p1, sds->cell_size, sds->adapt_res);
@@ -8047,8 +8057,10 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 				BKE_boundbox_init_from_minmax(&bb, sds->p0, sds->p1);
 				draw_box(bb.vec);
 #endif
+			}
 
-				/* draw a single voxel to hint the user about the resolution of the fluid */
+			/* draw a single voxel to hint the user about the resolution of the fluid */
+			{
 				copy_v3_v3(p0, sds->p0);
 
 				if (sds->flags & MOD_SMOKE_HIGHRES) {
@@ -8064,11 +8076,6 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 
 			/* don't show smoke before simulation starts, this could be made an option in the future */
 			if (smd->domain->fluid && CFRA >= smd->domain->point_cache[0]->startframe) {
-				float p0[3], p1[3];
-
-				glLoadMatrixf(rv3d->viewmat);
-				glMultMatrixf(ob->obmat);
-
 				/* get view vector */
 				invert_m4_m4(ob->imat, ob->obmat);
 				mul_v3_mat3_m4v3(viewnormal, ob->imat, rv3d->viewinv[2]);

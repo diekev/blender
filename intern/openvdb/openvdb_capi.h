@@ -43,21 +43,6 @@ void OpenVDB_get_grid_info(const char *filename, OpenVDBGridInfoCallback cb, voi
 void OpenVDB_copy_file(const char *from, const char *to);
 
 enum {
-	OPENVDB_NO_ERROR      = 0,
-	OPENVDB_ARITHM_ERROR  = 1,
-	OPENVDB_ILLEGAL_ERROR = 2,
-	OPENVDB_INDEX_ERROR   = 3,
-	OPENVDB_IO_ERROR      = 4,
-	OPENVDB_KEY_ERROR     = 5,
-	OPENVDB_LOOKUP_ERROR  = 6,
-	OPENVDB_IMPL_ERROR    = 7,
-	OPENVDB_REF_ERROR     = 8,
-	OPENVDB_TYPE_ERROR    = 9,
-	OPENVDB_VALUE_ERROR   = 10,
-	OPENVDB_UNKNOWN_ERROR = 11,
-};
-
-enum {
 	VEC_INVARIANT = 0,
 	VEC_COVARIANT = 1,
 	VEC_COVARIANT_NORMALIZE = 2,

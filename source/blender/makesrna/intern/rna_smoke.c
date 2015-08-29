@@ -342,7 +342,7 @@ static int rna_SmokeModifier_active_openvdb_cache_index_get(PointerRNA *ptr)
     int i = 0;
 
     for (; cache; cache = cache->next, i++) {
-        if (cache->flags & VDB_CACHE_CURRENT)
+        if (cache->flags & OPENVDB_CACHE_CURRENT)
             return i;
     }
     return 0;
@@ -356,9 +356,9 @@ static void rna_SmokeModifier_active_openvdb_cache_index_set(struct PointerRNA *
 
     for (; cache; cache = cache->next, i++) {
         if (i == value)
-            cache->flags |= VDB_CACHE_CURRENT;
+            cache->flags |= OPENVDB_CACHE_CURRENT;
         else
-            cache->flags &= ~VDB_CACHE_CURRENT;
+            cache->flags &= ~OPENVDB_CACHE_CURRENT;
     }
 }
 
@@ -396,12 +396,15 @@ static void rna_def_openvdb_cache(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "filepath", PROP_STRING, PROP_DIRPATH);
 	RNA_def_property_string_sdna(prop, NULL, "path");
 	RNA_def_property_ui_text(prop, "File Path", "Cache file path");
-//	RNA_def_property_update(prop, NC_OBJECT, "rna_Cache_idname_change");
 
 	prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "name");
 	RNA_def_property_ui_text(prop, "Name", "Cache name");
 	RNA_def_struct_name_property(srna, prop);
+
+	prop = RNA_def_property(srna, "is_baked", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", OPENVDB_CACHE_BAKED);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 
 	prop = RNA_def_property(srna, "compression", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "compression");
@@ -434,7 +437,7 @@ static void rna_def_openvdb_cache(BlenderRNA *brna)
 	RNA_def_property_update(prop, NC_OBJECT | ND_POINTCACHE, NULL);
 
 	prop = RNA_def_property(srna, "save_as_half", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "flags", VDB_CACHE_SAVE_AS_HALF);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", OPENVDB_CACHE_SAVE_AS_HALF);
 	RNA_def_property_ui_text(prop, "Save as Half",
 	                         "Write all scalar (including vector) grids to the file as 16-bit half floats to reduce file size");
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
