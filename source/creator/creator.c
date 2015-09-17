@@ -1489,7 +1489,7 @@ static void setupArguments(bContext *C, bArgs *ba, SYS_SystemHandle *syshandle)
 		"\n\t-g linearmipmap\t\tLinear Texture Mipmapping instead of Nearest (default)";
 
 	static char debug_doc[] = "\n\tTurn debugging on\n"
-		"\n\t* Prints every operator call and their arguments"
+		"\n\t* Enables memory error detection"
 		"\n\t* Disables mouse grab (to interact with a debugger in some cases)"
 		"\n\t* Keeps Python's 'sys.stdin' rather than setting it to None";
 
@@ -1540,7 +1540,7 @@ static void setupArguments(bContext *C, bArgs *ba, SYS_SystemHandle *syshandle)
 	BLI_argsAdd(ba, 1, NULL, "--debug-python", "\n\tEnable debug messages for Python", debug_mode_generic, (void *)G_DEBUG_PYTHON);
 	BLI_argsAdd(ba, 1, NULL, "--debug-events", "\n\tEnable debug messages for the event system", debug_mode_generic, (void *)G_DEBUG_EVENTS);
 	BLI_argsAdd(ba, 1, NULL, "--debug-handlers", "\n\tEnable debug messages for event handling", debug_mode_generic, (void *)G_DEBUG_HANDLERS);
-	BLI_argsAdd(ba, 1, NULL, "--debug-wm",     "\n\tEnable debug messages for the window manager", debug_mode_generic, (void *)G_DEBUG_WM);
+	BLI_argsAdd(ba, 1, NULL, "--debug-wm",     "\n\tEnable debug messages for the window manager, also prints every operator call", debug_mode_generic, (void *)G_DEBUG_WM);
 	BLI_argsAdd(ba, 1, NULL, "--debug-all",    "\n\tEnable all debug messages (excludes libmv)", debug_mode_generic, (void *)G_DEBUG_ALL);
 
 	BLI_argsAdd(ba, 1, NULL, "--debug-fpe", "\n\tEnable floating point exceptions", set_fpe, NULL);
@@ -1557,7 +1557,7 @@ static void setupArguments(bContext *C, bArgs *ba, SYS_SystemHandle *syshandle)
 	BLI_argsAdd(ba, 1, NULL, "--debug-jobs",  "\n\tEnable time profiling for background jobs.", debug_mode_generic, (void *)G_DEBUG_JOBS);
 	BLI_argsAdd(ba, 1, NULL, "--debug-gpu",  "\n\tEnable gpu debug context and information for OpenGL 4.3+.", debug_mode_generic, (void *)G_DEBUG_GPU);
 	BLI_argsAdd(ba, 1, NULL, "--debug-depsgraph", "\n\tEnable debug messages from dependency graph", debug_mode_generic, (void *)G_DEBUG_DEPSGRAPH);
-	BLI_argsAdd(ba, 1, NULL, "--debug-depsgraph-no-threads", "\n\tSwitch dependency graph to a single threaded evlauation", debug_mode_generic, (void *)G_DEBUG_DEPSGRAPH_NO_THREADS);
+	BLI_argsAdd(ba, 1, NULL, "--debug-depsgraph-no-threads", "\n\tSwitch dependency graph to a single threaded evaluation", debug_mode_generic, (void *)G_DEBUG_DEPSGRAPH_NO_THREADS);
 	BLI_argsAdd(ba, 1, NULL, "--debug-gpumem", "\n\tEnable GPU memory stats in status bar", debug_mode_generic, (void *)G_DEBUG_GPU_MEM);
 
 	BLI_argsAdd(ba, 1, NULL, "--enable-new-depsgraph", "\n\tUse new dependency graph", depsgraph_use_new, NULL);
@@ -1681,7 +1681,7 @@ int main(
 		int i;
 		for (i = 0; i < argc; i++) {
 			if (STREQ(argv[i], "--debug") || STREQ(argv[i], "-d") ||
-			    STREQ(argv[i], "--debug-memory"))
+			    STREQ(argv[i], "--debug-memory") || STREQ(argv[i], "--debug-all"))
 			{
 				printf("Switching to fully guarded memory allocator.\n");
 				MEM_use_guarded_allocator();
