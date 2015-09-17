@@ -6539,6 +6539,7 @@ void blo_lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *cursc
 				else if (sl->spacetype == SPACE_FILE) {
 					SpaceFile *sfile = (SpaceFile *)sl;
 					sfile->op = NULL;
+					sfile->previews_timer = NULL;
 				}
 				else if (sl->spacetype == SPACE_ACTION) {
 					SpaceAction *saction = (SpaceAction *)sl;
@@ -6622,7 +6623,13 @@ void blo_lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *cursc
 
 						BLI_mempool_iternew(so->treestore, &iter);
 						while ((tselem = BLI_mempool_iterstep(&iter))) {
-							tselem->id = restore_pointer_by_name(newmain, tselem->id, USER_IGNORE);
+							/* Do not try to restore pointers to drivers/sequence/etc., can crash in undo case! */
+							if (TSE_IS_REAL_ID(tselem)) {
+								tselem->id = restore_pointer_by_name(newmain, tselem->id, USER_IGNORE);
+							}
+							else {
+								tselem->id = NULL;
+							}
 						}
 						if (so->treehash) {
 							/* rebuild hash table, because it depends on ids too */
@@ -7068,6 +7075,7 @@ static bool direct_link_screen(FileData *fd, bScreen *sc)
 				sfile->files = NULL;
 				sfile->layout = NULL;
 				sfile->op = NULL;
+				sfile->previews_timer = NULL;
 				sfile->params = newdataadr(fd, sfile->params);
 			}
 			else if (sl->spacetype == SPACE_CLIP) {
@@ -8363,6 +8371,8 @@ BlendFileData *blo_read_file_internal(FileData *fd, const char *filepath)
 	
 	link_global(fd, bfd);	/* as last */
 	
+	fd->mainlist = NULL;  /* Safety, this is local variable, shall not be used afterward. */
+
 	return bfd;
 }
 

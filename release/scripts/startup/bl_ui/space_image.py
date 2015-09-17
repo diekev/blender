@@ -961,7 +961,7 @@ class IMAGE_PT_image_layers(Panel, ImagePaintPanel):
                 sub.prop(layers.active_image_layer, "blend_type", text="")
 
 
-class IMAGE_PT_paint(Panel, BrushButtonsPanel):
+class IMAGE_PT_paint(Panel, ImagePaintPanel):
     bl_label = "Paint"
     bl_category = "Tools"
 
@@ -977,6 +977,11 @@ class IMAGE_PT_paint(Panel, BrushButtonsPanel):
         if brush:
             brush_texpaint_common(self, context, layout, brush, settings)
 
+    @classmethod
+    def poll(cls, context):
+        sima = context.space_data
+        toolsettings = context.tool_settings.image_paint
+        return sima.show_paint
 
 class IMAGE_PT_tools_brush_overlay(BrushButtonsPanel, Panel):
     bl_label = "Overlay"
@@ -1192,7 +1197,7 @@ class IMAGE_PT_tools_imagepaint_symmetry(BrushButtonsPanel, Panel):
         row = col.row(align=True)
         row.prop(ipaint, "tile_x", text="X", toggle=True)
         row.prop(ipaint, "tile_y", text="Y", toggle=True)
- 
+
 
 class IMAGE_PT_tools_brush_appearance(BrushButtonsPanel, Panel):
     bl_label = "Appearance"
