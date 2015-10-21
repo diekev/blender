@@ -34,6 +34,7 @@
 #include "BLI_utildefines.h"
 
 #include "BKE_cdderivedmesh.h"
+#include "BKE_library_query.h"
 #include "BKE_modifier.h"
 #include "BKE_particle.h"
 
@@ -43,7 +44,10 @@
 #include "MOD_openvdb_util.h"
 
 #include "depsgraph_private.h"
+
+#ifdef WITH_MOD_PARTMESHER
 #include "openvdb_capi.h"
+#endif
 
 static void initData(ModifierData *md)
 {
@@ -97,7 +101,7 @@ static void foreachObjectLink(ModifierData *md, Object *ob, ObjectWalkFunc walk,
 	ParticleMesherModifierData *pmmd = (ParticleMesherModifierData *) md;
 
 	if (pmmd->mesher_mask_ob) {
-		walk(userData, ob, &pmmd->mesher_mask_ob);
+		walk(userData, ob, &pmmd->mesher_mask_ob, IDWALK_NOP);
 	}
 }
 
@@ -186,6 +190,7 @@ static void freeData(ModifierData *md)
 		MEM_freeN(filter);
 	}
 
+#ifdef WITH_MOD_PARTMESHER
 	if (pmmd->part_list) {
 		OpenVDB_part_list_free(pmmd->part_list);
 	}
@@ -197,6 +202,7 @@ static void freeData(ModifierData *md)
 	if (pmmd->mesher_mask) {
 		OpenVDBPrimitive_free(pmmd->mesher_mask);
 	}
+#endif
 }
 
 ModifierTypeInfo modifierType_ParticleMesher = {

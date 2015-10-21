@@ -53,11 +53,13 @@ OpenVDBPrimitive *OpenVDB_from_polygons(OpenVDBGeom *geom,
 		transform = math::Transform::createLinearTransform(voxel_size);
 	}
 
-	tools::MeshToVolume<FloatGrid> voxelizer(transform);
-	voxelizer.convertToLevelSet(geom->m_points, geom->m_polys, int_band, ext_band);
+	FloatGrid::Ptr ls = tools::meshToLevelSet<FloatGrid>(*transform,
+	                                                     geom->m_points,
+	                                                     geom->m_polys,
+	                                                     int_band);
 
 	OpenVDBPrimitive *vdb_prim = new OpenVDBPrimitive();
-	vdb_prim->setGrid(voxelizer.distGridPtr());
+	vdb_prim->setGrid(ls);
 
 	/* XXX - should be done in a better way */
 	if (input_prim) {
