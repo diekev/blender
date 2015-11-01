@@ -142,12 +142,8 @@ ccl_device_inline bool triangle_intersect(KernelGlobals *kg,
 	float U = Cx * By - Cy * Bx;
 	float V = Ax * Cy - Ay * Cx;
 	float W = Bx * Ay - By * Ax;
-	const int sign_mask = (__float_as_int(U) & 0x80000000);
-	/* TODO(sergey): Check if multiplication plus sign check is faster
-	 * or at least same speed (but robust for endian types).
-	 */
-	if(sign_mask != (__float_as_int(V) & 0x80000000) ||
-	   sign_mask != (__float_as_int(W) & 0x80000000))
+	if((U < 0.0f || V < 0.0f || W < 0.0f) &&
+	   (U > 0.0f || V > 0.0f || W > 0.0f))
 	{
 		return false;
 	}
@@ -162,9 +158,10 @@ ccl_device_inline bool triangle_intersect(KernelGlobals *kg,
 	 * the hit distance.
 	 */
 	const float T = (U * A_kz + V * B_kz + W * C_kz) * Sz;
-	const float sign_T = xor_signmask(T, sign_mask);
+	const int sign_det = (__float_as_int(det) & 0x80000000);
+	const float sign_T = xor_signmask(T, sign_det);
 	if((sign_T < 0.0f) ||
-	   (sign_T > isect->t * xor_signmask(det, sign_mask)))
+	   (sign_T > isect->t * xor_signmask(det, sign_det)))
 	{
 		return false;
 	}
@@ -179,7 +176,7 @@ ccl_device_inline bool triangle_intersect(KernelGlobals *kg,
 		float4 a = tri_b - tri_a, b = tri_c - tri_a;
 		if(len_squared(make_float3(a.y*b.z - a.z*b.y,
 		                           a.z*b.x - a.x*b.z,
-		                           a.x*b.y - a.y*b.x)) < 1e-16f)
+		                           a.x*b.y - a.y*b.x)) == 0.0f)
 		{
 			return false;
 		}
@@ -245,13 +242,12 @@ ccl_device_inline void triangle_intersect_subsurface(
 
 	/* Calculate scaled barycentric coordinates. */
 	float U = Cx * By - Cy * Bx;
-	int sign_mask = (__float_as_int(U) & 0x80000000);
 	float V = Ax * Cy - Ay * Cx;
-	if(sign_mask != (__float_as_int(V) & 0x80000000)) {
-		return;
-	}
 	float W = Bx * Ay - By * Ax;
-	if(sign_mask != (__float_as_int(W) & 0x80000000)) {
+
+	if((U < 0.0f || V < 0.0f || W < 0.0f) &&
+	   (U > 0.0f || V > 0.0f || W > 0.0f))
+	{
 		return;
 	}
 
@@ -264,10 +260,11 @@ ccl_device_inline void triangle_intersect_subsurface(
 	/* Calculate scaled z−coordinates of vertices and use them to calculate
 	 * the hit distance.
 	 */
+	const int sign_det = (__float_as_int(det) & 0x80000000);
 	const float T = (U * A_kz + V * B_kz + W * C_kz) * Sz;
-	const float sign_T = xor_signmask(T, sign_mask);
+	const float sign_T = xor_signmask(T, sign_det);
 	if((sign_T < 0.0f) ||
-	   (sign_T > tmax * xor_signmask(det, sign_mask)))
+	   (sign_T > tmax * xor_signmask(det, sign_det)))
 	{
 		return;
 	}
