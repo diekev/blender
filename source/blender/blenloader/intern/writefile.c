@@ -291,11 +291,10 @@ static void ww_handle_init(eWriteWrapType ww_type, WriteWrap *r_ww)
 typedef struct {
 	struct SDNA *sdna;
 
-	int file;
 	unsigned char *buf;
 	MemFile *compare, *current;
 	
-	int tot, count, error, memsize;
+	int tot, count, error;
 
 	/* Wrap writing, so we can use zlib or
 	 * other compression types later, see: G_FILE_COMPRESS
@@ -2598,6 +2597,7 @@ static void write_scenes(WriteData *wd, ListBase *scebase)
 		}
 		
 		write_previews(wd, sce->preview);
+		write_curvemapping_curves(wd, &sce->r.mblur_shutter_curve);
 
 		sce= sce->id.next;
 	}
@@ -3236,18 +3236,6 @@ static void write_paintcurves(WriteData *wd, ListBase *idbase)
 	}
 }
 
-static void write_scripts(WriteData *wd, ListBase *idbase)
-{
-	Script *script;
-	
-	for (script=idbase->first; script; script= script->id.next) {
-		if (script->id.us>0 || wd->current) {
-			writestruct(wd, ID_SCRIPT, "Script", 1, script);
-			if (script->id.properties) IDP_WriteProperty(script->id.properties, wd);
-		}
-	}
-}
-
 static void write_movieTracks(WriteData *wd, ListBase *tracks)
 {
 	MovieTrackingTrack *track;
@@ -3784,7 +3772,6 @@ static int write_file_handle(
 	write_brushes  (wd, &mainvar->brush);
 	write_palettes (wd, &mainvar->palettes);
 	write_paintcurves (wd, &mainvar->paintcurves);
-	write_scripts  (wd, &mainvar->script);
 	write_gpencils (wd, &mainvar->gpencil);
 	write_linestyles(wd, &mainvar->linestyle);
 	write_libraries(wd,  mainvar->next);
