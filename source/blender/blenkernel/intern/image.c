@@ -591,8 +591,8 @@ void BKE_image_make_local(struct Image *ima)
 			if (tex->id.lib == NULL) {
 				if (tex->ima == ima) {
 					tex->ima = ima_new;
-					ima_new->id.us++;
-					ima->id.us--;
+					id_us_plus(&ima_new->id);
+					id_us_min(&ima->id);
 				}
 			}
 			tex = tex->id.next;
@@ -602,8 +602,8 @@ void BKE_image_make_local(struct Image *ima)
 			if (brush->id.lib == NULL) {
 				if (brush->clone.image == ima) {
 					brush->clone.image = ima_new;
-					ima_new->id.us++;
-					ima->id.us--;
+					id_us_plus(&ima_new->id);
+					id_us_min(&ima->id);
 				}
 			}
 			brush = brush->id.next;
@@ -624,9 +624,7 @@ void BKE_image_make_local(struct Image *ima)
 						for (a = 0; a < me->totface; a++, tface++) {
 							if (tface->tpage == ima) {
 								tface->tpage = ima_new;
-								if (ima_new->id.us == 0) {
-									tface->tpage->id.us = 1;
-								}
+								id_us_ensure_real((ID *)ima_new);
 								id_lib_extern((ID *)ima_new);
 							}
 						}
@@ -645,9 +643,7 @@ void BKE_image_make_local(struct Image *ima)
 						for (a = 0; a < me->totpoly; a++, mtpoly++) {
 							if (mtpoly->tpage == ima) {
 								mtpoly->tpage = ima_new;
-								if (ima_new->id.us == 0) {
-									mtpoly->tpage->id.us = 1;
-								}
+								id_us_ensure_real((ID *)ima_new);
 								id_lib_extern((ID *)ima_new);
 							}
 						}
@@ -783,7 +779,7 @@ Image *BKE_image_load_exists_ex(const char *filepath, bool *r_exists)
 				if ((BKE_image_has_anim(ima) == false) ||
 				    (ima->id.us == 0))
 				{
-					ima->id.us++;  /* officially should not, it doesn't link here! */
+					id_us_plus(&ima->id);  /* officially should not, it doesn't link here! */
 					if (ima->ok == 0)
 						ima->ok = IMA_OK;
 					if (r_exists)
@@ -2293,6 +2289,7 @@ void BKE_imbuf_write_prepare(ImBuf *ibuf, ImageFormatData *imf)
 		ibuf->ftype = IMB_FTYPE_OPENEXR;
 		if (imf->depth == R_IMF_CHAN_DEPTH_16)
 			ibuf->foptions.flag |= OPENEXR_HALF;
+		ibuf->foptions.flag &= ~OPENEXR_COMPRESS;
 		ibuf->foptions.flag |= (imf->exr_codec & OPENEXR_COMPRESS);
 
 		if (!(imf->flag & R_IMF_FLAG_ZBUF))
