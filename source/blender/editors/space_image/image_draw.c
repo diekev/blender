@@ -1109,8 +1109,6 @@ void draw_image_main(const bContext *C, ARegion *ar)
 	}
 #endif
 
-	ED_space_image_release_buffer(sima, ibuf, lock);
-
 	if (next_ibuf) {
 		if (BKE_image_get_first_ibuf(ima)) {
 			ima->cache = NULL;
