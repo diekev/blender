@@ -61,7 +61,7 @@ static EnumPropertyItem image_source_items[] = {
 	{0, NULL, 0, NULL, NULL}
 };
 
-EnumPropertyItem image_layer_mode_items[] = {
+EnumPropertyItem rna_enum_image_layer_mode_items[] = {
 	{IMA_LAYER_NORMAL, "NORMAL", 0, "Normal", ""},
 	{IMA_LAYER_MULTIPLY, "MULTIPLY", 0, "Multiply", ""},
 	{IMA_LAYER_SCREEN, "SCREEN", 0, "Screen", ""},
@@ -745,7 +745,7 @@ static void rna_def_image_layer_common(StructRNA *srna)
 
 	prop = RNA_def_property(srna, "blend_type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "mode");
-	RNA_def_property_enum_items(prop, image_layer_mode_items);
+	RNA_def_property_enum_items(prop, rna_enum_image_layer_mode_items);
 	RNA_def_property_ui_text(prop, "Blend Modes", "Determine how two Layers are blended into each other");
 	RNA_def_property_update(prop, NC_IMAGE | ND_DISPLAY, NULL);
 
