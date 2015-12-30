@@ -753,10 +753,10 @@ static EnumPropertyItem *modifier_add_itemf(bContext *C, PointerRNA *UNUSED(ptr)
 	int totitem = 0, a;
 	
 	if (!ob)
-		return modifier_type_items;
+		return rna_enum_object_modifier_type_items;
 
-	for (a = 0; modifier_type_items[a].identifier; a++) {
-		md_item = &modifier_type_items[a];
+	for (a = 0; rna_enum_object_modifier_type_items[a].identifier; a++) {
+		md_item = &rna_enum_object_modifier_type_items[a];
 
 		if (md_item->identifier[0]) {
 			mti = modifierType_getInfo(md_item->value);
@@ -806,7 +806,7 @@ void OBJECT_OT_modifier_add(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 	
 	/* properties */
-	prop = RNA_def_enum(ot->srna, "type", modifier_type_items, eModifierType_Subsurf, "Type", "");
+	prop = RNA_def_enum(ot->srna, "type", rna_enum_object_modifier_type_items, eModifierType_Subsurf, "Type", "");
 	RNA_def_enum_funcs(prop, modifier_add_itemf);
 	ot->prop = prop;
 }
@@ -2332,7 +2332,7 @@ static LevelSetFilter *levelset_filter_new(void)
 	filter->offset = 1.0f;
 
 	BLI_strncpy(filter->name,
-	            part_mesher_filter_items[filter->type].name,
+	            rna_enum_part_mesher_filter_items[filter->type].name,
 				sizeof(filter->name));
 
 	return filter;
