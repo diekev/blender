@@ -231,7 +231,7 @@ static int space_image_poll(bContext *C)
 }
 #endif
 
-int space_image_main_area_poll(bContext *C)
+int space_image_main_region_poll(bContext *C)
 {
 	SpaceImage *sima = CTX_wm_space_image(C);
 	/* XXX ARegion *ar = CTX_wm_region(C); */
@@ -271,7 +271,7 @@ static int image_sample_poll(bContext *C)
 			return false;
 		}
 
-		return space_image_main_area_poll(C);
+		return space_image_main_region_poll(C);
 	}
 	else {
 		return false;
@@ -402,7 +402,7 @@ void IMAGE_OT_view_pan(wmOperatorType *ot)
 	ot->invoke = image_view_pan_invoke;
 	ot->modal = image_view_pan_modal;
 	ot->cancel = image_view_pan_cancel;
-	ot->poll = space_image_main_area_poll;
+	ot->poll = space_image_main_region_poll;
 
 	/* flags */
 	ot->flag = OPTYPE_BLOCKING | OPTYPE_GRAB_CURSOR | OPTYPE_LOCK_BYPASS;
@@ -618,7 +618,7 @@ void IMAGE_OT_view_zoom(wmOperatorType *ot)
 	ot->invoke = image_view_zoom_invoke;
 	ot->modal = image_view_zoom_modal;
 	ot->cancel = image_view_zoom_cancel;
-	ot->poll = space_image_main_area_poll;
+	ot->poll = space_image_main_region_poll;
 
 	/* flags */
 	ot->flag = OPTYPE_BLOCKING | OPTYPE_GRAB_CURSOR | OPTYPE_LOCK_BYPASS;
@@ -673,7 +673,7 @@ void IMAGE_OT_view_ndof(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->invoke = image_view_ndof_invoke;
-	ot->poll = space_image_main_area_poll;
+	ot->poll = space_image_main_region_poll;
 
 	/* flags */
 	ot->flag = OPTYPE_LOCK_BYPASS;
@@ -745,7 +745,7 @@ void IMAGE_OT_view_all(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec = image_view_all_exec;
-	ot->poll = space_image_main_area_poll;
+	ot->poll = space_image_main_region_poll;
 
 	/* flags */
 	ot->flag = OPTYPE_LOCK_BYPASS;
@@ -809,7 +809,7 @@ static int image_view_selected_exec(bContext *C, wmOperator *UNUSED(op))
 
 static int image_view_selected_poll(bContext *C)
 {
-	return (space_image_main_area_poll(C) && (ED_operator_uvedit(C) || ED_operator_mask(C)));
+	return (space_image_main_region_poll(C) && (ED_operator_uvedit(C) || ED_operator_mask(C)));
 }
 
 void IMAGE_OT_view_selected(wmOperatorType *ot)
@@ -864,7 +864,7 @@ void IMAGE_OT_view_zoom_in(wmOperatorType *ot)
 	/* api callbacks */
 	ot->invoke = image_view_zoom_in_invoke;
 	ot->exec = image_view_zoom_in_exec;
-	ot->poll = space_image_main_area_poll;
+	ot->poll = space_image_main_region_poll;
 
 	/* flags */
 	ot->flag = OPTYPE_LOCK_BYPASS;
@@ -913,7 +913,7 @@ void IMAGE_OT_view_zoom_out(wmOperatorType *ot)
 	/* api callbacks */
 	ot->invoke = image_view_zoom_out_invoke;
 	ot->exec = image_view_zoom_out_exec;
-	ot->poll = space_image_main_area_poll;
+	ot->poll = space_image_main_region_poll;
 
 	/* flags */
 	ot->flag = OPTYPE_LOCK_BYPASS;
@@ -960,7 +960,7 @@ void IMAGE_OT_view_zoom_ratio(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec = image_view_zoom_ratio_exec;
-	ot->poll = space_image_main_area_poll;
+	ot->poll = space_image_main_region_poll;
 
 	/* flags */
 	ot->flag = OPTYPE_LOCK_BYPASS;
@@ -5828,7 +5828,7 @@ void IMAGE_OT_sample_line(wmOperatorType *ot)
 	ot->invoke = image_sample_line_invoke;
 	ot->modal = WM_gesture_straightline_modal;
 	ot->exec = image_sample_line_exec;
-	ot->poll = space_image_main_area_poll;
+	ot->poll = space_image_main_region_poll;
 	ot->cancel = WM_gesture_straightline_cancel;
 	
 	/* flags */
@@ -6071,7 +6071,7 @@ static int change_frame_poll(bContext *C)
 	if (G.is_rendering)
 		return 0;
 
-	return space_image_main_area_poll(C);
+	return space_image_main_region_poll(C);
 }
 
 static void change_frame_apply(bContext *C, wmOperator *op)
@@ -6204,7 +6204,7 @@ void IMAGE_OT_read_renderlayers(wmOperatorType *ot)
 	ot->idname = "IMAGE_OT_read_renderlayers";
 	ot->description = "Read all the current scene's render layers from cache, as needed";
 
-	ot->poll = space_image_main_area_poll;
+	ot->poll = space_image_main_region_poll;
 	ot->exec = image_read_renderlayers_exec;
 
 	/* flags */

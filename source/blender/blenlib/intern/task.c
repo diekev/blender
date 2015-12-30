@@ -646,7 +646,7 @@ static void parallel_range_func(
  * \param range_threshold Minimum size of processed range to start using tasks
  *                        (below this, loop is done in main thread only).
  * \param use_dynamic_scheduling If \a true, the whole range is divided in a lot of small chunks (of size 32 currently),
- *                               otehrwise whole range is split in a few big chunks (num_threads * 2 chunks currently).
+ *                               otherwise whole range is split in a few big chunks (num_threads * 2 chunks currently).
  */
 void BLI_task_parallel_range_ex(
         int start, int stop,
@@ -706,8 +706,10 @@ void BLI_task_parallel_range_ex(
 		state.chunk_size = 32;
 	}
 	else {
-		state.chunk_size = (stop - start) / (num_tasks);
+		state.chunk_size = max_ii(1, (stop - start) / (num_tasks));
 	}
+
+	num_tasks = max_ii(1, (stop - start) / state.chunk_size);
 
 	for (i = 0; i < num_tasks; i++) {
 		BLI_task_pool_push(task_pool,

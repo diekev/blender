@@ -887,8 +887,7 @@ static void layer_draw_boundary(int xmin, int ymin, int xsize, int ysize, float 
 	glDisable(GL_LINE_STIPPLE);
 }
 
-/* draw main image area */
-
+/* draw main image region */
 void draw_image_main(const bContext *C, ARegion *ar)
 {
 	SpaceImage *sima = CTX_wm_space_image(C);

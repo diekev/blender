@@ -57,6 +57,7 @@
 
 #include "GPU_buffers.h"
 #include "GPU_draw.h"
+#include "GPU_basic_shader.h"
 
 #include "bmesh.h"
 
@@ -525,6 +526,7 @@ static GPUBuffer *gpu_buffer_setup(DerivedMesh *dm, GPUDrawObject *object,
 		if (!(buffer && (varray = glMapBuffer(target, GL_WRITE_ONLY)))) {
 			if (buffer)
 				gpu_buffer_free_intern(buffer);
+			BLI_mutex_unlock(&buffer_mutex);
 			return NULL;
 		}
 	}
@@ -1014,19 +1016,6 @@ struct GPU_PBVH_Buffers {
 	bool use_matcaps;
 	float diffuse_color[4];
 };
-
-static void gpu_colors_enable(void)
-{
-	glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE);
-	glEnable(GL_COLOR_MATERIAL);
-	glEnableClientState(GL_COLOR_ARRAY);
-}
-
-static void gpu_colors_disable(void)
-{
-	glDisable(GL_COLOR_MATERIAL);
-	glDisableClientState(GL_COLOR_ARRAY);
-}
 
 static float gpu_color_from_mask(float mask)
 {
@@ -1848,10 +1837,15 @@ void GPU_draw_pbvh_buffers(GPU_PBVH_Buffers *buffers, DMSetMaterial setMaterial,
 	if (buffers->vert_buf) {
 		char *base = NULL;
 		char *index_base = NULL;
+		int bound_options = 0;
 		glEnableClientState(GL_VERTEX_ARRAY);
 		if (!wireframe) {
 			glEnableClientState(GL_NORMAL_ARRAY);
-			gpu_colors_enable();
+			glEnableClientState(GL_COLOR_ARRAY);
+
+			/* weak inspection of bound options, should not be necessary ideally */
+			bound_options = GPU_basic_shader_bound_options();
+			GPU_basic_shader_bind(bound_options | GPU_SHADER_USE_COLOR);
 		}
 
 		GPU_buffer_bind(buffers->vert_buf, GPU_BINDING_ARRAY);
@@ -1930,7 +1924,8 @@ void GPU_draw_pbvh_buffers(GPU_PBVH_Buffers *buffers, DMSetMaterial setMaterial,
 		glDisableClientState(GL_VERTEX_ARRAY);
 		if (!wireframe) {
 			glDisableClientState(GL_NORMAL_ARRAY);
-			gpu_colors_disable();
+			glDisableClientState(GL_COLOR_ARRAY);
+			GPU_basic_shader_bind(bound_options);
 		}
 	}
 }
@@ -2046,8 +2041,6 @@ void GPU_init_draw_pbvh_BB(void)
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glDisableClientState(GL_COLOR_ARRAY);
 	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-	glDisable(GL_LIGHTING);
-	glDisable(GL_COLOR_MATERIAL);
 	glEnable(GL_BLEND);
 }
 
