@@ -1129,6 +1129,17 @@ class INFO_MT_metaball_add(Menu):
         layout.operator_enum("object.metaball_add", "type")
 
 
+class INFO_MT_volume_add(Menu):
+    bl_idname = "INFO_MT_volume_add"
+    bl_label = "Volume"
+
+    def draw(self, context):
+        layout = self.layout
+
+        layout.operator_context = 'INVOKE_REGION_WIN'
+        layout.operator("object.volume_add", text="Volume", icon='MOD_SMOKE')
+
+
 class INFO_MT_edit_curve_add(Menu):
     bl_idname = "INFO_MT_edit_curve_add"
     bl_label = "Add"
@@ -1200,6 +1211,9 @@ class INFO_MT_add(Menu):
         layout.menu("INFO_MT_metaball_add", text="Metaball", icon='OUTLINER_OB_META')
         layout.operator("object.text_add", text="Text", icon='OUTLINER_OB_FONT')
         layout.separator()
+        layout.menu("INFO_MT_volume_add", text="Volume", icon='MOD_SMOKE')
+        layout.separator()
+
 
         layout.menu("INFO_MT_armature_add", icon='OUTLINER_OB_ARMATURE')
         layout.operator("object.add", text="Lattice", icon='OUTLINER_OB_LATTICE').type = 'LATTICE'

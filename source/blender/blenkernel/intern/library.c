@@ -66,6 +66,7 @@
 #include "DNA_sound_types.h"
 #include "DNA_text_types.h"
 #include "DNA_vfont_types.h"
+#include "DNA_volume_types.h"
 #include "DNA_windowmanager_types.h"
 #include "DNA_world_types.h"
 
@@ -116,6 +117,7 @@
 #include "BKE_scene.h"
 #include "BKE_text.h"
 #include "BKE_texture.h"
+#include "BKE_volume.h"
 #include "BKE_world.h"
 
 #include "DEG_depsgraph.h"
@@ -590,6 +592,8 @@ ListBase *which_libbase(Main *mainlib, short type)
 			return &(mainlib->palettes);
 		case ID_PC:
 			return &(mainlib->paintcurves);
+		case ID_VL:
+			return &(mainlib->volume);
 	}
 	return NULL;
 }
@@ -716,6 +720,7 @@ int set_listbasepointers(Main *main, ListBase **lb)
 	lb[a++] = &(main->mesh);
 	lb[a++] = &(main->curve);
 	lb[a++] = &(main->mball);
+	lb[a++] = &(main->volume);
 
 	lb[a++] = &(main->latt);
 	lb[a++] = &(main->lamp);
@@ -864,6 +869,9 @@ void *BKE_libblock_alloc_notest(short type)
 		case ID_PC:
 			id = MEM_callocN(sizeof(PaintCurve), "Paint Curve");
 			break;
+		case ID_VL:
+			id = MEM_callocN(sizeof(Volume), "Volume");
+			break;
 	}
 	return id;
 }
@@ -998,6 +1006,9 @@ void BKE_libblock_init_empty(ID *id)
 			/* Nothing to do. */
 			break;
 		case ID_MSK:
+			/* Nothing to do. */
+			break;
+		case ID_VL:
 			/* Nothing to do. */
 			break;
 		case ID_LS:
@@ -1286,6 +1297,9 @@ void BKE_libblock_free_ex(Main *bmain, void *idv, bool do_id_user)
 		case ID_PC:
 			BKE_paint_curve_free((PaintCurve *)id);
 			break;
+		case ID_VL:
+			BKE_volume_free((Volume *)id);
+			break;
 	}
 
 	/* avoid notifying on removed data */
@@ -1402,6 +1416,7 @@ void BKE_main_free(Main *mainvar)
 				case  31: BKE_libblock_free_ex(mainvar, id, false); break;
 				case  32: BKE_libblock_free_ex(mainvar, id, false); break;
 				case  33: BKE_libblock_free_ex(mainvar, id, false); break;
+				case  34: BKE_libblock_free_ex(mainvar, id, false); break;
 				default:
 					BLI_assert(0);
 					break;

@@ -2376,3 +2376,50 @@ void OBJECT_OT_join_shapes(wmOperatorType *ot)
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
+
+/********************* Add Volume Operator ********************/
+
+static int object_volume_add_exec(bContext *C, wmOperator *op)
+{
+	Object *obedit = CTX_data_edit_object(C);
+	bool enter_editmode;
+	unsigned int layer;
+	float loc[3], rot[3];
+
+	WM_operator_view3d_unit_defaults(C, op);
+
+	if (!ED_object_add_generic_get_opts(C, op, 'Z', loc, rot, &enter_editmode, &layer, NULL))
+		return OPERATOR_CANCELLED;
+
+	if ((obedit == NULL) || (obedit->type != OB_VOLUME)) {
+		obedit = ED_object_add_type(C, OB_VOLUME, NULL, loc, rot, true, layer);
+	}
+
+	if (obedit == NULL) {
+		BKE_report(op->reports, RPT_ERROR, "Cannot create volume");
+		return OPERATOR_CANCELLED;
+	}
+
+	WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, obedit);
+
+	return OPERATOR_FINISHED;
+}
+
+void OBJECT_OT_volume_add(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Add Volume";
+	ot->description = "Add a volume object to the scene";
+	ot->idname = "OBJECT_OT_volume_add";
+
+	/* api callbacks */
+	ot->exec = object_volume_add_exec;
+	ot->poll = ED_operator_objectmode;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	/* properties */
+	ED_object_add_unit_props(ot);
+	ED_object_add_generic_props(ot, true);
+}

@@ -812,6 +812,7 @@ RNA_MAIN_ID_TAG_FUNCS_DEF(gpencil, gpencil, ID_GD)
 RNA_MAIN_ID_TAG_FUNCS_DEF(movieclips, movieclip, ID_MC)
 RNA_MAIN_ID_TAG_FUNCS_DEF(masks, mask, ID_MSK)
 RNA_MAIN_ID_TAG_FUNCS_DEF(linestyle, linestyle, ID_LS)
+//RNA_MAIN_ID_TAG_FUNCS_DEF(volume, volume, ID_VL)
 
 #undef RNA_MAIN_ID_TAG_FUNCS_DEF
 

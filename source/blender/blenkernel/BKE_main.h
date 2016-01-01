@@ -102,6 +102,7 @@ typedef struct Main {
 	ListBase movieclip;
 	ListBase mask;
 	ListBase linestyle;
+	ListBase volume;
 
 	char id_tag_update[256];
 
