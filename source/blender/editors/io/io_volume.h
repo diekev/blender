@@ -4,7 +4,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version. 
+ * of the License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -15,34 +15,23 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2008 Blender Foundation.
+ * The Original Code is Copyright (C) 2016 Blender Foundation.
  * All rights reserved.
  *
- * 
- * Contributor(s): Blender Foundation
+ * Contributor(s): Kevin Dietrich
  *
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/editors/io/io_ops.c
- *  \ingroup collada
+/** \file blender/editors/io/io_volume.h
+ *  \ingroup editor/io
  */
 
-#include "io_ops.h"  /* own include */
-#include "io_volume.h"
+#ifndef __IO_VOLUME_H__
+#define __IO_VOLUME_H__
 
-#include "WM_api.h"
+struct wmOperatorType;
 
-#ifdef WITH_COLLADA
-#  include "io_collada.h"
-#endif
+void WM_OT_volume_import(struct wmOperatorType *ot);
 
-void ED_operatortypes_io(void) 
-{
-#ifdef WITH_COLLADA
-	/* Collada operators: */
-	WM_operatortype_append(WM_OT_collada_export);
-	WM_operatortype_append(WM_OT_collada_import);
-#endif
-	WM_operatortype_append(WM_OT_volume_import);
-}
+#endif  /* __IO_VOLUME_H__ */

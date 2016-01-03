@@ -156,8 +156,10 @@ class INFO_MT_file_import(Menu):
     bl_label = "Import"
 
     def draw(self, context):
+        layout = self.layout
         if bpy.app.build_options.collada:
-            self.layout.operator("wm.collada_import", text="Collada (Default) (.dae)")
+            layout.operator("wm.collada_import", text="Collada (Default) (.dae)")
+        layout.operator("wm.volume_import", text="OpenVDB (.vdb)")
 
 
 class INFO_MT_file_export(Menu):

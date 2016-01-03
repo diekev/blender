@@ -37,9 +37,11 @@ set(INC_SYS
 set(SRC
 	io_collada.c
 	io_ops.c
+	io_volume.c
 
 	io_collada.h
 	io_ops.h
+	io_volume.h
 )
 
 if(WITH_OPENCOLLADA)
