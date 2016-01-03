@@ -280,3 +280,160 @@ void OpenVDBPrimitive_free(OpenVDBPrimitive *vdb_prim)
 {
     delete vdb_prim;
 }
+
+#if 0
+/* ------------------------------------------------------------------------- */
+/* Drawing */
+
+/* Helper macro for compact grid type selection code.
+ * This allows conversion of a grid id enum to templated function calls.
+ * DO_GRID must be defined locally.
+ */
+#define SELECT_SMOKE_GRID(data, type) \
+{ \
+	std::string stype(type); \
+	if (stype == "DENSITY") { DO_GRID(data->density.get()) } \
+	else if (stype == "VELOCITY") { DO_GRID(data->velocity.get()) } \
+	else if (stype == "PRESSURE") { DO_GRID(data->tmp_pressure.get()) } \
+	else if (stype == "DIVERGENCE") { DO_GRID(data->tmp_divergence.get()) } \
+	else if (stype == "DIVERGENCE_NEW") { DO_GRID(data->tmp_divergence_new.get()) } \
+	else if (stype == "FORCE") { DO_GRID(data->tmp_force.get()) } \
+	else if (stype == "OBSTACLE") { DO_GRID(data->obstacle.get()) } \
+	else if (stype == "PRESSURE_GRADIENT") { DO_GRID(data->tmp_pressure_gradient.get()) } \
+	else if (stype == "NEIGHBOR_SOLID1") { DO_GRID(data->tmp_neighbor_solid[0].get()) } \
+	else if (stype == "NEIGHBOR_SOLID2") { DO_GRID(data->tmp_neighbor_solid[1].get()) } \
+	else if (stype == "NEIGHBOR_SOLID3") { DO_GRID(data->tmp_neighbor_solid[2].get()) } \
+	else if (stype == "NEIGHBOR_SOLID4") { DO_GRID(data->tmp_neighbor_solid[3].get()) } \
+	else if (stype == "NEIGHBOR_SOLID5") { DO_GRID(data->tmp_neighbor_solid[4].get()) } \
+	else if (stype == "NEIGHBOR_SOLID6") { DO_GRID(data->tmp_neighbor_solid[5].get()) } \
+	else if (stype == "NEIGHBOR_FLUID1") { DO_GRID(data->tmp_neighbor_fluid[0].get()) } \
+	else if (stype == "NEIGHBOR_FLUID2") { DO_GRID(data->tmp_neighbor_fluid[1].get()) } \
+	else if (stype == "NEIGHBOR_FLUID3") { DO_GRID(data->tmp_neighbor_fluid[2].get()) } \
+	else if (stype == "NEIGHBOR_FLUID4") { DO_GRID(data->tmp_neighbor_fluid[3].get()) } \
+	else if (stype == "NEIGHBOR_FLUID5") { DO_GRID(data->tmp_neighbor_fluid[4].get()) } \
+	else if (stype == "NEIGHBOR_FLUID6") { DO_GRID(data->tmp_neighbor_fluid[5].get()) } \
+	else if (stype == "NEIGHBOR_EMPTY1") { DO_GRID(data->tmp_neighbor_empty[0].get()) } \
+	else if (stype == "NEIGHBOR_EMPTY2") { DO_GRID(data->tmp_neighbor_empty[1].get()) } \
+	else if (stype == "NEIGHBOR_EMPTY3") { DO_GRID(data->tmp_neighbor_empty[2].get()) } \
+	else if (stype == "NEIGHBOR_EMPTY4") { DO_GRID(data->tmp_neighbor_empty[3].get()) } \
+	else if (stype == "NEIGHBOR_EMPTY5") { DO_GRID(data->tmp_neighbor_empty[4].get()) } \
+	else if (stype == "NEIGHBOR_EMPTY6") { DO_GRID(data->tmp_neighbor_empty[5].get()) } \
+	else { DO_GRID(data->density.get()) } \
+} (void)0
+
+void OpenVDB_smoke_get_draw_buffers_cells(OpenVDBPrimitive *pdata, const char *grid,
+                                          float (**r_verts)[3], float (**r_colors)[3], int *r_numverts)
+{
+	const int min_level = 0;
+	const int max_level = 3;
+
+	internal::SmokeData *data = (internal::SmokeData *)pdata;
+
+#define DO_GRID(grid) \
+	internal::OpenVDB_get_draw_buffer_size_cells(grid, min_level, max_level, true, r_numverts); \
+	*r_verts = (float (*)[3])MEM_mallocN((*r_numverts) * sizeof(float) * 3, "OpenVDB vertex buffer"); \
+	*r_colors = (float (*)[3])MEM_mallocN((*r_numverts) * sizeof(float) * 3, "OpenVDB color buffer"); \
+	internal::OpenVDB_get_draw_buffers_cells(grid, min_level, max_level, true, *r_verts, *r_colors);
+
+	SELECT_SMOKE_GRID(data, grid);
+
+#undef DO_GRID
+}
+
+void OpenVDB_smoke_get_draw_buffers_boxes(OpenVDBPrimitive *pdata, const char *grid, float value_scale,
+                                          float (**r_verts)[3], float (**r_colors)[3], float (**r_normals)[3], int *r_numverts)
+{
+	internal::SmokeData *data = (internal::SmokeData *)pdata;
+
+#define DO_GRID(grid) \
+	internal::OpenVDB_get_draw_buffer_size_boxes(grid, r_numverts); \
+	const size_t bufsize_v3 = (*r_numverts) * sizeof(float) * 3; \
+	*r_verts = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB vertex buffer"); \
+	*r_colors = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB color buffer"); \
+	*r_normals = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB normal buffer"); \
+	internal::OpenVDB_get_draw_buffers_boxes(grid, value_scale, *r_verts, *r_colors, *r_normals);
+
+	SELECT_SMOKE_GRID(data, grid);
+
+#undef DO_GRID
+}
+
+void OpenVDB_smoke_get_draw_buffers_needles(OpenVDBPrimitive *pdata, const char *grid, float value_scale,
+                                            float (**r_verts)[3], float (**r_colors)[3], float (**r_normals)[3], int *r_numverts)
+{
+	internal::SmokeData *data = (internal::SmokeData *)pdata;
+
+#define DO_GRID(grid) \
+	internal::OpenVDB_get_draw_buffer_size_needles(grid, r_numverts); \
+	const size_t bufsize_v3 = (*r_numverts) * sizeof(float) * 3; \
+	*r_verts = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB vertex buffer"); \
+	*r_colors = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB color buffer"); \
+	*r_normals = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB normal buffer"); \
+	internal::OpenVDB_get_draw_buffers_needles(grid, value_scale, *r_verts, *r_colors, *r_normals);
+
+	SELECT_SMOKE_GRID(data, grid);
+
+#undef DO_GRID
+}
+
+void OpenVDB_smoke_get_draw_buffers_staggered(OpenVDBPrimitive *pdata, const char *grid, float value_scale,
+                                            float (**r_verts)[3], float (**r_colors)[3], int *r_numverts)
+{
+	internal::SmokeData *data = (internal::SmokeData *)pdata;
+
+#define DO_GRID(grid) \
+	internal::OpenVDB_get_draw_buffer_size_staggered(grid, r_numverts); \
+	const size_t bufsize_v3 = (*r_numverts) * sizeof(float) * 3; \
+	*r_verts = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB vertex buffer"); \
+	*r_colors = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB color buffer"); \
+	internal::OpenVDB_get_draw_buffers_staggered(grid, value_scale, *r_verts, *r_colors);
+
+	SELECT_SMOKE_GRID(data, grid);
+
+#undef DO_GRID
+}
+
+void OpenVDB_smoke_get_bounds(struct OpenVDBPrimitive *pdata, const char *grid,
+                              float bbmin[3], float bbmax[3])
+{
+	internal::SmokeData *data = (internal::SmokeData *)pdata;
+
+#define DO_GRID(grid) \
+	internal::OpenVDB_get_grid_bounds(grid, bbmin, bbmax);
+
+	SELECT_SMOKE_GRID(data, grid);
+
+#undef DO_GRID
+}
+
+float *OpenVDB_smoke_get_texture_buffer(struct OpenVDBPrimitive *pdata, const char *grid,
+                                        int res[3], float bbmin[3], float bbmax[3])
+{
+#define DO_GRID(grid) \
+	if (!internal::OpenVDB_get_dense_texture_res(grid, res, bbmin, bbmax)) \
+		return NULL; \
+	int numcells = res[0] * res[1] * res[2]; \
+	float *buffer = (float *)MEM_mallocN(numcells * sizeof(float), "smoke VDB domain texture buffer"); \
+	internal::OpenVDB_create_dense_texture(grid, buffer); \
+	return buffer;
+
+	SELECT_SMOKE_GRID(data, grid);
+
+#undef DO_GRID
+
+	return NULL;
+}
+
+void OpenVDB_smoke_get_value_range(struct OpenVDBPrimitive *pdata, const char *grid, float *bg, float *min, float *max)
+{
+#define DO_GRID(grid) \
+	internal::OpenVDB_get_grid_value_range(grid, bg, min, max);
+
+	SELECT_SMOKE_GRID(data, grid);
+
+#undef DO_GRID
+}
+
+#undef OPENVDB_SELECT_GRID
+
+#endif

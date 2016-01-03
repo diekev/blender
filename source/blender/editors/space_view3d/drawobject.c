@@ -7758,6 +7758,14 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 					}
 				}
 				break;
+			case OB_VOLUME:
+				if (!render_override) {
+					drawaxes(1.0, OB_ARROWS);
+					// draw_bound_box(ob);
+					// draw_openvdb_tree(ob);
+				}
+				// draw_volume(ob);
+				break;
 			default:
 				if (!render_override) {
 					drawaxes(rv3d->viewmatob, 1.0, OB_ARROWS);
