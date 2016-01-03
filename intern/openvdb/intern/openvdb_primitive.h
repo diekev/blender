@@ -15,56 +15,36 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2016 Blender Foundation.
+ * The Original Code is Copyright (C) 2015 Blender Foundation.
  * All rights reserved.
+ *
+ * The Original Code is: all of this file.
  *
  * Contributor(s): Kevin Dietrich
  *
  * ***** END GPL LICENSE BLOCK *****
  */
 
-/** \file blender/blenkernel/intern/volume.c
- *  \ingroup bke
- */
+#ifndef __OPENVDB_PRIMITIVE_H__
+#define __OPENVDB_PRIMITIVE_H__
 
-#include "MEM_guardedalloc.h"
+#include <openvdb/openvdb.h>
 
-#include "BLI_listbase.h"
-#include "BLI_utildefines.h"
+class OpenVDBPrimitive {
+    openvdb::GridBase::Ptr m_grid;
 
-#include "DNA_object_types.h"
-#include "DNA_volume_types.h"
+public:
+    OpenVDBPrimitive();
+    ~OpenVDBPrimitive();
 
-#include "BKE_library.h"
-#include "BKE_main.h"
-#include "BKE_volume.h"
+    openvdb::GridBase &getGrid();
+    const openvdb::GridBase &getConstGrid() const;
+    openvdb::GridBase::Ptr getGridPtr();
+    openvdb::GridBase::ConstPtr getConstGridPtr() const;
 
-#include "openvdb_capi.h"
+    void setGrid(openvdb::GridBase::Ptr grid);
+	void setGrid(openvdb::GridBase::ConstPtr grid);
+    void setTransform(const float mat[4][4]);
+};
 
-Volume *BKE_volume_add(Main *bmain, const char *name)
-{
-	Volume *volume = BKE_libblock_alloc(bmain, ID_VL, name);
-	return volume;
-}
-
-Volume *BKE_volume_from_object(Object *ob)
-{
-	if (ob->type == OB_VOLUME) {
-		return (Volume *)ob->data;
-	}
-
-	return NULL;
-}
-
-void BKE_volume_free(Volume *volume)
-{
-	if (volume == NULL) {
-		return;
-	}
-
-	VolumeData *data;
-	while ((data = BLI_pophead(&volume->fields)) != NULL) {
-		OpenVDBPrimitive_free(data->prim);
-		MEM_freeN(data);
-	}
-}
+#endif /* __OPENVDB_PRIMITIVE_H__ */

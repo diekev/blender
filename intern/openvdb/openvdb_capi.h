@@ -32,11 +32,20 @@ extern "C" {
 
 struct OpenVDBReader;
 struct OpenVDBWriter;
+struct OpenVDBPrimitive;
 struct OpenVDBFloatGrid;
 struct OpenVDBIntGrid;
 struct OpenVDBVectorGrid;
 
 int OpenVDB_getVersionHex(void);
+
+typedef void (*OpenVDBGridInfoCallback)(void *userdata, const char *name,
+                                        const char *value_type, bool is_color,
+                                        struct OpenVDBPrimitive *prim);
+
+void OpenVDB_get_grid_info(const char *filename,
+                           OpenVDBGridInfoCallback cb,
+                           void *userdata);
 
 enum {
 	VEC_INVARIANT = 0,
@@ -100,6 +109,9 @@ void OpenVDBReader_get_meta_int(struct OpenVDBReader *reader, const char *name, 
 void OpenVDBReader_get_meta_v3(struct OpenVDBReader *reader, const char *name, float value[3]);
 void OpenVDBReader_get_meta_v3_int(struct OpenVDBReader *reader, const char *name, int value[3]);
 void OpenVDBReader_get_meta_mat4(struct OpenVDBReader *reader, const char *name, float value[4][4]);
+
+struct OpenVDBPrimitive *OpenVDBPrimitive_create(void);
+void OpenVDBPrimitive_free(struct OpenVDBPrimitive *vdb_prim);
 
 #ifdef __cplusplus
 }

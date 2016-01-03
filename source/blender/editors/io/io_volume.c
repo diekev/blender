@@ -28,16 +28,23 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 
+#include "MEM_guardedalloc.h"
+
+#include "BLI_string.h"
 #include "BLI_utildefines.h"
+#include "BLI_listbase.h"
 #include "BLI_path_util.h"
 
 #include "DNA_object_types.h"
 #include "DNA_space_types.h"
+#include "DNA_volume_types.h"
 
 #include "BKE_context.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
+#include "BKE_volume.h"
 
 #include "RNA_access.h"
 
@@ -47,6 +54,35 @@
 #include "WM_types.h"
 
 #include "io_volume.h"
+
+#include "openvdb_capi.h"
+
+static void openvdb_get_grid_info(void *userdata, const char *name,
+                                  const char *value_type, bool is_color,
+                                  struct OpenVDBPrimitive *prim)
+{
+	Volume *volume = userdata;
+	VolumeData *data = MEM_mallocN(sizeof(VolumeData), "VolumeData");
+
+	BLI_strncpy(data->name, name, sizeof(data->name));
+
+	if (STREQ(value_type, "float")) {
+		data->type = VOLUME_TYPE_FLOAT;
+	}
+	else if (STREQ(value_type, "vec3s")) {
+		if (is_color)
+			data->type = VOLUME_TYPE_COLOR;
+		else
+			data->type = VOLUME_TYPE_VEC3;
+	}
+	else {
+		data->type = VOLUME_TYPE_UNKNOWN;
+	}
+
+	data->prim = prim;
+
+	BLI_addtail(&volume->fields, data);
+}
 
 static int wm_volume_import_exec(bContext *C, wmOperator *op)
 {
@@ -65,7 +101,16 @@ static int wm_volume_import_exec(bContext *C, wmOperator *op)
 	unsigned int layer;
 
 	ED_object_add_generic_get_opts(C, op, 'Z', loc, rot, &enter_editmode, &layer, NULL);
-	ED_object_add_type(C, OB_VOLUME, NULL, loc, rot, true, layer);
+	Object *ob = ED_object_add_type(C, OB_VOLUME, NULL, loc, rot, true, layer);
+
+	Volume *volume = BKE_volume_from_object(ob);
+
+	if (!volume) {
+		BKE_report(op->reports, RPT_ERROR, "Cannot create volume!");
+		return OPERATOR_CANCELLED;
+	}
+
+	OpenVDB_get_grid_info(filename, openvdb_get_grid_info, volume);
 
 	return OPERATOR_FINISHED;
 }
@@ -82,11 +127,7 @@ void WM_OT_volume_import(wmOperatorType *ot)
 	ot->exec = wm_volume_import_exec;
 	ot->poll = WM_operator_winactive;
 
-	/* flags */
-	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
-
 	/* properties */
-
 	ED_object_add_unit_props(ot);
 	ED_object_add_generic_props(ot, true);
 

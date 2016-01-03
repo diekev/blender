@@ -34,9 +34,27 @@
 
 #include "DNA_ID.h"
 
+typedef enum eVolumeDataType {
+	VOLUME_TYPE_UNKNOWN  = 0,
+	VOLUME_TYPE_FLOAT    = 1,
+	VOLUME_TYPE_VEC3     = 2,
+	VOLUME_TYPE_COLOR    = 3,
+	VOLUME_TYPE_INT      = 4,
+} eVolumeDataType;
+
+typedef struct VolumeData {
+	struct VolumeData *next, *prev;
+
+	struct OpenVDBPrimitive *prim;
+	char name[64];  /* MAX_NAME */
+	short type;
+	short pad[3];
+} VolumeData;
+
 typedef struct Volume {
 	ID id;
-	int unused, pad;
+
+	ListBase fields;
 } Volume;
 
 #endif /* __DNA_VOLUME_TYPES_H__ */

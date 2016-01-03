@@ -28,6 +28,7 @@ set(INC
 	../../makesrna
 	../../windowmanager
 	../../collada
+	../../../../intern/openvdb
 )
 
 set(INC_SYS

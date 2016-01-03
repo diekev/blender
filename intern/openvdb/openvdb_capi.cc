@@ -25,6 +25,7 @@
 
 #include "openvdb_capi.h"
 #include "openvdb_dense_convert.h"
+#include "openvdb_primitive.h"
 #include "openvdb_util.h"
 
 struct OpenVDBFloatGrid { int unused; };
@@ -35,6 +36,37 @@ int OpenVDB_getVersionHex()
 {
 	return openvdb::OPENVDB_LIBRARY_VERSION;
 }
+
+void OpenVDB_get_grid_info(const char *filename, OpenVDBGridInfoCallback cb, void *userdata)
+{
+	Timer(__func__);
+
+	using namespace openvdb;
+
+	initialize();
+
+	io::File file(filename);
+	file.open();
+
+	GridPtrVecPtr grids = file.getGrids();
+	int grid_num = grids->size();
+
+	for (size_t i = 0; i < grid_num; ++i) {
+		GridBase::ConstPtr grid = (*grids)[i];
+
+		Name name = grid->getName();
+		Name value_type = grid->valueType();
+		bool is_color = false;
+		if (grid->getMetadata< TypedMetadata<bool> >("is_color"))
+			is_color = grid->metaValue<bool>("is_color");
+
+		OpenVDBPrimitive *prim = new OpenVDBPrimitive;
+		prim->setGrid(grid);
+
+		cb(userdata, name.c_str(), value_type.c_str(), is_color, prim);
+	}
+}
+
 
 OpenVDBFloatGrid *OpenVDB_export_grid_fl(
         OpenVDBWriter *writer,
@@ -237,4 +269,14 @@ void OpenVDBReader_get_meta_v3_int(OpenVDBReader *reader, const char *name, int 
 void OpenVDBReader_get_meta_mat4(OpenVDBReader *reader, const char *name, float value[4][4])
 {
 	reader->mat4sMeta(name, value);
+}
+
+OpenVDBPrimitive *OpenVDBPrimitive_create()
+{
+	return new OpenVDBPrimitive();
+}
+
+void OpenVDBPrimitive_free(OpenVDBPrimitive *vdb_prim)
+{
+    delete vdb_prim;
 }
