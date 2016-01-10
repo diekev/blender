@@ -651,7 +651,7 @@ void psys_render_set(Object *ob, ParticleSystem *psys, float viewmat[4][4], floa
 		psys->recalc |= PSYS_RECALC_RESET;
 }
 
-void psys_render_restore(Scene *scene, Object *ob, ParticleSystem *psys)
+void psys_render_restore(Object *ob, ParticleSystem *psys)
 {
 	ParticleRenderData *data;
 	ParticleSystemModifierData *psmd = psys_get_modifier(ob, psys);
@@ -702,7 +702,12 @@ void psys_render_restore(Scene *scene, Object *ob, ParticleSystem *psys)
 
 	if (psmd->dm_final) {
 		if (!psmd->dm_final->deformedOnly) {
-			psmd->dm_deformed = CDDM_copy(mesh_get_derived_deform(scene, ob, CD_MASK_BAREMESH | CD_MASK_MFACE));
+			if (ob->derivedDeform) {
+				psmd->dm_deformed = CDDM_copy(ob->derivedDeform);
+			}
+			else {
+				psmd->dm_deformed = CDDM_from_mesh((Mesh *)ob->data);
+			}
 			DM_ensure_tessface(psmd->dm_deformed);
 		}
 		psys_calc_dmcache(ob, psmd->dm_final, psmd->dm_deformed, psys);
@@ -4073,7 +4078,10 @@ void psys_get_dupli_texture(ParticleSystem *psys, ParticleSettings *part,
 
 	if (cpa) {
 		if ((part->childtype == PART_CHILD_FACES) && (psmd->dm_final != NULL)) {
-			mtface = CustomData_get_layer(&psmd->dm_final->faceData, CD_MTFACE);
+			CustomData *mtf_data = psmd->dm_final->getTessFaceDataLayout(psmd->dm_final);
+			const int uv_idx = CustomData_get_render_layer(mtf_data, CD_MTFACE);
+			mtface = CustomData_get_layer_n(mtf_data, CD_MTFACE, uv_idx);
+
 			if (mtface) {
 				mface = psmd->dm_final->getTessFaceData(psmd->dm_final, cpa->num, CD_MFACE);
 				mtface += cpa->num;
@@ -4089,7 +4097,10 @@ void psys_get_dupli_texture(ParticleSystem *psys, ParticleSettings *part,
 	}
 
 	if ((part->from == PART_FROM_FACE) && (psmd->dm_final != NULL)) {
-		mtface = CustomData_get_layer(&psmd->dm_final->faceData, CD_MTFACE);
+		CustomData *mtf_data = psmd->dm_final->getTessFaceDataLayout(psmd->dm_final);
+		const int uv_idx = CustomData_get_render_layer(mtf_data, CD_MTFACE);
+		mtface = CustomData_get_layer_n(mtf_data, CD_MTFACE, uv_idx);
+
 		num = pa->num_dmcache;
 
 		if (num == DMCACHE_NOTFOUND)
