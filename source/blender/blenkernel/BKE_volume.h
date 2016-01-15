@@ -35,10 +35,13 @@
 struct Main;
 struct Object;
 struct Volume;
+struct VolumeData;
 
 struct Volume *BKE_volume_add(struct Main *bmain, const char *name);
 struct Volume *BKE_volume_from_object(struct Object *ob);
 
 void BKE_volume_free(struct Volume *volume);
+
+struct VolumeData *BKE_volume_field_current(struct Volume *volume);
 
 #endif /* __BKE_VOLUME_H__ */

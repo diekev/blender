@@ -163,6 +163,7 @@ short RNA_type_to_ID_code(StructRNA *type)
 	if (RNA_struct_is_a(type, &RNA_Texture)) return ID_TE;
 	if (RNA_struct_is_a(type, &RNA_Text)) return ID_TXT;
 	if (RNA_struct_is_a(type, &RNA_VectorFont)) return ID_VF;
+	if (RNA_struct_is_a(type, &RNA_Volume)) return ID_VL;
 	if (RNA_struct_is_a(type, &RNA_World)) return ID_WO;
 	if (RNA_struct_is_a(type, &RNA_WindowManager)) return ID_WM;
 
@@ -202,6 +203,7 @@ StructRNA *ID_code_to_RNA_type(short idcode)
 		case ID_TE: return &RNA_Texture;
 		case ID_TXT: return &RNA_Text;
 		case ID_VF: return &RNA_VectorFont;
+		case ID_VL: return &RNA_Volume;
 		case ID_WM: return &RNA_WindowManager;
 		case ID_WO: return &RNA_World;
 

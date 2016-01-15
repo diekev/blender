@@ -68,3 +68,16 @@ void BKE_volume_free(Volume *volume)
 		MEM_freeN(data);
 	}
 }
+
+struct VolumeData *BKE_volume_field_current(struct Volume *volume)
+{
+	VolumeData *data = volume->fields.first;
+
+	for (; data; data = data->next) {
+		if (data->flags & VOLUME_DATA_CURRENT) {
+			return data;
+		}
+	}
+
+	return data;
+}

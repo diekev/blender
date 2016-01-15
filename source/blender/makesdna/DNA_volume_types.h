@@ -42,13 +42,18 @@ typedef enum eVolumeDataType {
 	VOLUME_TYPE_INT      = 4,
 } eVolumeDataType;
 
+enum {
+	VOLUME_DATA_CURRENT = (1 << 0),
+};
+
 typedef struct VolumeData {
 	struct VolumeData *next, *prev;
 
 	struct OpenVDBPrimitive *prim;
 	char name[64];  /* MAX_NAME */
 	short type;
-	short pad[3];
+	short flags;
+	short pad[2];
 } VolumeData;
 
 typedef struct Volume {

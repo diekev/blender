@@ -679,6 +679,8 @@ extern StructRNA RNA_VectorFont;
 extern StructRNA RNA_VertexGroup;
 extern StructRNA RNA_VertexGroupElement;
 extern StructRNA RNA_VertexPaint;
+extern StructRNA RNA_Volume;
+extern StructRNA RNA_VolumeData;
 extern StructRNA RNA_VoronoiTexture;
 extern StructRNA RNA_VoxelData;
 extern StructRNA RNA_VoxelDataTexture;
