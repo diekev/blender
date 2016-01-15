@@ -28,6 +28,7 @@ set(INC
 	../../makesrna
 	../../windowmanager
 	../../collada
+	../../../../intern/guardedalloc
 	../../../../intern/openvdb
 )
 
