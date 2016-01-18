@@ -1,4 +1,4 @@
-/*
+﻿/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -36,11 +36,13 @@
 #include "DNA_screen_types.h"
 #include "DNA_smoke_types.h"
 #include "DNA_view3d_types.h"
+#include "DNA_volume_types.h"
 
 #include "BLI_utildefines.h"
 #include "BLI_math.h"
 
 #include "BKE_particle.h"
+#include "BKE_volume.h"
 
 #include "smoke_API.h"
 
@@ -51,6 +53,8 @@
 #include "GPU_texture.h"
 
 #include "view3d_intern.h"  // own include
+
+#include "openvdb_capi.h"
 
 struct GPUTexture;
 
@@ -421,6 +425,148 @@ void draw_smoke_volume(SmokeDomainSettings *sds, Object *ob,
 	MEM_freeN(slicer.verts);
 
 	GPU_shader_unbind();
+
+	if (!gl_blend) {
+		glDisable(GL_BLEND);
+	}
+
+	if (gl_depth) {
+		glEnable(GL_DEPTH_TEST);
+	}
+}
+
+static VolumeData *get_first_scalar_field(Volume *volume)
+{
+	VolumeData *data = volume->fields.first;
+
+	for (; data; data = data->next) {
+		if (data->type == VOLUME_TYPE_FLOAT) {
+			break;
+		}
+	}
+
+	return data;
+}
+
+void draw_volume(Object *ob, const float viewnormal[3])
+{
+	Volume *volume = BKE_volume_from_object(ob);
+
+	if (!volume) {
+		return;
+	}
+
+	VolumeData *data = get_first_scalar_field(volume);
+
+	if (!data || !data->prim) {
+		fprintf(stderr, "No OpenVDB primitive to draw!\n");
+		return;
+	}
+
+	struct OpenVDBPrimitive *prim = data->prim;
+
+	if (data->buffer == NULL) {
+		data->buffer = OpenVDB_get_texture_buffer(prim, data->res, data->bbmin, data->bbmax);
+	}
+
+	if (!data->buffer) {
+		fprintf(stderr, "Could not allocate OpenVDB buffer!\n");
+		return;
+	}
+
+	const float ob_sizei[3] = {
+	    1.0f / fabsf(ob->size[0]),
+	    1.0f / fabsf(ob->size[1]),
+	    1.0f / fabsf(ob->size[2])
+	};
+
+	const float size[3] = {
+	    data->bbmax[0] - data->bbmin[0],
+	    data->bbmax[1] - data->bbmin[1],
+	    data->bbmax[2] - data->bbmin[2]
+	};
+
+	const float invsize[3] = {
+	    1.0f / size[0],
+	    1.0f / size[1],
+	    1.0f / size[2]
+	};
+
+	/* setup smoke shader */
+	GPUShader *shader = GPU_shader_get_builtin_shader(GPU_SHADER_OPENVDB);
+
+	if (!shader) {
+		fprintf(stderr, "Could not create volume shader!\n");
+		return;
+	}
+
+	int soot_location = GPU_shader_get_uniform(shader, "soot_texture");
+	int invsize_location = GPU_shader_get_uniform(shader, "invsize");
+	int ob_sizei_location = GPU_shader_get_uniform(shader, "ob_sizei");
+	int min_location = GPU_shader_get_uniform(shader, "min");
+
+	GPUTexture *tex = GPU_texture_create_3D(data->res[0], data->res[1], data->res[2], 1, data->buffer);
+
+	if (!tex) {
+		fprintf(stderr, "Could not allocate 3D texture!\n");
+		return;
+	}
+
+	GPU_shader_bind(shader);
+
+	GPU_texture_bind(tex, 0);
+	GPU_shader_uniform_texture(shader, soot_location, tex);
+
+	GPU_shader_uniform_vector(shader, min_location, 3, 1, data->bbmin);
+	GPU_shader_uniform_vector(shader, ob_sizei_location, 3, 1, ob_sizei);
+	GPU_shader_uniform_vector(shader, invsize_location, 3, 1, invsize);
+
+	/* setup slicing information */
+
+	const int max_slices = 256;
+	const int max_points = max_slices * 12;
+
+	VolumeSlicer slicer;
+	copy_v3_v3(slicer.min, data->bbmin);
+	copy_v3_v3(slicer.max, data->bbmax);
+	copy_v3_v3(slicer.size, size);
+	slicer.verts = MEM_mallocN(sizeof(float) * 3 * max_points, "smoke_slice_vertices");
+
+	const int num_points = create_view_aligned_slices(&slicer, max_slices, viewnormal);
+
+	/* setup buffer and draw */
+
+	int gl_depth = 0, gl_blend = 0;
+	glGetBooleanv(GL_BLEND, (GLboolean *)&gl_blend);
+	glGetBooleanv(GL_DEPTH_TEST, (GLboolean *)&gl_depth);
+
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
+	GLuint vertex_buffer;
+	glGenBuffers(1, &vertex_buffer);
+	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 3 * num_points, &slicer.verts[0][0], GL_STATIC_DRAW);
+
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glVertexPointer(3, GL_FLOAT, 0, NULL);
+
+	glDrawArrays(GL_TRIANGLES, 0, num_points);
+
+	glDisableClientState(GL_VERTEX_ARRAY);
+
+	/* cleanup */
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glDeleteBuffers(1, &vertex_buffer);
+
+	GPU_texture_unbind(tex);
+	GPU_texture_free(tex);
+
+	GPU_shader_unbind();
+
+	MEM_freeN(slicer.verts);
 
 	if (!gl_blend) {
 		glDisable(GL_BLEND);

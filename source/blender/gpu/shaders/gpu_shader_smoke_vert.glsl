@@ -7,6 +7,6 @@ uniform vec3 ob_sizei;
 
 void main()
 {
-	gl_Position = gl_ModelViewProjectionMatrix * vec4(gl_Vertex.xyz * ob_sizei, 1.0);
+	gl_Position = gl_ModelViewProjectionMatrix * vec4(gl_Vertex.xyz, 1.0);
 	coords = (gl_Vertex.xyz - min_location) * invsize;
 }

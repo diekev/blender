@@ -113,6 +113,9 @@ void OpenVDBReader_get_meta_mat4(struct OpenVDBReader *reader, const char *name,
 struct OpenVDBPrimitive *OpenVDBPrimitive_create(void);
 void OpenVDBPrimitive_free(struct OpenVDBPrimitive *vdb_prim);
 
+float *OpenVDB_get_texture_buffer(struct OpenVDBPrimitive *prim, int res[3],
+                                  float bbmin[3], float bbmax[3]);
+
 #ifdef __cplusplus
 }
 #endif

@@ -65,6 +65,11 @@ void BKE_volume_free(Volume *volume)
 	VolumeData *data;
 	while ((data = BLI_pophead(&volume->fields)) != NULL) {
 		OpenVDBPrimitive_free(data->prim);
+
+		if (data->buffer) {
+			MEM_freeN(data->buffer);
+		}
+
 		MEM_freeN(data);
 	}
 }

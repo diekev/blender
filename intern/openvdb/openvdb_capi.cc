@@ -28,6 +28,8 @@
 #include "openvdb_primitive.h"
 #include "openvdb_util.h"
 
+#include "../guardedalloc/MEM_guardedalloc.h"
+
 struct OpenVDBFloatGrid { int unused; };
 struct OpenVDBIntGrid { int unused; };
 struct OpenVDBVectorGrid { int unused; };
@@ -281,6 +283,22 @@ void OpenVDBPrimitive_free(OpenVDBPrimitive *vdb_prim)
     delete vdb_prim;
 }
 
+float *OpenVDB_get_texture_buffer(struct OpenVDBPrimitive *prim,
+                                  int res[3], float bbmin[3], float bbmax[3])
+{
+
+	openvdb::FloatGrid::Ptr grid = openvdb::gridPtrCast<openvdb::FloatGrid>(prim->getGridPtr());
+
+	if (!internal::OpenVDB_get_dense_texture_res(grid.get(), res, bbmin, bbmax))
+		return NULL;
+
+	int numcells = res[0] * res[1] * res[2];
+	float *buffer = (float *)MEM_mallocN(numcells * sizeof(float), "smoke VDB domain texture buffer");
+	internal::OpenVDB_create_dense_texture(grid.get(), buffer);
+
+	return buffer;
+}
+
 #if 0
 /* ------------------------------------------------------------------------- */
 /* Drawing */
@@ -404,24 +422,6 @@ void OpenVDB_smoke_get_bounds(struct OpenVDBPrimitive *pdata, const char *grid,
 	SELECT_SMOKE_GRID(data, grid);
 
 #undef DO_GRID
-}
-
-float *OpenVDB_smoke_get_texture_buffer(struct OpenVDBPrimitive *pdata, const char *grid,
-                                        int res[3], float bbmin[3], float bbmax[3])
-{
-#define DO_GRID(grid) \
-	if (!internal::OpenVDB_get_dense_texture_res(grid, res, bbmin, bbmax)) \
-		return NULL; \
-	int numcells = res[0] * res[1] * res[2]; \
-	float *buffer = (float *)MEM_mallocN(numcells * sizeof(float), "smoke VDB domain texture buffer"); \
-	internal::OpenVDB_create_dense_texture(grid, buffer); \
-	return buffer;
-
-	SELECT_SMOKE_GRID(data, grid);
-
-#undef DO_GRID
-
-	return NULL;
 }
 
 void OpenVDB_smoke_get_value_range(struct OpenVDBPrimitive *pdata, const char *grid, float *bg, float *min, float *max)

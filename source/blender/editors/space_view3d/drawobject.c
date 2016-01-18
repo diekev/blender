@@ -7759,13 +7759,26 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 				}
 				break;
 			case OB_VOLUME:
+			{
 				if (!render_override) {
-					drawaxes(1.0, OB_ARROWS);
 					// draw_bound_box(ob);
 					// draw_openvdb_tree(ob);
 				}
-				// draw_volume(ob);
+
+				glLoadMatrixf(rv3d->viewmat);
+				glMultMatrixf(ob->obmat);
+
+				float viewnormal[3];
+
+				/* get view vector */
+				invert_m4_m4(ob->imat, ob->obmat);
+				mul_v3_mat3_m4v3(viewnormal, ob->imat, rv3d->viewinv[2]);
+				normalize_v3(viewnormal);
+
+				draw_volume(ob, viewnormal);
+
 				break;
+			}
 			default:
 				if (!render_override) {
 					drawaxes(rv3d->viewmatob, 1.0, OB_ARROWS);

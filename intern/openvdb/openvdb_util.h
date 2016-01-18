@@ -55,6 +55,83 @@ public:
 #	define Timer(x)
 #endif
 
+namespace internal {
+
+template <typename T>
+struct FloatConverter {
+	static float get(T value)
+	{
+		return value;
+	}
+};
+
+template <>
+struct FloatConverter<openvdb::Vec3f> {
+	static float get(const openvdb::Vec3f &value)
+	{
+		return value.length();
+	}
+};
+
+template <typename TreeType>
+static bool OpenVDB_get_dense_texture_res(const openvdb::Grid<TreeType> *grid, int res[3], float bbmin[3], float bbmax[3])
+{
+	if (!grid) {
+		res[0] = res[1] = res[2] = 0;
+		openvdb::Vec3f(0,0,0).toV(bbmin);
+		openvdb::Vec3f(0,0,0).toV(bbmax);
+		return false;
+	}
+
+	if (!grid->cbeginValueOn()) {
+		res[0] = res[1] = res[2] = 0;
+		return false;
+	}
+
+	openvdb::CoordBBox bbox = grid->evalActiveVoxelBoundingBox();
+	res[0] = bbox.dim().x();
+	res[1] = bbox.dim().y();
+	res[2] = bbox.dim().z();
+
+	openvdb::BBoxd vbox = grid->transform().indexToWorld(bbox);
+	vbox.min().toV(bbmin);
+	vbox.max().toV(bbmax);
+
+	return res[0] > 0 && res[1] > 0 && res[2] > 0;
+}
+
+template <typename TreeType>
+static void OpenVDB_create_dense_texture(const openvdb::Grid<TreeType> *grid, float *buffer)
+{
+	using namespace openvdb;
+	using namespace openvdb::math;
+
+	typedef Grid<TreeType> GridType;
+	typedef typename TreeType::ValueType ValueType;
+
+	if (!grid) {
+		return;
+	}
+
+	typename GridType::ConstAccessor acc = grid->getConstAccessor();
+
+	openvdb::CoordBBox bbox = grid->evalActiveVoxelBoundingBox();
+
+	openvdb::Coord bbmin = bbox.min(), bbmax = bbox.max();
+	size_t index = 0;
+	Coord ijk;
+	int &i = ijk[0], &j = ijk[1], &k = ijk[2];
+	for (k = bbmin[2]; k <= bbmax[2]; ++k) {
+		for (j = bbmin[1]; j <= bbmax[1]; ++j) {
+			for (i = bbmin[0]; i <= bbmax[0]; ++i, ++index) {
+				buffer[index] = acc.isValueOn(ijk) ? FloatConverter<ValueType>::get(acc.getValue(ijk)) : 0.0f;
+			}
+		}
+	}
+}
+
+}  /* namespace internal */
+
 #if 0
 
 namespace internal {
@@ -329,22 +406,6 @@ static void OpenVDB_get_draw_buffers_cells(const openvdb::Grid<TreeType> *grid, 
 		}
 	}
 }
-
-template <typename T>
-struct FloatConverter {
-	static float get(T value)
-	{
-		return value;
-	}
-};
-
-template <>
-struct FloatConverter<Vec3f> {
-	static float get(const Vec3f &value)
-	{
-		return value.length();
-	}
-};
 
 template <typename T>
 struct VectorConverter {
@@ -624,63 +685,6 @@ static void OpenVDB_get_grid_value_range(const openvdb::Grid<TreeType> *grid, fl
 	math::Extrema ex = tools::extrema(grid->cbeginValueOn());
 	*min = std::min((float)ex.min(), *bg);
 	*max = std::max((float)ex.max(), *bg);
-}
-
-template <typename TreeType>
-static bool OpenVDB_get_dense_texture_res(const openvdb::Grid<TreeType> *grid, int res[3], float bbmin[3], float bbmax[3])
-{
-	if (!grid) {
-		res[0] = res[1] = res[2] = 0;
-		Vec3f(0,0,0).toV(bbmin);
-		Vec3f(0,0,0).toV(bbmax);
-		return false;
-	}
-
-	if (!grid->cbeginValueOn()) {
-		res[0] = res[1] = res[2] = 0;
-		return false;
-	}
-
-	CoordBBox bbox = grid->evalActiveVoxelBoundingBox();
-	res[0] = bbox.dim().x();
-	res[1] = bbox.dim().y();
-	res[2] = bbox.dim().z();
-
-	BBoxd vbox = grid->transform().indexToWorld(bbox);
-	vbox.min().toV(bbmin);
-	vbox.max().toV(bbmax);
-
-	return res[0] > 0 && res[1] > 0 && res[2] > 0;
-}
-
-template <typename TreeType>
-static void OpenVDB_create_dense_texture(const openvdb::Grid<TreeType> *grid, float *buffer)
-{
-	using namespace openvdb;
-	using namespace openvdb::math;
-
-	typedef Grid<TreeType> GridType;
-	typedef typename TreeType::ValueType ValueType;
-
-	if (!grid) {
-		return;
-	}
-
-	typename GridType::ConstAccessor acc = grid->getConstAccessor();
-
-	CoordBBox bbox = grid->evalActiveVoxelBoundingBox();
-
-	Coord bbmin = bbox.min(), bbmax = bbox.max();
-	size_t index = 0;
-	Coord ijk;
-	int &i = ijk[0], &j = ijk[1], &k = ijk[2];
-	for (k = bbmin[2]; k <= bbmax[2]; ++k) {
-		for (j = bbmin[1]; j <= bbmax[1]; ++j) {
-			for (i = bbmin[0]; i <= bbmax[0]; ++i, ++index) {
-				buffer[index] = acc.isValueOn(ijk) ? FloatConverter<ValueType>::get(acc.getValue(ijk)) : 0.0f;
-			}
-		}
-	}
 }
 
 } /* namespace internal */

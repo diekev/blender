@@ -50,6 +50,14 @@ typedef struct VolumeData {
 	struct VolumeData *next, *prev;
 
 	struct OpenVDBPrimitive *prim;
+
+	/* dense buffer */
+	float *buffer;
+	int res[3];
+	int pad2;
+
+	float bbmin[3], bbmax[3];
+
 	char name[64];  /* MAX_NAME */
 	short type;
 	short flags;

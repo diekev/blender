@@ -290,6 +290,9 @@ void draw_smoke_volume(struct SmokeDomainSettings *sds, struct Object *ob,
                        const float min[3], const float max[3],
                        const float viewnormal[3]);
 
+
+void draw_volume(struct Object *ob, const float viewnormal[3]);
+
 //#define SMOKE_DEBUG_VELOCITY
 //#define SMOKE_DEBUG_HEAT
 

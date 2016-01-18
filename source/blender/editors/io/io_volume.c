@@ -80,6 +80,7 @@ static void openvdb_get_grid_info(void *userdata, const char *name,
 	}
 
 	data->prim = prim;
+	data->buffer = NULL;
 
 	BLI_addtail(&volume->fields, data);
 }
