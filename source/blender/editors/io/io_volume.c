@@ -41,6 +41,8 @@
 #include "DNA_space_types.h"
 #include "DNA_volume_types.h"
 
+#include "BLI_math.h"
+
 #include "BKE_context.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
@@ -81,6 +83,8 @@ static void openvdb_get_grid_info(void *userdata, const char *name,
 
 	data->prim = prim;
 	data->buffer = NULL;
+	zero_v3(data->bbmin);
+	zero_v3(data->bbmax);
 
 	BLI_addtail(&volume->fields, data);
 }

@@ -299,6 +299,13 @@ float *OpenVDB_get_texture_buffer(struct OpenVDBPrimitive *prim,
 	return buffer;
 }
 
+void OpenVDB_get_bounds(struct OpenVDBPrimitive *prim, float bbmin[3], float bbmax[3])
+{
+	openvdb::FloatGrid::Ptr grid = openvdb::gridPtrCast<openvdb::FloatGrid>(prim->getGridPtr());
+
+	internal::OpenVDB_get_grid_bounds(grid.get(), bbmin, bbmax);
+}
+
 float OpenVDB_get_voxel_size(struct OpenVDBPrimitive *prim)
 {
 	return prim->getConstGrid().transform().voxelSize()[0];
@@ -410,19 +417,6 @@ void OpenVDB_smoke_get_draw_buffers_staggered(OpenVDBPrimitive *pdata, const cha
 	*r_verts = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB vertex buffer"); \
 	*r_colors = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB color buffer"); \
 	internal::OpenVDB_get_draw_buffers_staggered(grid, value_scale, *r_verts, *r_colors);
-
-	SELECT_SMOKE_GRID(data, grid);
-
-#undef DO_GRID
-}
-
-void OpenVDB_smoke_get_bounds(struct OpenVDBPrimitive *pdata, const char *grid,
-                              float bbmin[3], float bbmax[3])
-{
-	internal::SmokeData *data = (internal::SmokeData *)pdata;
-
-#define DO_GRID(grid) \
-	internal::OpenVDB_get_grid_bounds(grid, bbmin, bbmax);
 
 	SELECT_SMOKE_GRID(data, grid);
 

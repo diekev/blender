@@ -115,6 +115,8 @@ void OpenVDBPrimitive_free(struct OpenVDBPrimitive *vdb_prim);
 
 float *OpenVDB_get_texture_buffer(struct OpenVDBPrimitive *prim, int res[3],
                                   float bbmin[3], float bbmax[3]);
+void OpenVDB_get_bounds(struct OpenVDBPrimitive *prim,
+                              float bbmin[3], float bbmax[3]);
 
 float OpenVDB_get_voxel_size(struct OpenVDBPrimitive *prim);
 

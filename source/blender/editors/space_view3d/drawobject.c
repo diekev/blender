@@ -77,6 +77,7 @@
 #include "BKE_subsurf.h"
 #include "BKE_unit.h"
 #include "BKE_tracking.h"
+#include "BKE_volume.h"
 
 #include "BKE_editmesh.h"
 
@@ -7085,6 +7086,9 @@ static void draw_bounding_volume(Object *ob, char type)
 	else if (ob->type == OB_LATTICE) {
 		bb = BKE_lattice_boundbox_get(ob);
 	}
+	else if (ob->type == OB_VOLUME) {
+		bb = BKE_volume_boundbox_get(ob);
+	}
 	else {
 		const float min[3] = {-1.0f, -1.0f, -1.0f}, max[3] = {1.0f, 1.0f, 1.0f};
 		bb = &bb_local;
@@ -7761,12 +7765,11 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 			case OB_VOLUME:
 			{
 				if (!render_override) {
-					// draw_bound_box(ob);
+					if (dt == OB_BOUNDBOX) {
+						draw_bounding_volume(ob, ob->boundtype);
+					}
 					// draw_openvdb_tree(ob);
 				}
-
-				glLoadMatrixf(rv3d->viewmat);
-				glMultMatrixf(ob->obmat);
 
 				float viewnormal[3];
 

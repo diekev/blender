@@ -32,6 +32,7 @@
 #ifndef __BKE_VOLUME_H__
 #define __BKE_VOLUME_H__
 
+struct BoundBox;
 struct Main;
 struct Object;
 struct Volume;
@@ -42,6 +43,8 @@ struct Volume *BKE_volume_from_object(struct Object *ob);
 
 void BKE_volume_free(struct Volume *volume);
 
-struct VolumeData *BKE_volume_field_current(struct Volume *volume);
+struct BoundBox *BKE_volume_boundbox_get(struct Object *ob);
+
+struct VolumeData *BKE_volume_field_current(const struct Volume *volume);
 
 #endif /* __BKE_VOLUME_H__ */

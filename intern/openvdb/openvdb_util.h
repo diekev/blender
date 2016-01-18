@@ -101,6 +101,21 @@ static bool OpenVDB_get_dense_texture_res(const openvdb::Grid<TreeType> *grid, i
 }
 
 template <typename TreeType>
+static void OpenVDB_get_grid_bounds(const openvdb::Grid<TreeType> *grid, float bbmin[3], float bbmax[3])
+{
+	if (!grid) {
+		openvdb::Vec3f(0,0,0).toV(bbmin);
+		openvdb::Vec3f(0,0,0).toV(bbmax);
+		return;
+	}
+
+	openvdb::CoordBBox bbox = grid->evalActiveVoxelBoundingBox();
+	openvdb::BBoxd vbox = grid->transform().indexToWorld(bbox);
+	vbox.min().toV(bbmin);
+	vbox.max().toV(bbmax);
+}
+
+template <typename TreeType>
 static void OpenVDB_create_dense_texture(const openvdb::Grid<TreeType> *grid, float *buffer)
 {
 	using namespace openvdb;
@@ -652,21 +667,6 @@ static void OpenVDB_get_draw_buffers_staggered(const openvdb::Grid<TreeType> *gr
 			add_staggered_needle(verts, colors, &verts_ofs, center, grid->voxelSize().x(), vec);
 		}
 	}
-}
-
-template <typename TreeType>
-static void OpenVDB_get_grid_bounds(const openvdb::Grid<TreeType> *grid, float bbmin[3], float bbmax[3])
-{
-	if (!grid) {
-		Vec3f(0,0,0).toV(bbmin);
-		Vec3f(0,0,0).toV(bbmax);
-		return;
-	}
-
-	CoordBBox bbox = grid->evalActiveVoxelBoundingBox();
-	BBoxd vbox = grid->transform().indexToWorld(bbox);
-	vbox.min().toV(bbmin);
-	vbox.max().toV(bbmax);
 }
 
 template <typename TreeType>

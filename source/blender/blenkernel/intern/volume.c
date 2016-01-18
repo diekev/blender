@@ -37,6 +37,7 @@
 
 #include "BKE_library.h"
 #include "BKE_main.h"
+#include "BKE_object.h"
 #include "BKE_volume.h"
 
 #include "openvdb_capi.h"
@@ -74,7 +75,7 @@ void BKE_volume_free(Volume *volume)
 	}
 }
 
-struct VolumeData *BKE_volume_field_current(struct Volume *volume)
+VolumeData *BKE_volume_field_current(const Volume *volume)
 {
 	VolumeData *data = volume->fields.first;
 
@@ -85,4 +86,18 @@ struct VolumeData *BKE_volume_field_current(struct Volume *volume)
 	}
 
 	return data;
+}
+
+BoundBox *BKE_volume_boundbox_get(Object *ob)
+{
+	const Volume *volume = BKE_volume_from_object(ob);
+	VolumeData *data = BKE_volume_field_current(volume);
+
+	if (ob->bb == NULL) {
+		ob->bb = BKE_boundbox_alloc_unit();
+	}
+
+	BKE_boundbox_init_from_minmax(ob->bb, data->bbmin, data->bbmax);
+
+	return ob->bb;
 }
