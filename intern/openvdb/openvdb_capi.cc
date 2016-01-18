@@ -299,6 +299,11 @@ float *OpenVDB_get_texture_buffer(struct OpenVDBPrimitive *prim,
 	return buffer;
 }
 
+float OpenVDB_get_voxel_size(struct OpenVDBPrimitive *prim)
+{
+	return prim->getConstGrid().transform().voxelSize()[0];
+}
+
 #if 0
 /* ------------------------------------------------------------------------- */
 /* Drawing */

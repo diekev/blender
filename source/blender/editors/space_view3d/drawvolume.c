@@ -492,6 +492,8 @@ void draw_volume(Object *ob, const float viewnormal[3])
 	    1.0f / size[2]
 	};
 
+	const float dx = OpenVDB_get_voxel_size(prim);
+
 	/* setup smoke shader */
 	GPUShader *shader = GPU_shader_get_builtin_shader(GPU_SHADER_OPENVDB);
 
@@ -504,6 +506,8 @@ void draw_volume(Object *ob, const float viewnormal[3])
 	int invsize_location = GPU_shader_get_uniform(shader, "invsize");
 	int ob_sizei_location = GPU_shader_get_uniform(shader, "ob_sizei");
 	int min_location = GPU_shader_get_uniform(shader, "min");
+	int N_location = GPU_shader_get_uniform(shader, "N");
+	int step_size_location = GPU_shader_get_uniform(shader, "step_size");
 
 	GPUTexture *tex = GPU_texture_create_3D(data->res[0], data->res[1], data->res[2], 1, data->buffer);
 
@@ -520,6 +524,8 @@ void draw_volume(Object *ob, const float viewnormal[3])
 	GPU_shader_uniform_vector(shader, min_location, 3, 1, data->bbmin);
 	GPU_shader_uniform_vector(shader, ob_sizei_location, 3, 1, ob_sizei);
 	GPU_shader_uniform_vector(shader, invsize_location, 3, 1, invsize);
+	GPU_shader_uniform_vector(shader, N_location, 3, 1, viewnormal);
+	GPU_shader_uniform_vector(shader, step_size_location, 1, 1, &dx);
 
 	/* setup slicing information */
 
