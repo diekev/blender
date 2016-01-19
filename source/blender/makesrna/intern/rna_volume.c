@@ -32,6 +32,8 @@
 
 #include "BKE_volume.h"
 
+#include "WM_types.h"
+
 #ifdef RNA_RUNTIME
 
 #include "BLI_listbase.h"
@@ -90,6 +92,11 @@ static void rna_def_volume_data(BlenderRNA *brna)
     RNA_def_property_string_sdna(prop, NULL, "name");
     RNA_def_property_ui_text(prop, "Name", "Field name");
     RNA_def_struct_name_property(srna, prop);
+
+	prop = RNA_def_property(srna, "show_topology", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", VOLUME_DRAW_TOPOLOGY);
+	RNA_def_property_ui_text(prop, "Draw Topology", "Show the topology of the volume");
+	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
 }
 
 static void rna_def_volume(BlenderRNA *brna)

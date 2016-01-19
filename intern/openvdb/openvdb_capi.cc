@@ -311,6 +311,20 @@ float OpenVDB_get_voxel_size(struct OpenVDBPrimitive *prim)
 	return prim->getConstGrid().transform().voxelSize()[0];
 }
 
+void OpenVDB_get_draw_buffers_nodes(OpenVDBPrimitive *prim,
+                                          float (**r_verts)[3], float (**r_colors)[3], int *r_numverts)
+{
+	const int min_level = 0;
+	const int max_level = 3;
+
+	openvdb::FloatGrid::Ptr grid = openvdb::gridPtrCast<openvdb::FloatGrid>(prim->getGridPtr());
+
+	internal::OpenVDB_get_draw_buffer_size_cells(grid.get(), min_level, max_level, false, r_numverts);
+	*r_verts = (float (*)[3])MEM_mallocN((*r_numverts) * sizeof(float) * 3, "OpenVDB vertex buffer");
+	*r_colors = (float (*)[3])MEM_mallocN((*r_numverts) * sizeof(float) * 3, "OpenVDB color buffer");
+	internal::OpenVDB_get_draw_buffers_cells(grid.get(), min_level, max_level, false, *r_verts, *r_colors);
+}
+
 #if 0
 /* ------------------------------------------------------------------------- */
 /* Drawing */
@@ -350,25 +364,6 @@ float OpenVDB_get_voxel_size(struct OpenVDBPrimitive *prim)
 	else if (stype == "NEIGHBOR_EMPTY6") { DO_GRID(data->tmp_neighbor_empty[5].get()) } \
 	else { DO_GRID(data->density.get()) } \
 } (void)0
-
-void OpenVDB_smoke_get_draw_buffers_cells(OpenVDBPrimitive *pdata, const char *grid,
-                                          float (**r_verts)[3], float (**r_colors)[3], int *r_numverts)
-{
-	const int min_level = 0;
-	const int max_level = 3;
-
-	internal::SmokeData *data = (internal::SmokeData *)pdata;
-
-#define DO_GRID(grid) \
-	internal::OpenVDB_get_draw_buffer_size_cells(grid, min_level, max_level, true, r_numverts); \
-	*r_verts = (float (*)[3])MEM_mallocN((*r_numverts) * sizeof(float) * 3, "OpenVDB vertex buffer"); \
-	*r_colors = (float (*)[3])MEM_mallocN((*r_numverts) * sizeof(float) * 3, "OpenVDB color buffer"); \
-	internal::OpenVDB_get_draw_buffers_cells(grid, min_level, max_level, true, *r_verts, *r_colors);
-
-	SELECT_SMOKE_GRID(data, grid);
-
-#undef DO_GRID
-}
 
 void OpenVDB_smoke_get_draw_buffers_boxes(OpenVDBPrimitive *pdata, const char *grid, float value_scale,
                                           float (**r_verts)[3], float (**r_colors)[3], float (**r_normals)[3], int *r_numverts)

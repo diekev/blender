@@ -145,13 +145,41 @@ static void OpenVDB_create_dense_texture(const openvdb::Grid<TreeType> *grid, fl
 	}
 }
 
-}  /* namespace internal */
+template <typename TreeType>
+static void OpenVDB_get_draw_buffer_size_cells(const openvdb::Grid<TreeType> *grid, int min_level, int max_level, bool voxels,
+                                               int *r_numverts)
+{
+	using namespace openvdb;
+	using namespace openvdb::math;
 
-#if 0
+	typedef typename TreeType::LeafNodeType LeafNodeType;
 
-namespace internal {
+	if (!grid) {
+		*r_numverts = 0;
+		return;
+	}
 
-using namespace openvdb;
+	/* count */
+	int numverts = 0;
+	for (typename TreeType::NodeCIter node_iter = grid->tree().cbeginNode(); node_iter; ++node_iter) {
+		const int level = node_iter.getLevel();
+
+		if (level < min_level || level > max_level)
+			continue;
+
+		numverts += 6 * 4;
+	}
+
+	if (voxels) {
+		for (typename TreeType::LeafCIter leaf_iter = grid->tree().cbeginLeaf(); leaf_iter; ++leaf_iter) {
+			const LeafNodeType *leaf = leaf_iter.getLeaf();
+
+			numverts += 6 * 4 * leaf->onVoxelCount();
+		}
+	}
+
+	*r_numverts = numverts;
+}
 
 static void copy_v3_v3(float *r, const float *a)
 {
@@ -167,17 +195,8 @@ static void cross_v3_v3v3(float *r, const float *a, const float *b)
 	r[2] = a[0] * b[1] - a[1] * b[0];
 }
 
-static void get_normal(float nor[3], const Vec3f &v1, const Vec3f &v2, const Vec3f &v3)
-{
-	openvdb::Vec3f n1, n2;
-
-	n1 = v2 - v1;
-	n2 = v3 - v1;
-
-	cross_v3_v3v3(nor, n1.asV(), n2.asV());
-}
-
-static void get_normal(float nor[3], const Vec3f &v1, const Vec3f &v2, const Vec3f &v3, const Vec3f &v4)
+static void get_normal(float nor[3], const openvdb::Vec3f &v1, const openvdb::Vec3f &v2,
+                       const openvdb::Vec3f &v3, const openvdb::Vec3f &v4)
 {
 	openvdb::Vec3f n1, n2;
 
@@ -187,32 +206,10 @@ static void get_normal(float nor[3], const Vec3f &v1, const Vec3f &v2, const Vec
 	cross_v3_v3v3(nor, n1.asV(), n2.asV());
 }
 
-static inline void add_tri(float (*verts)[3], float (*colors)[3], float (*normals)[3], int *verts_ofs,
-                           const Vec3f &p1, const Vec3f &p2, const Vec3f &p3, const Vec3f &color)
-{
-	copy_v3_v3(verts[*verts_ofs+0], p1.asV());
-	copy_v3_v3(verts[*verts_ofs+1], p2.asV());
-	copy_v3_v3(verts[*verts_ofs+2], p3.asV());
-
-	copy_v3_v3(colors[*verts_ofs+0], color.asV());
-	copy_v3_v3(colors[*verts_ofs+1], color.asV());
-	copy_v3_v3(colors[*verts_ofs+2], color.asV());
-
-	if (normals) {
-		float nor[3];
-
-		get_normal(nor, p1, p2, p3);
-
-		copy_v3_v3(normals[*verts_ofs+0], nor);
-		copy_v3_v3(normals[*verts_ofs+1], nor);
-		copy_v3_v3(normals[*verts_ofs+2], nor);
-	}
-
-	*verts_ofs += 3;
-}
-
 static inline void add_quad(float (*verts)[3], float (*colors)[3], float (*normals)[3], int *verts_ofs,
-                            const Vec3f &p1, const Vec3f &p2, const Vec3f &p3, const Vec3f &p4, const Vec3f &color)
+                            const openvdb::Vec3f &p1, const openvdb::Vec3f &p2,
+                            const openvdb::Vec3f &p3, const openvdb::Vec3f &p4,
+                            const openvdb::Vec3f &color)
 {
 	copy_v3_v3(verts[*verts_ofs+0], p1.asV());
 	copy_v3_v3(verts[*verts_ofs+1], p2.asV());
@@ -261,101 +258,6 @@ static void add_box(float (*verts)[3], float (*colors)[3], float (*normals)[3], 
 	add_quad(verts, colors, normals, verts_ofs, corners[3], corners[2], corners[6], corners[7], color);
 	add_quad(verts, colors, normals, verts_ofs, corners[3], corners[7], corners[4], corners[0], color);
 	add_quad(verts, colors, normals, verts_ofs, corners[1], corners[5], corners[6], corners[2], color);
-}
-
-static void add_needle(float (*verts)[3], float (*colors)[3], float (*normals)[3], int *verts_ofs,
-                       const openvdb::Vec3f &center, const openvdb::Vec3f &dir, float len,
-                       const openvdb::Vec3f &color)
-{
-	using namespace openvdb;
-
-	Vec3f corners[4] = {
-	    Vec3f(0.0f, 0.2f, -0.5f),
-	    Vec3f(-0.2f * 0.866f, -0.2f * 0.5f, -0.5f),
-	    Vec3f(0.2f * 0.866f, -0.2f * 0.5f, -0.5f),
-	    Vec3f(0.0f, 0.0f, 0.5f)
-	};
-	Vec3f up(0.0f, 0.0f, 1.0f);
-	Mat3R rot = math::rotation<Mat3R>(up, dir).transpose();
-	for (int i = 0; i < 4; ++i) {
-		corners[i] = (rot * corners[i]) * len + center;
-	}
-
-	add_tri(verts, colors, normals, verts_ofs, corners[0], corners[1], corners[2], color);
-	add_tri(verts, colors, normals, verts_ofs, corners[0], corners[1], corners[3], color);
-	add_tri(verts, colors, normals, verts_ofs, corners[1], corners[2], corners[3], color);
-	add_tri(verts, colors, normals, verts_ofs, corners[2], corners[0], corners[3], color);
-}
-
-static void add_staggered_needle(float (*verts)[3], float (*colors)[3], int *verts_ofs,
-                                 const openvdb::Vec3f &center, float size, const openvdb::Vec3f &vec)
-{
-	using namespace openvdb;
-
-#define SHIFT(v, n) Vec3f((v)[(n)%3], (v)[((n)+2)%3], (v)[((n)+1)%3])
-
-	Vec3f corners[6] = {
-	    Vec3f(1.0f, 0.0f, 0.0f),
-	    Vec3f(0.0f, 0.0f, 0.15f),
-	    Vec3f(0.0f, 0.0f, -0.15f),
-	    Vec3f(0.0f, 0.15f, 0.0f),
-	    Vec3f(0.0f, -0.15f, 0.0f),
-	};
-
-	for (int n = 0; n < 3; ++n) {
-		float len = vec[n] * size;
-
-		Vec3f tip = SHIFT(corners[0], n) * len;
-		Vec3f a = SHIFT(corners[1], n) * len;
-		Vec3f b = SHIFT(corners[2], n) * len;
-		Vec3f c = SHIFT(corners[3], n) * len;
-		Vec3f d = SHIFT(corners[4], n) * len;
-
-		Vec3f base = center - SHIFT(Vec3f(size * 0.5f, 0.0f, 0.0f), n);
-
-		Vec3f color = SHIFT(Vec3f(1,0,0), n);
-
-		add_tri(verts, colors, NULL, verts_ofs, base + tip, base + a, base + b, color);
-		add_tri(verts, colors, NULL, verts_ofs, base + tip, base + c, base + d, color);
-	}
-
-#undef SHIFT
-}
-
-template <typename TreeType>
-static void OpenVDB_get_draw_buffer_size_cells(const openvdb::Grid<TreeType> *grid, int min_level, int max_level, bool voxels,
-                                               int *r_numverts)
-{
-	using namespace openvdb;
-	using namespace openvdb::math;
-
-	typedef typename TreeType::LeafNodeType LeafNodeType;
-
-	if (!grid) {
-		*r_numverts = 0;
-		return;
-	}
-
-	/* count */
-	int numverts = 0;
-	for (typename TreeType::NodeCIter node_iter = grid->tree().cbeginNode(); node_iter; ++node_iter) {
-		const int level = node_iter.getLevel();
-
-		if (level < min_level || level > max_level)
-			continue;
-
-		numverts += 6 * 4;
-	}
-
-	if (voxels) {
-		for (typename TreeType::LeafCIter leaf_iter = grid->tree().cbeginLeaf(); leaf_iter; ++leaf_iter) {
-			const LeafNodeType *leaf = leaf_iter.getLeaf();
-
-			numverts += 6 * 4 * leaf->onVoxelCount();
-		}
-	}
-
-	*r_numverts = numverts;
 }
 
 template <typename TreeType>
@@ -420,6 +322,107 @@ static void OpenVDB_get_draw_buffers_cells(const openvdb::Grid<TreeType> *grid, 
 			}
 		}
 	}
+}
+
+}  /* namespace internal */
+
+#if 0
+
+namespace internal {
+
+using namespace openvdb;
+
+static void get_normal(float nor[3], const Vec3f &v1, const Vec3f &v2, const Vec3f &v3)
+{
+	openvdb::Vec3f n1, n2;
+
+	n1 = v2 - v1;
+	n2 = v3 - v1;
+
+	cross_v3_v3v3(nor, n1.asV(), n2.asV());
+}
+
+static inline void add_tri(float (*verts)[3], float (*colors)[3], float (*normals)[3], int *verts_ofs,
+                           const Vec3f &p1, const Vec3f &p2, const Vec3f &p3, const Vec3f &color)
+{
+	copy_v3_v3(verts[*verts_ofs+0], p1.asV());
+	copy_v3_v3(verts[*verts_ofs+1], p2.asV());
+	copy_v3_v3(verts[*verts_ofs+2], p3.asV());
+
+	copy_v3_v3(colors[*verts_ofs+0], color.asV());
+	copy_v3_v3(colors[*verts_ofs+1], color.asV());
+	copy_v3_v3(colors[*verts_ofs+2], color.asV());
+
+	if (normals) {
+		float nor[3];
+
+		get_normal(nor, p1, p2, p3);
+
+		copy_v3_v3(normals[*verts_ofs+0], nor);
+		copy_v3_v3(normals[*verts_ofs+1], nor);
+		copy_v3_v3(normals[*verts_ofs+2], nor);
+	}
+
+	*verts_ofs += 3;
+}
+
+static void add_needle(float (*verts)[3], float (*colors)[3], float (*normals)[3], int *verts_ofs,
+                       const openvdb::Vec3f &center, const openvdb::Vec3f &dir, float len,
+                       const openvdb::Vec3f &color)
+{
+	using namespace openvdb;
+
+	Vec3f corners[4] = {
+	    Vec3f(0.0f, 0.2f, -0.5f),
+	    Vec3f(-0.2f * 0.866f, -0.2f * 0.5f, -0.5f),
+	    Vec3f(0.2f * 0.866f, -0.2f * 0.5f, -0.5f),
+	    Vec3f(0.0f, 0.0f, 0.5f)
+	};
+	Vec3f up(0.0f, 0.0f, 1.0f);
+	Mat3R rot = math::rotation<Mat3R>(up, dir).transpose();
+	for (int i = 0; i < 4; ++i) {
+		corners[i] = (rot * corners[i]) * len + center;
+	}
+
+	add_tri(verts, colors, normals, verts_ofs, corners[0], corners[1], corners[2], color);
+	add_tri(verts, colors, normals, verts_ofs, corners[0], corners[1], corners[3], color);
+	add_tri(verts, colors, normals, verts_ofs, corners[1], corners[2], corners[3], color);
+	add_tri(verts, colors, normals, verts_ofs, corners[2], corners[0], corners[3], color);
+}
+
+static void add_staggered_needle(float (*verts)[3], float (*colors)[3], int *verts_ofs,
+                                 const openvdb::Vec3f &center, float size, const openvdb::Vec3f &vec)
+{
+	using namespace openvdb;
+
+#define SHIFT(v, n) Vec3f((v)[(n)%3], (v)[((n)+2)%3], (v)[((n)+1)%3])
+
+	Vec3f corners[6] = {
+	    Vec3f(1.0f, 0.0f, 0.0f),
+	    Vec3f(0.0f, 0.0f, 0.15f),
+	    Vec3f(0.0f, 0.0f, -0.15f),
+	    Vec3f(0.0f, 0.15f, 0.0f),
+	    Vec3f(0.0f, -0.15f, 0.0f),
+	};
+
+	for (int n = 0; n < 3; ++n) {
+		float len = vec[n] * size;
+
+		Vec3f tip = SHIFT(corners[0], n) * len;
+		Vec3f a = SHIFT(corners[1], n) * len;
+		Vec3f b = SHIFT(corners[2], n) * len;
+		Vec3f c = SHIFT(corners[3], n) * len;
+		Vec3f d = SHIFT(corners[4], n) * len;
+
+		Vec3f base = center - SHIFT(Vec3f(size * 0.5f, 0.0f, 0.0f), n);
+
+		Vec3f color = SHIFT(Vec3f(1,0,0), n);
+
+		add_tri(verts, colors, NULL, verts_ofs, base + tip, base + a, base + b, color);
+		add_tri(verts, colors, NULL, verts_ofs, base + tip, base + c, base + d, color);
+	}
+
+#undef SHIFT
 }
 
 template <typename T>

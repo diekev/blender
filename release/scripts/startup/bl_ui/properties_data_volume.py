@@ -52,6 +52,11 @@ class DATA_PT_volume_fields(VolumeButtonsPanel, Panel):
 
         layout.template_list("DATA_UL_volume_fields", "", volume, "fields", volume, "active_field_index", rows=3)
 
+        field = volume.active_field
+
+        if field:
+            layout.prop(field, "show_topology")
+
 
 
 if __name__ == "__main__":  # only for live edit.

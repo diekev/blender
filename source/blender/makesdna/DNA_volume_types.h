@@ -43,7 +43,8 @@ typedef enum eVolumeDataType {
 } eVolumeDataType;
 
 enum {
-	VOLUME_DATA_CURRENT = (1 << 0),
+	VOLUME_DATA_CURRENT  = (1 << 0),
+	VOLUME_DRAW_TOPOLOGY = (1 << 1),
 };
 
 typedef struct VolumeData {

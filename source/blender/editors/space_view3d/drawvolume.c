@@ -435,6 +435,39 @@ void draw_smoke_volume(SmokeDomainSettings *sds, Object *ob,
 	}
 }
 
+static void draw_vdb_topology(struct OpenVDBPrimitive *prim)
+{
+	float (*verts)[3] = NULL, (*colors)[3] = NULL;
+	int numverts;
+
+	OpenVDB_get_draw_buffers_nodes(prim, &verts, &colors, &numverts);
+
+	if (numverts > 0 && verts && colors) {
+		glEnableClientState(GL_VERTEX_ARRAY);
+		glEnableClientState(GL_COLOR_ARRAY);
+		glDisable(GL_BLEND);
+		glEnable(GL_DEPTH_TEST);
+
+		glVertexPointer(3, GL_FLOAT, 0, verts);
+		glColorPointer(3, GL_FLOAT, 0, colors);
+
+		glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+		glDrawArrays(GL_QUADS, 0, numverts);
+
+		glDisableClientState(GL_VERTEX_ARRAY);
+		glDisableClientState(GL_COLOR_ARRAY);
+
+		glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		glDisable(GL_DEPTH_TEST);
+	}
+
+	if (verts)
+		MEM_freeN(verts);
+	if (colors)
+		MEM_freeN(colors);
+}
+
 static VolumeData *get_first_scalar_field(Volume *volume)
 {
 	VolumeData *data = volume->fields.first;
@@ -464,6 +497,11 @@ void draw_volume(Object *ob, const float viewnormal[3])
 	}
 
 	struct OpenVDBPrimitive *prim = data->prim;
+
+	/* draw the topology first so it blends nicely. */
+	if (data->flags & VOLUME_DRAW_TOPOLOGY) {
+		draw_vdb_topology(prim);
+	}
 
 	if (data->buffer == NULL) {
 		data->buffer = OpenVDB_get_texture_buffer(prim, data->res, data->bbmin, data->bbmax);

@@ -120,6 +120,9 @@ void OpenVDB_get_bounds(struct OpenVDBPrimitive *prim,
 
 float OpenVDB_get_voxel_size(struct OpenVDBPrimitive *prim);
 
+void OpenVDB_get_draw_buffers_nodes(struct OpenVDBPrimitive *prim,
+                                          float (**r_verts)[3], float (**r_colors)[3], int *r_numverts);
+
 #ifdef __cplusplus
 }
 #endif
