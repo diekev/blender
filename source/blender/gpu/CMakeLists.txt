@@ -80,6 +80,8 @@ set(SRC
 	shaders/gpu_shader_fx_depth_resolve.glsl
 	shaders/gpu_shader_smoke_frag.glsl
 	shaders/gpu_shader_smoke_vert.glsl
+	shaders/gpu_shader_sparse_volume_frag.glsl
+	shaders/gpu_shader_sparse_volume_vert.glsl
 	shaders/gpu_shader_vdb_frag.glsl
 
 	GPU_basic_shader.h
@@ -103,6 +105,8 @@ data_to_c_simple(shaders/gpu_shader_geometry.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_smoke_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_vdb_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_smoke_vert.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_sparse_volume_frag.glsl SRC)
+data_to_c_simple(shaders/gpu_shader_sparse_volume_vert.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_material.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_sep_gaussian_blur_frag.glsl SRC)
 data_to_c_simple(shaders/gpu_shader_sep_gaussian_blur_vert.glsl SRC)

@@ -51,11 +51,13 @@ typedef struct VolumeData {
 	struct VolumeData *next, *prev;
 
 	struct OpenVDBPrimitive *prim;
+	struct VolumeDrawNode **draw_nodes;
 
 	/* dense buffer */
 	float *buffer;
 	int res[3];
-	int pad2;
+	short pad2;
+	short num_draw_nodes;
 
 	float bbmin[3], bbmax[3];
 

@@ -1471,6 +1471,28 @@ void GPU_create_smoke(SmokeModifierData *smd, int highres)
 #endif // WITH_SMOKE
 }
 
+VolumeDrawNode *GPU_volume_node_create(GPUTexture *indirection_map, bool do_ref)
+{
+	VolumeDrawNode *drawnode = MEM_mallocN(sizeof(VolumeDrawNode), __func__);
+
+	drawnode->max_leaves_per_atlas = 4096;
+	drawnode->voxels_per_dim = 8;
+	drawnode->indirection_tex = indirection_map;
+
+	if (do_ref) {
+		GPU_texture_ref(drawnode->indirection_tex);
+	}
+
+	return drawnode;
+}
+
+void GPU_volume_node_free(VolumeDrawNode *drawnode)
+{
+	GPU_texture_free(drawnode->indirection_tex);
+	GPU_texture_free(drawnode->leaf_atlas);
+	MEM_freeN(drawnode);
+}
+
 static LinkNode *image_free_queue = NULL;
 
 static void gpu_queue_image_for_free(Image *ima)

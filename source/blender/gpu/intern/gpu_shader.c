@@ -48,6 +48,8 @@
 extern char datatoc_gpu_shader_smoke_vert_glsl[];
 extern char datatoc_gpu_shader_smoke_frag_glsl[];
 extern char datatoc_gpu_shader_vdb_frag_glsl[];
+extern char datatoc_gpu_shader_sparse_volume_vert_glsl[];
+extern char datatoc_gpu_shader_sparse_volume_frag_glsl[];
 extern char datatoc_gpu_shader_vsm_store_vert_glsl[];
 extern char datatoc_gpu_shader_vsm_store_frag_glsl[];
 extern char datatoc_gpu_shader_sep_gaussian_blur_vert_glsl[];
@@ -69,6 +71,7 @@ static struct GPUShadersGlobal {
 		GPUShader *smoke;
 		GPUShader *smoke_fire;
 		GPUShader *vdb_volume;
+		GPUShader *sparse_volume;
 		/* cache for shader fx. Those can exist in combinations so store them here */
 		GPUShader *fx_shaders[MAX_FX_SHADERS * 2];
 	} shaders;
@@ -627,6 +630,13 @@ GPUShader *GPU_shader_get_builtin_shader(GPUBuiltinShader shader)
 				        NULL, NULL, NULL, 0, 0, 0);
 			retval = GG.shaders.vdb_volume;
 			break;
+		case GPU_SHADER_SPARSE_VOLUME:
+			if (!GG.shaders.sparse_volume)
+				GG.shaders.sparse_volume = GPU_shader_create(
+				        datatoc_gpu_shader_sparse_volume_vert_glsl, datatoc_gpu_shader_sparse_volume_frag_glsl,
+				        NULL, NULL, NULL, 0, 0, 0);
+			retval = GG.shaders.sparse_volume;
+			break;
 	}
 
 	if (retval == NULL)
@@ -741,6 +751,11 @@ void GPU_shader_free_builtin_shaders(void)
 	if (GG.shaders.vdb_volume) {
 		GPU_shader_free(GG.shaders.vdb_volume);
 		GG.shaders.vdb_volume = NULL;
+	}
+
+	if (GG.shaders.sparse_volume) {
+		GPU_shader_free(GG.shaders.sparse_volume);
+		GG.shaders.sparse_volume = NULL;
 	}
 
 	for (i = 0; i < 2 * MAX_FX_SHADERS; ++i) {

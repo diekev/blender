@@ -90,6 +90,7 @@ typedef enum GPUBuiltinShader {
 	GPU_SHADER_SMOKE             = 2,
 	GPU_SHADER_SMOKE_FIRE        = 3,
 	GPU_SHADER_OPENVDB           = 4,
+	GPU_SHADER_SPARSE_VOLUME     = 5,
 } GPUBuiltinShader;
 
 GPUShader *GPU_shader_get_builtin_shader(GPUBuiltinShader shader);

@@ -479,6 +479,54 @@ GPUTexture *GPU_texture_create_1D(int w, const float *fpixels, char err_out[256]
 	return tex;
 }
 
+GPUTexture *GPU_texture_create_1D_int(int w, const int *pixels, char err_out[256])
+{
+	GPUTexture *tex = MEM_callocN(sizeof(GPUTexture), "GPUTexture");
+	tex->w = w;
+	tex->h = 0;
+	tex->number = -1;
+	tex->refcount = 1;
+	tex->target = GL_TEXTURE_1D;
+	tex->target_base = GL_TEXTURE_1D;
+	tex->depth = 0;
+	tex->fb_attachment = -1;
+
+	glGenTextures(1, &tex->bindcode);
+
+	if (!tex->bindcode) {
+		if (err_out) {
+			BLI_snprintf(err_out, 256, "GPUTexture: texture create failed: %d",
+				(int)glGetError());
+		}
+		else {
+			fprintf(stderr, "GPUTexture: texture create failed: %d\n",
+				(int)glGetError());
+		}
+		GPU_texture_free(tex);
+		return NULL;
+	}
+
+	if (!GPU_full_non_power_of_two_support()) {
+		tex->w = power_of_2_max_i(tex->w);
+		tex->h = power_of_2_max_i(tex->h);
+	}
+
+	tex->number = 0;
+	glBindTexture(tex->target, tex->bindcode);
+
+	glTexImage1D(tex->target, 0, GL_R, tex->w, 0, GL_R32I, GL_INT, pixels);
+
+	glTexParameteri(tex->target_base, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(tex->target_base, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	glTexParameteri(tex->target_base, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+
+	if (tex)
+		GPU_texture_unbind(tex);
+
+	return tex;
+}
+
 GPUTexture *GPU_texture_create_2D(int w, int h, const float *fpixels, GPUHDRType hdr, char err_out[256])
 {
 	GPUTexture *tex = GPU_texture_create_nD(w, h, 2, fpixels, 0, hdr, 4, 0, err_out);

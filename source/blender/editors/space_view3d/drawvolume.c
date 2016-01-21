@@ -39,9 +39,11 @@
 #include "DNA_volume_types.h"
 
 #include "BLI_utildefines.h"
+#include "BLI_listbase.h"
 #include "BLI_math.h"
 
 #include "BKE_particle.h"
+#include "BKE_object.h" // for BKE_boundbox_init_from_minmax
 #include "BKE_volume.h"
 
 #include "smoke_API.h"
@@ -49,6 +51,7 @@
 #include "BIF_gl.h"
 
 #include "GPU_debug.h"
+#include "GPU_draw.h"
 #include "GPU_shader.h"
 #include "GPU_texture.h"
 
@@ -481,6 +484,317 @@ static VolumeData *get_first_scalar_field(Volume *volume)
 	return data;
 }
 
+/* ************************* Texture Atlas ********************** */
+
+typedef struct AtlasBuilder {
+	int item_count;
+	int item_count_x;
+	int item_count_y;
+	int item_count_z;
+	int item_width;
+
+	float *buffer;
+} AtlasBuilder;
+
+static void create_atlas_builder(AtlasBuilder *builder)
+{
+	builder->item_count = 0;
+	builder->item_width = 8;
+
+	builder->item_count_x = ceil(pow(4096.0f, 1.0 / 3.0));
+	builder->item_count_x = power_of_2_max_u(builder->item_count_x);
+
+	builder->item_count_y = ceil(sqrt(4096.0f / builder->item_count_x));
+	builder->item_count_y = power_of_2_max_u(builder->item_count_y);
+
+	builder->item_count_z = ceil((4096.0f / (builder->item_count_x * builder->item_count_y)));
+	builder->item_count_z = power_of_2_max_u(builder->item_count_z);
+
+	builder->buffer = MEM_mallocN(sizeof(float) * 4096 * 8 * 8 * 8,
+	                              "Internal node buffer");
+}
+
+static void free_atlas_builder(AtlasBuilder *builder)
+{
+	MEM_freeN(builder->buffer);
+}
+
+static void atlas_add_texture(void *data, const float *leaf_buffer)
+{
+	AtlasBuilder *builder = data;
+
+	const int fx = builder->item_count % builder->item_count_x;
+	const int fy = (builder->item_count / builder->item_count_x) % builder->item_count_y;
+	const int fz = builder->item_count / (builder->item_count_x * builder->item_count_y);
+
+	int index = 0;
+	for (int z = 0; z < 8; z++) {
+		for (int y = 0; y < 8; y++) {
+			float *buffer = &builder->buffer[fx + (fy + y) * fx + (fz + z) * fx * fy];
+
+			for (int x = 0; x < 8; x++, index++) {
+				*buffer++ = leaf_buffer[index];
+			}
+		}
+	}
+
+	builder->item_count++;
+}
+
+static GPUTexture *build_atlas(AtlasBuilder *builder)
+{
+#if 1
+	GPUTexture *tex = GPU_texture_create_3D(
+	                      builder->item_count_x * builder->item_width,
+	                      builder->item_count_y * builder->item_width,
+	                      builder->item_count_z * builder->item_width,
+	                      1,
+	                      builder->buffer);
+
+	return tex;
+#else
+	UNUSED_VARS(builder);
+	return NULL;
+#endif
+}
+
+static GPUTexture *build_node_indirection_texture(
+        int *internal_node_counts, int num_atlases,
+        const struct OpenVDBInternalNode2 **node_handles, int num_nodes)
+{
+	int internal_node_index = 0;
+	int max_node_leaf_count = 4096;
+
+	int *indirection_map = MEM_mallocN(sizeof(int) * max_node_leaf_count * num_nodes,
+	                                   "Indirection Map");
+
+	memset(indirection_map, -1, sizeof(int) * max_node_leaf_count * num_nodes);
+
+	for (int i = 0; i < num_atlases; i++) {
+		int leaf_index = 0;
+		int node_index = 0;
+
+		while (node_index < internal_node_counts[i]) {
+			OpenVDB_node_get_leaf_indices(node_handles[internal_node_index], indirection_map, &leaf_index, internal_node_index);
+
+			++node_index;
+			++internal_node_index;
+		}
+	}
+
+	GPUTexture *tex = GPU_texture_create_1D_int(max_node_leaf_count * num_nodes, indirection_map, NULL);
+
+	MEM_freeN(indirection_map);
+
+	return tex;
+}
+
+static void create_texture_atlas(VolumeData *data)
+{
+	int *atlas_nodes_counts = NULL;
+	int num_atlases = 0;
+	const struct OpenVDBInternalNode2 **node_handles;
+	int num_nodes = 0;
+
+	/* Calculate texture atlas sizes. */
+	OpenVDB_get_internal_nodes_count(data->prim,
+	                                 &atlas_nodes_counts, &num_atlases,
+	                                 &node_handles, &num_nodes);
+
+	data->draw_nodes = MEM_mallocN(sizeof(VolumeDrawNode *) * num_nodes,
+	                               "Volume Data Draw Nodes");
+
+	data->num_draw_nodes = num_nodes;
+
+	/* Build node indirection texture. */
+	GPUTexture *indirection_tex = build_node_indirection_texture(
+	                                  atlas_nodes_counts, num_atlases,
+	                                  node_handles, num_nodes);
+
+#if 0
+	printf("Number of internal nodes: %d\n", num_internal_nodes);
+#endif
+
+	int current_node_index = 0;
+	for (int i = 0; i < num_atlases; i++) {
+		AtlasBuilder builder;
+		create_atlas_builder(&builder);
+
+#if 0
+		printf("Atlas %d: number of nodes: %d\n", i, internal_nodes_counts[i]);
+		printf("Builder %d: item per dim: %d, %d, %d\n", i,
+		       builder.item_count_x, builder.item_count_y, builder.item_count_z);
+#endif
+
+		/* fill up this atlas with leaves from the nodes until it is full */
+
+		const int first_node_index = current_node_index;
+		while (current_node_index - first_node_index < atlas_nodes_counts[i]) {
+			/* Create renderable box for this internal node */
+			VolumeDrawNode *drawnode = GPU_volume_node_create(indirection_tex,
+			                                                  current_node_index > 0);
+
+			OpenVDB_get_node_bounds(data->prim, node_handles[current_node_index],
+			                        drawnode->bbmin, drawnode->bbmax);
+#if 0
+			printf("Internal node %d (%p)\n", i, node_handles[current_node_index]);
+			print_v3("center", drawnode.center);
+			print_v3("size", drawnode.size);
+#endif
+
+			/* Add all leaves of this internal node to atlas */
+			OpenVDB_get_leaf_buffers(node_handles[current_node_index],
+			                         atlas_add_texture, (void *)(&builder));
+
+			data->draw_nodes[current_node_index] = drawnode;
+
+			current_node_index++;
+		}
+
+		GPUTexture *atlas_tex = build_atlas(&builder);
+
+		for (int j = 0; j < atlas_nodes_counts[i]; j++) {
+			const int index = first_node_index + j;
+			data->draw_nodes[index]->leaf_atlas = atlas_tex;
+			data->draw_nodes[index]->first_node_index = index;
+			data->draw_nodes[index]->max_leaves_per_atlas_dim[0] = builder.item_count_x;
+			data->draw_nodes[index]->max_leaves_per_atlas_dim[1] = builder.item_count_y;
+			data->draw_nodes[index]->max_leaves_per_atlas_dim[2] = builder.item_count_z;
+
+			if (j > 0) {
+				GPU_texture_ref(data->draw_nodes[index]->leaf_atlas);
+			}
+		}
+
+		printf("Atlas %d: full at %.2f%%\n", i, (builder.item_count / 40.96f));
+		free_atlas_builder(&builder);
+	}
+
+	/* cleanup */
+
+	if (atlas_nodes_counts) {
+		MEM_freeN(atlas_nodes_counts);
+	}
+
+	if (node_handles) {
+		MEM_freeN(node_handles);
+	}
+}
+
+static void draw_slices(const float *slices, const size_t size, const int num_points)
+{
+	int gl_depth = 0, gl_blend = 0;
+	glGetBooleanv(GL_BLEND, (GLboolean *)&gl_blend);
+	glGetBooleanv(GL_DEPTH_TEST, (GLboolean *)&gl_depth);
+
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
+	GLuint vertex_buffer;
+	glGenBuffers(1, &vertex_buffer);
+	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+	glBufferData(GL_ARRAY_BUFFER, size, slices, GL_STATIC_DRAW);
+
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glVertexPointer(3, GL_FLOAT, 0, NULL);
+
+	glDrawArrays(GL_TRIANGLES, 0, num_points);
+
+	glDisableClientState(GL_VERTEX_ARRAY);
+
+	/* cleanup */
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glDeleteBuffers(1, &vertex_buffer);
+
+	if (!gl_blend) {
+		glDisable(GL_BLEND);
+	}
+
+	if (gl_depth) {
+		glEnable(GL_DEPTH_TEST);
+	}
+}
+
+static void draw_volume_nodes(VolumeDrawNode **nodes, const int num_nodes,
+                              const float *viewnormal)
+{
+	const int max_slices = 256;
+	const int max_points = max_slices * 12;
+
+	GPUShader *shader = GPU_shader_get_builtin_shader(GPU_SHADER_SPARSE_VOLUME);
+
+	if (!shader) {
+		fprintf(stderr, "Could not create sparse volume shader!\n");
+		return;
+	}
+
+	int invsize_location = GPU_shader_get_uniform(shader, "invsize");
+	int min_location = GPU_shader_get_uniform(shader, "min");
+	int soot_location = GPU_shader_get_uniform(shader, "soot_texture");
+	int indtex_location = GPU_shader_get_uniform(shader, "nodeIndirectionSampler");
+	int first_node_location = GPU_shader_get_uniform(shader, "first_node_index");
+	int max_leaf_location = GPU_shader_get_uniform(shader, "max_leaf_per_node");
+	int max_leaf_atlas_location = GPU_shader_get_uniform(shader, "maxLeafCountPerAtlasDimension");
+	int max_leaf_intern_location = GPU_shader_get_uniform(shader, "maxLeafCountPerInternalNodeDimension");
+
+	VolumeSlicer slicer;
+	slicer.verts = MEM_mallocN(sizeof(float) * 3 * max_points, "smoke_slice_vertices");
+
+	for (int i = 0; i < num_nodes; i++) {
+		VolumeDrawNode *node = nodes[i];
+
+//		printf("Node %d: first_node_index %d\n", i, node->first_node_index);
+
+		/* debug draw */
+		BoundBox bb;
+		BKE_boundbox_init_from_minmax(&bb, node->bbmin, node->bbmax);
+
+		draw_box(bb.vec, false);
+
+		float size[3];
+		sub_v3_v3v3(size, node->bbmax, node->bbmin);
+
+		const float invsize[3] = {
+		    1.0f / size[0],
+		    1.0f / size[1],
+		    1.0f / size[2]
+		};
+
+		GPU_shader_bind(shader);
+
+		GPU_texture_bind(node->leaf_atlas, 0);
+		GPU_shader_uniform_texture(shader, soot_location, node->leaf_atlas);
+
+		GPU_texture_bind(node->indirection_tex, 1);
+		GPU_shader_uniform_texture(shader, indtex_location, node->indirection_tex);
+
+		GPU_shader_uniform_vector(shader, min_location, 3, 1, node->bbmin);
+		GPU_shader_uniform_vector(shader, invsize_location, 3, 1, invsize);
+		GPU_shader_uniform_int(shader, first_node_location, node->first_node_index);
+		GPU_shader_uniform_int(shader, max_leaf_location, node->max_leaves_per_atlas);
+		GPU_shader_uniform_vector_int(shader, max_leaf_atlas_location, 3, 1, node->max_leaves_per_atlas_dim);
+		GPU_shader_uniform_int(shader, max_leaf_intern_location, 16);
+
+		/* create slices */
+		copy_v3_v3(slicer.min, node->bbmin);
+		copy_v3_v3(slicer.max, node->bbmax);
+		copy_v3_v3(slicer.size, size);
+
+		const int numpoints = create_view_aligned_slices(&slicer, max_slices, viewnormal);
+
+		/* draw call */
+		draw_slices(&slicer.verts[0][0], sizeof(float) * 3 * numpoints, numpoints);
+
+		GPU_texture_unbind(node->indirection_tex);
+		GPU_texture_unbind(node->leaf_atlas);
+		GPU_shader_unbind();
+	}
+
+	MEM_freeN(slicer.verts);
+}
+
 void draw_volume(Object *ob, const float viewnormal[3])
 {
 	Volume *volume = BKE_volume_from_object(ob);
@@ -502,6 +816,14 @@ void draw_volume(Object *ob, const float viewnormal[3])
 	if (data->flags & VOLUME_DRAW_TOPOLOGY) {
 		draw_vdb_topology(prim);
 	}
+
+#if 1
+	if (!data->draw_nodes) {
+		create_texture_atlas(data);
+	}
+
+	draw_volume_nodes(data->draw_nodes, data->num_draw_nodes, viewnormal);
+#else
 
 	if (data->buffer == NULL) {
 		data->buffer = OpenVDB_get_texture_buffer(prim, data->res, data->bbmin, data->bbmax);
@@ -619,6 +941,7 @@ void draw_volume(Object *ob, const float viewnormal[3])
 	if (gl_depth) {
 		glEnable(GL_DEPTH_TEST);
 	}
+#endif
 }
 
 #ifdef SMOKE_DEBUG_VELOCITY

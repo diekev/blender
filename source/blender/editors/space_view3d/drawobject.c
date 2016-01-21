@@ -215,7 +215,6 @@ static void drawcube_size(float size);
 static void drawcircle_size(float size);
 static void draw_empty_sphere(float size);
 static void draw_empty_cone(float size);
-static void draw_box(const float vec[8][3], bool solid);
 
 static void ob_wire_color_blend_theme_id(const unsigned char ob_wire_col[4], const int theme_id, float fac)
 {
@@ -6998,7 +6997,7 @@ static void draw_forcefield(Object *ob, RegionView3D *rv3d,
 	setlinestyle(0);
 }
 
-static void draw_box(const float vec[8][3], bool solid)
+void draw_box(const float vec[8][3], bool solid)
 {
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glVertexPointer(3, GL_FLOAT, 0, vec);

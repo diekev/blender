@@ -152,6 +152,22 @@ void GPU_free_images_old(void);
 void GPU_free_smoke(struct SmokeModifierData *smd);
 void GPU_create_smoke(struct SmokeModifierData *smd, int highres);
 
+typedef struct VolumeDrawNode {
+	struct GPUTexture *indirection_tex;
+	struct GPUTexture *leaf_atlas;
+
+	float bbmax[3];
+	float bbmin[3];
+
+	int first_node_index;
+	int max_leaves_per_atlas_dim[3];
+	int max_leaves_per_atlas; // 4096
+	int voxels_per_dim;       // 8
+} VolumeDrawNode;
+
+struct VolumeDrawNode *GPU_volume_node_create(struct GPUTexture *indirection_map, bool do_ref);
+void GPU_volume_node_free(struct VolumeDrawNode *drawnode);
+
 /* Delayed free of OpenGL buffers by main thread */
 void GPU_free_unused_buffers(void);
 

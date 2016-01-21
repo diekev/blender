@@ -33,6 +33,7 @@
 struct OpenVDBFloatGrid { int unused; };
 struct OpenVDBIntGrid { int unused; };
 struct OpenVDBVectorGrid { int unused; };
+struct OpenVDBInternalNode2 { int unused; };
 
 int OpenVDB_getVersionHex()
 {
@@ -323,6 +324,140 @@ void OpenVDB_get_draw_buffers_nodes(OpenVDBPrimitive *prim,
 	*r_verts = (float (*)[3])MEM_mallocN((*r_numverts) * sizeof(float) * 3, "OpenVDB vertex buffer");
 	*r_colors = (float (*)[3])MEM_mallocN((*r_numverts) * sizeof(float) * 3, "OpenVDB color buffer");
 	internal::OpenVDB_get_draw_buffers_cells(grid.get(), min_level, max_level, false, *r_verts, *r_colors);
+}
+
+void OpenVDB_get_internal_nodes_count(OpenVDBPrimitive *prim, int **r_nodes_counts,
+                                      int *r_num_atlas, const OpenVDBInternalNode2 ***r_nodes_handles,
+                                      int *r_num_nodes)
+{
+	using namespace openvdb;
+
+	typedef          FloatTree::RootNodeType RootNodeType;
+	typedef typename RootNodeType::ChildNodeType Int1NodeType;
+	typedef typename Int1NodeType::ChildNodeType Int2NodeType;
+
+	FloatGrid::Ptr grid = openvdb::gridPtrCast<FloatGrid>(prim->getGridPtr());
+
+	std::vector<int> nodes_counts;
+	std::vector<const Int2NodeType *> nodes;
+
+	FloatTree::NodeCIter node_iter = grid->tree().cbeginNode();
+
+	for (; node_iter; ++node_iter) {
+		const int depth = node_iter.getDepth();
+
+		if (depth != 2)
+			continue;
+
+		int node_count = 0;
+		int leaf_count = 0;
+
+		for (; node_iter; ++node_iter) {
+			const int depth = node_iter.getDepth();
+
+			if (depth != 2)
+				continue;
+
+			FloatTree::NodeCIter prev_it = node_iter;
+			node_iter = ++node_iter;
+
+			const Int2NodeType *node = NULL;
+			node_iter.getNode(node);
+			assert(node);
+
+			for (typename Int2NodeType::ChildOnCIter iter = node->cbeginChildOn();
+			     iter;
+			     ++iter)
+			{
+				++leaf_count;
+			}
+
+			if (leaf_count >= 4096) {
+				node_iter = prev_it;
+				break;
+			}
+
+			nodes.push_back(node);
+			++node_count;
+		}
+
+		nodes_counts.push_back(node_count);
+	}
+
+	*r_num_atlas = nodes_counts.size();
+	*r_num_nodes = nodes.size();
+	*r_nodes_counts = (int *)MEM_mallocN(sizeof(int) * (*r_num_atlas), "OpenVDB node counts");
+	*r_nodes_handles = (const OpenVDBInternalNode2 **)MEM_mallocN(sizeof(OpenVDBInternalNode2 *) * (*r_num_nodes), "OpenVDB node counts");
+
+	for (size_t i = 0; i < nodes_counts.size(); ++i) {
+		(*r_nodes_counts)[i] = nodes_counts[i];
+	}
+
+	for (size_t i = 0; i < nodes.size(); ++i) {
+		(*r_nodes_handles)[i] = reinterpret_cast<const OpenVDBInternalNode2 *>(nodes[i]);
+	}
+}
+
+void OpenVDB_get_leaf_buffers(const OpenVDBInternalNode2 *node_handle,
+                              OpenVDBLeafNodeBufferCb cb,
+                              void *userdata)
+{
+	typedef openvdb::FloatTree::RootNodeType     RootNodeType;
+	typedef typename RootNodeType::ChildNodeType Int1NodeType;
+	typedef typename Int1NodeType::ChildNodeType Int2NodeType;
+
+	const Int2NodeType *node = reinterpret_cast<const Int2NodeType *>(node_handle);
+
+	for (typename Int2NodeType::ChildOnCIter iter = node->cbeginChildOn();
+	     iter;
+	     ++iter)
+	{
+		openvdb::FloatTree::LeafNodeType leaf = *iter;
+		cb(userdata, leaf.buffer().data());
+	}
+}
+
+void OpenVDB_get_node_bounds(const OpenVDBPrimitive *prim,
+                             const OpenVDBInternalNode2 *node_handle,
+                             float bbmin[3], float bbmax[3])
+{
+	openvdb::FloatGrid::ConstPtr grid = openvdb::gridConstPtrCast<openvdb::FloatGrid>(prim->getConstGridPtr());
+
+	typedef openvdb::FloatTree::RootNodeType     RootNodeType;
+	typedef typename RootNodeType::ChildNodeType Int1NodeType;
+	typedef typename Int1NodeType::ChildNodeType Int2NodeType;
+
+	const Int2NodeType *node = reinterpret_cast<const Int2NodeType *>(node_handle);
+
+	const openvdb::math::CoordBBox bbox = node->getNodeBoundingBox();
+
+	const openvdb::Vec3f min = bbox.min().asVec3s() - openvdb::Vec3f(0.5f, 0.5f, 0.5f);
+	const openvdb::Vec3f max = bbox.max().asVec3s() + openvdb::Vec3f(0.5f, 0.5f, 0.5f);
+
+	const openvdb::Vec3f wmin = grid->indexToWorld(min);
+	const openvdb::Vec3f wmax = grid->indexToWorld(max);
+
+	wmin.toV(bbmin);
+	wmax.toV(bbmax);
+}
+
+void OpenVDB_node_get_leaf_indices(const OpenVDBInternalNode2 *node_handle,
+                                   int *indirection_map, int *leaf_index, int internal_node_index)
+{
+	typedef openvdb::FloatTree::RootNodeType     RootNodeType;
+	typedef typename RootNodeType::ChildNodeType Int1NodeType;
+	typedef typename Int1NodeType::ChildNodeType Int2NodeType;
+
+	const Int2NodeType *node = reinterpret_cast<const Int2NodeType *>(node_handle);
+
+	for (typename Int2NodeType::ChildOnCIter iter = node->cbeginChildOn();
+	     iter;
+	     ++iter)
+	{
+		int index = internal_node_index * 4096 + iter.offset();
+		indirection_map[index] = *leaf_index;
+		(*leaf_index)++;
+	}
 }
 
 #if 0

@@ -40,6 +40,8 @@
 #include "BKE_object.h"
 #include "BKE_volume.h"
 
+#include "GPU_draw.h"
+
 #include "openvdb_capi.h"
 
 Volume *BKE_volume_add(Main *bmain, const char *name)
@@ -69,6 +71,15 @@ void BKE_volume_free(Volume *volume)
 
 		if (data->buffer) {
 			MEM_freeN(data->buffer);
+		}
+
+		if (data->draw_nodes) {
+			for (int i = 0; i < data->num_draw_nodes; i++) {
+				if (data->draw_nodes[i])
+					GPU_volume_node_free(data->draw_nodes[i]);
+			}
+
+			MEM_freeN(data->draw_nodes);
 		}
 
 		MEM_freeN(data);

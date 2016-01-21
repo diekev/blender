@@ -36,12 +36,15 @@ struct OpenVDBPrimitive;
 struct OpenVDBFloatGrid;
 struct OpenVDBIntGrid;
 struct OpenVDBVectorGrid;
+struct OpenVDBInternalNode2;
 
 int OpenVDB_getVersionHex(void);
 
 typedef void (*OpenVDBGridInfoCallback)(void *userdata, const char *name,
                                         const char *value_type, bool is_color,
                                         struct OpenVDBPrimitive *prim);
+
+typedef void (*OpenVDBLeafNodeBufferCb)(void *userdata, const float *buffer);
 
 void OpenVDB_get_grid_info(const char *filename,
                            OpenVDBGridInfoCallback cb,
@@ -122,6 +125,22 @@ float OpenVDB_get_voxel_size(struct OpenVDBPrimitive *prim);
 
 void OpenVDB_get_draw_buffers_nodes(struct OpenVDBPrimitive *prim,
                                           float (**r_verts)[3], float (**r_colors)[3], int *r_numverts);
+
+void OpenVDB_get_internal_nodes_count(struct OpenVDBPrimitive *prim,
+                                      int (**r_nodes_counts), int *r_num_atlas,
+                                      const struct OpenVDBInternalNode2 ***r_nodes_handles,
+                                      int *r_num_nodes);
+
+void OpenVDB_get_leaf_buffers(const struct OpenVDBInternalNode2 *node_handle,
+                              OpenVDBLeafNodeBufferCb cb,
+                              void *userdata);
+
+void OpenVDB_get_node_bounds(const struct OpenVDBPrimitive *prim,
+                             const struct OpenVDBInternalNode2 *node_handle,
+                             float bbmin[3], float bbmax[3]);
+
+void OpenVDB_node_get_leaf_indices(const struct OpenVDBInternalNode2 *node_handle,
+                                   int *indirection_map, int *leaf_index, int internal_node_index);
 
 #ifdef __cplusplus
 }
