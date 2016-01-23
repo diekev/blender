@@ -33,7 +33,6 @@ set(INC_SYS
 )
 
 set(SRC
-
 	openvdb_capi.h
 )
 
@@ -43,21 +42,37 @@ if(WITH_OPENVDB)
 	)
 
 	list(APPEND INC_SYS
+		${BOOST_INCLUDE_DIR}
 		${OPENEXR_INCLUDE_DIRS}
 		${OPENVDB_INCLUDE_DIRS}
 	)
 
 	list(APPEND SRC
+		intern/openvdb_dense_convert.cc
 		intern/openvdb_filter_level_set.cpp
 		intern/openvdb_mesh_convert.cpp
 		intern/openvdb_primitive.cpp
+		intern/openvdb_reader.cc
 		intern/openvdb_render.cpp
+		intern/openvdb_writer.cc
 		intern/particle_tools.cpp
+		openvdb_capi.cc
 		openvdb_capi.cpp
+		openvdb_util.cc
 
+		intern/openvdb_dense_convert.h
+		intern/openvdb_reader.h
+		intern/openvdb_writer.h
 		intern/particle_tools.h
+		openvdb_util.h
 		openvdb_intern.h
 	)
+
+	if(WITH_OPENVDB_BLOSC)
+		add_definitions(
+			-DWITH_OPENVDB_BLOSC
+		)
+	endif()
 endif()
 
 blender_add_lib(bf_intern_openvdb "${SRC}" "${INC}" "${INC_SYS}")

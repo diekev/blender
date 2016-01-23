@@ -15,7 +15,12 @@
  * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * Contributor(s): Sergey Sharybin
+ * The Original Code is Copyright (C) 2015 Blender Foundation.
+ * All rights reserved.
+ *
+ * The Original Code is: all of this file.
+ *
+ * Contributor(s): Kevin Dietrich
  *
  * ***** END GPL LICENSE BLOCK *****
  */
@@ -30,3 +35,4 @@
 PyObject *BPY_app_openvdb_struct(void);
 
 #endif  /* __BPY_APP_OPENVDB_H__ */
+

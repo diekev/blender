@@ -33,6 +33,7 @@ SET(_openvdb_SEARCH_DIRS
   /sw # Fink
   /opt/local # DarwinPorts
   /opt/csw # Blastwave
+  /opt/openvdb
   /opt/lib/openvdb
 )
 
@@ -52,7 +53,7 @@ FIND_LIBRARY(OPENVDB_LIBRARY
     ${_openvdb_SEARCH_DIRS}
   PATH_SUFFIXES
     lib64 lib
-  )
+)
 
 # handle the QUIETLY and REQUIRED arguments and set OPENVDB_FOUND to TRUE if
 # all listed variables are TRUE
