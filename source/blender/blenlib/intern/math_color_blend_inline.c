@@ -658,7 +658,7 @@ MINLINE float blend_color_hardlight_float(const float src1, const float src2, co
 {
 	float temp;
 
-	if (src2[i] > 0.5f) {
+	if (src2 > 0.5f) {
 		temp = 1.0f - ((1.0f - 2.0f * (src2 - 0.5f)) * (1.0f - src1));
 	}
 	else {
@@ -872,7 +872,7 @@ MINLINE void blend_color_lighten_float_n(float *dst, const float *src1, const fl
 	if (fac != 0.0f) {
 		/* remap src2 to have same alpha as src1 premultiplied, take maximum of
 		 * src1 and src2, then blend it with src1 */
-		const float map_alpha = src1[3] / src2[3];
+		const float map_alpha = ((n == 4) ? src1[3] / src2[3] : 1.0f);
 		int i = 3;
 
 		while (i--) {
@@ -893,7 +893,7 @@ MINLINE void blend_color_darken_float_n(float *dst, const float *src1, const flo
 	if (fac != 0.0f) {
 		/* remap src2 to have same alpha as src1 premultiplied, take minimum of
 		 * src1 and src2, then blend it with src1 */
-		const float map_alpha = src1[3] / src2[3];
+		const float map_alpha = ((n == 4) ? src1[3] / src2[3] : 1.0f);
 		int i = 3;
 
 		while (i--) {

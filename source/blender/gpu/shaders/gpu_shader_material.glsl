@@ -527,17 +527,17 @@ void mix_overlay(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 	if(outcol.r < 0.5)
 		outcol.r = mix(col1.r, col1.r * (2.0 * col2.r), fac);
 	else
-		outcol.r = mix(col1.r, col1.r + (2.0 * col2.r - 1.0) - (col1.r * (2.0 * col2.r - 1.0), fac);
+		outcol.r = mix(col1.r, col1.r + (2.0 * col2.r - 1.0) - (col1.r * (2.0 * col2.r - 1.0)), fac);
 
 	if(outcol.g < 0.5)
 		outcol.g = mix(col1.g, col1.g * (2.0 * col2.g), fac);
 	else
-		outcol.g = mix(col1.g, col1.g + (2.0 * col2.g - 1.0) - (col1.g * (2.0 * col2.g - 1.0), fac);
+		outcol.g = mix(col1.g, col1.g + (2.0 * col2.g - 1.0) - (col1.g * (2.0 * col2.g - 1.0)), fac);
 
 	if(outcol.b < 0.5)
 		outcol.b = mix(col1.b, col1.b * (2.0 * col2.b), fac);
 	else
-		outcol.b = mix(col1.b, col1.b + (2.0 * col2.b - 1.0) - (col1.b * (2.0 * col2.b - 1.0), fac);
+		outcol.b = mix(col1.b, col1.b + (2.0 * col2.b - 1.0) - (col1.b * (2.0 * col2.b - 1.0)), fac);
 }
 
 void mix_sub(float fac, vec4 col1, vec4 col2, out vec4 outcol)
@@ -567,14 +567,14 @@ void mix_diff(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 void mix_dark(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 {
 	fac = clamp(fac, 0.0, 1.0);
-	outcol.rgb = mix(col1, min(col1.rgb, col2.rgb), fac);
+	outcol.rgb = mix(col1.rgb, min(col1.rgb, col2.rgb), fac);
 	outcol.a = col1.a;
 }
 
 void mix_light(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 {
 	fac = clamp(fac, 0.0, 1.0);
-	outcol.rgb = mix(col1, max(col1.rgb, col2.rgb), fac);
+	outcol.rgb = mix(col1.rgb, max(col1.rgb, col2.rgb), fac);
 	outcol.a = col1.a;
 }
 
