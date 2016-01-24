@@ -607,13 +607,20 @@ MINLINE void blend_color_interpolate_byte(unsigned char dst[4], const unsigned c
 	}
 }
 
-/* premultiplied alpha float blending modes */
+/* **************** premultiplied alpha float blending modes **************** */
 
-/* ********* Single channel floating point blending modes ************* */
+/* Single channel blending modes, used for weight paint, textures, and called by
+ * the multi-channel versions defined afterwards. */
 
 MINLINE float blend_color_add_float(const float src1, const float src2, const float fac)
 {
 	return interpf(src1 + src2, src1, fac);
+}
+
+MINLINE float blend_color_burn_float(const float src1, const float src2, const float fac)
+{
+	const float temp = (src2 == 0.0f) ? 0.0f : max_ff(1.0f - ((1.0f - src1) / src2), 0.0f);
+	return interpf(temp, src1, fac);
 }
 
 MINLINE float blend_color_darken_float(const float src1, const float src2, const float fac)
@@ -635,6 +642,32 @@ MINLINE float blend_color_div_float(const float src1, const float src2, const fl
 	return src1;
 }
 
+MINLINE float blend_color_dodge_float(const float src1, const float src2, const float fac)
+{
+	const float temp = (src2 >= 1.0f) ? 1.0f : min_ff(src1 / (1.0f - src2), 1.0f);
+	return interpf(temp, src1, fac);
+}
+
+MINLINE float blend_color_exclusion_float(const float src1, const float src2, const float fac)
+{
+	const float temp = 0.5f - (2.0f * (src1 - 0.5f) * (src2 - 0.5f));
+	return interpf(temp, src1, fac);
+}
+
+MINLINE float blend_color_hardlight_float(const float src1, const float src2, const float fac)
+{
+	float temp;
+
+	if (src2[i] > 0.5f) {
+		temp = 1.0f - ((1.0f - 2.0f * (src2 - 0.5f)) * (1.0f - src1));
+	}
+	else {
+		temp = 2.0f * src2 * src1;
+	}
+
+	return min_ff(interpf(temp, src1, fac), 1.0f);
+}
+
 MINLINE float blend_color_lighten_float(const float src1, const float src2, const float fac)
 {
 	return interpf(max_ff(src1, src2), src1, fac);
@@ -643,6 +676,12 @@ MINLINE float blend_color_lighten_float(const float src1, const float src2, cons
 MINLINE float blend_color_linlight_float(const float src1, const float src2, const float fac)
 {
 	return interpf(src1 + (2.0f * src2 - 1.0f), src1, fac);
+}
+
+MINLINE float blend_color_linearburn_float(const float src1, const float src2, const float fac)
+{
+	const float temp = max_ff(src1 + src2 - 1.0f, 0.0f);
+	return interpf(temp, src1, fac);
 }
 
 MINLINE float blend_color_mul_float(const float src1, const float src2, const float fac)
@@ -666,6 +705,20 @@ MINLINE float blend_color_overlay_float(const float src1, const float src2, cons
 	}
 
 	return min_ff(interpf(temp, src1, fac), 1.0f);
+}
+
+MINLINE float blend_color_pinlight_float(const float src1, const float src2, const float fac)
+{
+	float temp;
+
+	if (src2 > 0.5f) {
+		temp = max_ff(2.0f * (src2- 0.5f), src1);
+	}
+	else {
+		temp = min_ff(2.0f * src2, src1);
+	}
+
+	return interpf(temp, src1, fac);
 }
 
 MINLINE float blend_color_screen_float(const float src1, const float src2, const float fac)
@@ -693,7 +746,28 @@ MINLINE float blend_color_sub_float(const float src1, const float src2, const fl
 	return interpf(src1 - src2, src1, fac);
 }
 
-/* ********* Multi channel floating point blending modes ************* */
+MINLINE float blend_color_vividlight_float(const float src1, const float src2, const float fac)
+{
+	float temp;
+
+	if (src2 == 1.0f) {
+		temp = 1.0f;
+	}
+	else if (src2 == 0.0f) {
+		temp = 0.0f;
+	}
+	else if (src2 > 0.5f) {
+		temp = min_ff(((src1) * 1.0f) / (2.0f * (1.0f - src2)), 1.0f);
+	}
+	else {
+		temp = max_ff(1.0f - ((1.0f - src1) * 1.0f / (2.0f * src2)), 0.0f);
+	}
+
+	return interpf(temp, src1, fac);
+}
+
+/* Multi-channel blending modes, used by the compositor, the internal render
+ * engine, and texture painting. */
 
 MINLINE void blend_color_mix_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
 {
@@ -918,15 +992,7 @@ MINLINE void blend_color_hardlight_float_n(float *dst, const float *src1, const 
 		int i = 3;
 
 		while (i--) {
-			float temp;
-
-			if (src2[i] > 0.5f) {
-				temp = 1.0f - ((1.0f - 2.0f * (src2[i] - 0.5f)) * (1.0f - src1[i]));
-			}
-			else {
-				temp = 2.0f * src2[i] * src1[i];
-			}
-			dst[i] = min_ff(interpf(temp, src1[i], fac), 1.0f);
+			dst[i] = blend_color_hardlight_float(src1[i], src2[i], fac);
 		}
 	}
 	else {
@@ -944,8 +1010,7 @@ MINLINE void blend_color_burn_float_n(float *dst, const float *src1, const float
 		int i = 3;
 
 		while (i--) {
-			const float temp = (src2[i] == 0.0f) ? 0.0f : max_ff(1.0f - ((1.0f - src1[i]) / src2[i]), 0.0f);
-			dst[i] = interpf(temp, src1[i], fac);
+			dst[i] = blend_color_burn_float(src1[i], src2[i], fac);
 		}
 	}
 	else {
@@ -963,8 +1028,7 @@ MINLINE void blend_color_linearburn_float_n(float *dst, const float *src1, const
 		int i = 3;
 
 		while (i--) {
-			const float temp = max_ff(src1[i] + src2[i] - 1.0f, 0.0f);
-			dst[i] = interpf(temp, src1[i], fac);
+			dst[i] = blend_color_linearburn_float(src1[i], src2[i], fac);
 		}
 	}
 	else {
@@ -982,8 +1046,7 @@ MINLINE void blend_color_dodge_float_n(float *dst, const float *src1, const floa
 		int i = 3;
 
 		while (i--) {
-			const float temp = (src2[i] >= 1.0f) ? 1.0f : min_ff(src1[i] / (1.0f - src2[i]), 1.0f);
-			dst[i] = interpf(temp, src1[i], fac);
+			dst[i] = blend_color_dodge_float(src1[i], src2[i], fac);
 		}
 	}
 	else {
@@ -1037,15 +1100,7 @@ MINLINE void blend_color_pinlight_float_n(float *dst, const float *src1, const f
 		int i = 3;
 
 		while (i--) {
-			float temp;
-
-			if (src2[i] > 0.5f) {
-				temp = max_ff(2.0f * (src2[i] - 0.5f), src1[i]);
-			}
-			else {
-				temp = min_ff(2.0f * src2[i], src1[i]);
-			}
-			dst[i] = interpf(temp, src1[i], fac);
+			dst[i] = blend_color_pinlight_float(src1[i], src2[i], fac);
 		}
 	}
 	else {
@@ -1081,21 +1136,7 @@ MINLINE void blend_color_vividlight_float_n(float *dst, const float *src1, const
 		int i = 3;
 
 		while (i--) {
-			float temp;
-
-			if (src2[i] == 1.0f) {
-				temp = 1.0f;
-			}
-			else if (src2[i] == 0.0f) {
-				temp = 0.0f;
-			}
-			else if (src2[i] > 0.5f) {
-				temp = min_ff(((src1[i]) * 1.0f) / (2.0f * (1.0f - src2[i])), 1.0f);
-			}
-			else {
-				temp = max_ff(1.0f - ((1.0f - src1[i]) * 1.0f / (2.0f * src2[i])), 0.0f);
-			}
-			dst[i] = interpf(temp, src1[i], fac);
+			dst[i] = blend_color_vividlight_float(src1[i], src2[i], fac);
 		}
 	}
 	else {
@@ -1131,8 +1172,7 @@ MINLINE void blend_color_exclusion_float_n(float *dst, const float *src1, const 
 		int i = 3;
 
 		while (i--) {
-			const float temp = 0.5f - (2.0f * (src1[i] - 0.5f) * (src2[i] - 0.5f));
-			dst[i] = interpf(temp, src1[i], fac);
+			dst[i] = blend_color_exclusion_float(src1[i], src2[i], fac);
 		}
 	}
 	else {
@@ -1142,7 +1182,6 @@ MINLINE void blend_color_exclusion_float_n(float *dst, const float *src1, const 
 
 	if (n == 4)
 		dst[3] = src1[3];
-
 }
 
 MINLINE void blend_color_color_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
