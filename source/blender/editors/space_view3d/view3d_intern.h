@@ -46,6 +46,7 @@ struct bContext;
 struct bMotionPath;
 struct bPoseChannel;
 struct Mesh;
+struct VolumeData;
 struct wmNDOFMotionData;
 struct wmOperatorType;
 struct wmWindowManager;
@@ -294,6 +295,7 @@ void draw_smoke_volume(struct SmokeDomainSettings *sds, struct Object *ob,
 
 
 void draw_volume(struct Object *ob, const float viewnormal[3]);
+void create_volume_texture_atlas(struct VolumeData *data);
 
 //#define SMOKE_DEBUG_VELOCITY
 //#define SMOKE_DEBUG_HEAT

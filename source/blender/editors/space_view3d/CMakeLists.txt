@@ -48,6 +48,7 @@ set(SRC
 	drawobject.c
 	drawsimdebug.c
 	drawvolume.c
+	drawvolumesparse.c
 	space_view3d.c
 	view3d_buttons.c
 	view3d_camera_control.c
