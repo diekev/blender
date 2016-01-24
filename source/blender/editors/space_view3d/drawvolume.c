@@ -563,26 +563,27 @@ static GPUTexture *build_node_indirection_texture(
         const struct OpenVDBInternalNode2 **node_handles, int num_nodes)
 {
 	int internal_node_index = 0;
-	int max_node_leaf_count = 4096;
+	const int max_node_leaf_count = 4096;
+	const int map_size = max_node_leaf_count * num_nodes;
 
-	int *indirection_map = MEM_mallocN(sizeof(int) * max_node_leaf_count * num_nodes,
+	int *indirection_map = MEM_mallocN(sizeof(int) * map_size,
 	                                   "Indirection Map");
 
-	memset(indirection_map, -1, sizeof(int) * max_node_leaf_count * num_nodes);
+	memset(indirection_map, -1, sizeof(int) * map_size);
 
 	for (int i = 0; i < num_atlases; i++) {
 		int leaf_index = 0;
 		int node_index = 0;
 
 		while (node_index < internal_node_counts[i]) {
-			OpenVDB_node_get_leaf_indices(node_handles[internal_node_index], indirection_map, &leaf_index, internal_node_index);
+			OpenVDB_node_get_leaf_indices(node_handles[internal_node_index], &indirection_map, &leaf_index, internal_node_index);
 
 			++node_index;
 			++internal_node_index;
 		}
 	}
 
-	GPUTexture *tex = GPU_texture_create_1D_int(max_node_leaf_count * num_nodes, indirection_map, NULL);
+	GPUTexture *tex = GPU_texture_create_1D_int(map_size, indirection_map, NULL);
 
 	MEM_freeN(indirection_map);
 

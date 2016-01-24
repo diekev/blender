@@ -442,7 +442,7 @@ void OpenVDB_get_node_bounds(const OpenVDBPrimitive *prim,
 }
 
 void OpenVDB_node_get_leaf_indices(const OpenVDBInternalNode2 *node_handle,
-                                   int *indirection_map, int *leaf_index, int internal_node_index)
+                                   int **indirection_map, int *leaf_index, int internal_node_index)
 {
 	typedef openvdb::FloatTree::RootNodeType     RootNodeType;
 	typedef typename RootNodeType::ChildNodeType Int1NodeType;
@@ -455,7 +455,7 @@ void OpenVDB_node_get_leaf_indices(const OpenVDBInternalNode2 *node_handle,
 	     ++iter)
 	{
 		int index = internal_node_index * 4096 + iter.offset();
-		indirection_map[index] = *leaf_index;
+		(*indirection_map)[index] = *leaf_index;
 		(*leaf_index)++;
 	}
 }

@@ -140,7 +140,7 @@ void OpenVDB_get_node_bounds(const struct OpenVDBPrimitive *prim,
                              float bbmin[3], float bbmax[3]);
 
 void OpenVDB_node_get_leaf_indices(const struct OpenVDBInternalNode2 *node_handle,
-                                   int *indirection_map, int *leaf_index, int internal_node_index);
+                                   int **indirection_map, int *leaf_index, int internal_node_index);
 
 #ifdef __cplusplus
 }
