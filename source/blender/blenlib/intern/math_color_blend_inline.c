@@ -698,7 +698,7 @@ MINLINE float blend_color_sub_float(const float src1, const float src2, const fl
 MINLINE void blend_color_mix_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
 {
 	if (fac != 0.0f) {
-		int i = n - 1;
+		int i = 3;
 
 		while (i--) {
 			dst[i] = blend_color_mix_float(src1[i], src2[i], fac);
@@ -719,7 +719,7 @@ MINLINE void blend_color_mix_float_n(float *dst, const float *src1, const float 
 MINLINE void blend_color_add_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
 {
 	if (fac != 0.0f) {
-		int i = n - 1;
+		int i = 3;
 
 		while (i--) {
 			dst[i] = blend_color_add_float(src1[i], src2[i], fac);
@@ -739,7 +739,7 @@ MINLINE void blend_color_add_float_n(float *dst, const float *src1, const float 
 MINLINE void blend_color_sub_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
 {
 	if (fac != 0.0f) {
-		int i = n - 1;
+		int i = 3;
 
 		while (i--) {
 			dst[i] = blend_color_sub_float(src1[i], src2[i], fac);
@@ -760,7 +760,7 @@ MINLINE void blend_color_mul_float_n(float *dst, const float *src1, const float 
 {
 	if (fac != 0.0f) {
 		/* unpremul > multiply > premul, simplified */
-		int i = n - 1;
+		int i = 3;
 
 		while (i--) {
 			dst[i] = blend_color_mul_float(src1[i], src2[i], fac);
@@ -778,7 +778,7 @@ MINLINE void blend_color_mul_float_n(float *dst, const float *src1, const float 
 MINLINE void blend_color_divide_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
 {
 	if (fac != 0.0f) {
-		int i = n - 1;
+		int i = 3;
 
 		while (i--) {
 			dst[i] = blend_color_div_float(src1[i], src2[i], fac);
@@ -799,7 +799,7 @@ MINLINE void blend_color_lighten_float_n(float *dst, const float *src1, const fl
 		/* remap src2 to have same alpha as src1 premultiplied, take maximum of
 		 * src1 and src2, then blend it with src1 */
 		const float map_alpha = src1[3] / src2[3];
-		int i = n - 1;
+		int i = 3;
 
 		while (i--) {
 			dst[i] = blend_color_lighten_float(src1[i], src2[i] * map_alpha, fac);
@@ -820,7 +820,7 @@ MINLINE void blend_color_darken_float_n(float *dst, const float *src1, const flo
 		/* remap src2 to have same alpha as src1 premultiplied, take minimum of
 		 * src1 and src2, then blend it with src1 */
 		const float map_alpha = src1[3] / src2[3];
-		int i = n - 1;
+		int i = 3;
 
 		while (i--) {
 			dst[i] = blend_color_darken_float(src1[i], src2[i] * map_alpha, fac);
@@ -897,7 +897,7 @@ MINLINE void blend_color_add_alpha_float_n(float *dst, const float *src1, const 
 MINLINE void blend_color_overlay_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
 {
 	if (fac != 0.0f && fac < 1.0f) {
-		int i = n - 1;
+		int i = 3;
 
 		while (i--) {
 			dst[i] = blend_color_overlay_float(src1[i], src2[i], fac);
@@ -915,7 +915,7 @@ MINLINE void blend_color_overlay_float_n(float *dst, const float *src1, const fl
 MINLINE void blend_color_hardlight_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
 {
 	if (fac != 0.0f && fac < 1.0f) {
-		int i = n - 1;
+		int i = 3;
 
 		while (i--) {
 			float temp;
@@ -941,7 +941,7 @@ MINLINE void blend_color_hardlight_float_n(float *dst, const float *src1, const 
 MINLINE void blend_color_burn_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
 {
 	if (fac != 0.0f && fac < 1.0f) {
-		int i = n - 1;
+		int i = 3;
 
 		while (i--) {
 			const float temp = (src2[i] == 0.0f) ? 0.0f : max_ff(1.0f - ((1.0f - src1[i]) / src2[i]), 0.0f);
@@ -960,7 +960,7 @@ MINLINE void blend_color_burn_float_n(float *dst, const float *src1, const float
 MINLINE void blend_color_linearburn_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
 {
 	if (fac != 0.0f && fac < 1.0f) {
-		int i = n - 1;
+		int i = 3;
 
 		while (i--) {
 			const float temp = max_ff(src1[i] + src2[i] - 1.0f, 0.0f);
@@ -979,7 +979,7 @@ MINLINE void blend_color_linearburn_float_n(float *dst, const float *src1, const
 MINLINE void blend_color_dodge_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
 {
 	if (fac != 0.0f && fac < 1.0f) {
-		int i = n - 1;
+		int i = 3;
 
 		while (i--) {
 			const float temp = (src2[i] >= 1.0f) ? 1.0f : min_ff(src1[i] / (1.0f - src2[i]), 1.0f);
@@ -998,7 +998,7 @@ MINLINE void blend_color_dodge_float_n(float *dst, const float *src1, const floa
 MINLINE void blend_color_screen_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
 {
 	if (fac != 0.0f && fac < 1.0f) {
-		int i = n - 1;
+		int i = 3;
 
 		while (i--) {
 			dst[i] = blend_color_screen_float(src1[i], src2[i], fac);
@@ -1016,7 +1016,7 @@ MINLINE void blend_color_screen_float_n(float *dst, const float *src1, const flo
 MINLINE void blend_color_softlight_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
 {
 	if (fac != 0.0f && fac < 1.0f) {
-		int i = n - 1;
+		int i = 3;
 
 		while (i--) {
 			dst[i] = blend_color_soft_light_float(src1[i], src2[i], fac);
@@ -1034,7 +1034,7 @@ MINLINE void blend_color_softlight_float_n(float *dst, const float *src1, const 
 MINLINE void blend_color_pinlight_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
 {
 	if (fac != 0.0f && fac < 1.0f) {
-		int i = n - 1;
+		int i = 3;
 
 		while (i--) {
 			float temp;
@@ -1060,7 +1060,7 @@ MINLINE void blend_color_pinlight_float_n(float *dst, const float *src1, const f
 MINLINE void blend_color_linearlight_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
 {
 	if (fac != 0.0f && fac < 1.0f) {
-		int i = n - 1;
+		int i = 3;
 
 		while (i--) {
 			dst[i] = blend_color_linlight_float(src1[i], src2[i], fac);
@@ -1078,7 +1078,7 @@ MINLINE void blend_color_linearlight_float_n(float *dst, const float *src1, cons
 MINLINE void blend_color_vividlight_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
 {
 	if (fac != 0.0f && fac < 1.0f) {
-		int i = n - 1;
+		int i = 3;
 
 		while (i--) {
 			float temp;
@@ -1110,7 +1110,7 @@ MINLINE void blend_color_vividlight_float_n(float *dst, const float *src1, const
 MINLINE void blend_color_difference_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
 {
 	if (fac != 0.0f && fac < 1.0f) {
-		int i = n - 1;
+		int i = 3;
 
 		while (i--) {
 			dst[i] = blend_color_diff_float(src1[i], src2[i], fac);
@@ -1128,7 +1128,7 @@ MINLINE void blend_color_difference_float_n(float *dst, const float *src1, const
 MINLINE void blend_color_exclusion_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
 {
 	if (fac != 0.0f && fac < 1.0f) {
-		int i = n - 1;
+		int i = 3;
 
 		while (i--) {
 			const float temp = 0.5f - (2.0f * (src1[i] - 0.5f) * (src2[i] - 0.5f));
