@@ -113,6 +113,42 @@ static GPUTexture *create_flame_spectrum_texture(void)
 	return tex;
 }
 
+static void draw_slices(const float *slices, const size_t size, const int num_points)
+{
+	int gl_depth = 0, gl_blend = 0;
+	glGetBooleanv(GL_BLEND, (GLboolean *)&gl_blend);
+	glGetBooleanv(GL_DEPTH_TEST, (GLboolean *)&gl_depth);
+
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
+	GLuint vertex_buffer;
+	glGenBuffers(1, &vertex_buffer);
+	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+	glBufferData(GL_ARRAY_BUFFER, size, slices, GL_STATIC_DRAW);
+
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glVertexPointer(3, GL_FLOAT, 0, NULL);
+
+	glDrawArrays(GL_TRIANGLES, 0, num_points);
+
+	glDisableClientState(GL_VERTEX_ARRAY);
+
+	/* cleanup */
+
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glDeleteBuffers(1, &vertex_buffer);
+
+	if (!gl_blend) {
+		glDisable(GL_BLEND);
+	}
+
+	if (gl_depth) {
+		glEnable(GL_DEPTH_TEST);
+	}
+}
+
 typedef struct VolumeSlicer {
 	float size[3];
 	float min[3];
@@ -386,25 +422,7 @@ void draw_smoke_volume(SmokeDomainSettings *sds, Object *ob,
 
 	/* setup buffer and draw */
 
-	int gl_depth = 0, gl_blend = 0;
-	glGetBooleanv(GL_BLEND, (GLboolean *)&gl_blend);
-	glGetBooleanv(GL_DEPTH_TEST, (GLboolean *)&gl_depth);
-
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-
-	GLuint vertex_buffer;
-	glGenBuffers(1, &vertex_buffer);
-	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 3 * num_points, &slicer.verts[0][0], GL_STATIC_DRAW);
-
-	glEnableClientState(GL_VERTEX_ARRAY);
-	glVertexPointer(3, GL_FLOAT, 0, NULL);
-
-	glDrawArrays(GL_TRIANGLES, 0, num_points);
-
-	glDisableClientState(GL_VERTEX_ARRAY);
+	draw_slices(&slicer.verts[0][0], sizeof(float) * 3 * num_points, GL_STATIC_DRAW);
 
 #ifdef DEBUG_DRAW_TIME
 	printf("Draw Time: %f\n", (float)TIMEIT_VALUE(draw));
@@ -412,9 +430,6 @@ void draw_smoke_volume(SmokeDomainSettings *sds, Object *ob,
 #endif
 
 	/* cleanup */
-
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glDeleteBuffers(1, &vertex_buffer);
 
 	GPU_texture_unbind(sds->tex);
 	GPU_texture_unbind(sds->tex_shadow);
@@ -428,14 +443,6 @@ void draw_smoke_volume(SmokeDomainSettings *sds, Object *ob,
 	MEM_freeN(slicer.verts);
 
 	GPU_shader_unbind();
-
-	if (!gl_blend) {
-		glDisable(GL_BLEND);
-	}
-
-	if (gl_depth) {
-		glEnable(GL_DEPTH_TEST);
-	}
 }
 
 static void draw_vdb_topology(struct OpenVDBPrimitive *prim)
@@ -482,42 +489,6 @@ static VolumeData *get_first_scalar_field(Volume *volume)
 	}
 
 	return data;
-}
-
-static void draw_slices(const float *slices, const size_t size, const int num_points)
-{
-	int gl_depth = 0, gl_blend = 0;
-	glGetBooleanv(GL_BLEND, (GLboolean *)&gl_blend);
-	glGetBooleanv(GL_DEPTH_TEST, (GLboolean *)&gl_depth);
-
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-
-	GLuint vertex_buffer;
-	glGenBuffers(1, &vertex_buffer);
-	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-	glBufferData(GL_ARRAY_BUFFER, size, slices, GL_STATIC_DRAW);
-
-	glEnableClientState(GL_VERTEX_ARRAY);
-	glVertexPointer(3, GL_FLOAT, 0, NULL);
-
-	glDrawArrays(GL_TRIANGLES, 0, num_points);
-
-	glDisableClientState(GL_VERTEX_ARRAY);
-
-	/* cleanup */
-
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glDeleteBuffers(1, &vertex_buffer);
-
-	if (!gl_blend) {
-		glDisable(GL_BLEND);
-	}
-
-	if (gl_depth) {
-		glEnable(GL_DEPTH_TEST);
-	}
 }
 
 static void draw_volume_nodes(VolumeDrawNode **nodes, const int num_nodes,
@@ -620,7 +591,7 @@ void draw_volume(Object *ob, const float viewnormal[3])
 		draw_vdb_topology(prim);
 	}
 
-#if 1
+#if 0
 	if (!data->draw_nodes) {
 		create_volume_texture_atlas(data);
 	}
@@ -705,30 +676,7 @@ void draw_volume(Object *ob, const float viewnormal[3])
 
 	/* setup buffer and draw */
 
-	int gl_depth = 0, gl_blend = 0;
-	glGetBooleanv(GL_BLEND, (GLboolean *)&gl_blend);
-	glGetBooleanv(GL_DEPTH_TEST, (GLboolean *)&gl_depth);
-
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-
-	GLuint vertex_buffer;
-	glGenBuffers(1, &vertex_buffer);
-	glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 3 * num_points, &slicer.verts[0][0], GL_STATIC_DRAW);
-
-	glEnableClientState(GL_VERTEX_ARRAY);
-	glVertexPointer(3, GL_FLOAT, 0, NULL);
-
-	glDrawArrays(GL_TRIANGLES, 0, num_points);
-
-	glDisableClientState(GL_VERTEX_ARRAY);
-
-	/* cleanup */
-
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
-	glDeleteBuffers(1, &vertex_buffer);
+	draw_slices(&slicer.verts[0][0], sizeof(float) * 3 * num_points, GL_STATIC_DRAW);
 
 	GPU_texture_unbind(tex);
 	GPU_texture_free(tex);
@@ -736,14 +684,6 @@ void draw_volume(Object *ob, const float viewnormal[3])
 	GPU_shader_unbind();
 
 	MEM_freeN(slicer.verts);
-
-	if (!gl_blend) {
-		glDisable(GL_BLEND);
-	}
-
-	if (gl_depth) {
-		glEnable(GL_DEPTH_TEST);
-	}
 #endif
 }
 
