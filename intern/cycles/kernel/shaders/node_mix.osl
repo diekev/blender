@@ -34,31 +34,19 @@ color node_mix_mul(float t, color col1, color col2)
 
 color node_mix_screen(float t, color col1, color col2)
 {
-	float tm = 1.0 - t;
-
-	return color(1.0) - (color(tm) + t * (color(1.0) - col2)) * (color(1.0) - col1);
+	return mix(col1, col1 + col2 - (col1 * col2), t);
 }
 
 color node_mix_overlay(float t, color col1, color col2)
 {
-	float tm = 1.0 - t;
-
 	color outcol = col1;
 
-	if (outcol[0] < 0.5)
-		outcol[0] *= tm + 2.0 * t * col2[0];
-	else
-		outcol[0] = 1.0 - (tm + 2.0 * t * (1.0 - col2[0])) * (1.0 - outcol[0]);
-
-	if (outcol[1] < 0.5)
-		outcol[1] *= tm + 2.0 * t * col2[1];
-	else
-		outcol[1] = 1.0 - (tm + 2.0 * t * (1.0 - col2[1])) * (1.0 - outcol[1]);
-
-	if (outcol[2] < 0.5)
-		outcol[2] *= tm + 2.0 * t * col2[2];
-	else
-		outcol[2] = 1.0 - (tm + 2.0 * t * (1.0 - col2[2])) * (1.0 - outcol[2]);
+	for (int i = 0; i < 3; i++) {
+		if (outcol[i] < 0.5)
+			outcol[i] = mix(col1[i], col1[i] * (2.0 * col2[i]), t);
+		else
+			outcol[i] = mix(col1[i], 1.0 - 2.0 * (1.0 - col1[i]) * (1.0 - col2[i]), t);
+	}
 	
 	return outcol;
 }
@@ -88,44 +76,25 @@ color node_mix_diff(float t, color col1, color col2)
 
 color node_mix_dark(float t, color col1, color col2)
 {
-	return min(col1, col2) * t + col1 * (1.0 - t);
+	return mix(col1, min(col1, col2), t);
 }
 
 color node_mix_light(float t, color col1, color col2)
 {
-	return max(col1, col2 * t);
+	return mix(col1, max(col1, col2), t);
 }
 
 color node_mix_dodge(float t, color col1, color col2)
 {
 	color outcol = col1;
 
-	if (outcol[0] != 0.0) {
-		float tmp = 1.0 - t * col2[0];
-		if (tmp <= 0.0)
-			outcol[0] = 1.0;
-		else if ((tmp = outcol[0] / tmp) > 1.0)
-			outcol[0] = 1.0;
+	for (int i = 0; i < 3; i++) {
+		if (col1[i] == 0.0)
+			outcol[i] = 0.0;
+		else if (col2[i] == 1.0)
+			outcol[i] = 1.0;
 		else
-			outcol[0] = tmp;
-	}
-	if (outcol[1] != 0.0) {
-		float tmp = 1.0 - t * col2[1];
-		if (tmp <= 0.0)
-			outcol[1] = 1.0;
-		else if ((tmp = outcol[1] / tmp) > 1.0)
-			outcol[1] = 1.0;
-		else
-			outcol[1] = tmp;
-	}
-	if (outcol[2] != 0.0) {
-		float tmp = 1.0 - t * col2[2];
-		if (tmp <= 0.0)
-			outcol[2] = 1.0;
-		else if ((tmp = outcol[2] / tmp) > 1.0)
-			outcol[2] = 1.0;
-		else
-			outcol[2] = tmp;
+			outcol[i] = mix(col1[i], min(1.0, col1[i] / (1.0 - col2[i])), t);
 	}
 
 	return outcol;
@@ -133,39 +102,16 @@ color node_mix_dodge(float t, color col1, color col2)
 
 color node_mix_burn(float t, color col1, color col2)
 {
-	float tmp, tm = 1.0 - t;
-
 	color outcol = col1;
 
-	tmp = tm + t * col2[0];
-	if (tmp <= 0.0)
-		outcol[0] = 0.0;
-	else if ((tmp = (1.0 - (1.0 - outcol[0]) / tmp)) < 0.0)
-		outcol[0] = 0.0;
-	else if (tmp > 1.0)
-		outcol[0] = 1.0;
-	else
-		outcol[0] = tmp;
-
-	tmp = tm + t * col2[1];
-	if (tmp <= 0.0)
-		outcol[1] = 0.0;
-	else if ((tmp = (1.0 - (1.0 - outcol[1]) / tmp)) < 0.0)
-		outcol[1] = 0.0;
-	else if (tmp > 1.0)
-		outcol[1] = 1.0;
-	else
-		outcol[1] = tmp;
-
-	tmp = tm + t * col2[2];
-	if (tmp <= 0.0)
-		outcol[2] = 0.0;
-	else if ((tmp = (1.0 - (1.0 - outcol[2]) / tmp)) < 0.0)
-		outcol[2] = 0.0;
-	else if (tmp > 1.0)
-		outcol[2] = 1.0;
-	else
-		outcol[2] = tmp;
+	for (int i = 0; i < 3; i++) {
+		if (col1[i] == 1.0)
+			outcol[i] = 1.0;
+		else if (col2[i] == 0.0)
+			outcol[i] = 0.0;
+		else
+			outcol[i] = mix(col1[i], 1.0 - min(1.0, (1.0 - col1[i]) / col2[i]), t);
+	}
 	
 	return outcol;
 }
@@ -235,34 +181,14 @@ color node_mix_color(float t, color col1, color col2)
 
 color node_mix_soft(float t, color col1, color col2)
 {
-	float tm = 1.0 - t;
-
 	color one = color(1.0);
-	color scr = one - (one - col2) * (one - col1);
-
-	return tm * col1 + t * ((one - col1) * col2 * col1 + col1 * scr);
+	color scr = col1 + col2 - (col1 * col2);
+	return mix(col1, (one - col1) * col2 * col1 + col1 * scr, t);
 }
 
 color node_mix_linear(float t, color col1, color col2)
 {
-	color outcol = col1;
-
-	if (col2[0] > 0.5)
-		outcol[0] = col1[0] + t * (2.0 * (col2[0] - 0.5));
-	else
-		outcol[0] = col1[0] + t * (2.0 * (col2[0]) - 1.0);
-
-	if (col2[1] > 0.5)
-		outcol[1] = col1[1] + t * (2.0 * (col2[1] - 0.5));
-	else
-		outcol[1] = col1[1] + t * (2.0 * (col2[1]) - 1.0);
-
-	if (col2[2] > 0.5)
-		outcol[2] = col1[2] + t * (2.0 * (col2[2] - 0.5));
-	else
-		outcol[2] = col1[2] + t * (2.0 * (col2[2]) - 1.0);
-	
-	return outcol;
+	return mix(col1, col1 + (2.0 * col2[2] - 1.0), t);
 }
 
 color node_mix_clamp(color col)

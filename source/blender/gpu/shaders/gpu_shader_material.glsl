@@ -515,33 +515,29 @@ void mix_mult(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 void mix_screen(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 {
 	fac = clamp(fac, 0.0, 1.0);
-	float facm = 1.0 - fac;
-
-	outcol = vec4(1.0) - (vec4(facm) + fac*(vec4(1.0) - col2))*(vec4(1.0) - col1);
+	outcol = mix(col1, col1 + col2 - (col1 * col2), fac);
 	outcol.a = col1.a;
 }
 
 void mix_overlay(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 {
 	fac = clamp(fac, 0.0, 1.0);
-	float facm = 1.0 - fac;
-
 	outcol = col1;
 
 	if(outcol.r < 0.5)
-		outcol.r *= facm + 2.0*fac*col2.r;
+		outcol.r = mix(col1.r, col1.r * (2.0 * col2.r), fac);
 	else
-		outcol.r = 1.0 - (facm + 2.0*fac*(1.0 - col2.r))*(1.0 - outcol.r);
+		outcol.r = mix(col1.r, col1.r + (2.0 * col2.r - 1.0) - (col1.r * (2.0 * col2.r - 1.0), fac);
 
 	if(outcol.g < 0.5)
-		outcol.g *= facm + 2.0*fac*col2.g;
+		outcol.g = mix(col1.g, col1.g * (2.0 * col2.g), fac);
 	else
-		outcol.g = 1.0 - (facm + 2.0*fac*(1.0 - col2.g))*(1.0 - outcol.g);
+		outcol.g = mix(col1.g, col1.g + (2.0 * col2.g - 1.0) - (col1.g * (2.0 * col2.g - 1.0), fac);
 
 	if(outcol.b < 0.5)
-		outcol.b *= facm + 2.0*fac*col2.b;
+		outcol.b = mix(col1.b, col1.b * (2.0 * col2.b), fac);
 	else
-		outcol.b = 1.0 - (facm + 2.0*fac*(1.0 - col2.b))*(1.0 - outcol.b);
+		outcol.b = mix(col1.b, col1.b + (2.0 * col2.b - 1.0) - (col1.b * (2.0 * col2.b - 1.0), fac);
 }
 
 void mix_sub(float fac, vec4 col1, vec4 col2, out vec4 outcol)
@@ -554,13 +550,11 @@ void mix_sub(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 void mix_div(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 {
 	fac = clamp(fac, 0.0, 1.0);
-	float facm = 1.0 - fac;
-
 	outcol = col1;
 
-	if(col2.r != 0.0) outcol.r = facm*outcol.r + fac*outcol.r/col2.r;
-	if(col2.g != 0.0) outcol.g = facm*outcol.g + fac*outcol.g/col2.g;
-	if(col2.b != 0.0) outcol.b = facm*outcol.b + fac*outcol.b/col2.b;
+	if(col2.r != 0.0) outcol.r = mix(col1.r, col1.r / col2.r, fac);
+	if(col2.g != 0.0) outcol.g = mix(col1.g, col1.g / col2.g, fac);
+	if(col2.b != 0.0) outcol.b = mix(col1.b, col1.b / col2.b, fac);
 }
 
 void mix_diff(float fac, vec4 col1, vec4 col2, out vec4 outcol)
@@ -573,14 +567,14 @@ void mix_diff(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 void mix_dark(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 {
 	fac = clamp(fac, 0.0, 1.0);
-	outcol.rgb = min(col1.rgb, col2.rgb*fac);
+	outcol.rgb = mix(col1, min(col1.rgb, col2.rgb), fac);
 	outcol.a = col1.a;
 }
 
 void mix_light(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 {
 	fac = clamp(fac, 0.0, 1.0);
-	outcol.rgb = max(col1.rgb, col2.rgb*fac);
+	outcol.rgb = mix(col1, max(col1.rgb, col2.rgb), fac);
 	outcol.a = col1.a;
 }
 
@@ -589,78 +583,58 @@ void mix_dodge(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 	fac = clamp(fac, 0.0, 1.0);
 	outcol = col1;
 
-	if(outcol.r != 0.0) {
-		float tmp = 1.0 - fac*col2.r;
-		if(tmp <= 0.0)
-			outcol.r = 1.0;
-		else if((tmp = outcol.r/tmp) > 1.0)
-			outcol.r = 1.0;
-		else
-			outcol.r = tmp;
-	}
-	if(outcol.g != 0.0) {
-		float tmp = 1.0 - fac*col2.g;
-		if(tmp <= 0.0)
-			outcol.g = 1.0;
-		else if((tmp = outcol.g/tmp) > 1.0)
-			outcol.g = 1.0;
-		else
-			outcol.g = tmp;
-	}
-	if(outcol.b != 0.0) {
-		float tmp = 1.0 - fac*col2.b;
-		if(tmp <= 0.0)
-			outcol.b = 1.0;
-		else if((tmp = outcol.b/tmp) > 1.0)
-			outcol.b = 1.0;
-		else
-			outcol.b = tmp;
-	}
+	if(col1.r == 0.0)
+		outcol.r = 0.0;
+	else if(col2.r == 1.0)
+		outcol.r = 1.0;
+	else
+		outcol.r = mix(col1.r, min(1.0, col1.r / (1.0 - col2.r)), fac);
+
+	if(col1.g == 0.0)
+		outcol.g = 0.0;
+	else if(col2.g == 1.0)
+		outcol.g = 1.0;
+	else
+		outcol.g = mix(col1.g, min(1.0, col1.g / (1.0 - col2.g)), fac);
+
+	if(col1.b == 0.0)
+		outcol.b = 0.0;
+	else if(col2.b == 1.0)
+		outcol.b = 1.0;
+	else
+		outcol.b = mix(col1.b, min(1.0, col1.b / (1.0 - col2.b)), fac);
 }
 
 void mix_burn(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 {
 	fac = clamp(fac, 0.0, 1.0);
-	float tmp, facm = 1.0 - fac;
-
 	outcol = col1;
 
-	tmp = facm + fac*col2.r;
-	if(tmp <= 0.0)
-		outcol.r = 0.0;
-	else if((tmp = (1.0 - (1.0 - outcol.r)/tmp)) < 0.0)
-		outcol.r = 0.0;
-	else if(tmp > 1.0)
+	if(col1.r == 1.0)
 		outcol.r = 1.0;
+	else if(col2.r == 0.0)
+		outcol.r = 0.0;
 	else
-		outcol.r = tmp;
+		outcol.r = mix(col1.r, 1.0 - min(1.0, (1.0 - col1.r) / col2.r), fac);
 
-	tmp = facm + fac*col2.g;
-	if(tmp <= 0.0)
-		outcol.g = 0.0;
-	else if((tmp = (1.0 - (1.0 - outcol.g)/tmp)) < 0.0)
-		outcol.g = 0.0;
-	else if(tmp > 1.0)
+	if(col1.g == 1.0)
 		outcol.g = 1.0;
+	else if(col2.g == 0.0)
+		outcol.g = 0.0;
 	else
-		outcol.g = tmp;
+		outcol.g = mix(col1.g, 1.0 - min(1.0, (1.0 - col1.g) / col2.g), fac);
 
-	tmp = facm + fac*col2.b;
-	if(tmp <= 0.0)
-		outcol.b = 0.0;
-	else if((tmp = (1.0 - (1.0 - outcol.b)/tmp)) < 0.0)
-		outcol.b = 0.0;
-	else if(tmp > 1.0)
+	if(col1.b == 1.0)
 		outcol.b = 1.0;
+	else if(col2.b == 0.0)
+		outcol.b = 0.0;
 	else
-		outcol.b = tmp;
+		outcol.b = mix(col1.b, 1.0 - min(1.0, (1.0 - col1.b) / col2.b), fac);
 }
 
 void mix_hue(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 {
 	fac = clamp(fac, 0.0, 1.0);
-	float facm = 1.0 - fac;
-
 	outcol = col1;
 
 	vec4 hsv, hsv2, tmp;
@@ -741,8 +715,7 @@ void mix_soft(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 void mix_linear(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 {
 	fac = clamp(fac, 0.0, 1.0);
-
-	outcol = col1 + fac*(2.0*(col2 - vec4(0.5)));
+	outcol = mix(col1, col1 + (2.0*col2 - vec4(1.0)), fac);
 }
 
 void valtorgb(float fac, sampler2D colormap, out vec4 outcol, out float outalpha)
@@ -925,65 +898,45 @@ void shade_norm(vec3 normal, out vec3 outnormal)
 
 void mtex_rgb_blend(vec3 outcol, vec3 texcol, float fact, float facg, out vec3 incol)
 {
-	float facm;
-
-	fact *= facg;
-	facm = 1.0-fact;
-
-	incol = fact*texcol + facm*outcol;
+	incol = mix(outcol, texcol, fact*facg);
 }
 
 void mtex_rgb_mul(vec3 outcol, vec3 texcol, float fact, float facg, out vec3 incol)
 {
-	float facm;
-
-	fact *= facg;
-	facm = 1.0-fact;
-
-	incol = (facm + fact*texcol)*outcol;
+	incol = mix(outcol, outcol * texcol, fact*facg);
 }
 
 void mtex_rgb_screen(vec3 outcol, vec3 texcol, float fact, float facg, out vec3 incol)
 {
-	float facm;
-
-	fact *= facg;
-	facm = 1.0-fact;
-
-	incol = vec3(1.0) - (vec3(facm) + fact*(vec3(1.0) - texcol))*(vec3(1.0) - outcol);
+	incol = mix(outcol, outcol + texcol - (outcol*texcol), fact*facg);
 }
 
 void mtex_rgb_overlay(vec3 outcol, vec3 texcol, float fact, float facg, out vec3 incol)
 {
-	float facm;
-
-	fact *= facg;
-	facm = 1.0-fact;
-
 	if(outcol.r < 0.5)
-		incol.r = outcol.r*(facm + 2.0*fact*texcol.r);
+		incol.r = mix(outcol.r, outcol.r*(2.0*texcol.r), fact*facg);
 	else
-		incol.r = 1.0 - (facm + 2.0*fact*(1.0 - texcol.r))*(1.0 - outcol.r);
+		incol.r = mix(outcol.r, outcol.r + (2.0*texcol.r - 1.0) - (outcol.r * (2.0*texcol.r - 1.0)), fact*facg);
 
 	if(outcol.g < 0.5)
-		incol.g = outcol.g*(facm + 2.0*fact*texcol.g);
+		incol.g = mix(outcol.g, outcol.g*(2.0*texcol.g), fact*facg);
 	else
-		incol.g = 1.0 - (facm + 2.0*fact*(1.0 - texcol.g))*(1.0 - outcol.g);
+		incol.g = mix(outcol.g, outcol.g + (2.0*texcol.g - 1.0) - (outcol.g * (2.0*texcol.g - 1.0)), fact*facg);
 
 	if(outcol.b < 0.5)
-		incol.b = outcol.b*(facm + 2.0*fact*texcol.b);
+		incol.b = mix(outcol.b, outcol.b*(2.0*texcol.b), fact*facg);
 	else
-		incol.b = 1.0 - (facm + 2.0*fact*(1.0 - texcol.b))*(1.0 - outcol.b);
+		incol.b = mix(outcol.b, outcol.b + (2.0*texcol.b - 1.0) - (outcol.b * (2.0*texcol.b - 1.0)), fact*facg);
 }
 
 void mtex_rgb_sub(vec3 outcol, vec3 texcol, float fact, float facg, out vec3 incol)
 {
-	incol = -fact*facg*texcol + outcol;
+	incol = mix(outcol, outcol - texcol, fact*facg);
 }
 
 void mtex_rgb_add(vec3 outcol, vec3 texcol, float fact, float facg, out vec3 incol)
 {
-	incol = fact*facg*texcol + outcol;
+	incol = mix(outcol, outcol + texcol, fact*facg);
 }
 
 void mtex_rgb_div(vec3 outcol, vec3 texcol, float fact, float facg, out vec3 incol)
@@ -1000,38 +953,17 @@ void mtex_rgb_div(vec3 outcol, vec3 texcol, float fact, float facg, out vec3 inc
 
 void mtex_rgb_diff(vec3 outcol, vec3 texcol, float fact, float facg, out vec3 incol)
 {
-	float facm;
-
-	fact *= facg;
-	facm = 1.0-fact;
-
-	incol = facm*outcol + fact*abs(texcol - outcol);
+	incol = mix(outcol, abs(outcol - texcol), fact*facg);
 }
 
 void mtex_rgb_dark(vec3 outcol, vec3 texcol, float fact, float facg, out vec3 incol)
 {
-	float facm, col;
-
-	fact *= facg;
-	facm = 1.0-fact;
-
-	incol.r = min(outcol.r, texcol.r) * fact + outcol.r * facm;
-	incol.g = min(outcol.g, texcol.g) * fact + outcol.g * facm;
-	incol.b = min(outcol.b, texcol.b) * fact + outcol.b * facm;
+	incol = mix(outcol, min(outcol, texcol), fact*facg);
 }
 
 void mtex_rgb_light(vec3 outcol, vec3 texcol, float fact, float facg, out vec3 incol)
 {
-	float facm, col;
-
-	fact *= facg;
-
-	col = fact*texcol.r;
-	if(col > outcol.r) incol.r = col; else incol.r = outcol.r;
-	col = fact*texcol.g;
-	if(col > outcol.g) incol.g = col; else incol.g = outcol.g;
-	col = fact*texcol.b;
-	if(col > outcol.b) incol.b = col; else incol.b = outcol.b;
+	incol = mix(outcol, max(outcol, texcol), fact*facg);
 }
 
 void mtex_rgb_hue(vec3 outcol, vec3 texcol, float fact, float facg, out vec3 incol)
@@ -1080,22 +1012,7 @@ void mtex_rgb_soft(vec3 outcol, vec3 texcol, float fact, float facg, out vec3 in
 
 void mtex_rgb_linear(vec3 outcol, vec3 texcol, float fact, float facg, out vec3 incol)
 {
-	fact *= facg;
-
-	if(texcol.r > 0.5)
-		incol.r = outcol.r + fact*(2.0*(texcol.r - 0.5));
-	else
-		incol.r = outcol.r + fact*(2.0*(texcol.r) - 1.0);
-
-	if(texcol.g > 0.5)
-		incol.g = outcol.g + fact*(2.0*(texcol.g - 0.5));
-	else
-		incol.g = outcol.g + fact*(2.0*(texcol.g) - 1.0);
-
-	if(texcol.b > 0.5)
-		incol.b = outcol.b + fact*(2.0*(texcol.b - 0.5));
-	else
-		incol.b = outcol.b + fact*(2.0*(texcol.b) - 1.0);
+	incol = mix(outcol, 2.0*texcol - vec3(1.0), fact*facg);
 }
 
 void mtex_value_vars(inout float fact, float facg, out float facm)

@@ -24,6 +24,7 @@
 
 extern "C" {
 #  include "BLI_math.h"
+#  include "BLI_math_color_blend.h"
 }
 
 /* ******** Mix Base Operation ******** */
@@ -62,11 +63,8 @@ void MixBaseOperation::executePixelSampled(float output[4], float x, float y, Pi
 	if (this->useValueAlphaMultiply()) {
 		value *= inputColor2[3];
 	}
-	float valuem = 1.0f - value;
-	output[0] = valuem * (inputColor1[0]) + value * (inputColor2[0]);
-	output[1] = valuem * (inputColor1[1]) + value * (inputColor2[1]);
-	output[2] = valuem * (inputColor1[2]) + value * (inputColor2[2]);
-	output[3] = inputColor1[3];
+
+	blend_color_mix_float_n(output, inputColor1, inputColor2, value, 4);
 }
 
 void MixBaseOperation::determineResolution(unsigned int resolution[2], unsigned int preferredResolution[2])
@@ -121,10 +119,8 @@ void MixAddOperation::executePixelSampled(float output[4], float x, float y, Pix
 	if (this->useValueAlphaMultiply()) {
 		value *= inputColor2[3];
 	}
-	output[0] = inputColor1[0] + value * inputColor2[0];
-	output[1] = inputColor1[1] + value * inputColor2[1];
-	output[2] = inputColor1[2] + value * inputColor2[2];
-	output[3] = inputColor1[3];
+
+	blend_color_add_float_n(output, inputColor1, inputColor2, value, 4);
 
 	clampIfNeeded(output);
 }
@@ -151,11 +147,8 @@ void MixBlendOperation::executePixelSampled(float output[4], float x, float y, P
 	if (this->useValueAlphaMultiply()) {
 		value *= inputColor2[3];
 	}
-	float valuem = 1.0f - value;
-	output[0] = valuem * (inputColor1[0]) + value * (inputColor2[0]);
-	output[1] = valuem * (inputColor1[1]) + value * (inputColor2[1]);
-	output[2] = valuem * (inputColor1[2]) + value * (inputColor2[2]);
-	output[3] = inputColor1[3];
+
+	blend_color_mix_float_n(output, inputColor1, inputColor2, value, 4);
 
 	clampIfNeeded(output);
 }
@@ -172,7 +165,6 @@ void MixBurnOperation::executePixelSampled(float output[4], float x, float y, Pi
 	float inputColor1[4];
 	float inputColor2[4];
 	float inputValue[4];
-	float tmp;
 
 	this->m_inputValueOperation->readSampled(inputValue, x, y, sampler);
 	this->m_inputColor1Operation->readSampled(inputColor1, x, y, sampler);
@@ -182,48 +174,8 @@ void MixBurnOperation::executePixelSampled(float output[4], float x, float y, Pi
 	if (this->useValueAlphaMultiply()) {
 		value *= inputColor2[3];
 	}
-	float valuem = 1.0f - value;
 
-	tmp = valuem + value * inputColor2[0];
-	if (tmp <= 0.0f)
-		output[0] = 0.0f;
-	else {
-		tmp = 1.0f - (1.0f - inputColor1[0]) / tmp;
-		if (tmp < 0.0f)
-			output[0] = 0.0f;
-		else if (tmp > 1.0f)
-			output[0] = 1.0f;
-		else
-			output[0] = tmp;
-	}
-
-	tmp = valuem + value * inputColor2[1];
-	if (tmp <= 0.0f)
-		output[1] = 0.0f;
-	else {
-		tmp = 1.0f - (1.0f - inputColor1[1]) / tmp;
-		if (tmp < 0.0f)
-			output[1] = 0.0f;
-		else if (tmp > 1.0f)
-			output[1] = 1.0f;
-		else
-			output[1] = tmp;
-	}
-
-	tmp = valuem + value * inputColor2[2];
-	if (tmp <= 0.0f)
-		output[2] = 0.0f;
-	else {
-		tmp = 1.0f - (1.0f - inputColor1[2]) / tmp;
-		if (tmp < 0.0f)
-			output[2] = 0.0f;
-		else if (tmp > 1.0f)
-			output[2] = 1.0f;
-		else
-			output[2] = tmp;
-	}
-
-	output[3] = inputColor1[3];
+	blend_color_burn_float_n(output, inputColor1, inputColor2, value, 4);
 
 	clampIfNeeded(output);
 }
@@ -249,23 +201,8 @@ void MixColorOperation::executePixelSampled(float output[4], float x, float y, P
 	if (this->useValueAlphaMultiply()) {
 		value *= inputColor2[3];
 	}
-	float valuem = 1.0f - value;
 
-	float colH, colS, colV;
-	rgb_to_hsv(inputColor2[0], inputColor2[1], inputColor2[2], &colH, &colS, &colV);
-	if (colS != 0.0f) {
-		float rH, rS, rV;
-		float tmpr, tmpg, tmpb;
-		rgb_to_hsv(inputColor1[0], inputColor1[1], inputColor1[2], &rH, &rS, &rV);
-		hsv_to_rgb(colH, colS, rV, &tmpr, &tmpg, &tmpb);
-		output[0] = (valuem * inputColor1[0]) + (value * tmpr);
-		output[1] = (valuem * inputColor1[1]) + (value * tmpg);
-		output[2] = (valuem * inputColor1[2]) + (value * tmpb);
-	}
-	else {
-		copy_v3_v3(output, inputColor1);
-	}
-	output[3] = inputColor1[3];
+	blend_color_color_float_n(output, inputColor1, inputColor2, value, 4);
 
 	clampIfNeeded(output);
 }
@@ -291,11 +228,8 @@ void MixDarkenOperation::executePixelSampled(float output[4], float x, float y, 
 	if (this->useValueAlphaMultiply()) {
 		value *= inputColor2[3];
 	}
-	float valuem = 1.0f - value;
-	output[0] = min_ff(inputColor1[0], inputColor2[0]) * value + inputColor1[0] * valuem;
-	output[1] = min_ff(inputColor1[1], inputColor2[1]) * value + inputColor1[1] * valuem;
-	output[2] = min_ff(inputColor1[2], inputColor2[2]) * value + inputColor1[2] * valuem;
-	output[3] = inputColor1[3];
+
+	blend_color_darken_float_n(output, inputColor1, inputColor2, value, 4);
 
 	clampIfNeeded(output);
 }
@@ -321,11 +255,8 @@ void MixDifferenceOperation::executePixelSampled(float output[4], float x, float
 	if (this->useValueAlphaMultiply()) {
 		value *= inputColor2[3];
 	}
-	float valuem = 1.0f - value;
-	output[0] = valuem * inputColor1[0] + value * fabsf(inputColor1[0] - inputColor2[0]);
-	output[1] = valuem * inputColor1[1] + value * fabsf(inputColor1[1] - inputColor2[1]);
-	output[2] = valuem * inputColor1[2] + value * fabsf(inputColor1[2] - inputColor2[2]);
-	output[3] = inputColor1[3];
+
+	blend_color_difference_float_n(output, inputColor1, inputColor2, value, 4);
 
 	clampIfNeeded(output);
 }
@@ -351,22 +282,8 @@ void MixDivideOperation::executePixelSampled(float output[4], float x, float y, 
 	if (this->useValueAlphaMultiply()) {
 		value *= inputColor2[3];
 	}
-	float valuem = 1.0f - value;
 
-	if (inputColor2[0] != 0.0f)
-		output[0] = valuem * (inputColor1[0]) + value * (inputColor1[0]) / inputColor2[0];
-	else
-		output[0] = 0.0f;
-	if (inputColor2[1] != 0.0f)
-		output[1] = valuem * (inputColor1[1]) + value * (inputColor1[1]) / inputColor2[1];
-	else
-		output[1] = 0.0f;
-	if (inputColor2[2] != 0.0f)
-		output[2] = valuem * (inputColor1[2]) + value * (inputColor1[2]) / inputColor2[2];
-	else
-		output[2] = 0.0f;
-
-	output[3] = inputColor1[3];
+	blend_color_divide_float_n(output, inputColor1, inputColor2, value, 4);
 
 	clampIfNeeded(output);
 }
@@ -383,7 +300,6 @@ void MixDodgeOperation::executePixelSampled(float output[4], float x, float y, P
 	float inputColor1[4];
 	float inputColor2[4];
 	float inputValue[4];
-	float tmp;
 
 	this->m_inputValueOperation->readSampled(inputValue, x, y, sampler);
 	this->m_inputColor1Operation->readSampled(inputColor1, x, y, sampler);
@@ -394,52 +310,7 @@ void MixDodgeOperation::executePixelSampled(float output[4], float x, float y, P
 		value *= inputColor2[3];
 	}
 
-	if (inputColor1[0] != 0.0f) {
-		tmp = 1.0f - value * inputColor2[0];
-		if (tmp <= 0.0f)
-			output[0] = 1.0f;
-		else {
-			tmp = inputColor1[0] / tmp;
-			if (tmp > 1.0f)
-				output[0] = 1.0f;
-			else
-				output[0] = tmp;
-		}
-	}
-	else
-		output[0] = 0.0f;
-
-	if (inputColor1[1] != 0.0f) {
-		tmp = 1.0f - value * inputColor2[1];
-		if (tmp <= 0.0f)
-			output[1] = 1.0f;
-		else {
-			tmp = inputColor1[1] / tmp;
-			if (tmp > 1.0f)
-				output[1] = 1.0f;
-			else
-				output[1] = tmp;
-		}
-	}
-	else
-		output[1] = 0.0f;
-
-	if (inputColor1[2] != 0.0f) {
-		tmp = 1.0f - value * inputColor2[2];
-		if (tmp <= 0.0f)
-			output[2] = 1.0f;
-		else {
-			tmp = inputColor1[2] / tmp;
-			if (tmp > 1.0f)
-				output[2] = 1.0f;
-			else
-				output[2] = tmp;
-		}
-	}
-	else
-		output[2] = 0.0f;
-
-	output[3] = inputColor1[3];
+	blend_color_dodge_float_n(output, inputColor1, inputColor2, value, 4);
 
 	clampIfNeeded(output);
 }
@@ -497,23 +368,8 @@ void MixHueOperation::executePixelSampled(float output[4], float x, float y, Pix
 	if (this->useValueAlphaMultiply()) {
 		value *= inputColor2[3];
 	}
-	float valuem = 1.0f - value;
 
-	float colH, colS, colV;
-	rgb_to_hsv(inputColor2[0], inputColor2[1], inputColor2[2], &colH, &colS, &colV);
-	if (colS != 0.0f) {
-		float rH, rS, rV;
-		float tmpr, tmpg, tmpb;
-		rgb_to_hsv(inputColor1[0], inputColor1[1], inputColor1[2], &rH, &rS, &rV);
-		hsv_to_rgb(colH, rS, rV, &tmpr, &tmpg, &tmpb);
-		output[0] = valuem * (inputColor1[0]) + value * tmpr;
-		output[1] = valuem * (inputColor1[1]) + value * tmpg;
-		output[2] = valuem * (inputColor1[2]) + value * tmpb;
-	}
-	else {
-		copy_v3_v3(output, inputColor1);
-	}
-	output[3] = inputColor1[3];
+	blend_color_hue_float_n(output, inputColor1, inputColor2, value, 4);
 
 	clampIfNeeded(output);
 }
@@ -539,17 +395,8 @@ void MixLightenOperation::executePixelSampled(float output[4], float x, float y,
 	if (this->useValueAlphaMultiply()) {
 		value *= inputColor2[3];
 	}
-	float tmp;
-	tmp = value * inputColor2[0];
-	if (tmp > inputColor1[0]) output[0] = tmp;
-	else output[0] = inputColor1[0];
-	tmp = value * inputColor2[1];
-	if (tmp > inputColor1[1]) output[1] = tmp;
-	else output[1] = inputColor1[1];
-	tmp = value * inputColor2[2];
-	if (tmp > inputColor1[2]) output[2] = tmp;
-	else output[2] = inputColor1[2];
-	output[3] = inputColor1[3];
+
+	blend_color_lighten_float_n(output, inputColor1, inputColor2, value, 4);
 
 	clampIfNeeded(output);
 }
@@ -575,20 +422,8 @@ void MixLinearLightOperation::executePixelSampled(float output[4], float x, floa
 	if (this->useValueAlphaMultiply()) {
 		value *= inputColor2[3];
 	}
-	if (inputColor2[0] > 0.5f)
-		output[0] = inputColor1[0] + value * (2.0f * (inputColor2[0] - 0.5f));
-	else
-		output[0] = inputColor1[0] + value * (2.0f * (inputColor2[0]) - 1.0f);
-	if (inputColor2[1] > 0.5f)
-		output[1] = inputColor1[1] + value * (2.0f * (inputColor2[1] - 0.5f));
-	else
-		output[1] = inputColor1[1] + value * (2.0f * (inputColor2[1]) - 1.0f);
-	if (inputColor2[2] > 0.5f)
-		output[2] = inputColor1[2] + value * (2.0f * (inputColor2[2] - 0.5f));
-	else
-		output[2] = inputColor1[2] + value * (2.0f * (inputColor2[2]) - 1.0f);
 
-	output[3] = inputColor1[3];
+	blend_color_linearlight_float_n(output, inputColor1, inputColor2, value, 4);
 
 	clampIfNeeded(output);
 }
@@ -614,11 +449,8 @@ void MixMultiplyOperation::executePixelSampled(float output[4], float x, float y
 	if (this->useValueAlphaMultiply()) {
 		value *= inputColor2[3];
 	}
-	float valuem = 1.0f - value;
-	output[0] = inputColor1[0] * (valuem + value * inputColor2[0]);
-	output[1] = inputColor1[1] * (valuem + value * inputColor2[1]);
-	output[2] = inputColor1[2] * (valuem + value * inputColor2[2]);
-	output[3] = inputColor1[3];
+
+	blend_color_mul_float_n(output, inputColor1, inputColor2, value, 4);
 
 	clampIfNeeded(output);
 }
@@ -645,27 +477,7 @@ void MixOverlayOperation::executePixelSampled(float output[4], float x, float y,
 		value *= inputColor2[3];
 	}
 
-	float valuem = 1.0f - value;
-
-	if (inputColor1[0] < 0.5f) {
-		output[0] = inputColor1[0] * (valuem + 2.0f * value * inputColor2[0]);
-	}
-	else {
-		output[0] = 1.0f - (valuem + 2.0f * value * (1.0f - inputColor2[0])) * (1.0f - inputColor1[0]);
-	}
-	if (inputColor1[1] < 0.5f) {
-		output[1] = inputColor1[1] * (valuem + 2.0f * value * inputColor2[1]);
-	}
-	else {
-		output[1] = 1.0f - (valuem + 2.0f * value * (1.0f - inputColor2[1])) * (1.0f - inputColor1[1]);
-	}
-	if (inputColor1[2] < 0.5f) {
-		output[2] = inputColor1[2] * (valuem + 2.0f * value * inputColor2[2]);
-	}
-	else {
-		output[2] = 1.0f - (valuem + 2.0f * value * (1.0f - inputColor2[2])) * (1.0f - inputColor1[2]);
-	}
-	output[3] = inputColor1[3];
+	blend_color_overlay_float_n(output, inputColor1, inputColor2, value, 4);
 
 	clampIfNeeded(output);
 }
@@ -691,20 +503,8 @@ void MixSaturationOperation::executePixelSampled(float output[4], float x, float
 	if (this->useValueAlphaMultiply()) {
 		value *= inputColor2[3];
 	}
-	float valuem = 1.0f - value;
 
-	float rH, rS, rV;
-	rgb_to_hsv(inputColor1[0], inputColor1[1], inputColor1[2], &rH, &rS, &rV);
-	if (rS != 0.0f) {
-		float colH, colS, colV;
-		rgb_to_hsv(inputColor2[0], inputColor2[1], inputColor2[2], &colH, &colS, &colV);
-		hsv_to_rgb(rH, (valuem * rS + value * colS), rV, &output[0], &output[1], &output[2]);
-	}
-	else {
-		copy_v3_v3(output, inputColor1);
-	}
-
-	output[3] = inputColor1[3];
+	blend_color_saturation_float_n(output, inputColor1, inputColor2, value, 4);
 
 	clampIfNeeded(output);
 }
@@ -730,12 +530,8 @@ void MixScreenOperation::executePixelSampled(float output[4], float x, float y, 
 	if (this->useValueAlphaMultiply()) {
 		value *= inputColor2[3];
 	}
-	float valuem = 1.0f - value;
 
-	output[0] = 1.0f - (valuem + value * (1.0f - inputColor2[0])) * (1.0f - inputColor1[0]);
-	output[1] = 1.0f - (valuem + value * (1.0f - inputColor2[1])) * (1.0f - inputColor1[1]);
-	output[2] = 1.0f - (valuem + value * (1.0f - inputColor2[2])) * (1.0f - inputColor1[2]);
-	output[3] = inputColor1[3];
+	blend_color_screen_float_n(output, inputColor1, inputColor2, value, 4);
 
 	clampIfNeeded(output);
 }
@@ -761,18 +557,8 @@ void MixSoftLightOperation::executePixelSampled(float output[4], float x, float 
 	if (this->useValueAlphaMultiply()) {
 		value *= inputColor2[3];
 	}
-	float valuem = 1.0f - value;
-	float scr, scg, scb;
 
-	/* first calculate non-fac based Screen mix */
-	scr = 1.0f - (1.0f - inputColor2[0]) * (1.0f - inputColor1[0]);
-	scg = 1.0f - (1.0f - inputColor2[1]) * (1.0f - inputColor1[1]);
-	scb = 1.0f - (1.0f - inputColor2[2]) * (1.0f - inputColor1[2]);
-
-	output[0] = valuem * (inputColor1[0]) + value * (((1.0f - inputColor1[0]) * inputColor2[0] * (inputColor1[0])) + (inputColor1[0] * scr));
-	output[1] = valuem * (inputColor1[1]) + value * (((1.0f - inputColor1[1]) * inputColor2[1] * (inputColor1[1])) + (inputColor1[1] * scg));
-	output[2] = valuem * (inputColor1[2]) + value * (((1.0f - inputColor1[2]) * inputColor2[2] * (inputColor1[2])) + (inputColor1[2] * scb));
-	output[3] = inputColor1[3];
+	blend_color_softlight_float_n(output, inputColor1, inputColor2, value, 4);
 
 	clampIfNeeded(output);
 }
@@ -798,10 +584,8 @@ void MixSubtractOperation::executePixelSampled(float output[4], float x, float y
 	if (this->useValueAlphaMultiply()) {
 		value *= inputColor2[3];
 	}
-	output[0] = inputColor1[0] - value * (inputColor2[0]);
-	output[1] = inputColor1[1] - value * (inputColor2[1]);
-	output[2] = inputColor1[2] - value * (inputColor2[2]);
-	output[3] = inputColor1[3];
+
+	blend_color_sub_float_n(output, inputColor1, inputColor2, value, 4);
 
 	clampIfNeeded(output);
 }
@@ -827,14 +611,8 @@ void MixValueOperation::executePixelSampled(float output[4], float x, float y, P
 	if (this->useValueAlphaMultiply()) {
 		value *= inputColor2[3];
 	}
-	float valuem = 1.0f - value;
 
-	float rH, rS, rV;
-	float colH, colS, colV;
-	rgb_to_hsv(inputColor1[0], inputColor1[1], inputColor1[2], &rH, &rS, &rV);
-	rgb_to_hsv(inputColor2[0], inputColor2[1], inputColor2[2], &colH, &colS, &colV);
-	hsv_to_rgb(rH, rS, (valuem * rV + value * colV), &output[0], &output[1], &output[2]);
-	output[3] = inputColor1[3];
+	blend_color_luminosity_float_n(output, inputColor1, inputColor2, value, 4);
 
 	clampIfNeeded(output);
 }

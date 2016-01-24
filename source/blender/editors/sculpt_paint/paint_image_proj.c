@@ -4262,7 +4262,7 @@ static void do_projectpaint_soften_f(ProjPaintState *ps, ProjPixel *projPixel, f
 				projPixel->pixel.f_pt[3] = rgba[3] = mask;
 
 				/* add to enhance edges */
-				blend_color_add_float(rgba, projPixel->pixel.f_pt, rgba);
+				blend_color_add_float_n(rgba, projPixel->pixel.f_pt, rgba, rgba[3], 4);
 				rgba[3] = alpha;
 			}
 			else
@@ -4323,7 +4323,7 @@ static void do_projectpaint_soften(ProjPaintState *ps, ProjPixel *projPixel, flo
 				rgba[3] = rgba_pixel[3] = mask;
 
 				/* add to enhance edges */
-				blend_color_add_float(rgba, rgba_pixel, rgba);
+				blend_color_add_float_n(rgba, rgba_pixel, rgba, rgba[3], 4);
 
 				rgba[3] = alpha;
 				premul_float_to_straight_uchar(rgba_ub, rgba);
@@ -4620,8 +4620,8 @@ static void *do_projectpaint_thread(void *ph_v)
 
 							mul_v4_v4fl(projPixel->newColor.f, projPixel->newColor.f, mask);
 
-							blend_color_mix_float(projPixel->pixel.f_pt,  projPixel->origColor.f_pt,
-							                      projPixel->newColor.f);
+							blend_color_mix_float_n(projPixel->pixel.f_pt,  projPixel->origColor.f_pt,
+							                        projPixel->newColor.f, projPixel->newColor.f[3], 4);
 						}
 					}
 					else {

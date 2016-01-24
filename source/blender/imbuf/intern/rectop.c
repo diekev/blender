@@ -109,58 +109,55 @@ void IMB_blend_color_float(float dst[4], float src1[4], float src2[4], IMB_Blend
 {
 	switch (mode) {
 		case IMB_BLEND_MIX:
-			blend_color_mix_float(dst, src1, src2); break;
+			blend_color_mix_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_ADD:
-			blend_color_add_float(dst, src1, src2); break;
+			blend_color_add_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_SUB:
-			blend_color_sub_float(dst, src1, src2); break;
+			blend_color_sub_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_MUL:
-			blend_color_mul_float(dst, src1, src2); break;
+			blend_color_mul_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_LIGHTEN:
-			blend_color_lighten_float(dst, src1, src2); break;
+			blend_color_lighten_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_DARKEN:
-			blend_color_darken_float(dst, src1, src2); break;
+			blend_color_darken_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_ERASE_ALPHA:
-			blend_color_erase_alpha_float(dst, src1, src2); break;
+			blend_color_erase_alpha_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_ADD_ALPHA:
-			blend_color_add_alpha_float(dst, src1, src2); break;
+			blend_color_add_alpha_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_OVERLAY:
-			blend_color_overlay_float(dst, src1, src2); break;
+			blend_color_overlay_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_HARDLIGHT:
-			blend_color_hardlight_float(dst, src1, src2); break;
+			blend_color_hardlight_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_COLORBURN:
-			blend_color_burn_float(dst, src1, src2); break;
+			blend_color_burn_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_LINEARBURN:
-			blend_color_linearburn_float(dst, src1, src2); break;
+			blend_color_linearburn_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_COLORDODGE:
-			blend_color_dodge_float(dst, src1, src2); break;
+			blend_color_dodge_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_SCREEN:
-			blend_color_screen_float(dst, src1, src2); break;
+			blend_color_screen_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_SOFTLIGHT:
-			blend_color_softlight_float(dst, src1, src2); break;
+			blend_color_softlight_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_PINLIGHT:
-			blend_color_pinlight_float(dst, src1, src2); break;
+			blend_color_pinlight_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_LINEARLIGHT:
-			blend_color_linearlight_float(dst, src1, src2); break;
+			blend_color_linearlight_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_VIVIDLIGHT:
-			blend_color_vividlight_float(dst, src1, src2); break;
+			blend_color_vividlight_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_DIFFERENCE:
-			blend_color_difference_float(dst, src1, src2); break;
+			blend_color_difference_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_EXCLUSION:
-			blend_color_exclusion_float(dst, src1, src2); break;
+			blend_color_exclusion_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_COLOR:
-			blend_color_color_float(dst, src1, src2); break;
+			blend_color_color_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_HUE:
-			blend_color_hue_float(dst, src1, src2); break;
+			blend_color_hue_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_SATURATION:
-			blend_color_saturation_float(dst, src1, src2); break;
+			blend_color_saturation_float_n(dst, src1, src2, src2[3], 4); break;
 		case IMB_BLEND_LUMINOSITY:
-			blend_color_luminosity_float(dst, src1, src2); break;
+			blend_color_luminosity_float_n(dst, src1, src2, src2[3], 4); break;
 		default:
-			dst[0] = src1[0];
-			dst[1] = src1[1];
-			dst[2] = src1[2];
-			dst[3] = src1[3];
+			copy_v4_v4(dst, src1);
 			break;
 	}
 }
@@ -293,7 +290,7 @@ void IMB_rectcpy(ImBuf *dbuf, ImBuf *sbuf, int destx,
 }
 
 typedef void (*IMB_blend_func)(unsigned char *dst, const unsigned char *src1, const unsigned char *src2);
-typedef void (*IMB_blend_func_float)(float *dst, const float *src1, const float *src2);
+typedef void (*IMB_blend_func_float)(float *dst, const float *src1, const float *src2, const float fac, const int n);
 
 
 void IMB_rectblend(ImBuf *dbuf, ImBuf *obuf, ImBuf *sbuf, unsigned short *dmask, unsigned short *curvemask,
@@ -425,99 +422,99 @@ void IMB_rectblend(ImBuf *dbuf, ImBuf *obuf, ImBuf *sbuf, unsigned short *dmask,
 		switch (mode) {
 			case IMB_BLEND_MIX:
 				func = blend_color_mix_byte;
-				func_float = blend_color_mix_float;
+				func_float = blend_color_mix_float_n;
 				break;
 			case IMB_BLEND_ADD:
 				func = blend_color_add_byte;
-				func_float = blend_color_add_float;
+				func_float = blend_color_add_float_n;
 				break;
 			case IMB_BLEND_SUB:
 				func = blend_color_sub_byte;
-				func_float = blend_color_sub_float;
+				func_float = blend_color_sub_float_n;
 				break;
 			case IMB_BLEND_MUL:
 				func = blend_color_mul_byte;
-				func_float = blend_color_mul_float;
+				func_float = blend_color_mul_float_n;
 				break;
 			case IMB_BLEND_LIGHTEN:
 				func = blend_color_lighten_byte;
-				func_float = blend_color_lighten_float;
+				func_float = blend_color_lighten_float_n;
 				break;
 			case IMB_BLEND_DARKEN:
 				func = blend_color_darken_byte;
-				func_float = blend_color_darken_float;
+				func_float = blend_color_darken_float_n;
 				break;
 			case IMB_BLEND_ERASE_ALPHA:
 				func = blend_color_erase_alpha_byte;
-				func_float = blend_color_erase_alpha_float;
+				func_float = blend_color_erase_alpha_float_n;
 				break;
 			case IMB_BLEND_ADD_ALPHA:
 				func = blend_color_add_alpha_byte;
-				func_float = blend_color_add_alpha_float;
+				func_float = blend_color_add_alpha_float_n;
 				break;
 			case IMB_BLEND_OVERLAY:
 				func = blend_color_overlay_byte;
-				func_float = blend_color_overlay_float;
+				func_float = blend_color_overlay_float_n;
 				break;
 			case IMB_BLEND_HARDLIGHT:
 				func = blend_color_hardlight_byte;
-				func_float = blend_color_hardlight_float;
+				func_float = blend_color_hardlight_float_n;
 				break;
 			case IMB_BLEND_COLORBURN:
 				func = blend_color_burn_byte;
-				func_float = blend_color_burn_float;
+				func_float = blend_color_burn_float_n;
 				break;
 			case IMB_BLEND_LINEARBURN:
 				func = blend_color_linearburn_byte;
-				func_float = blend_color_linearburn_float;
+				func_float = blend_color_linearburn_float_n;
 				break;
 			case IMB_BLEND_COLORDODGE:
 				func = blend_color_dodge_byte;
-				func_float = blend_color_dodge_float;
+				func_float = blend_color_dodge_float_n;
 				break;
 			case IMB_BLEND_SCREEN:
 				func = blend_color_screen_byte;
-				func_float = blend_color_screen_float;
+				func_float = blend_color_screen_float_n;
 				break;
 			case IMB_BLEND_SOFTLIGHT:
 				func = blend_color_softlight_byte;
-				func_float = blend_color_softlight_float;
+				func_float = blend_color_softlight_float_n;
 				break;
 			case IMB_BLEND_PINLIGHT:
 				func = blend_color_pinlight_byte;
-				func_float = blend_color_pinlight_float;
+				func_float = blend_color_pinlight_float_n;
 				break;
 			case IMB_BLEND_LINEARLIGHT:
 				func = blend_color_linearlight_byte;
-				func_float = blend_color_linearlight_float;
+				func_float = blend_color_linearlight_float_n;
 				break;
 			case IMB_BLEND_VIVIDLIGHT:
 				func = blend_color_vividlight_byte;
-				func_float = blend_color_vividlight_float;
+				func_float = blend_color_vividlight_float_n;
 				break;
 			case IMB_BLEND_DIFFERENCE:
 				func = blend_color_difference_byte;
-				func_float = blend_color_difference_float;
+				func_float = blend_color_difference_float_n;
 				break;
 			case IMB_BLEND_EXCLUSION:
 				func = blend_color_exclusion_byte;
-				func_float = blend_color_exclusion_float;
+				func_float = blend_color_exclusion_float_n;
 				break;
 			case IMB_BLEND_COLOR:
 				func = blend_color_color_byte;
-				func_float = blend_color_color_float;
+				func_float = blend_color_color_float_n;
 				break;
 			case IMB_BLEND_HUE:
 				func = blend_color_hue_byte;
-				func_float = blend_color_hue_float;
+				func_float = blend_color_hue_float_n;
 				break;
 			case IMB_BLEND_SATURATION:
 				func = blend_color_saturation_byte;
-				func_float = blend_color_saturation_float;
+				func_float = blend_color_saturation_float_n;
 				break;
 			case IMB_BLEND_LUMINOSITY:
 				func = blend_color_luminosity_byte;
-				func_float = blend_color_luminosity_float;
+				func_float = blend_color_luminosity_float_n;
 				break;
 			default:
 				break;
@@ -647,7 +644,7 @@ void IMB_rectblend(ImBuf *dbuf, ImBuf *obuf, ImBuf *sbuf, unsigned short *dmask,
 									*dmr = mask;
 									mul_v4_v4fl(mask_srf, srf, mask / 65535.0f);
 
-									func_float(drf, orf, mask_srf);
+									func_float(drf, orf, mask_srf, mask_srf[3], 4);
 								}
 							}
 						}
@@ -668,7 +665,7 @@ void IMB_rectblend(ImBuf *dbuf, ImBuf *obuf, ImBuf *sbuf, unsigned short *dmask,
 
 								mul_v4_v4fl(mask_srf, srf, mask / 65535.0f);
 
-								func_float(drf, orf, mask_srf);
+								func_float(drf, orf, mask_srf, mask_srf[3], 4);
 							}
 						}
 					}
@@ -681,7 +678,7 @@ void IMB_rectblend(ImBuf *dbuf, ImBuf *obuf, ImBuf *sbuf, unsigned short *dmask,
 					/* regular blending */
 					for (x = width; x > 0; x--, drf += 4, orf += 4, srf += 4) {
 						if (srf[3] != 0)
-							func_float(drf, orf, srf);
+							func_float(drf, orf, srf, srf[3], 4);
 					}
 				}
 

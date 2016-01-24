@@ -34,6 +34,7 @@
 #include <math.h>
 
 #include "BLI_math.h"
+#include "BLI_math_color_blend.h"
 #include "BLI_noise.h"
 #include "BLI_rand.h"
 #include "BLI_utildefines.h"
@@ -1348,201 +1349,109 @@ int multitex_ext_safe(Tex *tex, float texvec[3], TexResult *texres, struct Image
 /* fact = texture strength, facg = button strength value */
 void texture_rgb_blend(float in[3], const float tex[3], const float out[3], float fact, float facg, int blendtype)
 {
-	float facm;
-	
+	fact *= facg;
+	copy_v3_v3(in, out);
+
 	switch (blendtype) {
-	case MTEX_BLEND:
-		fact*= facg;
-		facm= 1.0f-fact;
-
-		in[0]= (fact*tex[0] + facm*out[0]);
-		in[1]= (fact*tex[1] + facm*out[1]);
-		in[2]= (fact*tex[2] + facm*out[2]);
-		break;
-		
-	case MTEX_MUL:
-		fact*= facg;
-		facm= 1.0f-fact;
-		in[0]= (facm+fact*tex[0])*out[0];
-		in[1]= (facm+fact*tex[1])*out[1];
-		in[2]= (facm+fact*tex[2])*out[2];
-		break;
-
-	case MTEX_SCREEN:
-		fact*= facg;
-		facm= 1.0f-fact;
-		in[0]= 1.0f - (facm+fact*(1.0f-tex[0])) * (1.0f-out[0]);
-		in[1]= 1.0f - (facm+fact*(1.0f-tex[1])) * (1.0f-out[1]);
-		in[2]= 1.0f - (facm+fact*(1.0f-tex[2])) * (1.0f-out[2]);
-		break;
-
-	case MTEX_OVERLAY:
-		fact*= facg;
-		facm= 1.0f-fact;
-		
-		if (out[0] < 0.5f)
-			in[0] = out[0] * (facm + 2.0f*fact*tex[0]);
-		else
-			in[0] = 1.0f - (facm + 2.0f*fact*(1.0f - tex[0])) * (1.0f - out[0]);
-		if (out[1] < 0.5f)
-			in[1] = out[1] * (facm + 2.0f*fact*tex[1]);
-		else
-			in[1] = 1.0f - (facm + 2.0f*fact*(1.0f - tex[1])) * (1.0f - out[1]);
-		if (out[2] < 0.5f)
-			in[2] = out[2] * (facm + 2.0f*fact*tex[2]);
-		else
-			in[2] = 1.0f - (facm + 2.0f*fact*(1.0f - tex[2])) * (1.0f - out[2]);
-		break;
-		
-	case MTEX_SUB:
-		fact= -fact;
-	case MTEX_ADD:
-		fact*= facg;
-		in[0]= (fact*tex[0] + out[0]);
-		in[1]= (fact*tex[1] + out[1]);
-		in[2]= (fact*tex[2] + out[2]);
-		break;
-
-	case MTEX_DIV:
-		fact*= facg;
-		facm= 1.0f-fact;
-		
-		if (tex[0]!=0.0f)
-			in[0]= facm*out[0] + fact*out[0]/tex[0];
-		if (tex[1]!=0.0f)
-			in[1]= facm*out[1] + fact*out[1]/tex[1];
-		if (tex[2]!=0.0f)
-			in[2]= facm*out[2] + fact*out[2]/tex[2];
-
-		break;
-
-	case MTEX_DIFF:
-		fact*= facg;
-		facm= 1.0f-fact;
-		in[0]= facm*out[0] + fact*fabsf(tex[0]-out[0]);
-		in[1]= facm*out[1] + fact*fabsf(tex[1]-out[1]);
-		in[2]= facm*out[2] + fact*fabsf(tex[2]-out[2]);
-		break;
-
-	case MTEX_DARK:
-		fact*= facg;
-		facm= 1.0f-fact;
-		
-		in[0] = min_ff(out[0], tex[0])*fact + out[0]*facm;
-		in[1] = min_ff(out[1], tex[1])*fact + out[1]*facm;
-		in[2] = min_ff(out[2], tex[2])*fact + out[2]*facm;
-		break;
-
-	case MTEX_LIGHT:
-		fact*= facg;
-
-		in[0] = max_ff(fact * tex[0], out[0]);
-		in[1] = max_ff(fact * tex[1], out[1]);
-		in[2] = max_ff(fact * tex[2], out[2]);
-		break;
-		
-	case MTEX_BLEND_HUE:
-		fact*= facg;
-		copy_v3_v3(in, out);
-		ramp_blend(MA_RAMP_HUE, in, fact, tex);
-		break;
-	case MTEX_BLEND_SAT:
-		fact*= facg;
-		copy_v3_v3(in, out);
-		ramp_blend(MA_RAMP_SAT, in, fact, tex);
-		break;
-	case MTEX_BLEND_VAL:
-		fact*= facg;
-		copy_v3_v3(in, out);
-		ramp_blend(MA_RAMP_VAL, in, fact, tex);
-		break;
-	case MTEX_BLEND_COLOR:
-		fact*= facg;
-		copy_v3_v3(in, out);
-		ramp_blend(MA_RAMP_COLOR, in, fact, tex);
-		break;
-	case MTEX_SOFT_LIGHT: 
-		fact*= facg; 
-		copy_v3_v3(in, out);
-		ramp_blend(MA_RAMP_SOFT, in, fact, tex);
-		break; 
-	case MTEX_LIN_LIGHT: 
-		fact*= facg; 
-		copy_v3_v3(in, out);
-		ramp_blend(MA_RAMP_LINEAR, in, fact, tex);
-		break; 
+		case MTEX_BLEND:
+			ramp_blend(MA_RAMP_BLEND, in, fact, tex);
+			break;
+		case MTEX_MUL:
+			ramp_blend(MA_RAMP_MULT, in, fact, tex);
+			break;
+		case MTEX_SCREEN:
+			ramp_blend(MA_RAMP_SCREEN, in, fact, tex);
+			break;
+		case MTEX_OVERLAY:
+			ramp_blend(MA_RAMP_OVERLAY, in, fact, tex);
+			break;
+		case MTEX_SUB:
+			ramp_blend(MA_RAMP_SUB, in, fact, tex);
+			break;
+		case MTEX_ADD:
+			ramp_blend(MA_RAMP_ADD, in, fact, tex);
+			break;
+		case MTEX_DIV:
+			ramp_blend(MA_RAMP_DIV, in, fact, tex);
+			break;
+		case MTEX_DIFF:
+			ramp_blend(MA_RAMP_DIFF, in, fact, tex);
+			break;
+		case MTEX_DARK:
+			ramp_blend(MA_RAMP_DARK, in, fact, tex);
+			break;
+		case MTEX_LIGHT:
+			ramp_blend(MA_RAMP_LIGHT, in, fact, tex);
+			break;
+		case MTEX_BLEND_HUE:
+			ramp_blend(MA_RAMP_HUE, in, fact, tex);
+			break;
+		case MTEX_BLEND_SAT:
+			ramp_blend(MA_RAMP_SAT, in, fact, tex);
+			break;
+		case MTEX_BLEND_VAL:
+			ramp_blend(MA_RAMP_VAL, in, fact, tex);
+			break;
+		case MTEX_BLEND_COLOR:
+			ramp_blend(MA_RAMP_COLOR, in, fact, tex);
+			break;
+		case MTEX_SOFT_LIGHT:
+			ramp_blend(MA_RAMP_SOFT, in, fact, tex);
+			break;
+		case MTEX_LIN_LIGHT:
+			ramp_blend(MA_RAMP_LINEAR, in, fact, tex);
+			break;
 	}
 }
 
 float texture_value_blend(float tex, float out, float fact, float facg, int blendtype)
 {
-	float in=0.0, facm, col, scf;
-	int flip= (facg < 0.0f);
+	float in = 0.0f, facm;
+	int flip = (facg < 0.0f);
 
-	facg= fabsf(facg);
-	
-	fact*= facg;
-	facm= 1.0f-fact;
+	facg = fabsf(facg);
+	fact *= facg;
+	facm = 1.0f - fact;
+
 	if (flip) SWAP(float, fact, facm);
 
 	switch (blendtype) {
-	case MTEX_BLEND:
-		in= fact*tex + facm*out;
-		break;
-
-	case MTEX_MUL:
-		facm= 1.0f-facg;
-		in= (facm+fact*tex)*out;
-		break;
-
-	case MTEX_SCREEN:
-		facm= 1.0f-facg;
-		in= 1.0f-(facm+fact*(1.0f-tex))*(1.0f-out);
-		break;
-
-	case MTEX_OVERLAY:
-		facm= 1.0f-facg;
-		if (out < 0.5f)
-			in = out * (facm + 2.0f*fact*tex);
-		else
-			in = 1.0f - (facm + 2.0f*fact*(1.0f - tex)) * (1.0f - out);
-		break;
-
-	case MTEX_SUB:
-		fact= -fact;
-	case MTEX_ADD:
-		in= fact*tex + out;
-		break;
-
-	case MTEX_DIV:
-		if (tex!=0.0f)
-			in= facm*out + fact*out/tex;
-		break;
-
-	case MTEX_DIFF:
-		in= facm*out + fact*fabsf(tex-out);
-		break;
-
-	case MTEX_DARK:
-		in = min_ff(out, tex)*fact + out*facm;
-		break;
-
-	case MTEX_LIGHT:
-		col= fact*tex;
-		if (col > out) in= col; else in= out;
-		break;
-
-	case MTEX_SOFT_LIGHT: 
-		scf=1.0f - (1.0f - tex) * (1.0f - out);
-		in= facm*out + fact * ((1.0f - out) * tex * out) + (out * scf);
-		break;       
-
-	case MTEX_LIN_LIGHT: 
-		if (tex > 0.5f)
-			in = out + fact*(2.0f*(tex - 0.5f));
-		else 
-			in = out + fact*(2.0f*tex - 1.0f);
-		break;
+		case MTEX_ADD:
+			in = blend_color_add_float(out, tex, fact);
+			break;
+		case MTEX_BLEND:
+			in = blend_color_mix_float(out, tex, fact);
+			break;
+		case MTEX_DARK:
+			in = blend_color_darken_float(out, tex, fact);
+			break;
+		case MTEX_DIFF:
+			in = blend_color_diff_float(out, tex, fact);
+			break;
+		case MTEX_DIV:
+			in = blend_color_div_float(out, tex, fact);
+			break;
+		case MTEX_LIGHT:
+			in = blend_color_lighten_float(out, tex, fact);
+			break;
+		case MTEX_LIN_LIGHT:
+			in = blend_color_linlight_float(out, tex, fact);
+			break;
+		case MTEX_MUL:
+			in = blend_color_mul_float(out, tex, fact);
+			break;
+		case MTEX_OVERLAY:
+			in = blend_color_overlay_float(out, tex, fact);
+			break;
+		case MTEX_SCREEN:
+			in = blend_color_screen_float(out, tex, fact);
+			break;
+		case MTEX_SOFT_LIGHT:
+			in = blend_color_soft_light_float(out, tex, fact);
+			break;
+		case MTEX_SUB:
+			in = blend_color_sub_float(out, tex, fact);
+			break;
 	}
 	
 	return in;

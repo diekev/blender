@@ -33,35 +33,30 @@ ccl_device float3 svm_mix_mul(float t, float3 col1, float3 col2)
 
 ccl_device float3 svm_mix_screen(float t, float3 col1, float3 col2)
 {
-	float tm = 1.0f - t;
-	float3 one = make_float3(1.0f, 1.0f, 1.0f);
-	float3 tm3 = make_float3(tm, tm, tm);
-
-	return one - (tm3 + t*(one - col2))*(one - col1);
+	return interp(col1, col1 + col2 - (col1*col2), t);
 }
 
 ccl_device float3 svm_mix_overlay(float t, float3 col1, float3 col2)
 {
-	float tm = 1.0f - t;
 
 	float3 outcol = col1;
 
 	if(outcol.x < 0.5f)
-		outcol.x *= tm + 2.0f*t*col2.x;
+		outcol.x = col1.x*(2.0f*col2.x);
 	else
-		outcol.x = 1.0f - (tm + 2.0f*t*(1.0f - col2.x))*(1.0f - outcol.x);
+		outcol.x = 1.0f - 2.0f*(1.0f - col1.x)*(1.0f - col2.x);
 
 	if(outcol.y < 0.5f)
-		outcol.y *= tm + 2.0f*t*col2.y;
+		outcol.y = col1.y*(2.0f*col2.y);
 	else
-		outcol.y = 1.0f - (tm + 2.0f*t*(1.0f - col2.y))*(1.0f - outcol.y);
+		outcol.y = 1.0f - 2.0f*(1.0f - col1.y)*(1.0f - col2.y);
 
 	if(outcol.z < 0.5f)
-		outcol.z *= tm + 2.0f*t*col2.z;
+		outcol.z = col1.z*(2.0f*col2.z);
 	else
-		outcol.z = 1.0f - (tm + 2.0f*t*(1.0f - col2.z))*(1.0f - outcol.z);
+		outcol.z = 1.0f - 2.0f*(1.0f - col1.z)*(1.0f - col2.z);
 	
-	return outcol;
+	return interp(col1, outcol, t);
 }
 
 ccl_device float3 svm_mix_sub(float t, float3 col1, float3 col2)
@@ -71,15 +66,13 @@ ccl_device float3 svm_mix_sub(float t, float3 col1, float3 col2)
 
 ccl_device float3 svm_mix_div(float t, float3 col1, float3 col2)
 {
-	float tm = 1.0f - t;
-
 	float3 outcol = col1;
 
-	if(col2.x != 0.0f) outcol.x = tm*outcol.x + t*outcol.x/col2.x;
-	if(col2.y != 0.0f) outcol.y = tm*outcol.y + t*outcol.y/col2.y;
-	if(col2.z != 0.0f) outcol.z = tm*outcol.z + t*outcol.z/col2.z;
+	if(col2.x != 0.0f) outcol.x = col1.x/col2.x;
+	if(col2.y != 0.0f) outcol.y = col1.y/col2.y;
+	if(col2.z != 0.0f) outcol.z = col1.z/col2.z;
 
-	return outcol;
+	return interp(col1, outcol, t);
 }
 
 ccl_device float3 svm_mix_diff(float t, float3 col1, float3 col2)
@@ -89,86 +82,68 @@ ccl_device float3 svm_mix_diff(float t, float3 col1, float3 col2)
 
 ccl_device float3 svm_mix_dark(float t, float3 col1, float3 col2)
 {
-	return min(col1, col2)*t + col1*(1.0f - t);
+	return interp(col1, min(col1, col2), t);
 }
 
 ccl_device float3 svm_mix_light(float t, float3 col1, float3 col2)
 {
-	return max(col1, col2*t);
+	return interp(col1, max(col1, col2), t);
 }
 
 ccl_device float3 svm_mix_dodge(float t, float3 col1, float3 col2)
 {
 	float3 outcol = col1;
 
-	if(outcol.x != 0.0f) {
-		float tmp = 1.0f - t*col2.x;
-		if(tmp <= 0.0f)
-			outcol.x = 1.0f;
-		else if((tmp = outcol.x/tmp) > 1.0f)
-			outcol.x = 1.0f;
-		else
-			outcol.x = tmp;
-	}
-	if(outcol.y != 0.0f) {
-		float tmp = 1.0f - t*col2.y;
-		if(tmp <= 0.0f)
-			outcol.y = 1.0f;
-		else if((tmp = outcol.y/tmp) > 1.0f)
-			outcol.y = 1.0f;
-		else
-			outcol.y = tmp;
-	}
-	if(outcol.z != 0.0f) {
-		float tmp = 1.0f - t*col2.z;
-		if(tmp <= 0.0f)
-			outcol.z = 1.0f;
-		else if((tmp = outcol.z/tmp) > 1.0f)
-			outcol.z = 1.0f;
-		else
-			outcol.z = tmp;
-	}
+	if(col1.x == 0.0f)
+		outcol.x = 0.0f;
+	else if(col2.x == 1.0f)
+		outcol.x = 1.0f;
+	else
+		outcol.x = min(1.0f, col1.x/(1.0f - col2.x));
 
-	return outcol;
+	if(col1.y == 0.0f)
+		outcol.y = 0.0f;
+	else if(col2.y == 1.0f)
+		outcol.y = 1.0f;
+	else
+		outcol.y = min(1.0f, col1.y/(1.0f - col2.y));
+
+	if(col1.z == 0.0f)
+		outcol.z = 0.0f;
+	else if(col2.z == 1.0f)
+		outcol.z = 1.0f;
+	else
+		outcol.z = min(1.0f, col1.z/(1.0f - col2.z));
+
+	return interp(col1, outcol, t);
 }
 
 ccl_device float3 svm_mix_burn(float t, float3 col1, float3 col2)
 {
-	float tmp, tm = 1.0f - t;
-
 	float3 outcol = col1;
 
-	tmp = tm + t*col2.x;
-	if(tmp <= 0.0f)
-		outcol.x = 0.0f;
-	else if((tmp = (1.0f - (1.0f - outcol.x)/tmp)) < 0.0f)
-		outcol.x = 0.0f;
-	else if(tmp > 1.0f)
+	if(col1.x == 1.0f)
 		outcol.x = 1.0f;
+	else if(col2.x == 0.0f)
+		outcol.x = 0.0f;
 	else
-		outcol.x = tmp;
+		outcol.x = 1.0f - min(1.0f, (1.0f - col1.x)/col2.x);
 
-	tmp = tm + t*col2.y;
-	if(tmp <= 0.0f)
-		outcol.y = 0.0f;
-	else if((tmp = (1.0f - (1.0f - outcol.y)/tmp)) < 0.0f)
-		outcol.y = 0.0f;
-	else if(tmp > 1.0f)
+	if(col1.y == 1.0f)
 		outcol.y = 1.0f;
+	else if(col2.y == 0.0f)
+		outcol.y = 0.0f;
 	else
-		outcol.y = tmp;
+		outcol.y = 1.0f - min(1.0f, (1.0f - col1.y)/col2.y);
 
-	tmp = tm + t*col2.z;
-	if(tmp <= 0.0f)
-		outcol.z = 0.0f;
-	else if((tmp = (1.0f - (1.0f - outcol.z)/tmp)) < 0.0f)
-		outcol.z = 0.0f;
-	else if(tmp > 1.0f)
+	if(col1.z == 1.0f)
 		outcol.z = 1.0f;
+	else if(col2.z == 0.0f)
+		outcol.z = 0.0f;
 	else
-		outcol.z = tmp;
+		outcol.z = 1.0f - min(1.0f, (1.0f - col1.z)/col2.z);
 	
-	return outcol;
+	return interp(col1, outcol, t);
 }
 
 ccl_device float3 svm_mix_hue(float t, float3 col1, float3 col2)
@@ -237,17 +212,17 @@ ccl_device float3 svm_mix_color(float t, float3 col1, float3 col2)
 
 ccl_device float3 svm_mix_soft(float t, float3 col1, float3 col2)
 {
-	float tm = 1.0f - t;
-
 	float3 one = make_float3(1.0f, 1.0f, 1.0f);
-	float3 scr = one - (one - col2)*(one - col1);
+	float3 scr = col1 + col2 - (col1*col2);
 
-	return tm*col1 + t*((one - col1)*col2*col1 + col1*scr);
+	return interp(col1, (one - col1)*col2*col1 + col1*scr, t);
 }
 
 ccl_device float3 svm_mix_linear(float t, float3 col1, float3 col2)
 {
-	return col1 + t*(2.0f*col2 + make_float3(-1.0f, -1.0f, -1.0f));
+	float3 one = make_float3(1.0f, 1.0f, 1.0f);
+
+	return interp(col1, col1 + 2.0f*col2 - one, t);
 }
 
 ccl_device float3 svm_mix_clamp(float3 col)

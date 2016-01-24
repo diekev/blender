@@ -33,6 +33,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
+#include "BLI_math_color_blend.h"
 #include "BLI_array_utils.h"
 #include "BLI_bitmap.h"
 
@@ -538,190 +539,77 @@ void vpaint_dogamma(Scene *scene)
 }
 #endif
 
-BLI_INLINE unsigned int mcol_blend(unsigned int col1, unsigned int col2, int fac)
-{
-	unsigned char *cp1, *cp2, *cp;
-	int mfac;
-	unsigned int col = 0;
-
-	if (fac == 0) {
-		return col1;
-	}
-
-	if (fac >= 255) {
-		return col2;
-	}
-
-	mfac = 255 - fac;
-
-	cp1 = (unsigned char *)&col1;
-	cp2 = (unsigned char *)&col2;
-	cp  = (unsigned char *)&col;
-
-	cp[0] = divide_round_i((mfac * cp1[0] + fac * cp2[0]), 255);
-	cp[1] = divide_round_i((mfac * cp1[1] + fac * cp2[1]), 255);
-	cp[2] = divide_round_i((mfac * cp1[2] + fac * cp2[2]), 255);
-	cp[3] = 255;
-
-	return col;
-}
-
-BLI_INLINE unsigned int mcol_add(unsigned int col1, unsigned int col2, int fac)
-{
-	unsigned char *cp1, *cp2, *cp;
-	int temp;
-	unsigned int col = 0;
-
-	if (fac == 0) {
-		return col1;
-	}
-
-	cp1 = (unsigned char *)&col1;
-	cp2 = (unsigned char *)&col2;
-	cp  = (unsigned char *)&col;
-
-	temp = cp1[0] + divide_round_i((fac * cp2[0]), 255);
-	cp[0] = (temp > 254) ? 255 : temp;
-	temp = cp1[1] + divide_round_i((fac * cp2[1]), 255);
-	cp[1] = (temp > 254) ? 255 : temp;
-	temp = cp1[2] + divide_round_i((fac * cp2[2]), 255);
-	cp[2] = (temp > 254) ? 255 : temp;
-	cp[3] = 255;
-	
-	return col;
-}
-
-BLI_INLINE unsigned int mcol_sub(unsigned int col1, unsigned int col2, int fac)
-{
-	unsigned char *cp1, *cp2, *cp;
-	int temp;
-	unsigned int col = 0;
-
-	if (fac == 0) {
-		return col1;
-	}
-
-	cp1 = (unsigned char *)&col1;
-	cp2 = (unsigned char *)&col2;
-	cp  = (unsigned char *)&col;
-
-	temp = cp1[0] - divide_round_i((fac * cp2[0]), 255);
-	cp[0] = (temp < 0) ? 0 : temp;
-	temp = cp1[1] - divide_round_i((fac * cp2[1]), 255);
-	cp[1] = (temp < 0) ? 0 : temp;
-	temp = cp1[2] - divide_round_i((fac * cp2[2]), 255);
-	cp[2] = (temp < 0) ? 0 : temp;
-	cp[3] = 255;
-
-	return col;
-}
-
-BLI_INLINE unsigned int mcol_mul(unsigned int col1, unsigned int col2, int fac)
-{
-	unsigned char *cp1, *cp2, *cp;
-	int mfac;
-	unsigned int col = 0;
-
-	if (fac == 0) {
-		return col1;
-	}
-
-	mfac = 255 - fac;
-
-	cp1 = (unsigned char *)&col1;
-	cp2 = (unsigned char *)&col2;
-	cp  = (unsigned char *)&col;
-
-	/* first mul, then blend the fac */
-	cp[0] = divide_round_i(mfac * cp1[0] * 255 + fac * cp2[0] * cp1[0], 255 * 255);
-	cp[1] = divide_round_i(mfac * cp1[1] * 255 + fac * cp2[1] * cp1[1], 255 * 255);
-	cp[2] = divide_round_i(mfac * cp1[2] * 255 + fac * cp2[2] * cp1[2], 255 * 255);
-	cp[3] = 255;
-
-	return col;
-}
-
-BLI_INLINE unsigned int mcol_lighten(unsigned int col1, unsigned int col2, int fac)
-{
-	unsigned char *cp1, *cp2, *cp;
-	int mfac;
-	unsigned int col = 0;
-
-	if (fac == 0) {
-		return col1;
-	}
-	else if (fac >= 255) {
-		return col2;
-	}
-
-	mfac = 255 - fac;
-
-	cp1 = (unsigned char *)&col1;
-	cp2 = (unsigned char *)&col2;
-	cp  = (unsigned char *)&col;
-
-	/* See if are lighter, if so mix, else don't do anything.
-	 * if the paint col is darker then the original, then ignore */
-	if (IMB_colormanagement_get_luminance_byte(cp1) > IMB_colormanagement_get_luminance_byte(cp2)) {
-		return col1;
-	}
-
-	cp[0] = divide_round_i(mfac * cp1[0] + fac * cp2[0], 255);
-	cp[1] = divide_round_i(mfac * cp1[1] + fac * cp2[1], 255);
-	cp[2] = divide_round_i(mfac * cp1[2] + fac * cp2[2], 255);
-	cp[3] = 255;
-
-	return col;
-}
-
-BLI_INLINE unsigned int mcol_darken(unsigned int col1, unsigned int col2, int fac)
-{
-	unsigned char *cp1, *cp2, *cp;
-	int mfac;
-	unsigned int col = 0;
-
-	if (fac == 0) {
-		return col1;
-	}
-	else if (fac >= 255) {
-		return col2;
-	}
-
-	mfac = 255 - fac;
-
-	cp1 = (unsigned char *)&col1;
-	cp2 = (unsigned char *)&col2;
-	cp  = (unsigned char *)&col;
-
-	/* See if were darker, if so mix, else don't do anything.
-	 * if the paint col is brighter then the original, then ignore */
-	if (IMB_colormanagement_get_luminance_byte(cp1) < IMB_colormanagement_get_luminance_byte(cp2)) {
-		return col1;
-	}
-
-	cp[0] = divide_round_i((mfac * cp1[0] + fac * cp2[0]), 255);
-	cp[1] = divide_round_i((mfac * cp1[1] + fac * cp2[1]), 255);
-	cp[2] = divide_round_i((mfac * cp1[2] + fac * cp2[2]), 255);
-	cp[3] = 255;
-	return col;
-}
+typedef void (*vpaint_blend_func)(unsigned char *, const unsigned char *, const unsigned char *);
 
 /* wpaint has 'wpaint_blend_tool' */
 static unsigned int vpaint_blend_tool(const int tool, const unsigned int col,
                                       const unsigned int paintcol, const int alpha_i)
 {
+	if (alpha_i == 0) {
+		return col;
+	}
+
+	vpaint_blend_func blend_func;
+
+	unsigned int ret = 0;
+	unsigned char *cp1 = (unsigned char *)&col;
+	unsigned char *cp2 = (unsigned char *)&paintcol;
+	unsigned char *cp  = (unsigned char *)&ret;
+
+	cp2[3] = (unsigned char)alpha_i;
+
 	switch (tool) {
 		case PAINT_BLEND_MIX:
-		case PAINT_BLEND_BLUR:     return mcol_blend(col, paintcol, alpha_i);
-		case PAINT_BLEND_ADD:      return mcol_add(col, paintcol, alpha_i);
-		case PAINT_BLEND_SUB:      return mcol_sub(col, paintcol, alpha_i);
-		case PAINT_BLEND_MUL:      return mcol_mul(col, paintcol, alpha_i);
-		case PAINT_BLEND_LIGHTEN:  return mcol_lighten(col, paintcol, alpha_i);
-		case PAINT_BLEND_DARKEN:   return mcol_darken(col, paintcol, alpha_i);
+		case PAINT_BLEND_BLUR:
+			if (alpha_i >= 255) {
+				return paintcol;
+			}
+
+			blend_func = blend_color_mix_byte;
+			break;
+		case PAINT_BLEND_ADD:
+			blend_func = blend_color_add_byte;
+			break;
+		case PAINT_BLEND_SUB:
+			blend_func = blend_color_sub_byte;
+			break;
+		case PAINT_BLEND_MUL:
+			blend_func = blend_color_mul_byte;
+			break;
+		case PAINT_BLEND_LIGHTEN:
+			if (alpha_i >= 255) {
+				return paintcol;
+			}
+
+			/* See if we are lighter, if so mix, else don't do anything.
+			 * if the paint col is darker than the original, then ignore */
+			if (IMB_colormanagement_get_luminance_byte(cp1) > IMB_colormanagement_get_luminance_byte(cp2)) {
+				return col;
+			}
+
+			blend_func = blend_color_lighten_byte;
+			break;
+		case PAINT_BLEND_DARKEN:
+			if (alpha_i >= 255) {
+				return paintcol;
+			}
+
+			/* See if we are darker, if so mix, else don't do anything.
+			 * if the paint col is brighter than the original, then ignore */
+			if (IMB_colormanagement_get_luminance_byte(cp1) < IMB_colormanagement_get_luminance_byte(cp2)) {
+				return col;
+			}
+
+			blend_func = blend_color_darken_byte;
+			break;
 		default:
 			BLI_assert(0);
 			return 0;
 	}
+
+	blend_func(cp, cp1, cp2);
+
+	return ret;
 }
 
 /* wpaint has 'wpaint_blend' */
@@ -872,34 +760,6 @@ static float calc_vp_alpha_col_dl(VPaint *vp, ViewContext *vc,
 	return 0.0f;
 }
 
-
-BLI_INLINE float wval_blend(const float weight, const float paintval, const float alpha)
-{
-	const float talpha = min_ff(alpha, 1.0f);  /* blending with values over 1 doesn't make sense */
-	return (paintval * talpha) + (weight * (1.0f - talpha));
-}
-BLI_INLINE float wval_add(const float weight, const float paintval, const float alpha)
-{
-	return weight + (paintval * alpha);
-}
-BLI_INLINE float wval_sub(const float weight, const float paintval, const float alpha)
-{
-	return weight - (paintval * alpha);
-}
-BLI_INLINE float wval_mul(const float weight, const float paintval, const float alpha)
-{   /* first mul, then blend the fac */
-	return ((1.0f - alpha) + (alpha * paintval)) * weight;
-}
-BLI_INLINE float wval_lighten(const float weight, const float paintval, const float alpha)
-{
-	return (weight < paintval) ? wval_blend(weight, paintval, alpha) : weight;
-}
-BLI_INLINE float wval_darken(const float weight, const float paintval, const float alpha)
-{
-	return (weight > paintval) ? wval_blend(weight, paintval, alpha) : weight;
-}
-
-
 /* vpaint has 'vpaint_blend_tool' */
 /* result is not clamped from [0-1] */
 static float wpaint_blend_tool(const int tool,
@@ -909,12 +769,12 @@ static float wpaint_blend_tool(const int tool,
 {
 	switch (tool) {
 		case PAINT_BLEND_MIX:
-		case PAINT_BLEND_BLUR:     return wval_blend(weight, paintval, alpha);
-		case PAINT_BLEND_ADD:      return wval_add(weight, paintval, alpha);
-		case PAINT_BLEND_SUB:      return wval_sub(weight, paintval, alpha);
-		case PAINT_BLEND_MUL:      return wval_mul(weight, paintval, alpha);
-		case PAINT_BLEND_LIGHTEN:  return wval_lighten(weight, paintval, alpha);
-		case PAINT_BLEND_DARKEN:   return wval_darken(weight, paintval, alpha);
+		case PAINT_BLEND_BLUR:     return blend_color_mix_float(weight, paintval, alpha);
+		case PAINT_BLEND_ADD:      return blend_color_add_float(weight, paintval, alpha);
+		case PAINT_BLEND_SUB:      return blend_color_sub_float(weight, paintval, alpha);
+		case PAINT_BLEND_MUL:      return blend_color_mul_float(weight, paintval, alpha);
+		case PAINT_BLEND_LIGHTEN:  return blend_color_lighten_float(weight, paintval, alpha);
+		case PAINT_BLEND_DARKEN:   return blend_color_darken_float(weight, paintval, alpha);
 		default:
 			BLI_assert(0);
 			return 0.0f;
