@@ -433,10 +433,12 @@ static void image_assign_ibuf(Image *ima, ImBuf *ibuf, int index, int frame)
 		imagecache_put(ima, index, ibuf);
 
 		if ((ima->source == IMA_SRC_FILE) || (ima->source == IMA_SRC_GENERATED)) {
-			image_add_image_layer_base(ima);
-			if (ima->source == IMA_SRC_FILE) {
-				((ImageLayer *)ima->imlayers.last)->background = IMA_LAYER_BG_IMAGE;
-				strcpy(((ImageLayer *)ima->imlayers.last)->file_path, ima->name);
+			if (ima->imlayers.first == NULL) {
+				image_add_image_layer_base(ima);
+				if (ima->source == IMA_SRC_FILE) {
+					((ImageLayer *)ima->imlayers.last)->background = IMA_LAYER_BG_IMAGE;
+					strcpy(((ImageLayer *)ima->imlayers.last)->file_path, ima->name);
+				}
 			}
 		}
 	}
