@@ -827,10 +827,10 @@ ImageLayer *BKE_add_image_file_as_layer(Image *ima, const char *name)
 	layer_act = imalayer_get_current(ima);
 	layer_act->select = !IMA_LAYER_SEL_CURRENT;
 
-	iml = layer_alloc(ima, newname);
+	iml = image_layer_new(ima, newname);
 	if (iml) {
 		BLI_addhead(&ima->imlayers, iml);
-		ima->Act_Layers = 0;
+		ima->active_layer = 0;
 		ima->num_layers += 1;
 
 		//if (color[3] == 1.0f)

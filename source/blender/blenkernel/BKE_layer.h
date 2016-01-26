@@ -43,13 +43,13 @@ struct ImBuf;
 
 /* call from library */
 
-struct ImageLayer *layer_alloc(struct Image *ima, const char *name);
+struct ImageLayer *image_layer_new(struct Image *ima, const char *name);
 
 /* Removes all image layers from the image "ima" */
 void image_free_image_layers(struct Image *ima);
  
 /* Frees an image layer and associated memory */
-void free_image_layer(struct ImageLayer *layer);
+void image_layer_free(struct ImageLayer *layer);
  
 /* Removes the currently selected image layer */
 int image_remove_layer(struct Image *ima, const int action);
@@ -65,7 +65,7 @@ struct ImageLayer *image_add_image_layer(struct Image *ima, const char *name, in
 void image_add_image_layer_base(struct Image *ima);
  
 /* Returns the index of the currently selected image layer */
-short imalayer_get_current_act(struct Image *ima);
+short image_get_current_layer_index(struct Image *ima);
  
 /* Selects the image layer with the number specified in "value" */
 void imalayer_set_current_act(struct Image *ima, short value);

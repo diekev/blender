@@ -144,8 +144,6 @@
 #include "BKE_outliner_treehash.h"
 #include "BKE_sound.h"
 
-#include "IMB_imbuf_types.h"
-
 #include "NOD_common.h"
 #include "NOD_socket.h"
 
@@ -3689,14 +3687,6 @@ static void direct_link_image(FileData *fd, Image *ima)
 
 	for (iml = (ImageLayer *)ima->imlayers.first; iml; iml = iml->next)
 		link_list(fd, &iml->ibufs);
-
-	for (iml = (ImageLayer *)ima->imlayers.first; iml; iml = iml->next) {
-		ImBuf *ibuf = iml->ibufs.first;
-		for (; ibuf; ibuf = ibuf->next) {
-			ibuf->rect_float = newdataadr(fd, ibuf->rect_float);
-			ibuf->rect = newdataadr(fd, ibuf->rect);
-		}
-	}
 }
 
 

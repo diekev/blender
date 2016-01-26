@@ -3448,7 +3448,7 @@ static int image_duplicate_exec(bContext *C, wmOperator *op)
 
 	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
 	//BLI_addtail(&new_ima->ibufs, IMB_dupImBuf(ibuf));
-	new_ima->Act_Layers = ima->Act_Layers;
+	new_ima->active_layer = ima->active_layer;
 	new_ima->num_layers = ima->num_layers;
 	new_ima->use_layers = ima->use_layers;
 	new_ima->color_space = ima->color_space;
@@ -3976,22 +3976,22 @@ static int image_merge_exec(bContext *C, wmOperator *op)
 			else {
 				if (discard) {
 					BLI_remlink(&ima->imlayers, layer);
-					free_image_layer(layer);
+					image_layer_free(layer);
 					if (ima->imlayers.first) {
-						if (imalayer_get_current_act(ima) != 1)
-							imalayer_set_current_act(ima, imalayer_get_current_act(ima));
+						if (image_get_current_layer_index(ima) != 1)
+							imalayer_set_current_act(ima, image_get_current_layer_index(ima));
 						else
-							imalayer_set_current_act(ima, imalayer_get_current_act(ima) - 1);
+							imalayer_set_current_act(ima, image_get_current_layer_index(ima) - 1);
 					}
 					ima->num_layers -= 1;
 				}
 			}
 		}
 		if (discard)
-			ima->Act_Layers = 0;
+			ima->active_layer = 0;
 		else
-			ima->Act_Layers = ima->num_layers -1;
-		imalayer_set_current_act(ima, ima->Act_Layers);
+			ima->active_layer = ima->num_layers -1;
+		imalayer_set_current_act(ima, ima->active_layer);
 	}
 	else
 		BKE_report(op->reports, RPT_INFO, "It can not merge the layers, because the layers are hidden");
@@ -4054,19 +4054,19 @@ static int image_flatten_exec(bContext *C, wmOperator *op)
 			}
 			else {
 				BLI_remlink(&ima->imlayers, layer);
-				free_image_layer(layer);
+				image_layer_free(layer);
 				if (ima->imlayers.first) {
-					if (imalayer_get_current_act(ima) != 1)
-						imalayer_set_current_act(ima, imalayer_get_current_act(ima));
+					if (image_get_current_layer_index(ima) != 1)
+						imalayer_set_current_act(ima, image_get_current_layer_index(ima));
 					else
-						imalayer_set_current_act(ima, imalayer_get_current_act(ima) - 1);
+						imalayer_set_current_act(ima, image_get_current_layer_index(ima) - 1);
 				}
 				ima->num_layers -= 1;
 			}
 		}
 
-		ima->Act_Layers = 0;
-		imalayer_set_current_act(ima, ima->Act_Layers);
+		ima->active_layer = 0;
+		imalayer_set_current_act(ima, ima->active_layer);
 
 		imagelayer_get_background_color(col, prec);
 
@@ -4365,7 +4365,7 @@ static int image_layer_move_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 
 	type = RNA_enum_get(op->ptr, "type");
-	layerID = imalayer_get_current_act(ima);
+	layerID = image_get_current_layer_index(ima);
 
 	if (!(layer->type & IMA_LAYER_BASE)) {
 		if (type == -1) { /* Move direction: Up */
@@ -4402,18 +4402,18 @@ static int image_layer_move_exec(bContext *C, wmOperator *op)
 			BLI_remlink(&ima->imlayers, layer);
 			layer->next = layer->prev = NULL;
 			BLI_addhead(&ima->imlayers, layer);
-			ima->Act_Layers = 0;
+			ima->active_layer = 0;
 		}
 		else if (type == 2) {  /* Move direction: Bottom */
 			BLI_remlink(&ima->imlayers, layer);
 			layer->next = layer->prev = NULL;
 			if (((ImageLayer *)ima->imlayers.last)->type & IMA_LAYER_BASE) {
 				BLI_insertlinkafter(&ima->imlayers,((ImageLayer *)ima->imlayers.last)->prev, layer);
-				ima->Act_Layers = ima->num_layers - 2;
+				ima->active_layer = ima->num_layers - 2;
 			}
 			else {
 				BLI_addtail(&ima->imlayers, layer);
-				ima->Act_Layers = ima->num_layers - 1;
+				ima->active_layer = ima->num_layers - 1;
 			}
 		}
 		else if (type == 3) {  /* Move direction: Invert */
@@ -4497,26 +4497,26 @@ static int image_layer_select_exec(bContext *C, wmOperator *op)
 
 	switch (action) {
 		case IMA_LAYER_SEL_PREVIOUS:
-			if (ima->Act_Layers >= 1) {
+			if (ima->active_layer >= 1) {
 				layer->select = !IMA_LAYER_SEL_CURRENT;
 				layer->prev->select = IMA_LAYER_SEL_CURRENT;
-				ima->Act_Layers--;
+				ima->active_layer--;
 			}
 			break;
 		case IMA_LAYER_SEL_NEXT:
-			if (ima->Act_Layers < (ima->num_layers-1)) {
+			if (ima->active_layer < (ima->num_layers-1)) {
 				layer->select = !IMA_LAYER_SEL_CURRENT;
 				layer->next->select = IMA_LAYER_SEL_CURRENT;
-				ima->Act_Layers++;
+				ima->active_layer++;
 			}
 			break;
 		case IMA_LAYER_SEL_TOP:
 			((ImageLayer *)ima->imlayers.first)->select = IMA_LAYER_SEL_CURRENT;
-			ima->Act_Layers = 0;
+			ima->active_layer = 0;
 			break;
 		case IMA_LAYER_SEL_BOTTOM:
 			((ImageLayer *)ima->imlayers.last)->select = IMA_LAYER_SEL_CURRENT;
-			ima->Act_Layers = ima->num_layers - 1;
+			ima->active_layer = ima->num_layers - 1;
 			break;
 	}
 	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
@@ -4572,7 +4572,7 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 			if ((next->visible & IMA_LAYER_VISIBLE) && (!(next->locked & IMA_LAYER_LOCK))) {
 				merge_layers(ima, layer, next);
 
-				imalayer_set_current_act(ima, imalayer_get_current_act(ima));
+				imalayer_set_current_act(ima, image_get_current_layer_index(ima));
 				ima->num_layers--;
 			}
 			else
@@ -4603,7 +4603,7 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 					ima->num_layers--;
 				}
 			}
-			imalayer_set_current_act(ima,imalayer_get_current_act(ima));
+			imalayer_set_current_act(ima,image_get_current_layer_index(ima));
 		}
 		else
 			BKE_report(op->reports, RPT_INFO, "It can not merge the layers, because the layers are hidden");
@@ -4618,7 +4618,7 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 			}
 			else {
 				BLI_remlink(&ima->imlayers, layer);
-				free_image_layer(layer);
+				image_layer_free(layer);
 				ima->num_layers--;
 			}
 		}
@@ -4631,7 +4631,7 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 					next = next->next;
 
 					BLI_remlink(&ima->imlayers, app);
-					free_image_layer(app);
+					image_layer_free(app);
 					ima->num_layers--;
 				}
 				if (next) {
@@ -4640,7 +4640,7 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 				}
 			}
 
-			imalayer_set_current_act(ima, imalayer_get_current_act(ima));
+			imalayer_set_current_act(ima, image_get_current_layer_index(ima));
 			layer = (ImageLayer *)ima->imlayers.last;
 			if (!(layer->type & IMA_LAYER_BASE)) {
 				ImBuf *base;

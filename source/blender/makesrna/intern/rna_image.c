@@ -542,7 +542,7 @@ static void rna_Image_layers_begin(CollectionPropertyIterator *iter, PointerRNA 
 static int rna_Image_active_image_layer_index_get(PointerRNA *ptr)
 {
 	Image *ima = (Image*)ptr->data;
-	return imalayer_get_current_act(ima);
+	return image_get_current_layer_index(ima);
 }
 
 static void rna_Image_active_image_layer_index_set(PointerRNA *ptr, int value)
@@ -793,7 +793,7 @@ static void rna_def_image_layers(BlenderRNA *brna, PropertyRNA *cprop)
 	RNA_def_property_update(prop, NC_IMAGE | ND_DISPLAY, NULL);
 
 	prop = RNA_def_property(srna, "active_image_layer_index", PROP_INT, PROP_UNSIGNED);
-	RNA_def_property_int_sdna(prop, NULL, "Act_Layers");
+	RNA_def_property_int_sdna(prop, NULL, "active_layer");
 	RNA_def_property_int_funcs(prop, "rna_Image_active_image_layer_index_get", "rna_Image_active_image_layer_index_set",
 							   "rna_Image_active_image_layer_index_range");
 	RNA_def_property_ui_text(prop, "Active Image Layer Index", "Index of active image layer slot");

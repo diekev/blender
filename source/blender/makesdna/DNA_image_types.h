@@ -245,7 +245,7 @@ typedef struct Image {
 	RenderSlot render_slots[8];  /* 8 = IMA_MAX_RENDER_SLOT */
 
 	/* image layers */
-	int Act_Layers;
+	int active_layer;
 	int num_layers;
 	short use_layers;
 	short color_space;
