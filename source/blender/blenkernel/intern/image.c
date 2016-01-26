@@ -2299,7 +2299,7 @@ void BKE_imbuf_write_prepare(ImBuf *ibuf, const ImageFormatData *imf)
 		if (imf->tiff_codec == R_IMF_TIFF_CODEC_NONE) {
 			ibuf->foptions.flag |= TIF_COMPRESS_NONE;
 		}
-		else if (imf->tiff_codec== R_IMF_TIFF_CODEC_DEFLATE) {
+		else if (imf->tiff_codec == R_IMF_TIFF_CODEC_DEFLATE) {
 			ibuf->foptions.flag |= TIF_COMPRESS_DEFLATE;
 		}
 		else if (imf->tiff_codec == R_IMF_TIFF_CODEC_LZW) {
@@ -4495,6 +4495,15 @@ void BKE_image_get_size(Image *image, ImageUser *iuser, int *width, int *height)
 	if (ibuf && ibuf->x > 0 && ibuf->y > 0) {
 		*width = ibuf->x;
 		*height = ibuf->y;
+	}
+	else if (image->type == IMA_TYPE_R_RESULT && iuser != NULL && iuser->scene != NULL) {
+		Scene *scene = iuser->scene;
+		*width = (scene->r.xsch * scene->r.size) / 100;
+		*height = (scene->r.ysch * scene->r.size) / 100;
+		if ((scene->r.mode & R_BORDER) && (scene->r.mode & R_CROP)) {
+			*width *= BLI_rctf_size_x(&scene->r.border);
+			*height *= BLI_rctf_size_y(&scene->r.border);
+		}
 	}
 	else {
 		*width  = IMG_SIZE_FALLBACK;
