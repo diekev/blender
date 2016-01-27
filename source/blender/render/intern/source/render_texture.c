@@ -1417,40 +1417,40 @@ float texture_value_blend(float tex, float out, float fact, float facg, int blen
 
 	switch (blendtype) {
 		case MTEX_ADD:
-			in = blend_color_add_float(out, tex, fact);
+			in = blend_value_add_float(out, tex, fact);
 			break;
 		case MTEX_BLEND:
-			in = blend_color_mix_float(out, tex, fact);
+			in = blend_value_mix_float(out, tex, fact);
 			break;
 		case MTEX_DARK:
-			in = blend_color_darken_float(out, tex, fact);
+			in = blend_value_darken_float(out, tex, fact);
 			break;
 		case MTEX_DIFF:
-			in = blend_color_diff_float(out, tex, fact);
+			in = blend_value_diff_float(out, tex, fact);
 			break;
 		case MTEX_DIV:
-			in = blend_color_div_float(out, tex, fact);
+			in = blend_value_div_float(out, tex, fact);
 			break;
 		case MTEX_LIGHT:
-			in = blend_color_lighten_float(out, tex, fact);
+			in = blend_value_lighten_float(out, tex, fact);
 			break;
 		case MTEX_LIN_LIGHT:
-			in = blend_color_linlight_float(out, tex, fact);
+			in = blend_value_linlight_float(out, tex, fact);
 			break;
 		case MTEX_MUL:
-			in = blend_color_mul_float(out, tex, fact);
+			in = blend_value_mul_float(out, tex, fact);
 			break;
 		case MTEX_OVERLAY:
-			in = blend_color_overlay_float(out, tex, fact);
+			in = blend_value_overlay_float(out, tex, fact);
 			break;
 		case MTEX_SCREEN:
-			in = blend_color_screen_float(out, tex, fact);
+			in = blend_value_screen_float(out, tex, fact);
 			break;
 		case MTEX_SOFT_LIGHT:
-			in = blend_color_soft_light_float(out, tex, fact);
+			in = blend_value_soft_light_float(out, tex, fact);
 			break;
 		case MTEX_SUB:
-			in = blend_color_sub_float(out, tex, fact);
+			in = blend_value_sub_float(out, tex, fact);
 			break;
 	}
 	

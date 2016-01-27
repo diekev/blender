@@ -769,12 +769,12 @@ static float wpaint_blend_tool(const int tool,
 {
 	switch (tool) {
 		case PAINT_BLEND_MIX:
-		case PAINT_BLEND_BLUR:     return blend_color_mix_float(weight, paintval, alpha);
-		case PAINT_BLEND_ADD:      return blend_color_add_float(weight, paintval, alpha);
-		case PAINT_BLEND_SUB:      return blend_color_sub_float(weight, paintval, alpha);
-		case PAINT_BLEND_MUL:      return blend_color_mul_float(weight, paintval, alpha);
-		case PAINT_BLEND_LIGHTEN:  return blend_color_lighten_float(weight, paintval, alpha);
-		case PAINT_BLEND_DARKEN:   return blend_color_darken_float(weight, paintval, alpha);
+		case PAINT_BLEND_BLUR:     return blend_value_mix_float(weight, paintval, alpha);
+		case PAINT_BLEND_ADD:      return blend_value_add_float(weight, paintval, alpha);
+		case PAINT_BLEND_SUB:      return blend_value_sub_float(weight, paintval, alpha);
+		case PAINT_BLEND_MUL:      return blend_value_mul_float(weight, paintval, alpha);
+		case PAINT_BLEND_LIGHTEN:  return blend_value_lighten_float(weight, paintval, alpha);
+		case PAINT_BLEND_DARKEN:   return blend_value_darken_float(weight, paintval, alpha);
 		default:
 			BLI_assert(0);
 			return 0.0f;

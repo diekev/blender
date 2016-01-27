@@ -69,25 +69,25 @@ MINLINE void blend_color_luminosity_byte(unsigned char dst[4], unsigned const ch
 
 MINLINE void blend_color_interpolate_byte(unsigned char dst[4], const unsigned char src1[4], const unsigned char src2[4], float t);
 
-MINLINE float blend_color_add_float(const float src1, const float src2, const float fac);
-MINLINE float blend_color_burn_float(const float src1, const float src2, const float fac);
-MINLINE float blend_color_darken_float(const float src1, const float src2, const float fac);
-MINLINE float blend_color_diff_float(const float src1, const float src2, const float fac);
-MINLINE float blend_color_div_float(const float src1, const float src2, const float fac);
-MINLINE float blend_color_dodge_float(const float src1, const float src2, const float fac);
-MINLINE float blend_color_exclusion_float(const float src1, const float src2, const float fac);
-MINLINE float blend_color_hardlight_float(const float src1, const float src2, const float fac);
-MINLINE float blend_color_lighten_float(const float src1, const float src2, const float fac);
-MINLINE float blend_color_linlight_float(const float src1, const float src2, const float fac);
-MINLINE float blend_color_linearburn_float(const float src1, const float src2, const float fac);
-MINLINE float blend_color_mul_float(const float src1, const float src2, const float fac);
-MINLINE float blend_color_mix_float(const float src1, const float src2, const float fac);
-MINLINE float blend_color_overlay_float(const float src1, const float src2, const float fac);
-MINLINE float blend_color_pinlight_float(const float src1, const float src2, const float fac);
-MINLINE float blend_color_screen_float(const float src1, const float src2, const float fac);
-MINLINE float blend_color_soft_light_float(const float src1, const float src2, const float fac);
-MINLINE float blend_color_sub_float(const float src1, const float src2, const float fac);
-MINLINE float blend_color_vividlight_float(const float src1, const float src2, const float fac);
+MINLINE float blend_value_add_float(const float src1, const float src2, const float fac);
+MINLINE float blend_value_burn_float(const float src1, const float src2, const float fac);
+MINLINE float blend_value_darken_float(const float src1, const float src2, const float fac);
+MINLINE float blend_value_diff_float(const float src1, const float src2, const float fac);
+MINLINE float blend_value_div_float(const float src1, const float src2, const float fac);
+MINLINE float blend_value_dodge_float(const float src1, const float src2, const float fac);
+MINLINE float blend_value_exclusion_float(const float src1, const float src2, const float fac);
+MINLINE float blend_value_hardlight_float(const float src1, const float src2, const float fac);
+MINLINE float blend_value_lighten_float(const float src1, const float src2, const float fac);
+MINLINE float blend_value_linlight_float(const float src1, const float src2, const float fac);
+MINLINE float blend_value_linearburn_float(const float src1, const float src2, const float fac);
+MINLINE float blend_value_mul_float(const float src1, const float src2, const float fac);
+MINLINE float blend_value_mix_float(const float src1, const float src2, const float fac);
+MINLINE float blend_value_overlay_float(const float src1, const float src2, const float fac);
+MINLINE float blend_value_pinlight_float(const float src1, const float src2, const float fac);
+MINLINE float blend_value_screen_float(const float src1, const float src2, const float fac);
+MINLINE float blend_value_soft_light_float(const float src1, const float src2, const float fac);
+MINLINE float blend_value_sub_float(const float src1, const float src2, const float fac);
+MINLINE float blend_value_vividlight_float(const float src1, const float src2, const float fac);
 
 MINLINE void blend_color_mix_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n);
 MINLINE void blend_color_add_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n);
