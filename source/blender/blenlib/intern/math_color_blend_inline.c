@@ -769,7 +769,22 @@ MINLINE float blend_value_vividlight_float(const float src1, const float src2, c
 /* Multi-channel blending modes, used by the compositor, the internal render
  * engine, and texture painting. */
 
-MINLINE void blend_color_mix_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_mix_float_v3(float *dst, const float *src1, const float *src2, const float fac)
+{
+	if (fac != 0.0f) {
+		int i = 3;
+
+		while (i--) {
+			dst[i] = blend_value_mix_float(src1[i], src2[i], fac);
+		}
+	}
+	else {
+		/* no op */
+		copy_v3_v3(dst, src1);
+	}
+}
+
+MINLINE void blend_color_mix_float_v4(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f) {
 		int i = 3;
@@ -778,19 +793,15 @@ MINLINE void blend_color_mix_float_n(float *dst, const float *src1, const float 
 			dst[i] = blend_value_mix_float(src1[i], src2[i], fac);
 		}
 
-		if (n == 4)
-			dst[3] = (1.0f - fac) * src1[3] + fac;
+		dst[3] = (1.0f - fac) * src1[3] + fac;
 	}
 	else {
 		/* no op */
-		copy_v3_v3(dst, src1);
-
-		if (n == 4)
-			dst[3] = src1[3];
+		copy_v4_v4(dst, src1);
 	}
 }
 
-MINLINE void blend_color_add_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_add_float_v3(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f) {
 		int i = 3;
@@ -803,14 +814,15 @@ MINLINE void blend_color_add_float_n(float *dst, const float *src1, const float 
 		/* no op */
 		copy_v3_v3(dst, src1);
 	}
-
-	if (n == 4)
-		dst[3] = src1[3];
-
-	UNUSED_VARS(fac);
 }
 
-MINLINE void blend_color_sub_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_add_float_v4(float *dst, const float *src1, const float *src2, const float fac)
+{
+	blend_color_sub_float_v3(dst, src1, src2, fac);
+	dst[3] = src1[3];
+}
+
+MINLINE void blend_color_sub_float_v3(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f) {
 		int i = 3;
@@ -823,14 +835,15 @@ MINLINE void blend_color_sub_float_n(float *dst, const float *src1, const float 
 		/* no op */
 		copy_v3_v3(dst, src1);
 	}
-
-	if (n == 4)
-		dst[3] = src1[3];
-
-	UNUSED_VARS(fac);
 }
 
-MINLINE void blend_color_mul_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_sub_float_v4(float *dst, const float *src1, const float *src2, const float fac)
+{
+	blend_color_sub_float_v3(dst, src1, src2, fac);
+	dst[3] = src1[3];
+}
+
+MINLINE void blend_color_mul_float_v3(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f) {
 		/* unpremul > multiply > premul, simplified */
@@ -844,12 +857,15 @@ MINLINE void blend_color_mul_float_n(float *dst, const float *src1, const float 
 		/* no op */
 		copy_v3_v3(dst, src1);
 	}
-
-	if (n == 4)
-		dst[3] = src1[3];
 }
 
-MINLINE void blend_color_divide_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_mul_float_v4(float *dst, const float *src1, const float *src2, const float fac)
+{
+	blend_color_mul_float_v3(dst, src1, src2, fac);
+	dst[3] = src1[3];
+}
+
+MINLINE void blend_color_divide_float_v3(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f) {
 		int i = 3;
@@ -862,17 +878,35 @@ MINLINE void blend_color_divide_float_n(float *dst, const float *src1, const flo
 		/* no op */
 		copy_v3_v3(dst, src1);
 	}
-
-	if (n == 4)
-		dst[3] = src1[3];
 }
 
-MINLINE void blend_color_lighten_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_divide_float_v4(float *dst, const float *src1, const float *src2, const float fac)
+{
+	blend_color_divide_float_v3(dst, src1, src2, fac);
+	dst[3] = src1[3];
+}
+
+MINLINE void blend_color_lighten_float_v3(float *dst, const float *src1, const float *src2, const float fac)
+{
+	if (fac != 0.0f) {
+		int i = 3;
+
+		while (i--) {
+			dst[i] = blend_value_lighten_float(src1[i], src2[i], fac);
+		}
+	}
+	else {
+		/* no op */
+		copy_v3_v3(dst, src1);
+	}
+}
+
+MINLINE void blend_color_lighten_float_v4(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f) {
 		/* remap src2 to have same alpha as src1 premultiplied, take maximum of
 		 * src1 and src2, then blend it with src1 */
-		const float map_alpha = ((n == 4) ? src1[3] / src2[3] : 1.0f);
+		const float map_alpha = src1[3] / src2[3];
 		int i = 3;
 
 		while (i--) {
@@ -881,94 +915,46 @@ MINLINE void blend_color_lighten_float_n(float *dst, const float *src1, const fl
 	}
 	else {
 		/* no op */
-		copy_v3_v3(dst, src1);
+		copy_v4_v4(dst, src1);
 	}
-
-	if (n == 4)
-		dst[3] = src1[3];
 }
 
-MINLINE void blend_color_darken_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_darken_float_v3(float *dst, const float *src1, const float *src2, const float fac)
+{
+	if (fac != 0.0f) {
+		int i = 3;
+
+		while (i--) {
+			dst[i] = blend_value_darken_float(src1[i], src2[i], fac);
+		}
+		dst[3] = src1[3];
+	}
+	else {
+		/* no op */
+		copy_v3_v3(dst, src1);
+	}
+}
+
+MINLINE void blend_color_darken_float_v4(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f) {
 		/* remap src2 to have same alpha as src1 premultiplied, take minimum of
 		 * src1 and src2, then blend it with src1 */
-		const float map_alpha = ((n == 4) ? src1[3] / src2[3] : 1.0f);
+		const float map_alpha = src1[3] / src2[3];
 		int i = 3;
 
 		while (i--) {
 			dst[i] = blend_value_darken_float(src1[i], src2[i] * map_alpha, fac);
 		}
+		dst[3] = src1[3];
 	}
 	else {
 		/* no op */
-		copy_v3_v3(dst, src1);
+		copy_v4_v4(dst, src1);
 	}
-
-	if (n == 4)
-		dst[3] = src1[3];
 }
 
-MINLINE void blend_color_erase_alpha_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
-{
-	if (fac != 0.0f && src1[3] > 0.0f) {
-		/* subtract alpha and remap RGB channels to match */
-		float alpha = max_ff(src1[3] - src2[3], 0.0f);
-		float map_alpha;
-
-		if (alpha <= EPS_ALPHA) {
-			alpha = 0.0f;
-		}
-
-		map_alpha = alpha / src1[3];
-
-		dst[0] = src1[0] * map_alpha;
-		dst[1] = src1[1] * map_alpha;
-		dst[2] = src1[2] * map_alpha;
-
-		if (n == 4)
-			dst[3] = alpha;
-	}
-	else {
-		/* no op */
-		copy_v3_v3(dst, src1);
-	}
-
-	if (n == 4)
-		dst[3] = src1[3];
-
-	UNUSED_VARS(fac);
-}
-
-MINLINE void blend_color_add_alpha_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
-{
-	if (fac != 0.0f && src1[3] < 1.0f) {
-		/* add alpha and remap RGB channels to match */
-		float alpha = min_ff(src1[3] + src2[3], 1.0f);
-		float map_alpha;
-
-		if (alpha >= 1.0f - EPS_ALPHA) {
-			alpha = 1.0f;
-		}
-
-		map_alpha = (src1[3] > 0.0f) ? alpha / src1[3] : 1.0f;
-
-		dst[0] = src1[0] * map_alpha;
-		dst[1] = src1[1] * map_alpha;
-		dst[2] = src1[2] * map_alpha;
-	}
-	else {
-		/* no op */
-		copy_v3_v3(dst, src1);
-	}
-
-	if (n == 4)
-		dst[3] = src1[3];
-
-	UNUSED_VARS(fac);
-}
-
-MINLINE void blend_color_overlay_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_overlay_float_v3(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f && fac < 1.0f) {
 		int i = 3;
@@ -981,12 +967,15 @@ MINLINE void blend_color_overlay_float_n(float *dst, const float *src1, const fl
 		/* no op */
 		copy_v3_v3(dst, src1);
 	}
-
-	if (n == 4)
-		dst[3] = src1[3];
 }
 
-MINLINE void blend_color_hardlight_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_overlay_float_v4(float *dst, const float *src1, const float *src2, const float fac)
+{
+	blend_color_overlay_float_v3(dst, src1, src2, fac);
+	dst[3] = src1[3];
+}
+
+MINLINE void blend_color_hardlight_float_v3(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f && fac < 1.0f) {
 		int i = 3;
@@ -999,12 +988,15 @@ MINLINE void blend_color_hardlight_float_n(float *dst, const float *src1, const 
 		/* no op */
 		copy_v3_v3(dst, src1);
 	}
-
-	if (n == 4)
-		dst[3] = src1[3];
 }
 
-MINLINE void blend_color_burn_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_hardlight_float_v4(float *dst, const float *src1, const float *src2, const float fac)
+{
+	blend_color_hardlight_float_v3(dst, src1, src2, fac);
+	dst[3] = src1[3];
+}
+
+MINLINE void blend_color_burn_float_v3(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f && fac < 1.0f) {
 		int i = 3;
@@ -1017,12 +1009,15 @@ MINLINE void blend_color_burn_float_n(float *dst, const float *src1, const float
 		/* no op */
 		copy_v3_v3(dst, src1);
 	}
-
-	if (n == 4)
-		dst[3] = src1[3];
 }
 
-MINLINE void blend_color_linearburn_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_burn_float_v4(float *dst, const float *src1, const float *src2, const float fac)
+{
+	blend_color_burn_float_v3(dst, src1, src2, fac);
+	dst[3] = src1[3];
+}
+
+MINLINE void blend_color_linearburn_float_v3(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f && fac < 1.0f) {
 		int i = 3;
@@ -1035,12 +1030,15 @@ MINLINE void blend_color_linearburn_float_n(float *dst, const float *src1, const
 		/* no op */
 		copy_v3_v3(dst, src1);
 	}
-
-	if (n == 4)
-		dst[3] = src1[3];
 }
 
-MINLINE void blend_color_dodge_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_linearburn_float_v4(float *dst, const float *src1, const float *src2, const float fac)
+{
+	blend_color_linearburn_float_v3(dst, src1, src2, fac);
+	dst[3] = src1[3];
+}
+
+MINLINE void blend_color_dodge_float_v3(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f && fac < 1.0f) {
 		int i = 3;
@@ -1053,12 +1051,15 @@ MINLINE void blend_color_dodge_float_n(float *dst, const float *src1, const floa
 		/* no op */
 		copy_v3_v3(dst, src1);
 	}
-
-	if (n == 4)
-		dst[3] = src1[3];
 }
 
-MINLINE void blend_color_screen_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_dodge_float_v4(float *dst, const float *src1, const float *src2, const float fac)
+{
+	blend_color_dodge_float_v3(dst, src1, src2, fac);
+	dst[3] = src1[3];
+}
+
+MINLINE void blend_color_screen_float_v3(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f && fac < 1.0f) {
 		int i = 3;
@@ -1071,12 +1072,15 @@ MINLINE void blend_color_screen_float_n(float *dst, const float *src1, const flo
 		/* no op */
 		copy_v3_v3(dst, src1);
 	}
-
-	if (n == 4)
-		dst[3] = src1[3];
 }
 
-MINLINE void blend_color_softlight_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_screen_float_v4(float *dst, const float *src1, const float *src2, const float fac)
+{
+	blend_color_screen_float_v3(dst, src1, src2, fac);
+	dst[3] = src1[3];
+}
+
+MINLINE void blend_color_softlight_float_v3(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f && fac < 1.0f) {
 		int i = 3;
@@ -1089,12 +1093,15 @@ MINLINE void blend_color_softlight_float_n(float *dst, const float *src1, const 
 		/* no op */
 		copy_v3_v3(dst, src1);
 	}
-
-	if (n == 4)
-		dst[3] = src1[3];
 }
 
-MINLINE void blend_color_pinlight_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_softlight_float_v4(float *dst, const float *src1, const float *src2, const float fac)
+{
+	blend_color_softlight_float_v3(dst, src1, src2, fac);
+	dst[3] = src1[3];
+}
+
+MINLINE void blend_color_pinlight_float_v3(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f && fac < 1.0f) {
 		int i = 3;
@@ -1107,12 +1114,15 @@ MINLINE void blend_color_pinlight_float_n(float *dst, const float *src1, const f
 		/* no op */
 		copy_v3_v3(dst, src1);
 	}
-
-	if (n == 4)
-		dst[3] = src1[3];
 }
 
-MINLINE void blend_color_linearlight_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_pinlight_float_v4(float *dst, const float *src1, const float *src2, const float fac)
+{
+	blend_color_pinlight_float_v3(dst, src1, src2, fac);
+	dst[3] = src1[3];
+}
+
+MINLINE void blend_color_linearlight_float_v3(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f && fac < 1.0f) {
 		int i = 3;
@@ -1125,12 +1135,15 @@ MINLINE void blend_color_linearlight_float_n(float *dst, const float *src1, cons
 		/* no op */
 		copy_v3_v3(dst, src1);
 	}
-
-	if (n == 4)
-		dst[3] = src1[3];
 }
 
-MINLINE void blend_color_vividlight_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_linearlight_float_v4(float *dst, const float *src1, const float *src2, const float fac)
+{
+	blend_color_linearlight_float_v3(dst, src1, src2, fac);
+	dst[3] = src1[3];
+}
+
+MINLINE void blend_color_vividlight_float_v3(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f && fac < 1.0f) {
 		int i = 3;
@@ -1143,12 +1156,15 @@ MINLINE void blend_color_vividlight_float_n(float *dst, const float *src1, const
 		/* no op */
 		copy_v3_v3(dst, src1);
 	}
-
-	if (n == 4)
-		dst[3] = src1[3];
 }
 
-MINLINE void blend_color_difference_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_vividlight_float_v4(float *dst, const float *src1, const float *src2, const float fac)
+{
+	blend_color_vividlight_float_v3(dst, src1, src2, fac);
+	dst[3] = src1[3];
+}
+
+MINLINE void blend_color_difference_float_v3(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f && fac < 1.0f) {
 		int i = 3;
@@ -1161,12 +1177,15 @@ MINLINE void blend_color_difference_float_n(float *dst, const float *src1, const
 		/* no op */
 		copy_v3_v3(dst, src1);
 	}
-
-	if (n == 4)
-		dst[3] = src1[3];
 }
 
-MINLINE void blend_color_exclusion_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_difference_float_v4(float *dst, const float *src1, const float *src2, const float fac)
+{
+	blend_color_difference_float_v3(dst, src1, src2, fac);
+	dst[3] = src1[3];
+}
+
+MINLINE void blend_color_exclusion_float_v3(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f && fac < 1.0f) {
 		int i = 3;
@@ -1179,12 +1198,15 @@ MINLINE void blend_color_exclusion_float_n(float *dst, const float *src1, const 
 		/* no op */
 		copy_v3_v3(dst, src1);
 	}
-
-	if (n == 4)
-		dst[3] = src1[3];
 }
 
-MINLINE void blend_color_color_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_exclusion_float_v4(float *dst, const float *src1, const float *src2, const float fac)
+{
+	blend_color_exclusion_float_v3(dst, src1, src2, fac);
+	dst[3] = src1[3];
+}
+
+MINLINE void blend_color_color_float_v3(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f && fac < 1.0f) {
 		const float mfac = 1.0f - fac;
@@ -1208,12 +1230,15 @@ MINLINE void blend_color_color_float_n(float *dst, const float *src1, const floa
 		/* no op */
 		copy_v3_v3(dst, src1);
 	}
-
-	if (n == 4)
-		dst[3] = src1[3];
 }
 
-MINLINE void blend_color_hue_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_color_float_v4(float *dst, const float *src1, const float *src2, const float fac)
+{
+	blend_color_color_float_v3(dst, src1, src2, fac);
+	dst[3] = src1[3];
+}
+
+MINLINE void blend_color_hue_float_v3(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f && fac < 1.0f) {
 		const float mfac = 1.0f - fac;
@@ -1236,12 +1261,15 @@ MINLINE void blend_color_hue_float_n(float *dst, const float *src1, const float 
 		/* no op */
 		copy_v3_v3(dst, src1);
 	}
-
-	if (n == 4)
-		dst[3] = src1[3];
 }
 
-MINLINE void blend_color_saturation_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_hue_float_v4(float *dst, const float *src1, const float *src2, const float fac)
+{
+	blend_color_hue_float_v3(dst, src1, src2, fac);
+	dst[3] = src1[3];
+}
+
+MINLINE void blend_color_saturation_float_v3(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f && fac < 1.0f) {
 		const float mfac = 1.0f - fac;
@@ -1265,12 +1293,15 @@ MINLINE void blend_color_saturation_float_n(float *dst, const float *src1, const
 		/* no op */
 		copy_v3_v3(dst, src1);
 	}
-
-	if (n == 4)
-		dst[3] = src1[3];
 }
 
-MINLINE void blend_color_luminosity_float_n(float *dst, const float *src1, const float *src2, const float fac, const int n)
+MINLINE void blend_color_saturation_float_v4(float *dst, const float *src1, const float *src2, const float fac)
+{
+	blend_color_saturation_float_v3(dst, src1, src2, fac);
+	dst[3] = src1[3];
+}
+
+MINLINE void blend_color_luminosity_float_v3(float *dst, const float *src1, const float *src2, const float fac)
 {
 	if (fac != 0.0f && fac < 1.0f) {
 		const float mfac = 1.0f - fac;
@@ -1292,9 +1323,12 @@ MINLINE void blend_color_luminosity_float_n(float *dst, const float *src1, const
 		/* no op */
 		copy_v3_v3(dst, src1);
 	}
+}
 
-	if (n == 4)
-		dst[3] = src1[3];
+MINLINE void blend_color_luminosity_float_v4(float *dst, const float *src1, const float *src2, const float fac)
+{
+	blend_color_luminosity_float_v3(dst, src1, src2, fac);
+	dst[3] = src1[3];
 }
 
 MINLINE void blend_color_interpolate_float(float *dst, const float *src1, const float *src2, float t)
@@ -1306,6 +1340,54 @@ MINLINE void blend_color_interpolate_float(float *dst, const float *src1, const 
 	dst[1] = mt * src1[1] + t * src2[1];
 	dst[2] = mt * src1[2] + t * src2[2];
 	dst[3] = mt * src1[3] + t * src2[3];
+}
+
+MINLINE void blend_color_add_alpha_float(float *dst, const float *src1, const float *src2, const float fac)
+{
+	if (fac != 0.0f && src1[3] < 1.0f) {
+		/* add alpha and remap RGB channels to match */
+		float alpha = min_ff(src1[3] + src2[3], 1.0f);
+		float map_alpha;
+
+		if (alpha >= 1.0f - EPS_ALPHA) {
+			alpha = 1.0f;
+		}
+
+		map_alpha = (src1[3] > 0.0f) ? alpha / src1[3] : 1.0f;
+
+		dst[0] = src1[0] * map_alpha;
+		dst[1] = src1[1] * map_alpha;
+		dst[2] = src1[2] * map_alpha;
+		dst[3] = src1[3];
+	}
+	else {
+		/* no op */
+		copy_v4_v4(dst, src1);
+	}
+}
+
+MINLINE void blend_color_erase_alpha_float(float *dst, const float *src1, const float *src2, const float fac)
+{
+	if (fac != 0.0f && src1[3] > 0.0f) {
+		/* subtract alpha and remap RGB channels to match */
+		float alpha = max_ff(src1[3] - src2[3], 0.0f);
+		float map_alpha;
+
+		if (alpha <= EPS_ALPHA) {
+			alpha = 0.0f;
+		}
+
+		map_alpha = alpha / src1[3];
+
+		dst[0] = src1[0] * map_alpha;
+		dst[1] = src1[1] * map_alpha;
+		dst[2] = src1[2] * map_alpha;
+		dst[3] = alpha;
+	}
+	else {
+		/* no op */
+		copy_v4_v4(dst, src1);
+	}
 }
 
 #undef EPS_SATURATION

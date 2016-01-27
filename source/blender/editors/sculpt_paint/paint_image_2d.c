@@ -912,7 +912,7 @@ static void paint_2d_lift_soften(ImagePaintState *s, ImBuf *ibuf, ImBuf *ibufb, 
 						rgba[3] = outrgb[3] = mask;
 
 						/* add to enhance edges */
-						blend_color_add_float_n(outrgb, rgba, outrgb, outrgb[3], 4);
+						blend_color_add_float_v4(outrgb, rgba, outrgb, outrgb[3]);
 						outrgb[3] = alpha;
 					}
 					else
@@ -1411,8 +1411,8 @@ void paint_2d_bucket_fill(
 		if (do_float) {
 			for (x_px = 0; x_px < ibuf->x; x_px++) {
 				for (y_px = 0; y_px < ibuf->y; y_px++) {
-					blend_color_mix_float_n(ibuf->rect_float + 4 * (((size_t)y_px) * ibuf->x + x_px),
-					                      ibuf->rect_float + 4 * (((size_t)y_px) * ibuf->x + x_px), color_f, color_f[3], 4);
+					blend_color_mix_float_v4(ibuf->rect_float + 4 * (((size_t)y_px) * ibuf->x + x_px),
+					                         ibuf->rect_float + 4 * (((size_t)y_px) * ibuf->x + x_px), color_f, color_f[3]);
 				}
 			}
 		}

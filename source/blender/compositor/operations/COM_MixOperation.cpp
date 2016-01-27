@@ -64,7 +64,7 @@ void MixBaseOperation::executePixelSampled(float output[4], float x, float y, Pi
 		value *= inputColor2[3];
 	}
 
-	blend_color_mix_float_n(output, inputColor1, inputColor2, value, 4);
+	blend_color_mix_float_v4(output, inputColor1, inputColor2, value);
 }
 
 void MixBaseOperation::determineResolution(unsigned int resolution[2], unsigned int preferredResolution[2])
@@ -120,7 +120,7 @@ void MixAddOperation::executePixelSampled(float output[4], float x, float y, Pix
 		value *= inputColor2[3];
 	}
 
-	blend_color_add_float_n(output, inputColor1, inputColor2, value, 4);
+	blend_color_add_float_v4(output, inputColor1, inputColor2, value);
 
 	clampIfNeeded(output);
 }
@@ -148,7 +148,7 @@ void MixBlendOperation::executePixelSampled(float output[4], float x, float y, P
 		value *= inputColor2[3];
 	}
 
-	blend_color_mix_float_n(output, inputColor1, inputColor2, value, 4);
+	blend_color_mix_float_v4(output, inputColor1, inputColor2, value);
 
 	clampIfNeeded(output);
 }
@@ -175,7 +175,7 @@ void MixBurnOperation::executePixelSampled(float output[4], float x, float y, Pi
 		value *= inputColor2[3];
 	}
 
-	blend_color_burn_float_n(output, inputColor1, inputColor2, value, 4);
+	blend_color_burn_float_v4(output, inputColor1, inputColor2, value);
 
 	clampIfNeeded(output);
 }
@@ -202,7 +202,7 @@ void MixColorOperation::executePixelSampled(float output[4], float x, float y, P
 		value *= inputColor2[3];
 	}
 
-	blend_color_color_float_n(output, inputColor1, inputColor2, value, 4);
+	blend_color_color_float_v4(output, inputColor1, inputColor2, value);
 
 	clampIfNeeded(output);
 }
@@ -229,7 +229,7 @@ void MixDarkenOperation::executePixelSampled(float output[4], float x, float y, 
 		value *= inputColor2[3];
 	}
 
-	blend_color_darken_float_n(output, inputColor1, inputColor2, value, 4);
+	blend_color_darken_float_v4(output, inputColor1, inputColor2, value);
 
 	clampIfNeeded(output);
 }
@@ -256,7 +256,7 @@ void MixDifferenceOperation::executePixelSampled(float output[4], float x, float
 		value *= inputColor2[3];
 	}
 
-	blend_color_difference_float_n(output, inputColor1, inputColor2, value, 4);
+	blend_color_difference_float_v4(output, inputColor1, inputColor2, value);
 
 	clampIfNeeded(output);
 }
@@ -283,7 +283,7 @@ void MixDivideOperation::executePixelSampled(float output[4], float x, float y, 
 		value *= inputColor2[3];
 	}
 
-	blend_color_divide_float_n(output, inputColor1, inputColor2, value, 4);
+	blend_color_divide_float_v4(output, inputColor1, inputColor2, value);
 
 	clampIfNeeded(output);
 }
@@ -310,7 +310,7 @@ void MixDodgeOperation::executePixelSampled(float output[4], float x, float y, P
 		value *= inputColor2[3];
 	}
 
-	blend_color_dodge_float_n(output, inputColor1, inputColor2, value, 4);
+	blend_color_dodge_float_v4(output, inputColor1, inputColor2, value);
 
 	clampIfNeeded(output);
 }
@@ -369,7 +369,7 @@ void MixHueOperation::executePixelSampled(float output[4], float x, float y, Pix
 		value *= inputColor2[3];
 	}
 
-	blend_color_hue_float_n(output, inputColor1, inputColor2, value, 4);
+	blend_color_hue_float_v4(output, inputColor1, inputColor2, value);
 
 	clampIfNeeded(output);
 }
@@ -396,7 +396,7 @@ void MixLightenOperation::executePixelSampled(float output[4], float x, float y,
 		value *= inputColor2[3];
 	}
 
-	blend_color_lighten_float_n(output, inputColor1, inputColor2, value, 4);
+	blend_color_lighten_float_v4(output, inputColor1, inputColor2, value);
 
 	clampIfNeeded(output);
 }
@@ -423,7 +423,7 @@ void MixLinearLightOperation::executePixelSampled(float output[4], float x, floa
 		value *= inputColor2[3];
 	}
 
-	blend_color_linearlight_float_n(output, inputColor1, inputColor2, value, 4);
+	blend_color_linearlight_float_v4(output, inputColor1, inputColor2, value);
 
 	clampIfNeeded(output);
 }
@@ -450,7 +450,7 @@ void MixMultiplyOperation::executePixelSampled(float output[4], float x, float y
 		value *= inputColor2[3];
 	}
 
-	blend_color_mul_float_n(output, inputColor1, inputColor2, value, 4);
+	blend_color_mul_float_v4(output, inputColor1, inputColor2, value);
 
 	clampIfNeeded(output);
 }
@@ -477,7 +477,7 @@ void MixOverlayOperation::executePixelSampled(float output[4], float x, float y,
 		value *= inputColor2[3];
 	}
 
-	blend_color_overlay_float_n(output, inputColor1, inputColor2, value, 4);
+	blend_color_overlay_float_v4(output, inputColor1, inputColor2, value);
 
 	clampIfNeeded(output);
 }
@@ -504,7 +504,7 @@ void MixSaturationOperation::executePixelSampled(float output[4], float x, float
 		value *= inputColor2[3];
 	}
 
-	blend_color_saturation_float_n(output, inputColor1, inputColor2, value, 4);
+	blend_color_saturation_float_v4(output, inputColor1, inputColor2, value);
 
 	clampIfNeeded(output);
 }
@@ -531,7 +531,7 @@ void MixScreenOperation::executePixelSampled(float output[4], float x, float y, 
 		value *= inputColor2[3];
 	}
 
-	blend_color_screen_float_n(output, inputColor1, inputColor2, value, 4);
+	blend_color_screen_float_v4(output, inputColor1, inputColor2, value);
 
 	clampIfNeeded(output);
 }
@@ -558,7 +558,7 @@ void MixSoftLightOperation::executePixelSampled(float output[4], float x, float 
 		value *= inputColor2[3];
 	}
 
-	blend_color_softlight_float_n(output, inputColor1, inputColor2, value, 4);
+	blend_color_softlight_float_v4(output, inputColor1, inputColor2, value);
 
 	clampIfNeeded(output);
 }
@@ -585,7 +585,7 @@ void MixSubtractOperation::executePixelSampled(float output[4], float x, float y
 		value *= inputColor2[3];
 	}
 
-	blend_color_sub_float_n(output, inputColor1, inputColor2, value, 4);
+	blend_color_sub_float_v4(output, inputColor1, inputColor2, value);
 
 	clampIfNeeded(output);
 }
@@ -612,7 +612,7 @@ void MixValueOperation::executePixelSampled(float output[4], float x, float y, P
 		value *= inputColor2[3];
 	}
 
-	blend_color_luminosity_float_n(output, inputColor1, inputColor2, value, 4);
+	blend_color_luminosity_float_v4(output, inputColor1, inputColor2, value);
 
 	clampIfNeeded(output);
 }

@@ -1587,58 +1587,58 @@ void ramp_blend(int type, float r_col[3], const float fac, const float col[3])
 {
 	switch (type) {
 		case MA_RAMP_BLEND:
-			blend_color_mix_float_n(r_col, r_col, col, fac, 3);
+			blend_color_mix_float_v3(r_col, r_col, col, fac);
 			break;
 		case MA_RAMP_ADD:
-			blend_color_add_float_n(r_col, r_col, col, fac, 3);
+			blend_color_add_float_v3(r_col, r_col, col, fac);
 			break;
 		case MA_RAMP_MULT:
-			blend_color_mul_float_n(r_col, r_col, col, fac, 3);
+			blend_color_mul_float_v3(r_col, r_col, col, fac);
 			break;
 		case MA_RAMP_SCREEN:
-			blend_color_screen_float_n(r_col, r_col, col, fac, 3);
+			blend_color_screen_float_v3(r_col, r_col, col, fac);
 			break;
 		case MA_RAMP_OVERLAY:
-			blend_color_overlay_float_n(r_col, r_col, col, fac, 3);
+			blend_color_overlay_float_v3(r_col, r_col, col, fac);
 			break;
 		case MA_RAMP_SUB:
-			blend_color_sub_float_n(r_col, r_col, col, fac, 3);
+			blend_color_sub_float_v3(r_col, r_col, col, fac);
 			break;
 		case MA_RAMP_DIV:
-			blend_color_divide_float_n(r_col, r_col, col, fac, 3);
+			blend_color_divide_float_v3(r_col, r_col, col, fac);
 			break;
 		case MA_RAMP_DIFF:
-			blend_color_difference_float_n(r_col, r_col, col, fac, 3);
+			blend_color_difference_float_v3(r_col, r_col, col, fac);
 			break;
 		case MA_RAMP_DARK:
-			blend_color_darken_float_n(r_col, r_col, col, fac, 3);
+			blend_color_darken_float_v3(r_col, r_col, col, fac);
 			break;
 		case MA_RAMP_LIGHT:
-			blend_color_lighten_float_n(r_col, r_col, col, fac, 3);
+			blend_color_lighten_float_v3(r_col, r_col, col, fac);
 			break;
 		case MA_RAMP_DODGE:
-			blend_color_dodge_float_n(r_col, r_col, col, fac, 3);
+			blend_color_dodge_float_v3(r_col, r_col, col, fac);
 			break;
 		case MA_RAMP_BURN:
-			blend_color_burn_float_n(r_col, r_col, col, fac, 3);
+			blend_color_burn_float_v3(r_col, r_col, col, fac);
 			break;
 		case MA_RAMP_HUE:
-			blend_color_hue_float_n(r_col, r_col, col, fac, 3);
+			blend_color_hue_float_v3(r_col, r_col, col, fac);
 			break;
 		case MA_RAMP_SAT:
-			blend_color_saturation_float_n(r_col, r_col, col, fac, 3);
+			blend_color_saturation_float_v3(r_col, r_col, col, fac);
 			break;
 		case MA_RAMP_VAL:
-			blend_color_luminosity_float_n(r_col, r_col, col, fac, 3);
+			blend_color_luminosity_float_v3(r_col, r_col, col, fac);
 			break;
 		case MA_RAMP_COLOR:
-			blend_color_color_float_n(r_col, r_col, col, fac, 3);
+			blend_color_color_float_v3(r_col, r_col, col, fac);
 			break;
 		case MA_RAMP_SOFT:
-			blend_color_softlight_float_n(r_col, r_col, col, fac, 3);
+			blend_color_softlight_float_v3(r_col, r_col, col, fac);
 			break;
 		case MA_RAMP_LINEAR:
-			blend_color_linearlight_float_n(r_col, r_col, col, fac, 3);
+			blend_color_linearlight_float_v3(r_col, r_col, col, fac);
 			break;
 	}
 }
