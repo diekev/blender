@@ -294,6 +294,7 @@ void BKE_image_file_format_set(struct Image *image, int ftype, const struct ImbF
 bool BKE_image_has_loaded_ibuf(struct Image *image);
 struct ImBuf *BKE_image_get_ibuf_with_name(struct Image *image, const char *name);
 struct ImBuf *BKE_image_get_first_ibuf(struct Image *image);
+void BKE_image_replace_ibuf(struct Image *ima, struct ImBuf *new_ibuf);
 #ifdef __cplusplus
 }
 #endif

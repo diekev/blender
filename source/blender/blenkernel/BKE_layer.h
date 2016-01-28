@@ -81,7 +81,7 @@ void imalayer_fill_color(struct Image *ima, float color[4]);
 void imagelayer_unique_name(struct ImageLayer *iml, struct Image *ima);
 //void imalayer_unique_name(const struct ListBase *imlayers, struct ImageLayer *newlayer);
 
-struct ImBuf *imalayer_blend(struct ImBuf *base, struct ImBuf *layer, float opacity, short mode, short background);
+struct ImBuf *imalayer_blend(struct ImBuf *base, struct ImBuf *layer, float opacity, short mode, short background, bool *has_realloc);
 
 struct ImageLayer *merge_layers(struct Image *ima, struct ImageLayer *iml, struct ImageLayer *iml_next);
 

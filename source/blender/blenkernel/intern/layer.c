@@ -48,7 +48,7 @@
  
 ImageLayer *image_layer_new(Image *ima, const char *name)
 {
-	ImageLayer *layer = MEM_mallocN(sizeof(ImageLayer), "image_layer");
+	ImageLayer *layer = MEM_callocN(sizeof(ImageLayer), "image_layer");
 
 	if (!layer) {
 		return NULL;
@@ -470,7 +470,7 @@ static void copy_co(int rect, float *fp, char *cp, float co)
 		*cp = FTOCHAR(co);
 }
 
-ImBuf *imalayer_blend(ImBuf *base, ImBuf *layer, float opacity, short mode, short background)
+ImBuf *imalayer_blend(ImBuf *base, ImBuf *layer, float opacity, short mode, short background, bool *has_realloc)
 {
 	ImBuf *dest;
 	int i, flag;
@@ -488,13 +488,19 @@ ImBuf *imalayer_blend(ImBuf *base, ImBuf *layer, float opacity, short mode, shor
 
 	flag = 0;
 
-	if (!base)
-		return IMB_dupImBuf(layer);
-
-	dest = IMB_dupImBuf(base);
+	if (!base) {
+		return layer; // IMB_dupImBuf(layer);
+	}
 
 	if (opacity == 0.0f)
-		return dest;
+		return base;
+
+	// XXX(kevin) - figure that whole memory duplication nonsense.
+	if (has_realloc) {
+		*has_realloc = true;
+	}
+
+	dest = IMB_dupImBuf(base);
 
 	bg_x = base->x;
 	bg_y = base->y;
@@ -730,7 +736,7 @@ struct ImageLayer *merge_layers(Image *ima, ImageLayer *iml, ImageLayer *iml_nex
 	result_ibuf = imalayer_blend((ImBuf*)((ImageLayer*)iml_next->ibufs.first),
 	                             (ImBuf*)((ImageLayer*)iml->ibufs.first),
 								 iml->opacity, iml->mode,
-	                             ((ImageLayer*)iml_next->ibufs.first)->background);
+	                             ((ImageLayer*)iml_next->ibufs.first)->background, NULL);
 	
 	iml_next->background = IMA_LAYER_BG_RGB;
 	iml_next->file_path[0] = '\0';
@@ -771,7 +777,7 @@ void merge_layers_visible_nd(Image *ima)
 			ibuf = (ImBuf*)((ImageLayer*)layer->ibufs.first);
 				
 			if (ibuf) {
-				next_ibuf = imalayer_blend(result_ibuf, ibuf, layer->opacity, layer->mode, background);
+				next_ibuf = imalayer_blend(result_ibuf, ibuf, layer->opacity, layer->mode, background, NULL);
 				
 				if (result_ibuf)
 					IMB_freeImBuf(result_ibuf);
@@ -782,11 +788,7 @@ void merge_layers_visible_nd(Image *ima)
 		}
 	}
 
-//	if (BKE_image_get_first_ibuf(ima)) {
-//		ima->cache = NULL;
-//	}
-	
-	//BLI_addtail(&ima->ibufs, result_ibuf);
+	BKE_image_replace_ibuf(ima, result_ibuf);
 }
 
 static int imagelayer_find_name_dupe(const char *name, ImageLayer *iml, Image *ima)
@@ -836,6 +838,7 @@ ImageLayer *image_add_image_layer(Image *ima, const char *name, int depth, float
 	if (im_l) {
 		imaibuf = BKE_image_get_first_ibuf(ima);
 		ibuf = add_ibuf_size(imaibuf->x, imaibuf->y, im_l->name, depth, ima->gen_flag, 0, color, &ima->colorspace_settings);
+		BKE_image_release_ibuf(ima, imaibuf, NULL);
 
 		BLI_addtail(&im_l->ibufs, ibuf);
 		if (order == 2) { /*Head*/
@@ -885,10 +888,13 @@ void image_add_image_layer_base(Image *ima)
 
 		/* Get ImBuf from ima */
 		ImBuf *ima_ibuf = BKE_image_get_first_ibuf(ima);
-		ImBuf *ibuf = IMB_dupImBuf(ima_ibuf);
-		BKE_image_release_ibuf(ima, ima_ibuf, NULL);
 
-		BLI_addtail(&layer->ibufs, ibuf);
+		if (ima_ibuf) {
+			ImBuf *ibuf = IMB_dupImBuf(ima_ibuf);
+			BKE_image_release_ibuf(ima, ima_ibuf, NULL);
+
+			BLI_addtail(&layer->ibufs, ibuf);
+		}
 		BLI_addhead(&ima->imlayers, layer);
 	}
 }

@@ -1005,12 +1005,13 @@ void draw_image_main(const bContext *C, ARegion *ar)
 							ibuf_l = (ImBuf*)layer->ibufs.first;
 
 						if (ibuf_l) {
-							result_ibuf = imalayer_blend(next_ibuf, ibuf_l, layer->opacity, layer->mode, background);
+							bool has_realloc = false;
+							result_ibuf = imalayer_blend(next_ibuf, ibuf_l, layer->opacity, layer->mode, background, &has_realloc);
 
-							if (next_ibuf)
+							if (has_realloc && next_ibuf)
 								IMB_freeImBuf(next_ibuf);
 
-							next_ibuf = IMB_dupImBuf(result_ibuf);
+							next_ibuf = result_ibuf; // IMB_dupImBuf(result_ibuf);
 							sp_x = 0.0f;
 							sp_y = 0.0f;
 
@@ -1021,8 +1022,8 @@ void draw_image_main(const bContext *C, ARegion *ar)
 							draw_layer_buffer(C, sima, ar, scene, result_ibuf, sp_x, sp_y, zoomx, zoomy);
 							glDisable(GL_BLEND);
 
-							if (result_ibuf)
-								IMB_freeImBuf(result_ibuf);
+//							if (result_ibuf)
+//								IMB_freeImBuf(result_ibuf);
 						}
 					}
 
@@ -1108,9 +1109,7 @@ void draw_image_main(const bContext *C, ARegion *ar)
 #endif
 
 	if (next_ibuf) {
-		if (BKE_image_get_first_ibuf(ima)) {
-			ima->cache = NULL;
-		}
+		BKE_image_replace_ibuf(ima, next_ibuf);
 	}
 
 	if (show_viewer) {

@@ -4824,3 +4824,13 @@ static void image_update_views_format(Image *ima, ImageUser *iuser)
 		}
 	}
 }
+
+void BKE_image_replace_ibuf(Image *ima, ImBuf *new_ibuf)
+{
+	if (ima->cache != NULL) {
+		IMB_moviecache_free(ima->cache);
+		ima->cache = NULL;
+	}
+
+	image_assign_ibuf(ima, new_ibuf, IMA_NO_INDEX, 0);
+}
