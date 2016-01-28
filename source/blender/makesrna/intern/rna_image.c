@@ -34,7 +34,7 @@
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
 #include "BKE_image.h"
-#include "BKE_layer.h"
+#include "BKE_image_layer.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"

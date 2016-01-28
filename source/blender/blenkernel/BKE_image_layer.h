@@ -27,7 +27,7 @@
  #ifndef __BKE_LAYER_H__
 #define __BKE_LAYER_H__
 
-/** \file BKE_layer.h
+/** \file BKE_image_layer.h
  *  \ingroup bke
  *  \since March 2012
  *  \author ruesp83

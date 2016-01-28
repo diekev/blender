@@ -59,7 +59,7 @@
 #include "BKE_DerivedMesh.h"
 #include "BKE_icons.h"
 #include "BKE_image.h"
-#include "BKE_layer.h"
+#include "BKE_image_layer.h"
 #include "BKE_global.h"
 #include "BKE_library.h"
 #include "BKE_main.h"

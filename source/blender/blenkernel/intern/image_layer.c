@@ -44,7 +44,7 @@
 #include "BLI_utildefines.h"
 
 #include "BKE_image.h"
-#include "BKE_layer.h"
+#include "BKE_image_layer.h"
  
 ImageLayer *image_layer_new(Image *ima, const char *name)
 {

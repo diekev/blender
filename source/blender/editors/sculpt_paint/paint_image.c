@@ -58,7 +58,7 @@
 #include "BKE_DerivedMesh.h"
 #include "BKE_brush.h"
 #include "BKE_image.h"
-#include "BKE_layer.h"
+#include "BKE_image_layer.h"
 #include "BKE_main.h"
 #include "BKE_material.h"
 #include "BKE_node.h"
