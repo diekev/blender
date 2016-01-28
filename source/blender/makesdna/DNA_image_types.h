@@ -162,19 +162,23 @@ typedef enum ImageLayerMode {
 #define IMA_LAYER_VISIBLE	(1 << 0)
 
 /* ImageLayer.select */
-#define IMA_LAYER_SEL_CURRENT	(1 << 0)
-#define	IMA_LAYER_SEL_PREVIOUS	(1 << 1)
-#define	IMA_LAYER_SEL_NEXT		(1 << 2)
-#define IMA_LAYER_SEL_TOP		(1 << 3)
-#define IMA_LAYER_SEL_BOTTOM	(1 << 4)
+enum {
+	IMA_LAYER_SEL_CURRENT  = (1 << 0),
+	IMA_LAYER_SEL_PREVIOUS = (1 << 1),
+	IMA_LAYER_SEL_NEXT     = (1 << 2),
+	IMA_LAYER_SEL_TOP      = (1 << 3),
+	IMA_LAYER_SEL_BOTTOM   = (1 << 4),
+};
 
 /* ImageLayer.locked */
 #define IMA_LAYER_LOCK			1
 #define IMA_LAYER_LOCK_ALPHA	2
 
-/* Option for delete the layer*/
-#define IMA_LAYER_DEL_SELECTED	(1 << 0)
-#define IMA_LAYER_DEL_HIDDEN	(1 << 1)
+/* Option for delete the layer */
+enum {
+	IMA_LAYER_DEL_SELECTED = (1 << 0),
+	IMA_LAYER_DEL_HIDDEN   = (1 << 1),
+};
 
 /* Option for open a image*/
 #define IMA_LAYER_OPEN_IMAGE	(1 << 0)
@@ -257,7 +261,7 @@ typedef struct Image {
 	short use_layers;
 	short color_space;
 	int pad4;
-	struct ListBase imlayers;
+	struct ListBase layers;
 } Image;
 
 

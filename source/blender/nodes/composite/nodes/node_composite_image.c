@@ -265,7 +265,7 @@ static void cmp_node_image_create_outputs(bNodeTree *ntree, bNode *node)
 		}
 		else {
 			if (iuser->use_layer_ima) {
-				cmp_node_image_add_imagelayer_outputs(ntree, node, ima->imlayers.last);
+				cmp_node_image_add_imagelayer_outputs(ntree, node, ima->layers.last);
 			}
 			else
 				cmp_node_image_add_render_pass_outputs(ntree, node, RRES_OUT_IMAGE | RRES_OUT_ALPHA | RRES_OUT_Z);

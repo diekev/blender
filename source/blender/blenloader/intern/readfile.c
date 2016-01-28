@@ -3689,9 +3689,9 @@ static void direct_link_image(FileData *fd, Image *ima)
 	ima->ok = 1;
 	ima->packedfile = direct_link_packedfile(fd, ima->packedfile);
 	//ima->colorspace_settings = newdataadr(fd, &ima->colorspace_settings);
-	link_list(fd, &ima->imlayers);
+	link_list(fd, &ima->layers);
 
-	for (iml = (ImageLayer *)ima->imlayers.first; iml; iml = iml->next)
+	for (iml = (ImageLayer *)ima->layers.first; iml; iml = iml->next)
 		link_list(fd, &iml->ibufs);
 }
 

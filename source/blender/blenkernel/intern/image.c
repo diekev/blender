@@ -413,7 +413,7 @@ static ImBuf *image_get_cached_ibuf_for_index_frame(Image *ima, int index, int f
 	}
 
 	if (index == IMA_NO_INDEX) {
-		if (ima->imlayers.first) {
+		if (ima->layers.first) {
 	//		BLI_lock_thread(LOCK_IMAGE);
 			BKE_image_merge_visible_layers(ima);
 	//		BLI_unlock_thread(LOCK_IMAGE);
@@ -433,11 +433,13 @@ static void image_assign_ibuf(Image *ima, ImBuf *ibuf, int index, int frame)
 		imagecache_put(ima, index, ibuf);
 
 		if ((ima->source == IMA_SRC_FILE) || (ima->source == IMA_SRC_GENERATED)) {
-			if (ima->imlayers.first == NULL) {
+			if (ima->layers.first == NULL) {
 				BKE_image_add_image_layer_base(ima);
+
 				if (ima->source == IMA_SRC_FILE) {
-					((ImageLayer *)ima->imlayers.last)->background = IMA_LAYER_BG_IMAGE;
-					strcpy(((ImageLayer *)ima->imlayers.last)->file_path, ima->name);
+					ImageLayer *layer = ima->layers.last;
+					layer->background = IMA_LAYER_BG_IMAGE;
+					strcpy(layer->file_path, ima->name);
 				}
 			}
 		}
@@ -841,7 +843,7 @@ ImageLayer *BKE_add_image_file_as_layer(Image *ima, const char *name)
 
 	iml = BKE_image_layer_new(ima, newname);
 	if (iml) {
-		BLI_addhead(&ima->imlayers, iml);
+		BLI_addhead(&ima->layers, iml);
 		ima->active_layer = 0;
 		ima->num_layers += 1;
 

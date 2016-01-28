@@ -965,7 +965,7 @@ void draw_image_main(const bContext *C, ARegion *ar)
 		else if (ima && !show_render && (sima->mode == SI_MODE_PAINT)) {
 			next_ibuf = NULL;
 			ima->use_layers = true;
-			layer = (ImageLayer*)ima->imlayers.last;
+			layer = (ImageLayer*)ima->layers.last;
 
 			b_x = ibuf->x;
 			b_y = ibuf->y;
@@ -986,7 +986,7 @@ void draw_image_main(const bContext *C, ARegion *ar)
 				b_y = p_ibuf->y;
 			}
 			else {
-				for (layer = (ImageLayer*)ima->imlayers.last; layer; layer = layer->prev) {
+				for (layer = (ImageLayer*)ima->layers.last; layer; layer = layer->prev) {
 					if ((!first) || (layer->preview_ibuf)) {
 						if ((layer->opacity != 1.0f) || (ibuf->channels == 4) || (background & IMA_LAYER_BG_ALPHA)) {
 							UI_view2d_view_to_region(&ar->v2d, 0.0f, 0.0f, &x, &y);
@@ -1042,8 +1042,8 @@ void draw_image_main(const bContext *C, ARegion *ar)
 				layer_draw_boundary(x, y, b_x, b_y, zoomx, zoomy);
 		}
 		else {
-			if (ima->imlayers.last) {
-				layer = ima->imlayers.last;
+			if (ima->layers.last) {
+				layer = ima->layers.last;
 				if (layer->background & IMA_LAYER_BG_ALPHA) {
 					UI_view2d_view_to_region(&ar->v2d, 0.0f, 0.0f, &x, &y);
 					fdrawcheckerboard(x, y, x + ibuf->x * zoomx, y + ibuf->y * zoomy);

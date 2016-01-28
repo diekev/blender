@@ -1,4 +1,4 @@
-/*
+﻿/*
  * ***** BEGIN GPL LICENSE BLOCK *****
  *
  * This program is free software; you can redistribute it and/or
@@ -50,7 +50,7 @@ static int imagelayer_find_name_dupe(const char *name, ImageLayer *iml, Image *i
 {
 	ImageLayer *layer;
 
-	for (layer = ima->imlayers.last; layer; layer = layer->prev) {
+	for (layer = ima->layers.last; layer; layer = layer->prev) {
 		if (iml != layer) {
 			if (!strcmp(layer->name, name)) {
 				return 1;
@@ -127,7 +127,7 @@ void BKE_image_layer_free(ImageLayer *layer)
 void BKE_image_free_layers(struct Image *ima)
 {
 	ImageLayer *layer;
-	while ((layer = BLI_pophead(&ima->imlayers)) != NULL) {
+	while ((layer = BLI_pophead(&ima->layers)) != NULL) {
 		BKE_image_layer_free(layer);
 	}
 
@@ -141,7 +141,7 @@ ImageLayer *BKE_image_get_current_layer(Image *ima)
 	}
 
 	ImageLayer *layer = NULL;
-	for (layer = ima->imlayers.last; layer; layer = layer->prev) {
+	for (layer = ima->layers.last; layer; layer = layer->prev) {
 		if (layer->select & IMA_LAYER_SEL_CURRENT) {
 			break;
 		}
@@ -166,7 +166,7 @@ void BKE_image_set_current_layer(Image *ima, short index)
 	if (ima == NULL)
 		return;
 
-	for (layer = ima->imlayers.last, i = BLI_listbase_count(&ima->imlayers) - 1; layer; layer = layer->prev, i--) {
+	for (layer = ima->layers.last, i = BLI_listbase_count(&ima->layers) - 1; layer; layer = layer->prev, i--) {
 		if (i == index) {
 			layer->select = IMA_LAYER_SEL_CURRENT;
 			ima->active_layer = i;
@@ -244,10 +244,10 @@ ImageLayer *BKE_image_layer_duplicate_current(Image *ima)
 		dup_layer->next = dup_layer->prev = NULL;
 
 		if (layer) {
-			BLI_insertlinkbefore(&ima->imlayers, layer, dup_layer);
+			BLI_insertlinkbefore(&ima->layers, layer, dup_layer);
 		}
 		else {
-			BLI_addhead(&ima->imlayers, layer);
+			BLI_addhead(&ima->layers, layer);
 		}
 
 		BKE_image_set_current_layer(ima, BKE_image_get_current_layer_index(ima));
@@ -314,11 +314,11 @@ int BKE_image_layer_remove(Image *ima, const int action)
 		if (ima->num_layers > 1) {
 			layer = BKE_image_get_current_layer(ima);
 			if (layer) {
-				BLI_remlink(&ima->imlayers, layer);
+				BLI_remlink(&ima->layers, layer);
 				BKE_image_layer_free(layer);
 			}
 			/* Ensure the first element in list gets selected (if any) */
-			if (ima->imlayers.first) {
+			if (ima->layers.first) {
 				if (BKE_image_get_current_layer_index(ima) != 1)
 					BKE_image_set_current_layer(ima, BKE_image_get_current_layer_index(ima));
 				else
@@ -331,11 +331,11 @@ int BKE_image_layer_remove(Image *ima, const int action)
 	}
 	else {
 		if (ima->num_layers > 1) {
-			for (layer = ima->imlayers.last; layer; layer = layer->prev) {
+			for (layer = ima->layers.last; layer; layer = layer->prev) {
 				if (!(layer->visible & IMA_LAYER_VISIBLE)) {
-					BLI_remlink(&ima->imlayers, layer);
+					BLI_remlink(&ima->layers, layer);
 					BKE_image_layer_free(layer);
-					if (ima->imlayers.first) {
+					if (ima->layers.first) {
 						if (BKE_image_get_current_layer_index(ima) != 1)
 							BKE_image_set_current_layer(ima, BKE_image_get_current_layer_index(ima));
 						else
@@ -786,7 +786,7 @@ struct ImageLayer *BKE_image_layer_merge(Image *ima, ImageLayer *iml, ImageLayer
 	BLI_addtail(&iml_next->ibufs, result_ibuf);
 
 	/* delete the merged layer */
-	BLI_remlink(&ima->imlayers, iml);
+	BLI_remlink(&ima->layers, iml);
 	BKE_image_layer_free(iml);
 
 	return iml_next;
@@ -796,7 +796,7 @@ struct ImageLayer *BKE_image_layer_merge(Image *ima, ImageLayer *iml, ImageLayer
 void BKE_image_merge_visible_layers(Image *ima)
 {
 	ImBuf *result_ibuf = NULL;
-	ImageLayer *layer = ima->imlayers.last;
+	ImageLayer *layer = ima->layers.last;
 	short background = layer->background;
 
 	for (; layer; layer = layer->prev) {
@@ -846,14 +846,14 @@ ImageLayer *BKE_image_add_image_layer(Image *ima, const char *name, int depth, f
 
 	BLI_addtail(&layer_new->ibufs, ibuf);
 	if (order == 2) { /*Head*/
-		BLI_addhead(&ima->imlayers, layer_new);
+		BLI_addhead(&ima->layers, layer_new);
 		ima->active_layer = 0;
 	}
 	else if (order == -1) { /*Before*/
 		/* Layer Act
 		 * --> Add Layer
 		 */
-		BLI_insertlinkafter(&ima->imlayers, layer_act , layer_new);
+		BLI_insertlinkafter(&ima->layers, layer_act , layer_new);
 		ima->active_layer += 1;
 		BKE_image_set_current_layer(ima, ima->active_layer);
 	}
@@ -861,7 +861,7 @@ ImageLayer *BKE_image_add_image_layer(Image *ima, const char *name, int depth, f
 		/* --> Add Layer
 		 * Layer Act
 		 */
-		BLI_insertlinkbefore(&ima->imlayers, layer_act , layer_new);
+		BLI_insertlinkbefore(&ima->layers, layer_act , layer_new);
 		//ima->Act_Layers -= 1;
 		BKE_image_set_current_layer(ima, ima->active_layer);
 	}
@@ -901,21 +901,20 @@ void BKE_image_add_image_layer_base(Image *ima)
 
 			BLI_addtail(&layer->ibufs, ibuf);
 		}
-		BLI_addhead(&ima->imlayers, layer);
+
+		BLI_addhead(&ima->layers, layer);
 	}
 }
 
 void BKE_image_layer_get_background_color(float col[4], ImageLayer *layer)
 {
-	static float alpha_color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-	static float black_color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
-	static float white_color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+	const float black_color[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 
 	if (layer) {
 		if (layer->background & IMA_LAYER_BG_WHITE)
-			copy_v4_v4(col, white_color);
+			copy_v4_fl(col, 1.0f);
 		else if (layer->background & IMA_LAYER_BG_ALPHA)
-			copy_v4_v4(col, alpha_color);
+			zero_v4(col);
 		else {
 			if (layer->default_color[0] != -1)
 				copy_v4_v4(col, layer->default_color);

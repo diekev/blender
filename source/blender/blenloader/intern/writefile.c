@@ -2202,8 +2202,8 @@ static void write_images(WriteData *wd, ListBase *idbase)
 			writestruct(wd, DATA, "ColorManagedColorspaceSettings", 1, cs_s);
 			//}
 
-			if (ima->imlayers.last) {
-				for (iml = (ImageLayer *)ima->imlayers.first; iml; iml = iml->next)
+			if (ima->layers.last) {
+				for (iml = (ImageLayer *)ima->layers.first; iml; iml = iml->next)
 					writestruct(wd, DATA, "ImageLayer", 1, iml);
 			}
 

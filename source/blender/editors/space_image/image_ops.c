@@ -2344,8 +2344,8 @@ static int image_new_exec(bContext *C, wmOperator *op)
 	else
 		ima->color_space = IMA_COL_GRAY;
 
-	((ImageLayer *)ima->imlayers.last)->background = background;
-	copy_v4_v4(((ImageLayer *)ima->imlayers.first)->default_color, color);
+	((ImageLayer *)ima->layers.last)->background = background;
+	copy_v4_v4(((ImageLayer *)ima->layers.first)->default_color, color);
 
 	if (!ima)
 		return OPERATOR_CANCELLED;
@@ -2625,7 +2625,7 @@ static int image_invert_exec(bContext *C, wmOperator *op)
 		ImageLayer *layer;
 		ImBuf *ibuf_l;
 
-		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+		for (layer = ima->layers.first; layer; layer = layer->next) {
 			ibuf_l = (ImBuf *)layer->ibufs.first;
 			IMB_invert_channels(ibuf_l, r, g, b, a);
 		}
@@ -2700,7 +2700,7 @@ static int image_invert_value_exec(bContext *C, wmOperator *UNUSED(op))
 		ImageLayer *layer;
 		ImBuf *ibuf_l;
 
-		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+		for (layer = ima->layers.first; layer; layer = layer->next) {
 			ibuf_l = (ImBuf *)layer->ibufs.first;
 			IMB_invert_value(ibuf_l);
 		}
@@ -2762,7 +2762,7 @@ static int image_bright_contrast_exec(bContext *C, wmOperator *op)
 		ImageLayer *layer;
 		ImBuf *ibuf_l;
 
-		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+		for (layer = ima->layers.first; layer; layer = layer->next) {
 			ibuf_l = (ImBuf *)layer->ibufs.first;
 			IMB_bright_contrast(ibuf_l, bright, contrast);
 		}
@@ -2869,7 +2869,7 @@ static int image_desaturate_exec(bContext *C, wmOperator *op)
 		ImageLayer *layer;
 		ImBuf *ibuf_l;
 
-		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+		for (layer = ima->layers.first; layer; layer = layer->next) {
 			ibuf_l = (ImBuf *)layer->ibufs.first;
 			IMB_desaturate(ibuf_l, type);
 		}
@@ -2935,7 +2935,7 @@ static int image_posterize_exec(bContext *C, wmOperator *op)
 		ImageLayer *layer;
 		ImBuf *ibuf_l;
 
-		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+		for (layer = ima->layers.first; layer; layer = layer->next) {
 			ibuf_l = (ImBuf *)layer->ibufs.first;
 			IMB_posterize(ibuf_l, levels);
 		}
@@ -3044,7 +3044,7 @@ static int image_threshold_exec(bContext *C, wmOperator *op)
 		ImageLayer *layer;
 		ImBuf *ibuf_l;
 
-		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+		for (layer = ima->layers.first; layer; layer = layer->next) {
 			ibuf_l = (ImBuf *)layer->ibufs.first;
 			IMB_threshold(ibuf_l, low, high);
 		}
@@ -3161,7 +3161,7 @@ static int image_exposure_exec(bContext *C, wmOperator *op)
 		ImageLayer *layer;
 		ImBuf *ibuf_l;
 
-		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+		for (layer = ima->layers.first; layer; layer = layer->next) {
 			ibuf_l = (ImBuf *)layer->ibufs.first;
 			IMB_exposure(ibuf_l, exposure, offset, gamma);
 		}
@@ -3274,7 +3274,7 @@ static int image_colorize_exec(bContext *C, wmOperator *op)
 		ImageLayer *layer;
 		ImBuf *ibuf_l;
 
-		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+		for (layer = ima->layers.first; layer; layer = layer->next) {
 			ibuf_l = (ImBuf *)layer->ibufs.first;
 			IMB_colorize(ibuf_l, hue, saturation, lightness);
 		}
@@ -3379,7 +3379,7 @@ static int image_grayscale_exec(bContext *C, wmOperator *UNUSED(op))
 	ima->color_space = IMA_COL_GRAY;
 	IMB_color_to_bw(ibuf);
 
-	for (layer = (ImageLayer *)ima->imlayers.first; layer; layer = layer->next) {
+	for (layer = (ImageLayer *)ima->layers.first; layer; layer = layer->next) {
 		IMB_color_to_bw((ImBuf *)layer->ibufs.first);
 	}
 
@@ -3453,12 +3453,12 @@ static int image_duplicate_exec(bContext *C, wmOperator *op)
 	new_ima->use_layers = ima->use_layers;
 	new_ima->color_space = ima->color_space;
 
-	layer = (ImageLayer *)ima->imlayers.first;
-	new_ima->imlayers.first = new_ima->imlayers.last = NULL;
+	layer = (ImageLayer *)ima->layers.first;
+	new_ima->layers.first = new_ima->layers.last = NULL;
 
 	while (layer) {
 		dup = BKE_image_layer_duplicate(ima, layer);
-		BLI_addtail(&new_ima->imlayers, dup);
+		BLI_addtail(&new_ima->layers, dup);
 
 		layer = layer->next;
 	}
@@ -3505,12 +3505,12 @@ static int image_flip_exec(bContext *C, wmOperator *op)
 
 	if (type == 1) { /* Flip Horizontally */
 		IMB_flipx(ibuf);
-		for (layer = ima->imlayers.first; layer; layer = layer->next)
+		for (layer = ima->layers.first; layer; layer = layer->next)
 			IMB_flipx((ImBuf *)layer->ibufs.first);
 	}
 	else if (type == 2) { /* Flip Vertically */
 		IMB_flipy(ibuf);
-		for (layer = ima->imlayers.first; layer; layer = layer->next)
+		for (layer = ima->layers.first; layer; layer = layer->next)
 			IMB_flipy((ImBuf *)layer->ibufs.first);
 	}
 
@@ -3564,7 +3564,7 @@ static int image_rotate_exec(bContext *C, wmOperator *op)
 
 	if (type == 1) { /* ROT_90 */
 		ibuf = IMB_rotation(ibuf, 0.0, 0.0, DEG2RADF(-90.0), 2, 0, col);
-		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+		for (layer = ima->layers.first; layer; layer = layer->next) {
 			ibuf_l = (ImBuf *)layer->ibufs.first;
 			layer->ibufs.first = NULL;
 			layer->ibufs.last = NULL;
@@ -3573,7 +3573,7 @@ static int image_rotate_exec(bContext *C, wmOperator *op)
 	}
 	else if (type == 2) { /* ROT_90A */
 		ibuf = IMB_rotation(ibuf, 0.0, 0.0, DEG2RADF(90.0), 2, 0, col);
-		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+		for (layer = ima->layers.first; layer; layer = layer->next) {
 			ibuf_l = (ImBuf *)layer->ibufs.first;
 			layer->ibufs.first = NULL;
 			layer->ibufs.last = NULL;
@@ -3582,7 +3582,7 @@ static int image_rotate_exec(bContext *C, wmOperator *op)
 	}
 	else if (type == 3) { /* ROT_180 */
 		ibuf = IMB_rotation(ibuf, 0.0, 0.0, DEG2RADF(180.0), 2, 0, col);
-		for (layer = ima->imlayers.first; layer; layer = layer->next) {
+		for (layer = ima->layers.first; layer; layer = layer->next) {
 			ibuf_l = (ImBuf *)layer->ibufs.first;
 			layer->ibufs.first = NULL;
 			layer->ibufs.last = NULL;
@@ -3648,12 +3648,12 @@ static int image_arbitrary_rot_exec(bContext *C, wmOperator *op)
 	angle = RNA_float_get(op->ptr, "angle");
 	lock = RNA_boolean_get(op->ptr, "lock_size");
 
-	BKE_image_layer_get_background_color(col, (ImageLayer*)ima->imlayers.last);
+	BKE_image_layer_get_background_color(col, (ImageLayer*)ima->layers.last);
 
 	angle = angle * (-1);
 
 	ibuf = IMB_rotation(ibuf, 0.0, 0.0, angle, type, lock, col);
-	for (layer = ima->imlayers.first; layer; layer = layer->next) {
+	for (layer = ima->layers.first; layer; layer = layer->next) {
 		ibuf_l = (ImBuf *)layer->ibufs.first;
 		layer->ibufs.first = NULL;
 		layer->ibufs.last = NULL;
@@ -3686,7 +3686,7 @@ static bool image_arbitrary_rot_check(bContext *C, wmOperator *op)
 	type = RNA_enum_get(op->ptr, "type");
 	angle = RNA_float_get(op->ptr, "angle");
 	lock = RNA_boolean_get(op->ptr, "lock_size");
-	BKE_image_layer_get_background_color(col, (ImageLayer*)ima->imlayers.last);
+	BKE_image_layer_get_background_color(col, (ImageLayer*)ima->layers.last);
 
 	angle = angle * (-1);
 
@@ -3773,11 +3773,11 @@ static int image_offset_exec(bContext *C, wmOperator *op)
 	}
 
 	if (!wrap) {
-		BKE_image_layer_get_background_color(col, (ImageLayer*)ima->imlayers.last);
+		BKE_image_layer_get_background_color(col, (ImageLayer*)ima->layers.last);
 	}
 
 	ibuf = IMB_offset(ibuf, x, y, half, wrap, col);
-	for (layer = ima->imlayers.first; layer; layer = layer->next) {
+	for (layer = ima->layers.first; layer; layer = layer->next) {
 		ibuf_l = (ImBuf *)layer->ibufs.first;
 		layer->ibufs.first = NULL;
 		layer->ibufs.last = NULL;
@@ -3825,7 +3825,7 @@ static bool image_offset_check(bContext *C, wmOperator *op)
 	}
 
 	if (!wrap) {
-		BKE_image_layer_get_background_color(col, (ImageLayer*)ima->imlayers.last);
+		BKE_image_layer_get_background_color(col, (ImageLayer*)ima->layers.last);
 	}
 
 	if (ima->preview_ibuf) {
@@ -3906,7 +3906,7 @@ static int image_scale_exec(bContext *C, wmOperator *op)
 	}
 
 	IMB_scaleImBuf(ibuf, width, height);
-	for (layer = ima->imlayers.first; layer; layer = layer->next) {
+	for (layer = ima->layers.first; layer; layer = layer->next) {
 		ibuf_l = (ImBuf *)layer->ibufs.first;
 		layer->ibufs.first = NULL;
 		layer->ibufs.last = NULL;
@@ -3953,7 +3953,7 @@ static int image_merge_exec(bContext *C, wmOperator *op)
 
 	discard = RNA_boolean_get(op->ptr, "discard");
 
-	for (layer = (ImageLayer *)ima->imlayers.first; layer; layer = layer->next) {
+	for (layer = (ImageLayer *)ima->layers.first; layer; layer = layer->next) {
 		if (layer->visible & IMA_LAYER_VISIBLE) {
 			flag = 1;
 			break;
@@ -3961,7 +3961,7 @@ static int image_merge_exec(bContext *C, wmOperator *op)
 	}
 	if (flag == 1) {
 		prec = NULL;
-		for (layer = (ImageLayer *)ima->imlayers.first; layer; layer = layer->next) {
+		for (layer = (ImageLayer *)ima->layers.first; layer; layer = layer->next) {
 			if (layer->visible & IMA_LAYER_VISIBLE) {
 				if (prec == NULL) {
 					prec = layer;
@@ -3975,9 +3975,9 @@ static int image_merge_exec(bContext *C, wmOperator *op)
 			}
 			else {
 				if (discard) {
-					BLI_remlink(&ima->imlayers, layer);
+					BLI_remlink(&ima->layers, layer);
 					BKE_image_layer_free(layer);
-					if (ima->imlayers.first) {
+					if (ima->layers.first) {
 						if (BKE_image_get_current_layer_index(ima) != 1)
 							BKE_image_set_current_layer(ima, BKE_image_get_current_layer_index(ima));
 						else
@@ -4032,7 +4032,7 @@ static int image_flatten_exec(bContext *C, wmOperator *op)
 	if (!ima)
 		return OPERATOR_CANCELLED;
 
-	for (layer = (ImageLayer *)ima->imlayers.first; layer; layer = layer->next) {
+	for (layer = (ImageLayer *)ima->layers.first; layer; layer = layer->next) {
 		if (layer->visible & IMA_LAYER_VISIBLE) {
 			flag = 1;
 			break;
@@ -4040,7 +4040,7 @@ static int image_flatten_exec(bContext *C, wmOperator *op)
 	}
 	if (flag == 1) {
 		prec = NULL;
-		for (layer = (ImageLayer *)ima->imlayers.first; layer; layer = layer->next) {
+		for (layer = (ImageLayer *)ima->layers.first; layer; layer = layer->next) {
 			if (layer->visible & IMA_LAYER_VISIBLE) {
 				if (prec == NULL) {
 					prec = layer;
@@ -4053,9 +4053,9 @@ static int image_flatten_exec(bContext *C, wmOperator *op)
 
 			}
 			else {
-				BLI_remlink(&ima->imlayers, layer);
+				BLI_remlink(&ima->layers, layer);
 				BKE_image_layer_free(layer);
-				if (ima->imlayers.first) {
+				if (ima->layers.first) {
 					if (BKE_image_get_current_layer_index(ima) != 1)
 						BKE_image_set_current_layer(ima, BKE_image_get_current_layer_index(ima));
 					else
@@ -4371,13 +4371,13 @@ static int image_layer_move_exec(bContext *C, wmOperator *op)
 		if (type == -1) { /* Move direction: Up */
 			if (layerID > 0) {
 				tmp = layer->prev;
-				BLI_remlink(&ima->imlayers, layer);
+				BLI_remlink(&ima->layers, layer);
 				layer->next = layer->prev = NULL;
 
 				if (tmp)
-					BLI_insertlinkbefore(&ima->imlayers, tmp, layer);
+					BLI_insertlinkbefore(&ima->layers, tmp, layer);
 				else
-					BLI_addhead(&ima->imlayers, layer);
+					BLI_addhead(&ima->layers, layer);
 
 				BKE_image_set_current_layer(ima, layerID - 1);
 			}
@@ -4386,33 +4386,33 @@ static int image_layer_move_exec(bContext *C, wmOperator *op)
 			if (layerID < (ima->num_layers - 1)) {
 				tmp = layer->next;
 				if (!(tmp->type & IMA_LAYER_BASE)) {
-					BLI_remlink(&ima->imlayers, layer);
+					BLI_remlink(&ima->layers, layer);
 					layer->next = layer->prev = NULL;
 
 					if (tmp)
-						BLI_insertlinkafter(&ima->imlayers, tmp, layer);
+						BLI_insertlinkafter(&ima->layers, tmp, layer);
 					else
-						BLI_addtail(&ima->imlayers, layer);
+						BLI_addtail(&ima->layers, layer);
 
 					BKE_image_set_current_layer(ima, layerID+1);
 				}
 			}
 		}
 		else if (type == -2) {  /* Move direction: Top */
-			BLI_remlink(&ima->imlayers, layer);
+			BLI_remlink(&ima->layers, layer);
 			layer->next = layer->prev = NULL;
-			BLI_addhead(&ima->imlayers, layer);
+			BLI_addhead(&ima->layers, layer);
 			ima->active_layer = 0;
 		}
 		else if (type == 2) {  /* Move direction: Bottom */
-			BLI_remlink(&ima->imlayers, layer);
+			BLI_remlink(&ima->layers, layer);
 			layer->next = layer->prev = NULL;
-			if (((ImageLayer *)ima->imlayers.last)->type & IMA_LAYER_BASE) {
-				BLI_insertlinkafter(&ima->imlayers,((ImageLayer *)ima->imlayers.last)->prev, layer);
+			if (((ImageLayer *)ima->layers.last)->type & IMA_LAYER_BASE) {
+				BLI_insertlinkafter(&ima->layers,((ImageLayer *)ima->layers.last)->prev, layer);
 				ima->active_layer = ima->num_layers - 2;
 			}
 			else {
-				BLI_addtail(&ima->imlayers, layer);
+				BLI_addtail(&ima->layers, layer);
 				ima->active_layer = ima->num_layers - 1;
 			}
 		}
@@ -4425,8 +4425,8 @@ static int image_layer_move_exec(bContext *C, wmOperator *op)
 				else
 					lim = (ima->num_layers / 2) + 1;
 
-				tmp_up = (ImageLayer *)ima->imlayers.first;
-				tmp_down = ((ImageLayer *)ima->imlayers.last)->prev;
+				tmp_up = (ImageLayer *)ima->layers.first;
+				tmp_down = ((ImageLayer *)ima->layers.last)->prev;
 				while ((i<lim) && (tmp_up != tmp_down)) {
 					tmp = tmp_up;
 
@@ -4438,7 +4438,7 @@ static int image_layer_move_exec(bContext *C, wmOperator *op)
 					if (tmp->prev)
 						tmp->prev->next = tmp_down;
 					else
-						ima->imlayers.first = tmp_down;
+						ima->layers.first = tmp_down;
 					tmp->next->prev = tmp_down;
 
 					tmp_up->next = next;
@@ -4511,11 +4511,11 @@ static int image_layer_select_exec(bContext *C, wmOperator *op)
 			}
 			break;
 		case IMA_LAYER_SEL_TOP:
-			((ImageLayer *)ima->imlayers.first)->select = IMA_LAYER_SEL_CURRENT;
+			((ImageLayer *)ima->layers.first)->select = IMA_LAYER_SEL_CURRENT;
 			ima->active_layer = 0;
 			break;
 		case IMA_LAYER_SEL_BOTTOM:
-			((ImageLayer *)ima->imlayers.last)->select = IMA_LAYER_SEL_CURRENT;
+			((ImageLayer *)ima->layers.last)->select = IMA_LAYER_SEL_CURRENT;
 			ima->active_layer = ima->num_layers - 1;
 			break;
 	}
@@ -4585,7 +4585,7 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 	else if (type == 2) { /* Merge Visible */
 		int i = 0;
 		ImageLayer *next;
-		for (layer = (ImageLayer *)ima->imlayers.first; layer; layer = layer->next) {
+		for (layer = (ImageLayer *)ima->layers.first; layer; layer = layer->next) {
 			if (layer->visible & IMA_LAYER_VISIBLE) {
 				i = 1;
 				break;
@@ -4612,17 +4612,17 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 		ImageLayer *next, *app;
 		static float white_color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 
-		for (layer = (ImageLayer *)ima->imlayers.first; layer; layer = layer->next) {
+		for (layer = (ImageLayer *)ima->layers.first; layer; layer = layer->next) {
 			if (layer->visible & IMA_LAYER_VISIBLE) {
 				break;
 			}
 			else {
-				BLI_remlink(&ima->imlayers, layer);
+				BLI_remlink(&ima->layers, layer);
 				BKE_image_layer_free(layer);
 				ima->num_layers--;
 			}
 		}
-		if (ima->imlayers.first) {
+		if (ima->layers.first) {
 			next = layer;
 			while ((next != NULL) && (layer->type != IMA_LAYER_BASE)) {
 				next = layer->next;
@@ -4630,7 +4630,7 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 					app = next;
 					next = next->next;
 
-					BLI_remlink(&ima->imlayers, app);
+					BLI_remlink(&ima->layers, app);
 					BKE_image_layer_free(app);
 					ima->num_layers--;
 				}
@@ -4641,7 +4641,7 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 			}
 
 			BKE_image_set_current_layer(ima, BKE_image_get_current_layer_index(ima));
-			layer = (ImageLayer *)ima->imlayers.last;
+			layer = (ImageLayer *)ima->layers.last;
 			if (!(layer->type & IMA_LAYER_BASE)) {
 				ImBuf *base;
 				int i;
@@ -4677,7 +4677,7 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 		}
 		else {
 			BKE_image_add_image_layer_base(ima);
-			layer = (ImageLayer *)ima->imlayers.last;
+			layer = (ImageLayer *)ima->layers.last;
 			layer->background = IMA_LAYER_BG_WHITE;
 			copy_v4_v4(layer->default_color, white_color);
 			BKE_image_layer_color_fill(ima, white_color);

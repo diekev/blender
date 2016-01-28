@@ -528,7 +528,7 @@ static void rna_Image_active_image_layer_set(PointerRNA *ptr, PointerRNA value)
 {
 	Image *ima = (Image*)ptr->data;
 	ImageLayer *layer = (ImageLayer*)value.data;
-	const int index = BLI_findindex(&ima->imlayers, layer);
+	const int index = BLI_findindex(&ima->layers, layer);
 	if (index != -1)
 		BKE_image_set_current_layer(ima, index);
 }
@@ -536,7 +536,7 @@ static void rna_Image_active_image_layer_set(PointerRNA *ptr, PointerRNA value)
 static void rna_Image_layers_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
 {
 	Image *ima = (Image*)ptr->data;
-	rna_iterator_listbase_begin(iter, &ima->imlayers, NULL);
+	rna_iterator_listbase_begin(iter, &ima->layers, NULL);
 }
 
 static int rna_Image_active_image_layer_index_get(PointerRNA *ptr)
@@ -556,7 +556,7 @@ static void rna_Image_active_image_layer_index_range(PointerRNA *ptr, int *min, 
 {
 	Image *im = (Image*)ptr->data;
 
-	*min = BLI_listbase_count(&im->imlayers) - 1;
+	*min = BLI_listbase_count(&im->layers) - 1;
 	*max = 0;
 	*min = MAX2(0, *min);
 
@@ -879,7 +879,7 @@ static void rna_def_image(BlenderRNA *brna)
 
 	/* Image Layers */
 	prop = RNA_def_property(srna, "image_layers", PROP_COLLECTION, PROP_NONE);
-	RNA_def_property_collection_sdna(prop, NULL, "imlayers", NULL);
+	RNA_def_property_collection_sdna(prop, NULL, "layers", NULL);
 	RNA_def_property_struct_type(prop, "ImageLayer");
 	RNA_def_property_collection_funcs(prop, "rna_Image_layers_begin", "rna_iterator_listbase_next",
 									  "rna_iterator_listbase_end", "rna_iterator_listbase_get", 0, 0, 0, 0);
