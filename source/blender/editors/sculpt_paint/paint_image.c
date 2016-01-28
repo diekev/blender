@@ -609,7 +609,7 @@ static int image_paint_poll(bContext *C)
 
 			if ((sima->mode == SI_MODE_PAINT) &&
 				(ar->regiontype == RGN_TYPE_WINDOW) &&
-				(!(imalayer_is_locked(sima->image) & IMA_LAYER_LOCK)))
+				(!(BKE_image_layer_is_locked(sima->image) & IMA_LAYER_LOCK)))
 			{
 				if ((!(win->modalcursor & BC_NSEW_SCROLLCURSOR)) || (!(win->modalcursor & BC_EYEDROPPER_CURSOR)))
 					WM_cursor_modal_set(win, BC_PAINTBRUSHCURSOR);

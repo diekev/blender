@@ -519,7 +519,7 @@ static void rna_render_slots_active_index_set(PointerRNA *ptr, int value)
 static PointerRNA rna_Image_active_image_layer_get(PointerRNA *ptr)
 {
 	Image *ima = (Image*)ptr->data;
-	ImageLayer *layer = imalayer_get_current(ima);
+	ImageLayer *layer = BKE_image_get_current_layer(ima);
 
 	return rna_pointer_inherit_refine(ptr, &RNA_ImageLayer, layer);
 }
@@ -530,7 +530,7 @@ static void rna_Image_active_image_layer_set(PointerRNA *ptr, PointerRNA value)
 	ImageLayer *layer = (ImageLayer*)value.data;
 	const int index = BLI_findindex(&ima->imlayers, layer);
 	if (index != -1)
-		imalayer_set_current_act(ima, index);
+		BKE_image_set_current_layer(ima, index);
 }
 
 static void rna_Image_layers_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
@@ -542,14 +542,14 @@ static void rna_Image_layers_begin(CollectionPropertyIterator *iter, PointerRNA 
 static int rna_Image_active_image_layer_index_get(PointerRNA *ptr)
 {
 	Image *ima = (Image*)ptr->data;
-	return image_get_current_layer_index(ima);
+	return BKE_image_get_current_layer_index(ima);
 }
 
 static void rna_Image_active_image_layer_index_set(PointerRNA *ptr, int value)
 {
 	Image *ima = (Image*)ptr->data;
 
-	imalayer_set_current_act(ima, value);
+	BKE_image_set_current_layer(ima, value);
 }
 
 static void rna_Image_active_image_layer_index_range(PointerRNA *ptr, int *min, int *max, int *softmin, int *softmax)

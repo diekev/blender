@@ -2560,7 +2560,7 @@ static void free_preview(Image *ima, char mode)
 	}
 
 	if (mode == SI_MODE_PAINT) {
-		layer = imalayer_get_current(ima);
+		layer = BKE_image_get_current_layer(ima);
 		if (layer) {
 			if (layer->preview_ibuf) {
 				IMB_freeImBuf(layer->preview_ibuf);
@@ -2799,7 +2799,7 @@ static bool image_bright_contrast_check(bContext *C, wmOperator *op)
 	contrast = RNA_float_get(op->ptr, "contrast");
 
 	if (sima->mode == SI_MODE_PAINT) {
-		layer = imalayer_get_current(ima);
+		layer = BKE_image_get_current_layer(ima);
 		preview_ibuf = layer->preview_ibuf;
 	}
 	else {
@@ -2971,7 +2971,7 @@ static bool image_posterize_check(bContext *C, wmOperator *op)
 	levels = RNA_int_get(op->ptr, "levels");
 
 	if (sima->mode == SI_MODE_PAINT) {
-		layer = imalayer_get_current(ima);
+		layer = BKE_image_get_current_layer(ima);
 		preview_ibuf = layer->preview_ibuf;
 	}
 	else {
@@ -3081,7 +3081,7 @@ static bool image_threshold_check(bContext *C, wmOperator *op)
 	high = RNA_int_get(op->ptr, "high");
 
 	if (sima->mode == SI_MODE_PAINT) {
-		layer = imalayer_get_current(ima);
+		layer = BKE_image_get_current_layer(ima);
 		preview_ibuf = layer->preview_ibuf;
 	}
 	else {
@@ -3199,7 +3199,7 @@ static bool image_exposure_check(bContext *C, wmOperator *op)
 	gamma = RNA_float_get(op->ptr, "gamma");
 
 	if (sima->mode == SI_MODE_PAINT) {
-		layer = imalayer_get_current(ima);
+		layer = BKE_image_get_current_layer(ima);
 		preview_ibuf = layer->preview_ibuf;
 	}
 	else {
@@ -3312,7 +3312,7 @@ static bool image_colorize_check(bContext *C, wmOperator *op)
 	lightness = RNA_int_get(op->ptr, "lightness");
 
 	if (sima->mode == SI_MODE_PAINT) {
-		layer = imalayer_get_current(ima);
+		layer = BKE_image_get_current_layer(ima);
 		preview_ibuf = layer->preview_ibuf;
 	}
 	else {
@@ -3457,7 +3457,7 @@ static int image_duplicate_exec(bContext *C, wmOperator *op)
 	new_ima->imlayers.first = new_ima->imlayers.last = NULL;
 
 	while (layer) {
-		dup = image_duplicate_layer(ima, layer);
+		dup = BKE_image_layer_duplicate(ima, layer);
 		BLI_addtail(&new_ima->imlayers, dup);
 
 		layer = layer->next;
@@ -3648,7 +3648,7 @@ static int image_arbitrary_rot_exec(bContext *C, wmOperator *op)
 	angle = RNA_float_get(op->ptr, "angle");
 	lock = RNA_boolean_get(op->ptr, "lock_size");
 
-	imagelayer_get_background_color(col, (ImageLayer*)ima->imlayers.last);
+	BKE_image_layer_get_background_color(col, (ImageLayer*)ima->imlayers.last);
 
 	angle = angle * (-1);
 
@@ -3686,7 +3686,7 @@ static bool image_arbitrary_rot_check(bContext *C, wmOperator *op)
 	type = RNA_enum_get(op->ptr, "type");
 	angle = RNA_float_get(op->ptr, "angle");
 	lock = RNA_boolean_get(op->ptr, "lock_size");
-	imagelayer_get_background_color(col, (ImageLayer*)ima->imlayers.last);
+	BKE_image_layer_get_background_color(col, (ImageLayer*)ima->imlayers.last);
 
 	angle = angle * (-1);
 
@@ -3773,7 +3773,7 @@ static int image_offset_exec(bContext *C, wmOperator *op)
 	}
 
 	if (!wrap) {
-		imagelayer_get_background_color(col, (ImageLayer*)ima->imlayers.last);
+		BKE_image_layer_get_background_color(col, (ImageLayer*)ima->imlayers.last);
 	}
 
 	ibuf = IMB_offset(ibuf, x, y, half, wrap, col);
@@ -3825,7 +3825,7 @@ static bool image_offset_check(bContext *C, wmOperator *op)
 	}
 
 	if (!wrap) {
-		imagelayer_get_background_color(col, (ImageLayer*)ima->imlayers.last);
+		BKE_image_layer_get_background_color(col, (ImageLayer*)ima->imlayers.last);
 	}
 
 	if (ima->preview_ibuf) {
@@ -3967,7 +3967,7 @@ static int image_merge_exec(bContext *C, wmOperator *op)
 					prec = layer;
 				}
 				else {
-					layer = merge_layers(ima, prec, layer);
+					layer = BKE_image_layer_merge(ima, prec, layer);
 					ima->num_layers--;
 					prec = layer;
 				}
@@ -3976,12 +3976,12 @@ static int image_merge_exec(bContext *C, wmOperator *op)
 			else {
 				if (discard) {
 					BLI_remlink(&ima->imlayers, layer);
-					image_layer_free(layer);
+					BKE_image_layer_free(layer);
 					if (ima->imlayers.first) {
-						if (image_get_current_layer_index(ima) != 1)
-							imalayer_set_current_act(ima, image_get_current_layer_index(ima));
+						if (BKE_image_get_current_layer_index(ima) != 1)
+							BKE_image_set_current_layer(ima, BKE_image_get_current_layer_index(ima));
 						else
-							imalayer_set_current_act(ima, image_get_current_layer_index(ima) - 1);
+							BKE_image_set_current_layer(ima, BKE_image_get_current_layer_index(ima) - 1);
 					}
 					ima->num_layers -= 1;
 				}
@@ -3991,7 +3991,7 @@ static int image_merge_exec(bContext *C, wmOperator *op)
 			ima->active_layer = 0;
 		else
 			ima->active_layer = ima->num_layers -1;
-		imalayer_set_current_act(ima, ima->active_layer);
+		BKE_image_set_current_layer(ima, ima->active_layer);
 	}
 	else
 		BKE_report(op->reports, RPT_INFO, "It can not merge the layers, because the layers are hidden");
@@ -4046,7 +4046,7 @@ static int image_flatten_exec(bContext *C, wmOperator *op)
 					prec = layer;
 				}
 				else {
-					layer = merge_layers(ima, prec, layer);
+					layer = BKE_image_layer_merge(ima, prec, layer);
 					ima->num_layers--;
 					prec = layer;
 				}
@@ -4054,21 +4054,21 @@ static int image_flatten_exec(bContext *C, wmOperator *op)
 			}
 			else {
 				BLI_remlink(&ima->imlayers, layer);
-				image_layer_free(layer);
+				BKE_image_layer_free(layer);
 				if (ima->imlayers.first) {
-					if (image_get_current_layer_index(ima) != 1)
-						imalayer_set_current_act(ima, image_get_current_layer_index(ima));
+					if (BKE_image_get_current_layer_index(ima) != 1)
+						BKE_image_set_current_layer(ima, BKE_image_get_current_layer_index(ima));
 					else
-						imalayer_set_current_act(ima, image_get_current_layer_index(ima) - 1);
+						BKE_image_set_current_layer(ima, BKE_image_get_current_layer_index(ima) - 1);
 				}
 				ima->num_layers -= 1;
 			}
 		}
 
 		ima->active_layer = 0;
-		imalayer_set_current_act(ima, ima->active_layer);
+		BKE_image_set_current_layer(ima, ima->active_layer);
 
-		imagelayer_get_background_color(col, prec);
+		BKE_image_layer_get_background_color(col, prec);
 
 		ima->use_layers = false;
 		if (sima->mode == SI_MODE_PAINT)
@@ -4133,7 +4133,7 @@ static void image_layer_preview_cancel(bContext *C, wmOperator *UNUSED(op))
 	Image *ima = CTX_data_edit_image(C);
 	ImageLayer *layer;
 
-	layer = imalayer_get_current(ima);
+	layer = BKE_image_get_current_layer(ima);
 	if (layer) {
 		if (layer->preview_ibuf) {
 			IMB_freeImBuf(layer->preview_ibuf);
@@ -4177,7 +4177,7 @@ static int image_layer_add_exec(bContext *C, wmOperator *op)
 	if (!alpha)
 		color[3] = 1.0f;
 
-	iml = image_add_image_layer(ima, name, alpha ? 32 : 24, color, order);
+	iml = BKE_image_add_image_layer(ima, name, alpha ? 32 : 24, color, order);
 
 	if (!iml)
 		return OPERATOR_CANCELLED;
@@ -4285,7 +4285,7 @@ static int image_layer_duplicate_exec(bContext *C, wmOperator *UNUSED(op))
 	if (!ima)
 		return OPERATOR_CANCELLED;
 
-	iml = image_duplicate_current_image_layer(ima);
+	iml = BKE_image_layer_duplicate_current(ima);
 
 	if (!iml)
 		return OPERATOR_CANCELLED;
@@ -4318,7 +4318,7 @@ static int image_layer_remove_exec(bContext *C, wmOperator *op)
 	if (!ima)
 		return OPERATOR_CANCELLED;
 
-	if (image_remove_layer(ima, action) == -1)
+	if (BKE_image_layer_remove(ima, action) == -1)
 		BKE_report(op->reports, RPT_INFO, "Impossible to remove only one layer");
 
 	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, ima);
@@ -4359,13 +4359,13 @@ static int image_layer_move_exec(bContext *C, wmOperator *op)
 	if (!ima)
 		return OPERATOR_CANCELLED;
 
-	layer = imalayer_get_current(ima);
+	layer = BKE_image_get_current_layer(ima);
 
 	if (!layer)
 		return OPERATOR_CANCELLED;
 
 	type = RNA_enum_get(op->ptr, "type");
-	layerID = image_get_current_layer_index(ima);
+	layerID = BKE_image_get_current_layer_index(ima);
 
 	if (!(layer->type & IMA_LAYER_BASE)) {
 		if (type == -1) { /* Move direction: Up */
@@ -4379,7 +4379,7 @@ static int image_layer_move_exec(bContext *C, wmOperator *op)
 				else
 					BLI_addhead(&ima->imlayers, layer);
 
-				imalayer_set_current_act(ima, layerID - 1);
+				BKE_image_set_current_layer(ima, layerID - 1);
 			}
 		}
 		else if (type == 1){ /* Move direction: Down */
@@ -4394,7 +4394,7 @@ static int image_layer_move_exec(bContext *C, wmOperator *op)
 					else
 						BLI_addtail(&ima->imlayers, layer);
 
-					imalayer_set_current_act(ima, layerID+1);
+					BKE_image_set_current_layer(ima, layerID+1);
 				}
 			}
 		}
@@ -4418,7 +4418,7 @@ static int image_layer_move_exec(bContext *C, wmOperator *op)
 		}
 		else if (type == 3) {  /* Move direction: Invert */
 			int i = 0, lim;
-			ImageLayer *tmp, *next, *prev, *tmp_up, *tmp_down;
+			ImageLayer *next, *prev, *tmp_up, *tmp_down;
 			if (ima->num_layers > 2) {
 				if (ima->num_layers % 2 == 0)
 					lim = (ima->num_layers / 2);
@@ -4493,7 +4493,7 @@ static int image_layer_select_exec(bContext *C, wmOperator *op)
 	ImageLayer *layer;
 	int action = RNA_enum_get(op->ptr, "action");
 
-	layer = imalayer_get_current(ima);
+	layer = BKE_image_get_current_layer(ima);
 
 	switch (action) {
 		case IMA_LAYER_SEL_PREVIOUS:
@@ -4561,7 +4561,7 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 	type = RNA_enum_get(op->ptr, "type");
 
 	if (type == 1) { /* Merge Layers */
-		layer = imalayer_get_current(ima);
+		layer = BKE_image_get_current_layer(ima);
 		if (!layer)
 			return OPERATOR_CANCELLED;
 
@@ -4570,9 +4570,9 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 
 			next = layer->next;
 			if ((next->visible & IMA_LAYER_VISIBLE) && (!(next->locked & IMA_LAYER_LOCK))) {
-				merge_layers(ima, layer, next);
+				BKE_image_layer_merge(ima, layer, next);
 
-				imalayer_set_current_act(ima, image_get_current_layer_index(ima));
+				BKE_image_set_current_layer(ima, BKE_image_get_current_layer_index(ima));
 				ima->num_layers--;
 			}
 			else
@@ -4599,11 +4599,11 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 					next = next->next;
 
 				if (next) {
-					layer = merge_layers(ima, layer, next);
+					layer = BKE_image_layer_merge(ima, layer, next);
 					ima->num_layers--;
 				}
 			}
-			imalayer_set_current_act(ima,image_get_current_layer_index(ima));
+			BKE_image_set_current_layer(ima,BKE_image_get_current_layer_index(ima));
 		}
 		else
 			BKE_report(op->reports, RPT_INFO, "It can not merge the layers, because the layers are hidden");
@@ -4618,7 +4618,7 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 			}
 			else {
 				BLI_remlink(&ima->imlayers, layer);
-				image_layer_free(layer);
+				BKE_image_layer_free(layer);
 				ima->num_layers--;
 			}
 		}
@@ -4631,16 +4631,16 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 					next = next->next;
 
 					BLI_remlink(&ima->imlayers, app);
-					image_layer_free(app);
+					BKE_image_layer_free(app);
 					ima->num_layers--;
 				}
 				if (next) {
-					layer = merge_layers(ima, layer, next);
+					layer = BKE_image_layer_merge(ima, layer, next);
 					ima->num_layers--;
 				}
 			}
 
-			imalayer_set_current_act(ima, image_get_current_layer_index(ima));
+			BKE_image_set_current_layer(ima, BKE_image_get_current_layer_index(ima));
 			layer = (ImageLayer *)ima->imlayers.last;
 			if (!(layer->type & IMA_LAYER_BASE)) {
 				ImBuf *base;
@@ -4676,11 +4676,11 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 			}
 		}
 		else {
-			image_add_image_layer_base(ima);
+			BKE_image_add_image_layer_base(ima);
 			layer = (ImageLayer *)ima->imlayers.last;
 			layer->background = IMA_LAYER_BG_WHITE;
 			copy_v4_v4(layer->default_color, white_color);
-			imalayer_fill_color(ima, white_color);
+			BKE_image_layer_color_fill(ima, white_color);
 		}
 	}
 
@@ -4721,7 +4721,7 @@ static int image_layer_clean_exec(bContext *C, wmOperator *UNUSED(op))
 	static float alpha_color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 	static float white_color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 
-	layer = imalayer_get_current(ima);
+	layer = BKE_image_get_current_layer(ima);
 
 	if (layer->background & IMA_LAYER_BG_IMAGE) {
 		int flag;
@@ -4738,12 +4738,12 @@ static int image_layer_clean_exec(bContext *C, wmOperator *UNUSED(op))
 		BLI_addtail(&layer->ibufs, ibuf);
 	}
 	else if (layer->background & IMA_LAYER_BG_WHITE)
-		imalayer_fill_color(ima, white_color);
+		BKE_image_layer_color_fill(ima, white_color);
 	else if (layer->background & IMA_LAYER_BG_ALPHA)
-		imalayer_fill_color(ima, alpha_color);
+		BKE_image_layer_color_fill(ima, alpha_color);
 	else {
 		if (layer->default_color[0] != -1)
-			imalayer_fill_color(ima, layer->default_color);
+			BKE_image_layer_color_fill(ima, layer->default_color);
 	}
 
 	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, ima);
@@ -4777,7 +4777,7 @@ static int image_layer_flip_exec(bContext *C, wmOperator *op)
 
 	type = RNA_enum_get(op->ptr, "type");
 
-	layer = imalayer_get_current(ima);
+	layer = BKE_image_get_current_layer(ima);
 	if (!layer)
 		return OPERATOR_CANCELLED;
 
@@ -4828,11 +4828,11 @@ static int image_layer_rotate_exec(bContext *C, wmOperator *op)
 
 	type = RNA_enum_get(op->ptr, "type");
 
-	layer = imalayer_get_current(ima);
+	layer = BKE_image_get_current_layer(ima);
 	if (!layer)
 		return OPERATOR_CANCELLED;
 
-	imagelayer_get_background_color(col, layer);
+	BKE_image_layer_get_background_color(col, layer);
 
 	ibuf = (ImBuf*)((ImageLayer*)layer->ibufs.first);
 	if (type == 1) { /* ROT_90 */
@@ -4898,7 +4898,7 @@ static int image_layer_arbitrary_rot_exec(bContext *C, wmOperator *op)
 	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
 	ima->use_layers = true;
 
-	layer = imalayer_get_current(ima);
+	layer = BKE_image_get_current_layer(ima);
 	if (!layer)
 		return OPERATOR_CANCELLED;
 
@@ -4910,7 +4910,7 @@ static int image_layer_arbitrary_rot_exec(bContext *C, wmOperator *op)
 	type = RNA_enum_get(op->ptr, "type");
 	angle = RNA_float_get(op->ptr, "angle");
 	lock = RNA_boolean_get(op->ptr, "lock_size");
-	imagelayer_get_background_color(col, layer);
+	BKE_image_layer_get_background_color(col, layer);
 
 	angle = angle * (-1);
 
@@ -4943,12 +4943,12 @@ static bool image_layer_arbitrary_rot_check(bContext *C, wmOperator *op)
 	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
 	ima->use_layers = true;
 
-	layer = imalayer_get_current(ima);
+	layer = BKE_image_get_current_layer(ima);
 	type = RNA_enum_get(op->ptr, "type");
 	angle = RNA_float_get(op->ptr, "angle");
 	lock = RNA_boolean_get(op->ptr, "lock_size");
 
-	imagelayer_get_background_color(col, layer);
+	BKE_image_layer_get_background_color(col, layer);
 
 	angle = angle * (-1);
 
@@ -5010,7 +5010,7 @@ static int image_layer_offset_exec(bContext *C, wmOperator *op)
 	if (!ima)
 		return OPERATOR_CANCELLED;
 
-	layer = imalayer_get_current(ima);
+	layer = BKE_image_get_current_layer(ima);
 	if (!layer)
 		return OPERATOR_CANCELLED;
 
@@ -5034,7 +5034,7 @@ static int image_layer_offset_exec(bContext *C, wmOperator *op)
 	}
 
 	if (!wrap)
-		imagelayer_get_background_color(col, layer);
+		BKE_image_layer_get_background_color(col, layer);
 
 	layer->ibufs.first = NULL;
 	layer->ibufs.last = NULL;
@@ -5060,7 +5060,7 @@ static bool image_layer_offset_check(bContext *C, wmOperator *op)
 	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
 	ima->use_layers = true;
 
-	layer = imalayer_get_current(ima);
+	layer = BKE_image_get_current_layer(ima);
 	x = RNA_int_get(op->ptr, "off_x");
 	y = RNA_int_get(op->ptr, "off_y");
 	half = RNA_boolean_get(op->ptr, "half");
@@ -5081,7 +5081,7 @@ static bool image_layer_offset_check(bContext *C, wmOperator *op)
 	}
 
 	if (!wrap) {
-		imagelayer_get_background_color(col, layer);
+		BKE_image_layer_get_background_color(col, layer);
 	}
 
 	if (layer->preview_ibuf) {
@@ -5132,7 +5132,7 @@ static int image_layer_scale_exec(bContext *C, wmOperator *op)
 	if (!ima)
 		return OPERATOR_CANCELLED;
 
-	layer = imalayer_get_current(ima);
+	layer = BKE_image_get_current_layer(ima);
 	if (!layer)
 		return OPERATOR_CANCELLED;
 
@@ -5205,7 +5205,7 @@ static int image_layer_size_exec(bContext *C, wmOperator *op)
 	if (!ima)
 		return OPERATOR_CANCELLED;
 
-	layer = imalayer_get_current(ima);
+	layer = BKE_image_get_current_layer(ima);
 	if (!layer)
 		return OPERATOR_CANCELLED;
 
@@ -5268,7 +5268,7 @@ static int image_layer_size_exec(bContext *C, wmOperator *op)
 		}
 	}
 
-	imagelayer_get_background_color(col, layer);
+	BKE_image_layer_get_background_color(col, layer);
 	layer->ibufs.first = NULL;
 	layer->ibufs.last = NULL;
 	BLI_addtail(&layer->ibufs, IMB_size(ibuf, width, height, off_x, off_y, centre, col));

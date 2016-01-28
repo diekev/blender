@@ -1006,7 +1006,7 @@ void draw_image_main(const bContext *C, ARegion *ar)
 
 						if (ibuf_l) {
 							bool has_realloc = false;
-							result_ibuf = imalayer_blend(next_ibuf, ibuf_l, layer->opacity, layer->mode, background, &has_realloc);
+							result_ibuf = BKE_image_layer_blend(next_ibuf, ibuf_l, layer->opacity, layer->mode, background, &has_realloc);
 
 							if (has_realloc && next_ibuf)
 								IMB_freeImBuf(next_ibuf);
@@ -1045,8 +1045,6 @@ void draw_image_main(const bContext *C, ARegion *ar)
 			if (ima->imlayers.last) {
 				layer = ima->imlayers.last;
 				if (layer->background & IMA_LAYER_BG_ALPHA) {
-					int x, y;
-
 					UI_view2d_view_to_region(&ar->v2d, 0.0f, 0.0f, &x, &y);
 					fdrawcheckerboard(x, y, x + ibuf->x * zoomx, y + ibuf->y * zoomy);
 				}
@@ -1075,7 +1073,6 @@ void draw_image_main(const bContext *C, ARegion *ar)
 		}
 		
 		if (sima->flag & SI_DRAW_METADATA) {
-			int x, y;
 			rctf frame;
 
 			BLI_rctf_init(&frame, 0.0f, ibuf->x, 0.0f, ibuf->y);

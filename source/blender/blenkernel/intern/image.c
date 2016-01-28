@@ -258,7 +258,7 @@ void BKE_image_de_interlace(Image *ima, int odd)
 
 static void image_free_cached_frames(Image *image)
 {
-	image_free_image_layers(image);
+	BKE_image_free_layers(image);
 	if (image->cache) {
 		IMB_moviecache_free(image->cache);
 		image->cache = NULL;
@@ -390,7 +390,7 @@ static ImBuf *image_get_ibuf_layer(Image *ima)
 
 	//BLI_spin_lock(&image_spin);
 
-		layer = imalayer_get_current(ima);
+		layer = BKE_image_get_current_layer(ima);
 		if (layer && layer->ibufs.first)
 			ibuf = (ImBuf *)layer->ibufs.first;
 
@@ -415,7 +415,7 @@ static ImBuf *image_get_cached_ibuf_for_index_frame(Image *ima, int index, int f
 	if (index == IMA_NO_INDEX) {
 		if (ima->imlayers.first) {
 	//		BLI_lock_thread(LOCK_IMAGE);
-			merge_layers_visible_nd(ima);
+			BKE_image_merge_visible_layers(ima);
 	//		BLI_unlock_thread(LOCK_IMAGE);
 		}
 	}
@@ -434,7 +434,7 @@ static void image_assign_ibuf(Image *ima, ImBuf *ibuf, int index, int frame)
 
 		if ((ima->source == IMA_SRC_FILE) || (ima->source == IMA_SRC_GENERATED)) {
 			if (ima->imlayers.first == NULL) {
-				image_add_image_layer_base(ima);
+				BKE_image_add_image_layer_base(ima);
 				if (ima->source == IMA_SRC_FILE) {
 					((ImageLayer *)ima->imlayers.last)->background = IMA_LAYER_BG_IMAGE;
 					strcpy(((ImageLayer *)ima->imlayers.last)->file_path, ima->name);
@@ -836,10 +836,10 @@ ImageLayer *BKE_add_image_file_as_layer(Image *ima, const char *name)
 
 	//iml = image_add_image_layer(ima, newname, alpha ? 32 : 24, color, 2);
 
-	layer_act = imalayer_get_current(ima);
+	layer_act = BKE_image_get_current_layer(ima);
 	layer_act->select = !IMA_LAYER_SEL_CURRENT;
 
-	iml = image_layer_new(ima, newname);
+	iml = BKE_image_layer_new(ima, newname);
 	if (iml) {
 		BLI_addhead(&ima->imlayers, iml);
 		ima->active_layer = 0;
