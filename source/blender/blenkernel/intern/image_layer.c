@@ -19,8 +19,8 @@
  * All rights reserved.
  *
  * Contributor(s): Konrad Kleine,
- *				   Fabio Russo,
- *				   Kevin Dietrich
+ *                 Fabio Russo,
+ *                 Kevin Dietrich
  *
  * ***** END GPL LICENSE BLOCK *****
  */
@@ -28,7 +28,7 @@
 /** \file blender/blenkernel/intern/layer.c
  *  \ingroup bke
  */
- 
+
 #include <stdio.h>
 #include <string.h>
 
@@ -75,7 +75,7 @@ static void imagelayer_unique_name(ImageLayer *iml, Image *ima)
 
 	BLI_uniquename_cb(imagelayer_unique_check, &data, "Layer", '.', iml->name, sizeof(iml->name));
 }
- 
+
 ImageLayer *BKE_image_layer_new(Image *ima, const char *name)
 {
 	ImageLayer *layer = MEM_callocN(sizeof(ImageLayer), "image_layer");
@@ -102,14 +102,12 @@ ImageLayer *BKE_image_layer_new(Image *ima, const char *name)
 
 void BKE_image_layer_free(ImageLayer *layer)
 {
-	ImBuf *ibuf;
- 
-	if (!layer)
+	if (!layer) {
 		return;
+	}
 
-	while ((ibuf = (ImBuf *)layer->ibufs.first)) {
-		BLI_remlink(&layer->ibufs, ibuf);
- 
+	ImBuf *ibuf;
+	while ((ibuf = BLI_pophead(&layer->ibufs))) {
 		if (ibuf->userdata) {
 			MEM_freeN(ibuf->userdata);
 			ibuf->userdata = NULL;
@@ -129,12 +127,7 @@ void BKE_image_layer_free(ImageLayer *layer)
 void BKE_image_free_layers(struct Image *ima)
 {
 	ImageLayer *layer;
- 
-	if (ima->imlayers.first == NULL)
-		return;
-
-	while ((layer = (ImageLayer *)ima->imlayers.first)) {
-		BLI_remlink(&ima->imlayers, layer);
+	while ((layer = BLI_pophead(&ima->imlayers)) != NULL) {
 		BKE_image_layer_free(layer);
 	}
 
@@ -143,35 +136,36 @@ void BKE_image_free_layers(struct Image *ima)
 
 ImageLayer *BKE_image_get_current_layer(Image *ima)
 {
-	ImageLayer *layer;
-	
-	if (ima == NULL)
+	if (ima == NULL) {
 		return NULL;
- 
-	for (layer = ima->imlayers.last; layer; layer = layer->prev) {
-		if (layer->select & IMA_LAYER_SEL_CURRENT)
-			return layer;
 	}
- 
-	return NULL;
+
+	ImageLayer *layer = NULL;
+	for (layer = ima->imlayers.last; layer; layer = layer->prev) {
+		if (layer->select & IMA_LAYER_SEL_CURRENT) {
+			break;
+		}
+	}
+
+	return layer;
 }
 
 short BKE_image_get_current_layer_index(Image *ima)
 {
 	if (ima == NULL)
 		return 0;
- 
+
 	return ima->active_layer;
 }
- 
+
 void BKE_image_set_current_layer(Image *ima, short index)
 {
 	ImageLayer *layer;
 	short i;
- 
+
 	if (ima == NULL)
 		return;
-	
+
 	for (layer = ima->imlayers.last, i = BLI_listbase_count(&ima->imlayers) - 1; layer; layer = layer->prev, i--) {
 		if (i == index) {
 			layer->select = IMA_LAYER_SEL_CURRENT;
@@ -184,51 +178,48 @@ void BKE_image_set_current_layer(Image *ima, short index)
 
 int BKE_image_layer_is_locked(Image *ima)
 {
-	ImageLayer *layer= NULL;
+	ImageLayer *layer = BKE_image_get_current_layer(ima);
 
-	layer = BKE_image_get_current_layer(ima);
-
-	if (layer)
+	if (layer) {
 		return layer->locked;
+	}
 
 	return 0;
 }
 
 void BKE_image_layer_color_fill(Image *ima, float color[4])
 {
-	ImBuf *ibuf = NULL;
-	unsigned char *rect = NULL;
-	float *rect_float = NULL;
-	void *lock;
- 
-	if (ima == NULL)
+	if (ima == NULL) {
 		return;
-	
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock, IMA_IBUF_LAYER);
+	}
+
+	void *lock;
+	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock, IMA_IBUF_LAYER);
 
 	if (ibuf) {
+		unsigned char *rect = NULL;
+		float *rect_float = NULL;
+
 		if (ibuf->flags & IB_rectfloat)
 			rect_float = (float*)ibuf->rect_float;
 		else
 			rect = (unsigned char*)ibuf->rect;
- 
+
 		BKE_image_buf_fill_color(rect, rect_float, ibuf->x, ibuf->y, color);
 	}
- 
+
 	BKE_image_release_ibuf(ima, ibuf, lock);
 }
 
 ImageLayer *BKE_image_layer_duplicate_current(Image *ima)
 {
-	ImageLayer *layer = NULL, *dup_layer = NULL;
-	char dup_name[sizeof(layer->name)];
-	ImBuf *ibuf, *new_ibuf;
-	void *lock;
- 
+
 	if (ima == NULL)
 		return NULL;
- 
-	layer = BKE_image_get_current_layer(ima);
+
+	ImageLayer *layer = BKE_image_get_current_layer(ima);
+
+	char dup_name[sizeof(layer->name)];
 
 	if (!strstr(layer->name, "_copy")) {
 		BLI_snprintf(dup_name, sizeof(dup_name), "%s_copy", layer->name);
@@ -237,78 +228,85 @@ ImageLayer *BKE_image_layer_duplicate_current(Image *ima)
 		BLI_snprintf(dup_name, sizeof(dup_name), "%s", layer->name);
 	}
 
-	dup_layer = BKE_image_layer_new(ima, dup_name);
+	ImageLayer *dup_layer = BKE_image_layer_new(ima, dup_name);
 
-	if (dup_layer) {
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock, IMA_IBUF_LAYER);
+	if (!dup_layer) {
+		return NULL;
+	}
 
-		if (ibuf) {
-			new_ibuf = IMB_dupImBuf(ibuf);
-			BLI_addtail(&dup_layer->ibufs, new_ibuf);
+	void *lock;
+	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock, IMA_IBUF_LAYER);
 
-			dup_layer->next = dup_layer->prev = NULL;
+	if (ibuf) {
+		ImBuf *new_ibuf = IMB_dupImBuf(ibuf);
+		BLI_addtail(&dup_layer->ibufs, new_ibuf);
 
-			if (layer) {
-				BLI_insertlinkbefore(&ima->imlayers, layer, dup_layer);
-			}
-			else {
-				BLI_addhead(&ima->imlayers, layer);
-			}
+		dup_layer->next = dup_layer->prev = NULL;
 
-			BKE_image_set_current_layer(ima, BKE_image_get_current_layer_index(ima));
-
-			BLI_strncpy(dup_layer->file_path, layer->file_path, sizeof(layer->file_path));
-			dup_layer->opacity = layer->opacity;
-			dup_layer->background = layer->background;
-			dup_layer->mode = layer->mode;
-			dup_layer->type = IMA_LAYER_LAYER;
-			dup_layer->visible = layer->visible;
-			dup_layer->locked = layer->locked;
-			copy_v4_v4(dup_layer->default_color, layer->default_color);
+		if (layer) {
+			BLI_insertlinkbefore(&ima->imlayers, layer, dup_layer);
+		}
+		else {
+			BLI_addhead(&ima->imlayers, layer);
 		}
 
-		BKE_image_release_ibuf(ima, ibuf, lock);
-		ima->num_layers += 1;
+		BKE_image_set_current_layer(ima, BKE_image_get_current_layer_index(ima));
+
+		BLI_strncpy(dup_layer->file_path, layer->file_path, sizeof(layer->file_path));
+		dup_layer->opacity = layer->opacity;
+		dup_layer->background = layer->background;
+		dup_layer->mode = layer->mode;
+		dup_layer->type = IMA_LAYER_LAYER;
+		dup_layer->visible = layer->visible;
+		dup_layer->locked = layer->locked;
+		copy_v4_v4(dup_layer->default_color, layer->default_color);
 	}
+
+	BKE_image_release_ibuf(ima, ibuf, lock);
+	ima->num_layers += 1;
+
 	return dup_layer;
 }
 
 ImageLayer *BKE_image_layer_duplicate(Image *ima, ImageLayer *layer)
 {
-	ImageLayer *new_layer = NULL;
-	ImBuf *ibuf, *new_ibuf;
- 
-	if (ima == NULL)
+	if (ima == NULL) {
 		return NULL;
-
-	new_layer = BKE_image_layer_new(ima, layer->name);
-	if (new_layer) {
-		ibuf = (ImBuf *)layer->ibufs.first;
-		if (ibuf) {
-			new_ibuf = IMB_dupImBuf(ibuf);
-			BLI_addtail(&new_layer->ibufs, new_ibuf);
-
-			new_layer->next = new_layer->prev = NULL;
-
-			BLI_strncpy(new_layer->name, layer->name, sizeof(layer->name));
-			BLI_strncpy(new_layer->file_path, layer->file_path, sizeof(layer->file_path));
-			new_layer->opacity = layer->opacity;
-			new_layer->background = layer->background;
-			new_layer->mode = layer->mode;
-			new_layer->type = layer->type;
-			new_layer->visible = layer->visible;
-			new_layer->select = layer->select;
-			new_layer->locked = layer->locked;
-			copy_v4_v4(new_layer->default_color, layer->default_color);
-		}
 	}
+
+	ImageLayer *new_layer = BKE_image_layer_new(ima, layer->name);
+
+	if (!new_layer) {
+		return NULL;
+	}
+
+	ImBuf *ibuf = layer->ibufs.first;
+
+	if (ibuf) {
+		ImBuf *new_ibuf = IMB_dupImBuf(ibuf);
+		BLI_addtail(&new_layer->ibufs, new_ibuf);
+
+		new_layer->next = new_layer->prev = NULL;
+
+		BLI_strncpy(new_layer->name, layer->name, sizeof(layer->name));
+		BLI_strncpy(new_layer->file_path, layer->file_path, sizeof(layer->file_path));
+		new_layer->opacity = layer->opacity;
+		new_layer->background = layer->background;
+		new_layer->mode = layer->mode;
+		new_layer->type = layer->type;
+		new_layer->visible = layer->visible;
+		new_layer->select = layer->select;
+		new_layer->locked = layer->locked;
+		copy_v4_v4(new_layer->default_color, layer->default_color);
+	}
+
 	return new_layer;
 }
- 
+
 int BKE_image_layer_remove(Image *ima, const int action)
 {
-	ImageLayer *layer= NULL;
-	 
+	ImageLayer *layer = NULL;
+
 	if (ima == NULL)
 		return false;
 
@@ -494,7 +492,7 @@ static void copy_co(int rect, float *fp, char *cp, float co)
 	/* rect_float */
 	if (rect == 0)
 		*fp = co;
-				
+
 	/* rect */
 	if (rect == 1)
 		*cp = FTOCHAR(co);
@@ -505,7 +503,7 @@ ImBuf *BKE_image_layer_blend(ImBuf *base, ImBuf *layer, float opacity, short mod
 	ImBuf *dest;
 	int i, flag;
 	int bg_x, bg_y, diff_x;
-	float (*blend_callback)(float B, float L, float O) = NULL;	//Mode callback
+	float (*blend_callback)(float B, float L, float O) = NULL;//Mode callback
 
 	float as, ab, ao, co, aoco;
 	float *fp_b, *fp_l, *fp_d;
@@ -616,11 +614,11 @@ ImBuf *BKE_image_layer_blend(ImBuf *base, ImBuf *layer, float opacity, short mod
 			break;
 	}
 
-	/* 
-	* Ao*Co = As * (1 - Ab) * Cs + As * Ab * B(Cb, Cs) + (1 - As) * Ab * Cb
-	* Ao = As + Ab * (1 - As)
-	* Co = Co / Ao
-	*/
+	/*
+	 * Ao*Co = As * (1 - Ab) * Cs + As * Ab * B(Cb, Cs) + (1 - As) * Ab * Cb
+	 * Ao = As + Ab * (1 - As)
+	 * Co = Co / Ao
+	 */
 
 	fp_b = NULL;
 	fp_l = fp_d = fp_b;
@@ -653,13 +651,13 @@ ImBuf *BKE_image_layer_blend(ImBuf *base, ImBuf *layer, float opacity, short mod
 		}
 
 		if (((background & IMA_LAYER_BG_ALPHA) && ((f_la != 0.0f) || (f_ba != 0.0f))) ||
-		   ((!(background & IMA_LAYER_BG_ALPHA)) && ((f_la != 0.0f) && (f_ba != 0.0f)))) {
-		//if ((f_la != 0.0f) && (f_ba != 0.0f)) {
+		    ((!(background & IMA_LAYER_BG_ALPHA)) && ((f_la != 0.0f) && (f_ba != 0.0f)))) {
+			//if ((f_la != 0.0f) && (f_ba != 0.0f)) {
 			if (base->rect_float) {
 				f_br = fp_b[0];
 				f_bg = fp_b[1];
 				f_bb = fp_b[2];
-			
+
 				f_lr = fp_l[0];
 				f_lg = fp_l[1];
 				f_lb = fp_l[2];
@@ -669,7 +667,7 @@ ImBuf *BKE_image_layer_blend(ImBuf *base, ImBuf *layer, float opacity, short mod
 				f_br = (((float)cp_b[0]) / 255.0f);
 				f_bg = (((float)cp_b[1]) / 255.0f);
 				f_bb = (((float)cp_b[2]) / 255.0f);
-			
+
 				f_lr = (((float)cp_l[0]) / 255.0f);
 				f_lg = (((float)cp_l[1]) / 255.0f);
 				f_lb = (((float)cp_l[2]) / 255.0f);
@@ -706,11 +704,11 @@ ImBuf *BKE_image_layer_blend(ImBuf *base, ImBuf *layer, float opacity, short mod
 			else {
 				if (background & IMA_LAYER_BG_ALPHA) {
 					/*if (f_ba != 0.0f) {
-						printf("2\n");
-						copy_co(flag, &fp_d[0], &cp_d[0], f_br);
-						copy_co(flag, &fp_d[1], &cp_d[1], f_bg);
-						copy_co(flag, &fp_d[2], &cp_d[2], f_bb);
-						copy_co(flag, &fp_d[3], &cp_d[3], f_ba);
+					printf("2\n");
+					copy_co(flag, &fp_d[0], &cp_d[0], f_br);
+					copy_co(flag, &fp_d[1], &cp_d[1], f_bg);
+					copy_co(flag, &fp_d[2], &cp_d[2], f_bb);
+					copy_co(flag, &fp_d[3], &cp_d[3], f_ba);
 					}*/
 					//else {
 					if (f_la != 0.0f) {
@@ -734,7 +732,7 @@ ImBuf *BKE_image_layer_blend(ImBuf *base, ImBuf *layer, float opacity, short mod
 					fp_l = fp_l + diff_x * 4;
 			}
 			fp_b += 4;
-			fp_l += 4; 
+			fp_l += 4;
 			fp_d += 4;
 		}
 
@@ -748,7 +746,7 @@ ImBuf *BKE_image_layer_blend(ImBuf *base, ImBuf *layer, float opacity, short mod
 					cp_l = cp_l + diff_x * 4;
 			}
 			cp_b += 4;
-			cp_l += 4; 
+			cp_l += 4;
 			cp_d += 4;
 		}
 	}
@@ -761,21 +759,23 @@ ImBuf *BKE_image_layer_blend(ImBuf *base, ImBuf *layer, float opacity, short mod
 
 struct ImageLayer *BKE_image_layer_merge(Image *ima, ImageLayer *iml, ImageLayer *iml_next)
 {
-	ImBuf *ibuf, *result_ibuf;
-	 /* merge layers */
-	result_ibuf = BKE_image_layer_blend((ImBuf*)((ImageLayer*)iml_next->ibufs.first),
-	                             (ImBuf*)((ImageLayer*)iml->ibufs.first),
-								 iml->opacity, iml->mode,
-	                             ((ImageLayer*)iml_next->ibufs.first)->background, NULL);
-	
+	ImBuf *ibuf = iml_next->ibufs.first;
+
+	/* merge layers */
+	ImBuf *result_ibuf = BKE_image_layer_blend(ibuf,
+	                                           (ImBuf*)((ImageLayer*)iml->ibufs.first),
+	                                           iml->opacity,
+	                                           iml->mode,
+	                                           iml_next->background,
+	                                           NULL);
+
 	iml_next->background = IMA_LAYER_BG_RGB;
 	iml_next->file_path[0] = '\0';
 	copy_v4_fl(iml_next->default_color, -1.0f);
 
 	/* Delete old ibuf */
-	ibuf = (ImBuf *)iml_next->ibufs.first;
 	BLI_remlink(&iml_next->ibufs, ibuf);
- 
+
 	if (ibuf->userdata) {
 		MEM_freeN(ibuf->userdata);
 		ibuf->userdata = NULL;
@@ -785,92 +785,98 @@ struct ImageLayer *BKE_image_layer_merge(Image *ima, ImageLayer *iml, ImageLayer
 	/* add new ibuf */
 	BLI_addtail(&iml_next->ibufs, result_ibuf);
 
-	/* delete the layer merge */
+	/* delete the merged layer */
 	BLI_remlink(&ima->imlayers, iml);
 	BKE_image_layer_free(iml);
-	
+
 	return iml_next;
 }
 
 /* Non destructive */
 void BKE_image_merge_visible_layers(Image *ima)
 {
-	ImageLayer *layer;
-	ImBuf *ibuf, *result_ibuf, *next_ibuf;
-	short background;
+	ImBuf *result_ibuf = NULL;
+	ImageLayer *layer = ima->imlayers.last;
+	short background = layer->background;
 
-	result_ibuf = NULL;
-	background = ((ImageLayer *)ima->imlayers.last)->background;
-	
-	for (layer = (ImageLayer *)ima->imlayers.last; layer; layer = layer->prev) {
-		if (layer->visible & IMA_LAYER_VISIBLE) {
-			ibuf = (ImBuf*)((ImageLayer*)layer->ibufs.first);
-				
-			if (ibuf) {
-				next_ibuf = BKE_image_layer_blend(result_ibuf, ibuf, layer->opacity, layer->mode, background, NULL);
-				
-				if (result_ibuf)
-					IMB_freeImBuf(result_ibuf);
-				
-				result_ibuf = next_ibuf;
-				next_ibuf = NULL;
+	for (; layer; layer = layer->prev) {
+		if ((layer->visible & IMA_LAYER_VISIBLE) == 0) {
+			continue;
+		}
+
+		ImBuf *ibuf = (ImBuf*)((ImageLayer*)layer->ibufs.first);
+
+		if (ibuf) {
+			ImBuf *next_ibuf = BKE_image_layer_blend(result_ibuf, ibuf, layer->opacity, layer->mode, background, NULL);
+
+			if (result_ibuf) {
+				IMB_freeImBuf(result_ibuf);
 			}
+
+			result_ibuf = next_ibuf;
+			next_ibuf = NULL;
 		}
 	}
 
-	BKE_image_replace_ibuf(ima, result_ibuf);
+	if (result_ibuf) {
+		BKE_image_replace_ibuf(ima, result_ibuf);
+	}
 }
 
 ImageLayer *BKE_image_add_image_layer(Image *ima, const char *name, int depth, float color[4], int order)
 {
-	ImageLayer *layer_act, *im_l = NULL;
-	ImBuf *ibuf, *imaibuf;
-
-	if (ima == NULL)
+	if (!ima) {
 		return NULL;
+	}
 
- 	layer_act = BKE_image_get_current_layer(ima);
+	ImageLayer *layer_act = BKE_image_get_current_layer(ima);
 
 	/* Deselect other layers */
 	layer_act->select = !IMA_LAYER_SEL_CURRENT;
-	
-	im_l = BKE_image_layer_new(ima, name);
-	if (im_l) {
-		imaibuf = BKE_image_get_first_ibuf(ima);
-		ibuf = add_ibuf_size(imaibuf->x, imaibuf->y, im_l->name, depth, ima->gen_flag, 0, color, &ima->colorspace_settings);
-		BKE_image_release_ibuf(ima, imaibuf, NULL);
 
-		BLI_addtail(&im_l->ibufs, ibuf);
-		if (order == 2) { /*Head*/
-			BLI_addhead(&ima->imlayers, im_l);
-			ima->active_layer = 0;
-		}
-		else if (order == -1) { /*Before*/
-			/* Layer Act
-			 * --> Add Layer
-			 */
-			BLI_insertlinkafter(&ima->imlayers, layer_act , im_l);
-			ima->active_layer += 1;
-			BKE_image_set_current_layer(ima, ima->active_layer);
-		}
-		else { /*After*/
-			/* --> Add Layer
-			 * Layer Act
-			 */
-			BLI_insertlinkbefore(&ima->imlayers, layer_act , im_l);
-			//ima->Act_Layers -= 1;
-			BKE_image_set_current_layer(ima, ima->active_layer);
-		}
-		ima->num_layers += 1;
+	ImageLayer *layer_new = BKE_image_layer_new(ima, name);
 
-		if (color[3] == 1.0f)
-			im_l->background = IMA_LAYER_BG_RGB;
-		copy_v4_v4(im_l->default_color, color);
+	if (!layer_new) {
+		return NULL;
 	}
- 
-	return im_l;
+
+	ImBuf *imaibuf = BKE_image_get_first_ibuf(ima);
+	ImBuf *ibuf = add_ibuf_size(imaibuf->x, imaibuf->y, layer_new->name, depth, ima->gen_flag, 0, color, &ima->colorspace_settings);
+	BKE_image_release_ibuf(ima, imaibuf, NULL);
+
+	BLI_addtail(&layer_new->ibufs, ibuf);
+	if (order == 2) { /*Head*/
+		BLI_addhead(&ima->imlayers, layer_new);
+		ima->active_layer = 0;
+	}
+	else if (order == -1) { /*Before*/
+		/* Layer Act
+		 * --> Add Layer
+		 */
+		BLI_insertlinkafter(&ima->imlayers, layer_act , layer_new);
+		ima->active_layer += 1;
+		BKE_image_set_current_layer(ima, ima->active_layer);
+	}
+	else { /*After*/
+		/* --> Add Layer
+		 * Layer Act
+		 */
+		BLI_insertlinkbefore(&ima->imlayers, layer_act , layer_new);
+		//ima->Act_Layers -= 1;
+		BKE_image_set_current_layer(ima, ima->active_layer);
+	}
+
+	ima->num_layers += 1;
+
+	if (color[3] == 1.0f) {
+		layer_new->background = IMA_LAYER_BG_RGB;
+	}
+
+	copy_v4_v4(layer_new->default_color, color);
+
+	return layer_new;
 }
- 
+
 /* TODO: (kwk) Base image layer needs proper locking... */
 void BKE_image_add_image_layer_base(Image *ima)
 {
