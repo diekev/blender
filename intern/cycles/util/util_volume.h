@@ -70,7 +70,26 @@ CCL_NAMESPACE_END
 #endif
 
 #include "util_map.h"
+#include "util_thread.h"
 #include "util_vector.h"
+
+#if defined(HAS_CPP11_FEATURES) && defined(_MSC_VER)
+
+namespace std {
+
+template<>
+struct hash<pthread_t> {
+	size_t operator()(const pthread_t &pt) const
+	{
+		return static_cast<size_t>(pt.p);
+	}
+};
+
+bool operator==(const pthread_t &lhs, const pthread_t &rhs);
+
+}  /* namespace std */
+
+#endif
 
 CCL_NAMESPACE_BEGIN
 
@@ -102,12 +121,14 @@ class vdb_float_volume : public float_volume {
 	openvdb::FloatGrid::ConstAccessor *accessor;
 	openvdb::math::Transform *transform;
 
+	/* only grids with uniform voxels can be used with VolumeRayIntersector, so
+	 * we keep track of this for ray marching */
+	bool uniform_voxels;
+
 	/* Main intersector, its purpose is to initialize the voxels' bounding box
 	 * so the ones for the various threads do not do this, rather they are
 	 * generated from a copy of it */
 	isector_t *main_isector;
-
-	bool uniform_voxels;
 
 public:
 	vdb_float_volume(openvdb::FloatGrid::Ptr grid);
@@ -216,12 +237,15 @@ class vdb_float3_volume : public float3_volume {
 	openvdb::Vec3SGrid::ConstAccessor *accessor;
 	openvdb::math::Transform *transform;
 
+	/* only grids with uniform voxels can be used with VolumeRayIntersector, so
+	 * we keep track of this for ray marching */
+	bool uniform_voxels;
+	bool staggered;
+
 	/* Main intersector, its purpose is to initialize the voxels' bounding box
 	 * so the ones for the various threads do not do this, rather they are
 	 * generated from a copy of it. */
 	isector_t *main_isector;
-
-	bool uniform_voxels, staggered;
 
 public:
 	vdb_float3_volume(openvdb::Vec3SGrid::Ptr grid);
