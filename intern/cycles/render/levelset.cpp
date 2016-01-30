@@ -217,35 +217,31 @@ void LevelSetManager::device_update(Device *device, DeviceScene *dscene, Scene *
 	progress.set_status("Updating Level Sets", "Copying Level Sets to device");
 
 	dscene->data.tables.num_level_sets = scene->level_sets.size();
-	if (scene->level_sets.size() > 0){
-		/* Allocate a memory pool big enough for all LevelSets */
-		void* levelset_pool = operator new (sizeof(LevelSet) * dscene->data.tables.num_level_sets );
 
-		for( int ls = 0; ls < dscene->data.tables.num_level_sets; ls++ ){
-			/* Move into the pool by the appropriate amount */
-			void* pool_offset = levelset_pool + (sizeof( LevelSet ) * ls);
+	if (scene->level_sets.size() > 0) {
+		/* Allocate a memory pool big enough for all LevelSets */
+		LevelSet **levelset_pool = new LevelSet*[dscene->data.tables.num_level_sets];
+
+		for(int ls = 0; ls < dscene->data.tables.num_level_sets; ls++) {
 
 			/* We need to protect against potential leaks due to failed construction */
 			try {
-				LevelSet* temp_levelset_ptr = new(pool_offset) LevelSet( *(scene->level_sets[ls]) );
+				levelset_pool[ls] = new LevelSet(*(scene->level_sets[ls]));
 			}
 			catch (...) {
 				/* if something goes wrong, rewind all constructed entries... */
-				for( int rls = ls-1; rls >= 0; rls-- ){
-					void* rev_pool_offset = levelset_pool + (sizeof( LevelSet ) * rls);
-					LevelSet* levelset_ptr = (LevelSet*)(rev_pool_offset);
-					levelset_ptr->~LevelSet();
+				for(int rls = ls-1; rls >= 0; rls--) {
+					delete levelset_pool[rls];
 				}
 
-				/* then destroy the pool itself. */
-				operator delete(levelset_pool);
+				delete [] levelset_pool;
 
 				/* finally, toss the exception upward */
 				throw;
 			}
 		}
 
-		dscene->data.tables.level_sets = levelset_pool;
+		dscene->data.tables.level_sets = static_cast<void *>(levelset_pool);
 	}
 
 	if(progress.get_cancel()) return;
@@ -255,17 +251,15 @@ void LevelSetManager::device_update(Device *device, DeviceScene *dscene, Scene *
 
 void LevelSetManager::device_free(Device */*device*/, DeviceScene *dscene)
 {
-	if( dscene->data.tables.num_level_sets > 0 ){
-		/*we've allocated all the levelsets in a pool using placement new, special care is required */
-		for( int ls = 0; ls < dscene->data.tables.num_level_sets; ls++ ){
-			/* Move into the pool by the appropriate amount */
-			void* pool_offset = dscene->data.tables.level_sets + (sizeof( LevelSet ) * ls);
-			LevelSet* levelset_ptr = (LevelSet*)(pool_offset);
-			/* explicitly call the destructor to clean up the placed object instance */
-			levelset_ptr->~LevelSet();
+	if(dscene->data.tables.num_level_sets > 0) {
+		LevelSet **levelset_pool = static_cast<LevelSet **>(dscene->data.tables.level_sets);
+
+		for(int ls = 0; ls < dscene->data.tables.num_level_sets; ls++) {
+			delete levelset_pool[ls];
 		}
-		/* now delete the memory pool */
-		operator delete( dscene->data.tables.level_sets );
+
+		delete [] levelset_pool;
+
 		dscene->data.tables.level_sets = NULL;
 		dscene->data.tables.num_level_sets = 0;
 	}

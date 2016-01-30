@@ -230,8 +230,9 @@ ccl_device_intersect bool scene_intersect(KernelGlobals *kg, const Ray *ray, con
 	bool level_set_hit = false;
 
 	if (kernel_data.tables.num_level_sets) {
+		LevelSet **level_sets = static_cast<LevelSet **>(kernel_data.tables.level_sets);
 		for (int i = 0; i < kernel_data.tables.num_level_sets; i++) {
-			level_set_hit |= (((LevelSet*) kernel_data.tables.level_sets)+i)->intersect(ray, isect);
+			level_set_hit |= level_sets[i]->intersect(ray, isect);
 		}
 	}
 
