@@ -349,7 +349,7 @@ Object *BlenderSync::sync_object(BL::Object b_parent,
 
 		level_set->shader = shader_id;
 		scene->level_sets.push_back(level_set);
-		object_updated = true;
+//		object_updated = true;
 	}
 
 	/* only interested in object that we can create meshes from */

@@ -156,7 +156,7 @@ bool LevelSet::intersect(const Ray* ray, Intersection *isect)
 		float x = static_cast<float>(normal.x());
 		float y = static_cast<float>(normal.y());
 		float z = static_cast<float>(normal.z());
-		isect->norm = normalize(make_float3(x, y, z));
+		isect->norm = (make_float3(x, y, z));
 		isect->prim = 0;
 		isect->object = 0;
 		return true;
