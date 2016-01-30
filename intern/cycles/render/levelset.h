@@ -335,8 +335,12 @@ public:
 	   openvdb::FloatGrid::Ptr grid;
        int shader;
 
+#if 1
 	   typedef openvdb::tools::CyclesLinearSearchImpl<openvdb::FloatGrid,
 	                                                  openvdb::math::BoxStencil<openvdb::FloatGrid>, 1, double, true> LinearSearchImpl;
+#else
+	   typedef openvdb::tools::LinearSearchImpl<openvdb::FloatGrid, 1, double> LinearSearchImpl;
+#endif
 	   typedef openvdb::math::Ray<double> vdb_ray_t;
        typedef openvdb::tools::LevelSetRayIntersector<openvdb::FloatGrid,
 	                                                  LinearSearchImpl,
