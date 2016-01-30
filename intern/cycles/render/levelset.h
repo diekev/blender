@@ -353,6 +353,7 @@ public:
 	   typedef unordered_map<pthread_t, isect_t * > isect_map_t;
 #endif
 	   isect_map_t isect_map;
+	   isect_t *main_isect;
 };
 
 class LevelSetManager {

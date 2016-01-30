@@ -24,6 +24,38 @@ openvdb::FloatGrid::Ptr last_level_set;
 
 CCL_NAMESPACE_BEGIN
 
+// TODO(kevin): de-duplicate this with the ones in util_volume.cpp, keeping them
+// here for now.
+template <typename T>
+void release_map_memory(unordered_map<pthread_t, T> &map)
+{
+	typename unordered_map<pthread_t, T>::iterator iter;
+
+	for(iter = map.begin(); iter != map.end(); ++iter) {
+		delete iter->second;
+	}
+}
+
+template <typename IsectorType>
+void create_isectors_threads(unordered_map<pthread_t, IsectorType *> &isect_map,
+                             const vector<pthread_t> &thread_ids,
+                             const IsectorType &main_isect)
+{
+	release_map_memory(isect_map);
+
+	pthread_t my_thread = pthread_self();
+
+	for (size_t i = 0; i < thread_ids.size(); ++i) {
+		if (isect_map.find(thread_ids[i]) == isect_map.end()) {
+			isect_map[thread_ids[i]] = new IsectorType(main_isect);
+		}
+	}
+
+	if (isect_map.find(my_thread) == isect_map.end()) {
+		isect_map[my_thread] = new IsectorType(main_isect);
+	}
+}
+
 void OpenVDB_initialize()
 {
 	openvdb::initialize();
@@ -149,54 +181,24 @@ LevelSet::LevelSet()
 LevelSet::LevelSet(openvdb::FloatGrid::Ptr gridPtr, int shader_)
     : grid(gridPtr), shader(shader_)
 {
-	vector<pthread_t> ids = TaskScheduler::thread_ids();
-	pthread_t my_thread = pthread_self();
-	foreach( pthread_t id, ids) {
-		// printf( "New RayIntersector required for thread %u. Creating...\n", id);
-		isect_t* isector = new isect_t(*grid);
-		pair<pthread_t, isect_t *> isect(id, isector);
-		isect_map.insert(isect);
-	}
-
-	/* Always add this thread, as it also seems to be used for rendering */
-	if(isect_map.find(my_thread) == isect_map.end()) {
-		isect_t* isector = new isect_t(*grid);
-		pair<pthread_t, isect_t *> isect(my_thread, isector);
-		isect_map.insert(isect);
-	}
+	main_isect = new isect_t(*grid);
+	create_isectors_threads(isect_map, TaskScheduler::thread_ids(), *main_isect);
 }
 
 LevelSet::LevelSet( const LevelSet& levelset )
     : grid( levelset.grid ), shader( levelset.shader )
 {
+	main_isect = new isect_t(*grid);
 	//printf( "LevelSet Copy Constructor\n" );
 
 	// printf( "Initializing thread accessor mapping from thread %u.\n", pthread_self() );
-	vector<pthread_t> ids = TaskScheduler::thread_ids();
-	pthread_t my_thread = pthread_self();
-	foreach( pthread_t id, ids) {
-		// printf( "New RayIntersector required for thread %u. Creating...\n", id);
-		isect_t* isector = new isect_t(*grid);
-		pair<pthread_t, isect_t *> isect(id, isector);
-		isect_map.insert(isect);
-	}
-
-	/* Always add this thread, as it also seems to be used for rendering */
-	if( isect_map.find(my_thread) == isect_map.end() ){
-		isect_t* isector = new isect_t(*grid);
-		pair<pthread_t, isect_t *> isect(my_thread, isector);
-		isect_map.insert(isect);
-	}
+	create_isectors_threads(isect_map, TaskScheduler::thread_ids(), *main_isect);
 }
 
 LevelSet::~LevelSet()
 {
-	for(isect_map_t::iterator iter = isect_map.begin();
-	    iter != isect_map.end();
-	    ++iter)
-	{
-		delete iter->second;
-	}
+	release_map_memory(isect_map);
+	delete main_isect;
 	isect_map.clear();
 }
 
@@ -205,30 +207,10 @@ void LevelSet::initialize(openvdb::FloatGrid::Ptr& gridPtr, int shader_)
 	// printf( "LevelSet Post-Construction Initializer\n" );
 	grid.swap(gridPtr);
 	shader = shader_;
-
-	for(isect_map_t::iterator iter = isect_map.begin();
-	    iter != isect_map.end();
-	    ++iter)
-	{
-		delete iter->second;
-	}
+	main_isect = new isect_t(*grid);
 
 	//printf( "Initializing thread accessor mapping from thread %u.\n", pthread_self() );
-
-	vector<pthread_t> ids = TaskScheduler::thread_ids();
-	pthread_t my_thread = pthread_self();
-	foreach( pthread_t id, ids) {
-		// printf( "New RayIntersector required for thread %u. Creating...\n", id);
-		isect_t* isector = new isect_t(*grid);
-		pair<pthread_t, isect_t *> isect(id, isector);
-		isect_map.insert(isect);
-	}
-	/* Always add this thread, as it also seems to be used for rendering */
-	if( isect_map.find(my_thread) == isect_map.end() ){
-		isect_t* isector = new isect_t(*grid);
-		pair<pthread_t, isect_t *> isect(my_thread, isector);
-		isect_map.insert(isect);
-	}
+	create_isectors_threads(isect_map, TaskScheduler::thread_ids(), *main_isect);
 }
 
 void LevelSet::tag_update(Scene *scene)
