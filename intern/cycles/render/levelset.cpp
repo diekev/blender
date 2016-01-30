@@ -53,7 +53,7 @@ void OpenVDB_file_info(const char* filename)
 
 openvdb::FloatGrid::Ptr loaded_level_set;
 
-void OpenVDB_file_read(const char* filename, Scene* scene)
+LevelSet *OpenVDB_file_read(const char* filename, Scene* scene)
 {
 	using namespace openvdb;
 
@@ -89,7 +89,8 @@ void OpenVDB_file_read(const char* filename, Scene* scene)
 		}
 	}
 
-	scene->level_sets.push_back(new LevelSet(loaded_level_set, 0));
+	return new LevelSet(loaded_level_set, 0);
+//	scene->level_sets.push_back(new LevelSet(loaded_level_set, 0));
 }
 
 void OpenVDB_use_level_mesh(Scene* scene)
@@ -142,15 +143,20 @@ bool LevelSet::intersect(const Ray* ray, Intersection *isect)
 	D.normalize();
 
 	vdb_ray_t vdbray(P, D, 1e-5f, ray->t);
-	vdb_ray_t::Vec3Type pos, normal;
-	float t;
+	vdb_ray_t::Vec3Type pos(0.0), normal;
+	double t;
 
-	if(isector->intersectsWS(vdbray, pos, normal, t)) {
-		isect->t = t;
+	bool intersects = isector->intersectsWS(vdbray, pos, normal, t);
+
+	if(intersects) {
+		isect->t = static_cast<float>(t);
 		isect->u = isect->v = 1.0f;
 		isect->type = PRIMITIVE_LEVEL_SET;
 		isect->shad = shader;
-		isect->norm = normalize(make_float3(normal.x(), normal.y(), normal.z()));
+		float x = static_cast<float>(normal.x());
+		float y = static_cast<float>(normal.y());
+		float z = static_cast<float>(normal.z());
+		isect->norm = normalize(make_float3(x, y, z));
 		isect->prim = 0;
 		isect->object = 0;
 		return true;

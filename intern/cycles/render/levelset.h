@@ -17,9 +17,19 @@
 #ifndef __LEVELSET_H__
 #define __LEVELSET_H__
 
+#ifdef __GNUC__
+#	pragma GCC diagnostic push
+#	pragma GCC diagnostic ignored "-Wfloat-conversion"
+#	pragma GCC diagnostic ignored "-Wdouble-promotion"
+#endif
+
 #include <openvdb/openvdb.h>
 #include <openvdb/io/File.h>
 #include <openvdb/tools/RayIntersector.h>
+
+#ifdef __GNUC__
+#	pragma GCC diagnostic pop
+#endif
 
 #include "kernel_types.h"
 #include "util_map.h"
@@ -28,12 +38,13 @@ CCL_NAMESPACE_BEGIN
 
 class Device;
 class DeviceScene;
+class LevelSet;
 class Progress;
 class Scene;
 
 void OpenVDB_initialize();
 void OpenVDB_file_info(const char* filename);
-void OpenVDB_file_read(const char* filename, Scene* scene);
+LevelSet *OpenVDB_file_read(const char* filename, Scene* scene);
 void OpenVDB_use_level_mesh(Scene* scene);
 
 class LevelSet {
@@ -48,8 +59,8 @@ public:
 	   openvdb::FloatGrid::Ptr grid;
        int shader;
 
-	   typedef openvdb::tools::LinearSearchImpl<openvdb::FloatGrid, 0, float> LinearSearchImpl;
-	   typedef openvdb::math::Ray<float> vdb_ray_t;
+	   typedef openvdb::tools::LinearSearchImpl<openvdb::FloatGrid, 0, double> LinearSearchImpl;
+	   typedef openvdb::math::Ray<double> vdb_ray_t;
        typedef openvdb::tools::LevelSetRayIntersector<openvdb::FloatGrid,
 	                                                  LinearSearchImpl,
 	                                                  openvdb::FloatTree::RootNodeType::ChildNodeType::LEVEL,
