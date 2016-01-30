@@ -262,7 +262,11 @@ bool LevelSet::intersect(const Ray* ray, Intersection *isect)
 		float z = static_cast<float>(normal.z());
 		isect->norm = (make_float3(x, y, z));
 		isect->prim = 0;
-		isect->object = 0;
+
+		/* Do this to avoid instancing code. Since levelsets are not part of the
+		 * BVH, object instancing does not apply. */
+		isect->object = OBJECT_NONE;
+
 		return true;
 	}
 
