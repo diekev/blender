@@ -299,9 +299,6 @@ class Progress;
 class Scene;
 
 void OpenVDB_initialize();
-void OpenVDB_file_info(const char* filename);
-LevelSet *OpenVDB_file_read(const char* filename, Scene* scene);
-void OpenVDB_use_level_mesh(Scene* scene);
 void OpenVDB_file_read_to_levelset(const char* filename, Scene* scene, LevelSet* levelset, int shader );
 
 #if defined(_MSC_VER) && (defined(CYCLES_TR1_UNORDERED_MAP) || defined(CYCLES_STD_UNORDERED_MAP) || defined(CYCLES_STD_UNORDERED_MAP_IN_TR1_NAMESPACE))

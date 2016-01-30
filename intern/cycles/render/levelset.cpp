@@ -61,71 +61,6 @@ void OpenVDB_initialize()
 	openvdb::initialize();
 }
 
-void OpenVDB_file_info(const char* filename)
-{
-	using namespace openvdb;
-
-	OpenVDB_initialize();
-
-	io::File file(filename);
-	file.open();
-
-	size_t size = file.getSize();
-
-	printf("Opening %s, is %lu bytes!\n", filename, size);
-
-	for(io::File::NameIterator iter = file.beginName();
-	    iter != file.endName();
-	    ++iter)
-	{
-		printf("Contains grid %s!\n", iter.gridName().c_str());
-	}
-
-	file.close();
-}
-
-openvdb::FloatGrid::Ptr loaded_level_set;
-
-LevelSet *OpenVDB_file_read(const char* filename, Scene* /*scene*/)
-{
-	using namespace openvdb;
-
-	OpenVDB_initialize();
-
-	if (!loaded_level_set.use_count()) {
-		try {
-			io::File file(filename);
-			file.open();
-
-			size_t size = file.getSize();
-			printf("Opening %s, is %lu bytes!\n", filename, size);
-
-			for (io::File::NameIterator iter = file.beginName(); iter != file.endName(); ++iter) {
-				printf("Reading grid %s!\n", iter.gridName().c_str());
-
-				GridBase::Ptr grid = file.readGrid(iter.gridName());
-				grid->print();
-
-				if(grid->getGridClass() != GRID_LEVEL_SET)
-					continue;
-
-				if (grid->isType<FloatGrid>())
-					loaded_level_set = gridPtrCast<openvdb::FloatGrid>(grid);
-				else
-					printf("No FloatGrid, ignoring!\n");
-			}
-
-			file.close();
-		}
-		catch (const IoError &e) {
-			std::cerr << e.what() << "\n";
-		}
-	}
-
-	return new LevelSet(loaded_level_set, 0);
-//	scene->level_sets.push_back(new LevelSet(loaded_level_set, 0));
-}
-
 void OpenVDB_file_read_to_levelset(const char* filename, Scene* /*scene*/, LevelSet* levelset, int shader )
 {
 	using namespace openvdb;
@@ -160,18 +95,6 @@ void OpenVDB_file_read_to_levelset(const char* filename, Scene* /*scene*/, Level
 	}
 
 	levelset->initialize( level_set_ptr, shader );
-}
-
-void OpenVDB_use_level_mesh(Scene* /*scene*/)
-{
-#if 0
-	if (last_level_set.use_count()) {
-		last_level_set->print();
-		uint shader = 0;//scene->shader_manager->get_shader_id(scene->default_surface, NULL, false);
-		printf("Used shader OVDB: %d\n", shader);
-		scene->level_sets.push_back(new LevelSet(last_level_set, shader));
-	}
-#endif
 }
 
 LevelSet::LevelSet()
