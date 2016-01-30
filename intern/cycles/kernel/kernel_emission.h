@@ -107,7 +107,7 @@ ccl_device_noinline bool direct_emission(KernelGlobals *kg,
 	/* evaluate BSDF at shading point */
 
 #ifdef __VOLUME__
-	if(ccl_fetch(sd, prim) != PRIM_NONE)
+	if(ccl_fetch(sd, prim) != PRIM_NONE || ccl_fetch(sd, type) == PRIMITIVE_LEVEL_SET)
 		shader_bsdf_eval(kg, sd, ls->D, eval, ls->pdf, ls->shader & SHADER_USE_MIS);
 	else {
 		float bsdf_pdf;
