@@ -363,10 +363,22 @@ Object *BlenderSync::sync_object(BL::Object b_parent,
 		char filename[1024];
 		PointerRNA cyc = RNA_pointer_get(&b_ob.ptr, "cycles");
 		RNA_string_get(&cyc, "openvdb_filename", filename);
+		string abs_path = blender_absolute_path(b_data, b_ob, string(filename));
 		int levelset_material = RNA_int_get(&cyc, "openvdb_material");
 
-		if(string(filename) != object->levelset_path || levelset_material != object->levelset_material_slot) {
-			object->levelset_path = filename;
+		/* 0 - single, 1 - sequence */
+		int is_sequence = RNA_enum_get(&cyc, "sequence" );
+		if(is_sequence == 1) {
+			int sequence_num = RNA_int_get(&cyc, "sequence_num" );
+			std::stringstream ss;
+			ss << abs_path;
+			ss << ".";
+			ss << sequence_num;
+			abs_path = ss.str();
+		}
+
+		if(abs_path != object->levelset_path || levelset_material != object->levelset_material_slot) {
+			object->levelset_path = abs_path;
 			object->levelset_material_slot = levelset_material;
 			levelset_map.set_recalc(b_ob);
 			object_updated = true;

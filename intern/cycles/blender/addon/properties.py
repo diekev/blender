@@ -128,6 +128,10 @@ enum_volume_interpolation = (
     ('CUBIC', "Cubic", "Smoothed high quality interpolation, but slower")
     )
 
+enum_openvdb_sequences = (
+    ('SINGLE', "Single", "Filename represents a single level set"),
+    ('SEQUENCE', "Sequence", "Filename represents a sequence of level sets")
+    )
 
 class CyclesRenderSettings(bpy.types.PropertyGroup):
     @classmethod
@@ -973,6 +977,20 @@ class CyclesObjectSettings(bpy.types.PropertyGroup):
                 description="Type of the OpenVDB grid",
                 items=enum_openvdb_types,
                 default='LEVEL_SET'
+                )
+
+        cls.sequence = EnumProperty(
+                name="Multiframe",
+                description="Single level set or sequence of level sets",
+                items=enum_openvdb_sequences,
+                default='SINGLE',
+                )
+ 
+        cls.sequence_num = IntProperty(
+                name="Sequence Number",
+                description="Sequence number to automatically append to filename",
+                min=0,
+                default=0,
                 )
 
         cls.prop_name = StringProperty(
