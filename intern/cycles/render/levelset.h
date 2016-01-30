@@ -46,14 +46,33 @@ void OpenVDB_initialize();
 void OpenVDB_file_info(const char* filename);
 LevelSet *OpenVDB_file_read(const char* filename, Scene* scene);
 void OpenVDB_use_level_mesh(Scene* scene);
+void OpenVDB_file_read_to_levelset(const char* filename, Scene* scene, LevelSet* levelset, int shader );
+
+#if defined(_MSC_VER) && (defined(CYCLES_TR1_UNORDERED_MAP) || defined(CYCLES_STD_UNORDERED_MAP) || defined(CYCLES_STD_UNORDERED_MAP_IN_TR1_NAMESPACE))
+struct pthread_hash {
+  size_t operator() (const pthread_t& val){
+    /* not really sure how to hash a pthread_t, since it could be implemented as a struct */
+    size_t res;
+    memcpy( &res, &val, sizeof(size_t)>sizeof(pthread_t)?sizeof(pthread_t):sizeof(size_t));
+    return res;
+  };
+};
+
+struct pthread_equal_to : std::binary_function <pthread_t,pthread_t,bool> {
+  bool operator() (const pthread_t& x, const pthread_t& y) const {return pthread_equal(x, y);}
+};
+#endif
 
 class LevelSet {
 public:
+	LevelSet( );
        LevelSet(openvdb::FloatGrid::Ptr gridPtr, int shader_);
+	   LevelSet(const LevelSet& levelset);
        ~LevelSet();
 
        void tag_update(Scene *scene);
 
+	   void initialize(openvdb::FloatGrid::Ptr& gridPtr, int shader_);
        bool intersect(const Ray* ray, Intersection *isect);
 
 	   openvdb::FloatGrid::Ptr grid;
@@ -66,8 +85,12 @@ public:
 	                                                  openvdb::FloatTree::RootNodeType::ChildNodeType::LEVEL,
 	                                                  vdb_ray_t> isect_t;
 
-	   /* used to ensure each thread gets its own intersector */
-	   typedef unordered_map<pthread_t, isect_t *> isect_map_t;
+#if defined(_MSC_VER) && (defined(CYCLES_TR1_UNORDERED_MAP) || defined(CYCLES_STD_UNORDERED_MAP) || defined(CYCLES_STD_UNORDERED_MAP_IN_TR1_NAMESPACE))
+	   typedef unordered_map<pthread_t, isect_t *,
+	   pthread_hash, pthread_equal_to > isect_map_t;
+#else
+	   typedef unordered_map<pthread_t, isect_t * > isect_map_t;
+#endif
 	   isect_map_t isect_map;
 };
 

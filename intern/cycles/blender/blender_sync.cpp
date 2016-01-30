@@ -50,6 +50,7 @@ BlenderSync::BlenderSync(BL::RenderEngine b_engine_, BL::BlendData b_data_, BL::
   mesh_map(&scene_->meshes),
   light_map(&scene_->lights),
   particle_system_map(&scene_->particle_systems),
+  levelset_map(&scene_->level_sets),
   world_map(NULL),
   world_recalc(false),
   experimental(false),
