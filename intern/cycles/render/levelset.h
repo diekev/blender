@@ -290,6 +290,24 @@ private:
 #	pragma GCC diagnostic pop
 #endif
 
+#if defined(HAS_CPP11_FEATURES) && defined(_MSC_VER)
+
+namespace std {
+
+template<>
+struct hash<pthread_t> {
+	size_t operator()(const pthread_t &pt) const
+	{
+		return static_cast<size_t>(pt.p);
+	}
+};
+
+bool operator==(const pthread_t &lhs, const pthread_t &rhs);
+
+}  /* namespace std */
+
+#endif
+
 CCL_NAMESPACE_BEGIN
 
 class Device;
@@ -301,24 +319,6 @@ class Scene;
 void OpenVDB_initialize();
 void OpenVDB_file_read_to_levelset(const char* filename, Scene* scene, LevelSet* levelset, int shader );
 
-#if defined(_MSC_VER) && (defined(CYCLES_TR1_UNORDERED_MAP) || defined(CYCLES_STD_UNORDERED_MAP) || defined(CYCLES_STD_UNORDERED_MAP_IN_TR1_NAMESPACE))
-struct pthread_hash {
-	size_t operator()(const pthread_t& val) const
-	{
-		/* not really sure how to hash a pthread_t, since it could be implemented as a struct */
-		size_t res;
-		memcpy(&res, &val, sizeof(size_t) > sizeof(pthread_t)? sizeof(pthread_t): sizeof(size_t));
-		return res;
-	}
-};
-
-struct pthread_equal_to : std::binary_function<pthread_t, pthread_t, bool> {
-	bool operator()(const pthread_t& x, const pthread_t& y) const
-	{
-		return pthread_equal(x, y);
-	}
-};
-#endif
 
 class LevelSet {
 public:
@@ -347,12 +347,8 @@ public:
 	                                                  openvdb::FloatTree::RootNodeType::ChildNodeType::LEVEL,
 	                                                  vdb_ray_t> isect_t;
 
-#if defined(_MSC_VER) && (defined(CYCLES_TR1_UNORDERED_MAP) || defined(CYCLES_STD_UNORDERED_MAP) || defined(CYCLES_STD_UNORDERED_MAP_IN_TR1_NAMESPACE))
-	   typedef unordered_map<pthread_t, isect_t *,
-	   pthread_hash, pthread_equal_to > isect_map_t;
-#else
 	   typedef unordered_map<pthread_t, isect_t * > isect_map_t;
-#endif
+
 	   isect_map_t isect_map;
 	   isect_t *main_isect;
 };
