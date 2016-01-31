@@ -909,6 +909,7 @@ class IMAGE_UL_ima_layers(UIList):
 
 
 class IMAGE_PT_image_layers(Panel, ImagePaintPanel):
+    bl_category = "Layers"
     bl_label = "Image Layers"
 
     @classmethod
