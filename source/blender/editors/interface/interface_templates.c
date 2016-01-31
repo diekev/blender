@@ -799,7 +799,7 @@ static int modifier_is_simulation(ModifierData *md)
 {
 	/* Physic Tab */
 	if (ELEM(md->type, eModifierType_Cloth, eModifierType_Collision, eModifierType_Fluidsim, eModifierType_Smoke,
-	          eModifierType_Softbody, eModifierType_Surface, eModifierType_DynamicPaint))
+	          eModifierType_Softbody, eModifierType_Surface, eModifierType_DynamicPaint, eModifierType_Poseidon))
 	{
 		return 1;
 	}

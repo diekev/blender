@@ -42,6 +42,7 @@
 #include "DNA_object_types.h"
 #include "DNA_object_force.h"
 #include "DNA_particle_types.h"
+#include "DNA_poseidon_types.h"
 #include "DNA_rigidbody_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_smoke_types.h"
@@ -1179,6 +1180,18 @@ static int ptcache_smoke_openvdb_read(struct OpenVDBReader *reader, void *smoke_
 }
 #endif
 
+static int ptcache_poseidon_write(struct OpenVDBWriter *writer, void *smoke_v)
+{
+	UNUSED_VARS(writer, smoke_v);
+	return 0;
+}
+
+static int ptcache_poseidon_read(struct OpenVDBReader *reader, void *smoke_v)
+{
+	UNUSED_VARS(reader, smoke_v);
+	return 0;
+}
+
 static int ptcache_dynamicpaint_totpoint(void *sd, int UNUSED(cfra))
 {
 	DynamicPaintSurface *surface = (DynamicPaintSurface*)sd;
@@ -1566,6 +1579,30 @@ void BKE_ptcache_id_from_smoke(PTCacheID *pid, struct Object *ob, struct SmokeMo
 	pid->file_type = smd->domain->cache_file_format;
 }
 
+void BKE_ptcache_id_from_poseidon(PTCacheID *pid, struct Object *ob, struct PoseidonModifierData *pmd)
+{
+	PoseidonDomainSettings *pds = pmd->domain;
+
+	memset(pid, 0, sizeof(PTCacheID));
+
+	pid->ob = ob;
+	pid->calldata = pmd;
+
+	pid->type = PTCACHE_TYPE_POSEIDON;
+	pid->stack_index = pds->cache->index;
+
+	pid->cache = pds->cache;
+	pid->cache_ptr = &(pds->cache);
+	pid->ptcaches = &(pds->ptcaches);
+
+	pid->write_openvdb_stream = ptcache_poseidon_write;
+	pid->read_openvdb_stream  = ptcache_poseidon_read;
+
+	pid->default_step = 1;
+	pid->max_step = 1;
+	pid->file_type = PTCACHE_FILE_OPENVDB;
+}
+
 void BKE_ptcache_id_from_dynamicpaint(PTCacheID *pid, Object *ob, DynamicPaintSurface *surface)
 {
 
@@ -1693,6 +1730,14 @@ void BKE_ptcache_ids_from_object(ListBase *lb, Object *ob, Scene *scene, int dup
 			if (smd->type & MOD_SMOKE_TYPE_DOMAIN) {
 				pid= MEM_callocN(sizeof(PTCacheID), "PTCacheID");
 				BKE_ptcache_id_from_smoke(pid, ob, (SmokeModifierData*)md);
+				BLI_addtail(lb, pid);
+			}
+		}
+		else if (md->type == eModifierType_Poseidon) {
+			PoseidonModifierData *pmd = (PoseidonModifierData *)md;
+			if (pmd->type & MOD_SMOKE_TYPE_DOMAIN) {
+				pid = MEM_callocN(sizeof(PTCacheID), "PTCacheID");
+				BKE_ptcache_id_from_poseidon(pid, ob, (PoseidonModifierData*)md);
 				BLI_addtail(lb, pid);
 			}
 		}
@@ -3323,6 +3368,13 @@ int  BKE_ptcache_object_reset(Scene *scene, Object *ob, int mode)
 			SmokeModifierData *smd = (SmokeModifierData *)md;
 			if (smd->type & MOD_SMOKE_TYPE_DOMAIN) {
 				BKE_ptcache_id_from_smoke(&pid, ob, (SmokeModifierData*)md);
+				reset |= BKE_ptcache_id_reset(scene, &pid, mode);
+			}
+		}
+		if (md->type == eModifierType_Poseidon) {
+			PoseidonModifierData *pmd = (PoseidonModifierData *)md;
+			if (pmd->type & MOD_SMOKE_TYPE_DOMAIN) {
+				BKE_ptcache_id_from_poseidon(&pid, ob, (PoseidonModifierData*)md);
 				reset |= BKE_ptcache_id_reset(scene, &pid, mode);
 			}
 		}

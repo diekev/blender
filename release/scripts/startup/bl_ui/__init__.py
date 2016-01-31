@@ -57,6 +57,7 @@ _modules = [
     "properties_physics_rigidbody",
     "properties_physics_rigidbody_constraint",
     "properties_physics_smoke",
+    "properties_physics_poseidon",
     "properties_physics_softbody",
     "properties_render",
     "properties_render_layer",

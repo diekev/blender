@@ -1145,6 +1145,8 @@ static void tselem_draw_icon(uiBlock *block, int xmax, float x, float y, TreeSto
 						UI_icon_draw(x, y, ICON_MOD_MULTIRES); break;
 					case eModifierType_Smoke:
 						UI_icon_draw(x, y, ICON_MOD_SMOKE); break;
+					case eModifierType_Poseidon:
+						UI_icon_draw(x, y, ICON_MOD_SMOKE); break;
 					case eModifierType_Solidify:
 						UI_icon_draw(x, y, ICON_MOD_SOLIDIFY); break;
 					case eModifierType_Screw:

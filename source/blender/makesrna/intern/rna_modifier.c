@@ -50,6 +50,7 @@
 #include "BKE_mesh_mapping.h"
 #include "BKE_mesh_remap.h"
 #include "BKE_multires.h"
+#include "BKE_poseidon.h"
 #include "BKE_smoke.h" /* For smokeModifier_free & smokeModifier_createType */
 
 #include "RNA_access.h"
@@ -115,6 +116,7 @@ EnumPropertyItem rna_enum_object_modifier_type_items[] = {
 	{eModifierType_ParticleInstance, "PARTICLE_INSTANCE", ICON_MOD_PARTICLES, "Particle Instance", ""},
 	{eModifierType_ParticleSystem, "PARTICLE_SYSTEM", ICON_MOD_PARTICLES, "Particle System", ""},
 	{eModifierType_Smoke, "SMOKE", ICON_MOD_SMOKE, "Smoke", ""},
+    {eModifierType_Poseidon, "POSEIDON", ICON_MOD_SMOKE, "Poseidon", ""},
 	{eModifierType_Softbody, "SOFT_BODY", ICON_MOD_SOFT, "Soft Body", ""},
 	{eModifierType_Surface, "SURFACE", ICON_MOD_PHYSICS, "Surface", ""},
 	{0, NULL, 0, NULL, NULL}
@@ -361,6 +363,8 @@ static StructRNA *rna_Modifier_refine(struct PointerRNA *ptr)
 			return &RNA_SurfaceModifier;
 		case eModifierType_Smoke:
 			return &RNA_SmokeModifier;
+		case eModifierType_Poseidon:
+			return &RNA_PoseidonModifier;
 		case eModifierType_Solidify:
 			return &RNA_SolidifyModifier;
 		case eModifierType_Screw:
@@ -606,6 +610,33 @@ static void rna_Smoke_set_type(Main *bmain, Scene *scene, PointerRNA *ptr)
 	smokeModifier_createType(smd); /* create regarding of selected type */
 
 	switch (smd->type) {
+		case MOD_SMOKE_TYPE_DOMAIN:
+			ob->dt = OB_WIRE;
+			break;
+		case MOD_SMOKE_TYPE_FLOW:
+		case MOD_SMOKE_TYPE_COLL:
+		case 0:
+		default:
+			break;
+	}
+
+	/* update dependency since a domain - other type switch could have happened */
+	rna_Modifier_dependency_update(bmain, scene, ptr);
+}
+
+static void rna_Poseidon_set_type(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	PoseidonModifierData *pmd = (PoseidonModifierData *)ptr->data;
+	Object *ob = (Object *)ptr->id.data;
+
+	/* nothing changed */
+	if ((pmd->type & MOD_SMOKE_TYPE_DOMAIN) && pmd->domain)
+		return;
+
+	BKE_poseidon_modifier_free(pmd); /* XXX TODO: completely free all 3 pointers */
+	BKE_poseidon_modifier_create_type(pmd); /* create regarding of selected type */
+
+	switch (pmd->type) {
 		case MOD_SMOKE_TYPE_DOMAIN:
 			ob->dt = OB_WIRE;
 			break;
@@ -2777,6 +2808,44 @@ static void rna_def_modifier_smoke(BlenderRNA *brna)
 	RNA_def_property_update(prop, 0, "rna_Smoke_set_type");
 }
 
+static void rna_def_modifier_poseidon(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	static EnumPropertyItem prop_smoke_type_items[] = {
+		{0, "NONE", 0, "None", ""},
+		{MOD_SMOKE_TYPE_DOMAIN, "DOMAIN", 0, "Domain", ""},
+		{MOD_SMOKE_TYPE_FLOW, "FLOW", 0, "Flow", "Inflow/Outflow"},
+		{MOD_SMOKE_TYPE_COLL, "COLLISION", 0, "Collision", ""},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	srna = RNA_def_struct(brna, "PoseidonModifier", "Modifier");
+	RNA_def_struct_ui_text(srna, "Poseidon Modifier", "Smoke simulation modifier");
+	RNA_def_struct_sdna(srna, "PoseidonModifierData");
+	RNA_def_struct_ui_icon(srna, ICON_MOD_SMOKE);
+
+	prop = RNA_def_property(srna, "domain_settings", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "domain");
+	RNA_def_property_ui_text(prop, "Domain Settings", "");
+
+	prop = RNA_def_property(srna, "flow_settings", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "flow");
+	RNA_def_property_ui_text(prop, "Flow Settings", "");
+
+	prop = RNA_def_property(srna, "coll_settings", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "coll");
+	RNA_def_property_ui_text(prop, "Collision Settings", "");
+
+	prop = RNA_def_property(srna, "smoke_type", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "type");
+	RNA_def_property_enum_items(prop, prop_smoke_type_items);
+	RNA_def_property_ui_text(prop, "Type", "");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_update(prop, 0, "rna_Poseidon_set_type");
+}
+
 static void rna_def_modifier_dynamic_paint(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -4749,6 +4818,7 @@ void RNA_def_modifier(BlenderRNA *brna)
 	rna_def_modifier_wireframe(brna);
 	rna_def_modifier_datatransfer(brna);
 	rna_def_modifier_normaledit(brna);
+	rna_def_modifier_poseidon(brna);
 }
 
 #endif

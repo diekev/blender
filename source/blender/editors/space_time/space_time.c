@@ -121,6 +121,7 @@ static void time_draw_cache(SpaceTime *stime, Object *ob, Scene *scene)
 			case PTCACHE_TYPE_CLOTH:
 				if (!(stime->cache_display & TIME_CACHE_CLOTH)) continue;
 				break;
+			case PTCACHE_TYPE_POSEIDON:
 			case PTCACHE_TYPE_SMOKE_DOMAIN:
 			case PTCACHE_TYPE_SMOKE_HIGHRES:
 				if (!(stime->cache_display & TIME_CACHE_SMOKE)) continue;
@@ -187,6 +188,7 @@ static void time_draw_cache(SpaceTime *stime, Object *ob, Scene *scene)
 				col[0] = 0.1;   col[1] = 0.1;   col[2] = 0.75;
 				col[3] = 0.1;
 				break;
+			case PTCACHE_TYPE_POSEIDON:
 			case PTCACHE_TYPE_SMOKE_DOMAIN:
 			case PTCACHE_TYPE_SMOKE_HIGHRES:
 				col[0] = 0.2;   col[1] = 0.2;   col[2] = 0.2;

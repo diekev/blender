@@ -85,6 +85,7 @@ typedef enum ModifierType {
 	eModifierType_DataTransfer      = 49,
 	eModifierType_NormalEdit        = 50,
 	eModifierType_CorrectiveSmooth  = 51,
+	eModifierType_Poseidon          = 52,
 	NUM_MODIFIER_TYPES
 } ModifierType;
 
@@ -366,6 +367,16 @@ enum {
 	MOD_SMOKE_TYPE_FLOW   = (1 << 1),
 	MOD_SMOKE_TYPE_COLL   = (1 << 2),
 };
+
+typedef struct PoseidonModifierData {
+	ModifierData modifier;
+
+	struct PoseidonDomainSettings *domain;
+	struct PoseidonFlowSettings *flow; /* inflow, outflow, smoke objects */
+	struct PoseidonCollSettings *coll; /* collision objects */
+	float time;
+	int type;  /* domain, inflow, outflow, ... */
+} PoseidonModifierData;
 
 typedef struct DisplaceModifierData {
 	ModifierData modifier;

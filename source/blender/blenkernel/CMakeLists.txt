@@ -156,6 +156,7 @@ set(SRC
 	intern/pbvh.c
 	intern/pbvh_bmesh.c
 	intern/pointcache.c
+	intern/poseidon.c
 	intern/property.c
 	intern/report.c
 	intern/rigidbody.c
@@ -271,6 +272,7 @@ set(SRC
 	BKE_particle.h
 	BKE_pbvh.h
 	BKE_pointcache.h
+	BKE_poseidon.h
 	BKE_property.h
 	BKE_report.h
 	BKE_rigidbody.h

@@ -68,6 +68,7 @@
 #define PTCACHE_TYPE_SMOKE_HIGHRES      4
 #define PTCACHE_TYPE_DYNAMICPAINT       5
 #define PTCACHE_TYPE_RIGIDBODY          6
+#define PTCACHE_TYPE_POSEIDON           7
 
 /* high bits reserved for flags that need to be stored in file */
 #define PTCACHE_TYPEFLAG_COMPRESS       (1 << 16)
@@ -89,6 +90,7 @@ struct Object;
 struct ParticleKey;
 struct ParticleSystem;
 struct PointCache;
+struct PoseidonModifierData;
 struct Scene;
 struct SmokeModifierData;
 struct SoftBody;
@@ -275,6 +277,7 @@ void BKE_ptcache_id_from_cloth(PTCacheID *pid, struct Object *ob, struct ClothMo
 void BKE_ptcache_id_from_smoke(PTCacheID *pid, struct Object *ob, struct SmokeModifierData *smd);
 void BKE_ptcache_id_from_dynamicpaint(PTCacheID *pid, struct Object *ob, struct DynamicPaintSurface *surface);
 void BKE_ptcache_id_from_rigidbody(PTCacheID *pid, struct Object *ob, struct RigidBodyWorld *rbw);
+void BKE_ptcache_id_from_poseidon(PTCacheID *pid, struct Object *ob, struct PoseidonModifierData *pmd);
 
 void BKE_ptcache_ids_from_object(struct ListBase *lb, struct Object *ob, struct Scene *scene, int duplis);
 
