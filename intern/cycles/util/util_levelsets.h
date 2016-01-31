@@ -17,7 +17,6 @@
 #ifndef __UTIL_LEVELSETS_H__
 #define __UTIL_LEVELSETS_H__
 
-
 namespace openvdb{
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -50,7 +49,7 @@ namespace tools {
 /// so make sure to give each thread its own instance.  This of course also means that
 /// the cost of allocating an instance should (if possible) be amortized over
 /// as many ray intersections as possible.
-template<typename GridT, typename StencilT, int Iterations, typename RealT, bool use_bisection_secant_root=false>
+template<typename GridT, typename StencilT, int Iterations, typename RealT>
 class CyclesLinearSearchImpl
 {
 public:
@@ -160,14 +159,13 @@ private:
 	{
 		// Implementation is derived from the PhysBAM Bisection_Secant_Root code
 		ValueT V;
-		if (mStencil.accessor().probeValue(ijk, V) &&
-		    V > mMinValue && V < mMaxValue ){
+		if (mStencil.accessor().probeValue(ijk, V) && V > mMinValue && V < mMaxValue) {
 			mT[1] = time;
 			mV[1] = static_cast<ValueT>(this->interpValue(time));
 
 			if (math::ZeroCrossing(mV[0], mV[1])) {
-				RealT tolerance = 1e-6;
-				int max_iterations = 100;
+				const RealT tolerance = 1e-6;
+				const int max_iterations = 100;
 
 				RealT a=mT[0];
 				RealT b=mT[1];
@@ -178,22 +176,35 @@ private:
 				RealT x=b;
 				ValueT Fx_old=Fa;
 				ValueT Fx=Fb;
+
 				while(b - a > tolerance && iterations++ < max_iterations ) {
 					/* bisection method */
-					if(abs(Fx-Fx_old)<tolerance){
-						RealT m=0.5*(a+b);
-						ValueT Fm=static_cast<ValueT>(this->interpValue(m));
-						if(Fa*Fm<=0) {b=m;Fb=Fm;}
-						else{a=m;Fa=Fm;}
-						x_old=a;x=b;Fx_old=Fa;Fx=Fb; // Update secant points
+					if(abs(Fx - Fx_old) < tolerance) {
+						RealT m = 0.5 * (a + b);
+						ValueT Fm = static_cast<ValueT>(this->interpValue(m));
+
+						if(Fa * Fm <= 0) {
+							b = m;
+							Fb = Fm;
+						}
+						else {
+							a = m;
+							Fa = Fm;
+						}
+
+						/* Update secant points */
+						x_old = a;
+						x = b;
+						Fx_old = Fa;
+						Fx = Fb;
 					}
 					/* secant method */
 					else {
 						RealT x_temp = x;
-						x -= Fx * (x - x_old) / (Fx-Fx_old);
+						x -= Fx * (x - x_old) / (Fx - Fx_old);
 
 						/* Update bisection points */
-						if(a<x && x<b){
+						if(a < x && x < b) {
 							x_old=x_temp;
 							Fx_old=Fx;
 							Fx=static_cast<ValueT>(this->interpValue(x));
@@ -211,11 +222,22 @@ private:
 						}
 						/* throw out secant root - do bisection instead */
 						else {
-							RealT m=0.5*(a+b);
-							ValueT Fm=static_cast<ValueT>(this->interpValue(m));
-							if(Fa*Fm<=0){b=m;Fb=Fm;}
-							else{a=m;Fa=Fm;}
-							x_old=a;x=b;Fx_old=Fa;Fx=Fb;
+							RealT m = 0.5 * (a + b);
+							ValueT Fm = static_cast<ValueT>(this->interpValue(m));
+
+							if(Fa * Fm <= 0) {
+								b = m;
+								Fb = Fm;
+							}
+							else {
+								a = m;
+								Fa = Fm;
+							}
+
+							x_old = a;
+							x = b;
+							Fx_old = Fa;
+							Fx = Fb;
 						}
 					}
 				}
@@ -224,7 +246,7 @@ private:
 					printf("max iterations reached, tolerance not reached.");
 				}
 
-				mTime=x;
+				mTime = x;
 				return true;
 			}
 

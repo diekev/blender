@@ -65,7 +65,7 @@ public:
 
 #if 1
 	   typedef openvdb::tools::CyclesLinearSearchImpl<openvdb::FloatGrid,
-	                                                  openvdb::math::BoxStencil<openvdb::FloatGrid>, 1, double, true> LinearSearchImpl;
+	                                                  openvdb::math::BoxStencil<openvdb::FloatGrid>, 1, double> LinearSearchImpl;
 #else
 	   typedef openvdb::tools::LinearSearchImpl<openvdb::FloatGrid, 1, double> LinearSearchImpl;
 #endif
