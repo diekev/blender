@@ -61,11 +61,19 @@ typedef struct PoseidonCollSettings {
 
 typedef struct PoseidonDomainSettings {
 	struct PoseidonModifierData *pmd;
+	struct Group *fluid_group;
+	struct Group *coll_group; // collision objects group
+
 	struct PointCache *cache;
 	ListBase ptcaches;
 
 	SmokeFields *fields;
 
+	float obmat[4][4];
+	float imat[4][4];
+
+	float voxel_size;
+	int pad;
 } PoseidonDomainSettings;
 
 #endif /* __DNA_POSEIDON_TYPES_H__ */

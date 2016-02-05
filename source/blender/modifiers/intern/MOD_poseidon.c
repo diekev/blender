@@ -58,15 +58,12 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
                                   DerivedMesh *dm,
                                   ModifierApplyFlag flag)
 {
-	PoseidonModifierData *smd = (PoseidonModifierData *) md;
+	PoseidonModifierData *pmd = (PoseidonModifierData *) md;
 
 	if (flag & MOD_APPLY_ORCO)
 		return dm;
 
-	(void)smd;
-	(void)ob;
-
-	return dm;
+	return BKE_poseidon_modifier_do(pmd, md->scene, ob, dm);
 }
 
 ModifierTypeInfo modifierType_Poseidon = {

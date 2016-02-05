@@ -31,7 +31,9 @@
 #include "BLI_math.h"
 
 #include "BKE_cdderivedmesh.h"
+#include "BKE_collision.h"
 #include "BKE_DerivedMesh.h"
+#include "BKE_modifier.h"
 #include "BKE_pointcache.h"
 #include "BKE_poseidon.h"
 
@@ -41,6 +43,64 @@
 #ifdef DEBUG_TIME
 #	include "PIL_time.h"
 #endif
+
+#include "openvdb_capi.h"
+#include "openvdb_mesh_capi.h"
+
+typedef struct OpenVDBDerivedMeshIterator {
+	OpenVDBMeshIterator base;
+	struct MVert *vert, *vert_end;
+	const struct MLoopTri *looptri, *looptri_end;
+	struct MLoop *loop;
+} OpenVDBDerivedMeshIterator;
+
+static bool openvdb_dm_has_vertices(OpenVDBDerivedMeshIterator *it)
+{
+	return it->vert < it->vert_end;
+}
+
+static bool openvdb_dm_has_triangles(OpenVDBDerivedMeshIterator *it)
+{
+	return it->looptri < it->looptri_end;
+}
+
+static void openvdb_dm_next_vertex(OpenVDBDerivedMeshIterator *it)
+{
+	++it->vert;
+}
+
+static void openvdb_dm_next_triangle(OpenVDBDerivedMeshIterator *it)
+{
+	++it->looptri;
+}
+
+static void openvdb_dm_get_vertex(OpenVDBDerivedMeshIterator *it, float co[3])
+{
+	copy_v3_v3(co, it->vert->co);
+}
+
+static void openvdb_dm_get_triangle(OpenVDBDerivedMeshIterator *it, int *a, int *b, int *c)
+{
+	*a = it->loop[it->looptri->tri[0]].v;
+	*b = it->loop[it->looptri->tri[1]].v;
+	*c = it->loop[it->looptri->tri[2]].v;
+}
+
+static inline void openvdb_dm_iter_init(OpenVDBDerivedMeshIterator *it, DerivedMesh *dm)
+{
+	it->base.has_vertices = (OpenVDBMeshHasVerticesFn)openvdb_dm_has_vertices;
+	it->base.has_triangles = (OpenVDBMeshHasTrianglesFn)openvdb_dm_has_triangles;
+	it->base.next_vertex = (OpenVDBMeshNextVertexFn)openvdb_dm_next_vertex;
+	it->base.next_triangle = (OpenVDBMeshNextTriangleFn)openvdb_dm_next_triangle;
+	it->base.get_vertex = (OpenVDBMeshGetVertexFn)openvdb_dm_get_vertex;
+	it->base.get_triangle = (OpenVDBMeshGetTriangleFn)openvdb_dm_get_triangle;
+
+	it->vert = dm->getVertArray(dm);
+	it->vert_end = it->vert + dm->getNumVerts(dm);
+	it->looptri = dm->getLoopTriArray(dm);
+	it->looptri_end = it->looptri + dm->getNumLoopTri(dm);
+	it->loop = dm->getLoopArray(dm);
+}
 
 static void poseidon_domain_free(PoseidonDomainSettings *domain);
 static void poseidon_flow_free(PoseidonFlowSettings *flow);
@@ -60,11 +120,16 @@ void BKE_poseidon_modifier_create_type(PoseidonModifierData *pmd)
 		pmd->domain = MEM_callocN(sizeof(PoseidonDomainSettings), "PoseidonDomainSettings");
 		pmd->domain->pmd = pmd;
 
+		pmd->domain->fluid_group = NULL;
+		pmd->domain->coll_group = NULL;
+
 		pmd->domain->cache = BKE_ptcache_add(&(pmd->domain->ptcaches));
 		pmd->domain->cache->flag |= PTCACHE_DISK_CACHE;
 		pmd->domain->cache->step = 1;
 
 		pmd->domain->fields = MEM_callocN(sizeof(SmokeFields), "SmokeFields");
+
+		pmd->domain->voxel_size = 0.1f;
 	}
 	else if (pmd->type & MOD_SMOKE_TYPE_FLOW) {
 		if (pmd->flow) {
@@ -97,7 +162,6 @@ static void poseidon_domain_free(PoseidonDomainSettings *domain)
 	domain->fields = NULL;
 
 	MEM_freeN(domain);
-	domain = NULL;
 }
 
 static void poseidon_flow_free(PoseidonFlowSettings *flow)
@@ -117,7 +181,6 @@ static void poseidon_flow_free(PoseidonFlowSettings *flow)
 	}
 
 	MEM_freeN(flow);
-	flow = NULL;
 }
 
 static void poseidon_collision_free(PoseidonCollSettings *coll)
@@ -137,7 +200,6 @@ static void poseidon_collision_free(PoseidonCollSettings *coll)
 	}
 
 	MEM_freeN(coll);
-	coll = NULL;
 }
 
 void BKE_poseidon_modifier_free(PoseidonModifierData *pmd)
@@ -147,8 +209,13 @@ void BKE_poseidon_modifier_free(PoseidonModifierData *pmd)
 	}
 
 	poseidon_domain_free(pmd->domain);
+	pmd->domain = NULL;
+
 	poseidon_flow_free(pmd->flow);
+	pmd->flow = NULL;
+
 	poseidon_collision_free(pmd->coll);
+	pmd->coll = NULL;
 }
 
 static int poseidon_modifier_init(PoseidonModifierData *pmd, Object *ob, Scene *scene, DerivedMesh *dm)
@@ -200,6 +267,70 @@ void BKE_poseidon_modifier_reset(PoseidonModifierData *pmd)
 	}
 }
 
+static void update_obstacles(Scene *scene, Object *ob, PoseidonDomainSettings *pds)
+{
+//	OpenVDB_smoke_clear_obstacles(sds->data);
+
+	unsigned int numflowobj = 0;
+	Object **collobjs = get_collisionobjects(scene, ob, pds->coll_group, &numflowobj, eModifierType_Poseidon);
+
+	for (unsigned int flowIndex = 0; flowIndex < numflowobj; flowIndex++) {
+		Object *collob = collobjs[flowIndex];
+		PoseidonModifierData *smd2 = (PoseidonModifierData *)modifiers_findByType(collob, eModifierType_Poseidon);
+
+		// check for initialized smoke object
+		if ((smd2->type & MOD_SMOKE_TYPE_COLL) && smd2->coll) {
+			PoseidonCollSettings *pcs = smd2->coll;
+
+			float mat[4][4];
+			mul_m4_m4m4(mat, pds->imat, collob->obmat);
+
+			OpenVDBDerivedMeshIterator iter;
+			openvdb_dm_iter_init(&iter, pcs->dm);
+
+			struct OpenVDBPrimitive *prim = OpenVDBPrimitive_from_mesh(&iter.base, mat, pds->voxel_size);
+
+			OpenVDBPrimitive_free(prim);
+		}
+	}
+
+	if (collobjs) {
+		MEM_freeN(collobjs);
+	}
+}
+
+static void update_sources(Scene *scene, Object *ob, PoseidonDomainSettings *pds)
+{
+	unsigned int numflowobj = 0;
+	Object **flowobjs = get_collisionobjects(scene, ob, pds->fluid_group, &numflowobj, eModifierType_Poseidon);
+
+	for (unsigned int flowIndex = 0; flowIndex < numflowobj; flowIndex++) {
+		Object *collob = flowobjs[flowIndex];
+		PoseidonModifierData *smd2 = (PoseidonModifierData *)modifiers_findByType(collob, eModifierType_Poseidon);
+
+		/* check for initialized smoke object */
+		if ((smd2->type & MOD_SMOKE_TYPE_FLOW) && smd2->flow) {
+			PoseidonFlowSettings *pfs = smd2->flow;
+
+			float mat[4][4];
+			mul_m4_m4m4(mat, pds->imat, collob->obmat);
+
+			OpenVDBDerivedMeshIterator iter;
+			openvdb_dm_iter_init(&iter, pfs->dm);
+
+			struct OpenVDBPrimitive *prim = OpenVDBPrimitive_from_mesh(&iter.base, mat, pds->voxel_size);
+
+			printf("%s\n", __func__);
+
+			OpenVDBPrimitive_free(prim);
+		}
+	}
+
+	if (flowobjs) {
+		MEM_freeN(flowobjs);
+	}
+}
+
 static void step(Scene *scene, Object *ob, PoseidonModifierData *pmd, DerivedMesh *domain_dm, float fps)
 {
 	PoseidonDomainSettings *pds = pmd->domain;
@@ -207,8 +338,8 @@ static void step(Scene *scene, Object *ob, PoseidonModifierData *pmd, DerivedMes
 	float gravity[3] = { 0.0f, 0.0f, -1.0f };
 
 	/* update object state */
-//	invert_m4_m4(pds->imat, ob->obmat);
-//	copy_m4_m4(pds->obmat, ob->obmat);
+	invert_m4_m4(pds->imat, ob->obmat);
+	copy_m4_m4(pds->obmat, ob->obmat);
 //	smoke_set_domain_from_derivedmesh(sds, ob, domain_dm, (sds->flags & MOD_SMOKE_ADAPTIVE_DOMAIN) != 0);
 
 	/* use global gravity if enabled */
@@ -220,7 +351,7 @@ static void step(Scene *scene, Object *ob, PoseidonModifierData *pmd, DerivedMes
 
 	/* convert gravity to domain space */
 	const float gravity_mag = len_v3(gravity);
-//	mul_mat3_m4_v3(pds->imat, gravity);
+	mul_mat3_m4_v3(pds->imat, gravity);
 	normalize_v3(gravity);
 	mul_v3_fl(gravity, gravity_mag);
 
@@ -251,8 +382,8 @@ static void step(Scene *scene, Object *ob, PoseidonModifierData *pmd, DerivedMes
 
 	for (int substep = 0; substep < totalSubsteps; substep++) {
 		// calc animated obstacle velocities
-//		update_flowsfluids(scene, ob, pds, dtSubdiv);
-//		update_obstacles(scene, ob, pds, dtSubdiv, substep, totalSubsteps);
+		update_sources(scene, ob, pds);
+		update_obstacles(scene, ob, pds);
 
 //		if (pds->total_cells > 1) {
 //			update_effectors(scene, ob, pds, dtSubdiv); // DG TODO? problem --> uses forces instead of velocity, need to check how they need to be changed with variable dt
@@ -374,6 +505,7 @@ static void poseidon_modifier_process(PoseidonModifierData *pmd, Scene *scene,
 //				smoke_dissolve(pds->fluid, pds->diss_speed, pds->flags & MOD_SMOKE_DISSOLVE_LOG);
 //			}
 
+			printf("%s\n", __func__);
 			step(scene, ob, pmd, dm, scene->r.frs_sec / scene->r.frs_sec_base);
 		}
 
@@ -392,6 +524,7 @@ static void poseidon_modifier_process(PoseidonModifierData *pmd, Scene *scene,
 DerivedMesh *BKE_poseidon_modifier_do(PoseidonModifierData *smd, Scene *scene,
                                       Object *ob, DerivedMesh *dm)
 {
+	printf("%s\n", __func__);
 	poseidon_modifier_process(smd, scene, ob, dm);
 	return CDDM_copy(dm);
 }
