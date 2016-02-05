@@ -2685,7 +2685,7 @@ int BKE_ptcache_read(PTCacheID *pid, float cfra)
 	int ret = 0;
 
 	/* nothing to read to */
-	if (pid->totpoint(pid->calldata, cfrai) == 0)
+	if (pid->totpoint && pid->totpoint(pid->calldata, cfrai) == 0)
 		return 0;
 
 	if (pid->cache->flag & PTCACHE_READ_INFO) {
