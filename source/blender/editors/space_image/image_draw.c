@@ -893,8 +893,8 @@ void draw_image_main(const bContext *C, ARegion *ar)
 	Scene *scene = CTX_data_scene(C);
 	Image *ima;
 	ImageLayer *layer = NULL;
-	ImBuf *ibuf, *next_ibuf = NULL, *ibuf_l = NULL, *p_ibuf = NULL, *result_ibuf = NULL;
-	float zoomx, zoomy, sp_x, sp_y;
+	ImBuf *ibuf, *p_ibuf = NULL;
+	float zoomx, zoomy;
 	bool show_viewer, show_render, show_paint, show_stereo3d, show_multilayer;
 	int first = 0;
 	int x, y, b_x, b_y;
@@ -965,7 +965,6 @@ void draw_image_main(const bContext *C, ARegion *ar)
 		else if (ima && (ima->tpageflag & IMA_TILES))
 			draw_image_buffer_tiled(sima, ar, scene, ima, ibuf, 0.0f, 0.0, zoomx, zoomy);
 		else if (ima && !show_render && (sima->mode == SI_MODE_PAINT)) {
-			next_ibuf = NULL;
 			ima->use_layers = true;
 			layer = (ImageLayer*)ima->layers.last;
 
@@ -987,7 +986,16 @@ void draw_image_main(const bContext *C, ARegion *ar)
 				b_x = p_ibuf->x;
 				b_y = p_ibuf->y;
 			}
+			else if (ima->num_layers == 1) {
+				glEnable(GL_BLEND);
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+				glColor4f(1.0f, 1.0f, 1.0f, layer->opacity);
+				draw_image_buffer(C, sima, ar, scene, ibuf, 0.0f, 0.0f, zoomx, zoomy);
+				glDisable(GL_BLEND);
+			}
 			else {
+				ImBuf *ibuf_l = NULL, *result_ibuf = NULL;
 				for (layer = (ImageLayer*)ima->layers.last; layer; layer = layer->prev) {
 					if ((!first) || (layer->preview_ibuf)) {
 						if ((layer->opacity != 1.0f) || (ibuf->channels == 4) || (background & IMA_LAYER_BG_ALPHA)) {
@@ -1000,7 +1008,6 @@ void draw_image_main(const bContext *C, ARegion *ar)
 						}
 					}
 
-#if 1
 					if (layer->visible & IMA_LAYER_VISIBLE) {
 						if (layer->preview_ibuf)
 							ibuf_l = layer->preview_ibuf;
@@ -1014,25 +1021,14 @@ void draw_image_main(const bContext *C, ARegion *ar)
 
 							BKE_image_layer_blend(result_ibuf, result_ibuf, ibuf_l, layer->opacity, layer->mode, background);
 
-//							if (has_realloc && next_ibuf)
-//								IMB_freeImBuf(next_ibuf);
-
-//							next_ibuf = result_ibuf; // IMB_dupImBuf(result_ibuf);
-							sp_x = 0.0f;
-							sp_y = 0.0f;
-
 							glEnable(GL_BLEND);
 							glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 							glColor4f(1.0f, 1.0f, 1.0f, layer->opacity);
-							draw_image_buffer(C, sima, ar, scene, result_ibuf, sp_x, sp_y, zoomx, zoomy);
+							draw_image_buffer(C, sima, ar, scene, result_ibuf, 0.0f, 0.0f, zoomx, zoomy);
 							glDisable(GL_BLEND);
-
-//							if (result_ibuf)
-//								IMB_freeImBuf(result_ibuf);
 						}
 					}
-#endif
 
 					if (UI_GetThemeValue(TH_SHOW_BOUNDARY_LAYER)) {
 						if (layer->select & IMA_LAYER_SEL_CURRENT) {
@@ -1043,8 +1039,6 @@ void draw_image_main(const bContext *C, ARegion *ar)
 						}
 					}
 				}
-
-	//			draw_image_buffer(C, sima, ar, scene, ibuf, 0.0f, 0.0f, zoomx, zoomy);
 
 				if (result_ibuf) {
 					IMB_freeImBuf(result_ibuf);
@@ -1120,10 +1114,6 @@ void draw_image_main(const bContext *C, ARegion *ar)
 		}
 	}
 #endif
-
-//	if (result_ibuf) {
-//		BKE_image_replace_ibuf(ima, result_ibuf);
-//	}
 
 	if (show_viewer) {
 		BLI_unlock_thread(LOCK_DRAW_IMAGE);
