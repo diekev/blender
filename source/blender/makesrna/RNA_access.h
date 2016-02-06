@@ -288,7 +288,6 @@ extern StructRNA RNA_ImageSequence;
 extern StructRNA RNA_ImageTexture;
 extern StructRNA RNA_ImageUser;
 extern StructRNA RNA_ImapaintToolCapabilities;
-extern StructRNA RNA_ImBuf;
 extern StructRNA RNA_InflowFluidSettings;
 extern StructRNA RNA_IntProperty;
 extern StructRNA RNA_Itasc;

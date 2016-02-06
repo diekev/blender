@@ -554,19 +554,28 @@ static bool ui_imageuser_layer_menu_step(bContext *C, int direction, void *rnd_p
 		return false;
 	}
 
-	int tot = BLI_listbase_count(&rr->layers);
-	if (iuser->layer < tot - 1) {
-		iuser->layer++;
-		BKE_image_multilayer_index(rr, iuser);
-		WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
+	if (direction == -1) {
+		if (iuser->layer > 0) {
+			iuser->layer--;
+			changed = true;
+		}
 	}
 	else if (direction == 1) {
+		int tot = BLI_listbase_count(&rr->layers);
+
 		if (RE_HasFakeLayer(rr))
 			tot++;  /* fake compo/sequencer layer */
+
+		if (iuser->layer < tot - 1) {
+			iuser->layer++;
+			changed = true;
+		}
+	}
+	else {
+		BLI_assert(0);
 	}
 
-	if (iuser->layer > 0) {
-		iuser->layer--;
+	if (changed) {
 		BKE_image_multilayer_index(rr, iuser);
 		WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
 	}

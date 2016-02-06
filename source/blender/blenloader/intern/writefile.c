@@ -2215,7 +2215,7 @@ static void write_images(WriteData *wd, ListBase *idbase)
 
 			ima->packedfile = NULL;
 		}
-		ima = ima->id.next;
+		ima= ima->id.next;
 	}
 	/* flush helps the compression for undo-save */
 	mywrite(wd, MYWRITE_FLUSH, 0);

@@ -170,6 +170,7 @@ class IMAGE_MT_brush(Menu):
         # brush tool
         layout.prop_menu_enum(brush, "image_tool")
 
+
 class IMAGE_MT_file(Menu):
     bl_label = "File"
 
