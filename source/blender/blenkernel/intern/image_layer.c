@@ -498,9 +498,8 @@ static void copy_co(int rect, float *fp, char *cp, float co)
 		*cp = FTOCHAR(co);
 }
 
-ImBuf *BKE_image_layer_blend(ImBuf *base, ImBuf *layer, float opacity, short mode, short background, bool *has_realloc)
+void BKE_image_layer_blend(ImBuf *dest, ImBuf *base, ImBuf *layer, float opacity, short mode, short background)
 {
-	ImBuf *dest;
 	int i, flag;
 	int bg_x, bg_y, diff_x;
 	float (*blend_callback)(float B, float L, float O) = NULL;//Mode callback
@@ -516,19 +515,9 @@ ImBuf *BKE_image_layer_blend(ImBuf *base, ImBuf *layer, float opacity, short mod
 
 	flag = 0;
 
-	if (!base) {
-		return layer; // IMB_dupImBuf(layer);
+	if (!layer) {
+		return;
 	}
-
-	if (opacity == 0.0f)
-		return base;
-
-	// XXX(kevin) - figure that whole memory duplication nonsense.
-	if (has_realloc) {
-		*has_realloc = true;
-	}
-
-	dest = IMB_dupImBuf(base);
 
 	bg_x = base->x;
 	bg_y = base->y;
@@ -754,7 +743,6 @@ ImBuf *BKE_image_layer_blend(ImBuf *base, ImBuf *layer, float opacity, short mod
 	//end=clock();
 	//tempo=((double)(end-start))/CLOCKS_PER_SEC;
 	//printf("Elapsed time: %f seconds.\n", tempo);
-	return dest;
 }
 
 struct ImageLayer *BKE_image_layer_merge(Image *ima, ImageLayer *iml, ImageLayer *iml_next)
@@ -762,12 +750,8 @@ struct ImageLayer *BKE_image_layer_merge(Image *ima, ImageLayer *iml, ImageLayer
 	ImBuf *ibuf = iml_next->ibufs.first;
 
 	/* merge layers */
-	ImBuf *result_ibuf = BKE_image_layer_blend(ibuf,
-	                                           (ImBuf*)((ImageLayer*)iml->ibufs.first),
-	                                           iml->opacity,
-	                                           iml->mode,
-	                                           iml_next->background,
-	                                           NULL);
+	BKE_image_layer_blend(ibuf, ibuf, iml->ibufs.first,
+	                      iml->opacity, iml->mode, iml_next->background);
 
 	iml_next->background = IMA_LAYER_BG_RGB;
 	iml_next->file_path[0] = '\0';
@@ -783,7 +767,7 @@ struct ImageLayer *BKE_image_layer_merge(Image *ima, ImageLayer *iml, ImageLayer
 	IMB_freeImBuf(ibuf);
 
 	/* add new ibuf */
-	BLI_addtail(&iml_next->ibufs, result_ibuf);
+//	BLI_addtail(&iml_next->ibufs, result_ibuf);
 
 	/* delete the merged layer */
 	BLI_remlink(&ima->layers, iml);
@@ -795,32 +779,21 @@ struct ImageLayer *BKE_image_layer_merge(Image *ima, ImageLayer *iml, ImageLayer
 /* Non destructive */
 void BKE_image_merge_visible_layers(Image *ima)
 {
-	ImBuf *result_ibuf = NULL;
 	ImageLayer *layer = ima->layers.last;
 	short background = layer->background;
+
+	ImBuf *ima_ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
 
 	for (; layer; layer = layer->prev) {
 		if ((layer->visible & IMA_LAYER_VISIBLE) == 0) {
 			continue;
 		}
 
-		ImBuf *ibuf = (ImBuf*)((ImageLayer*)layer->ibufs.first);
-
-		if (ibuf) {
-			ImBuf *next_ibuf = BKE_image_layer_blend(result_ibuf, ibuf, layer->opacity, layer->mode, background, NULL);
-
-			if (result_ibuf) {
-				IMB_freeImBuf(result_ibuf);
-			}
-
-			result_ibuf = next_ibuf;
-			next_ibuf = NULL;
-		}
+		BKE_image_layer_blend(ima_ibuf, ima_ibuf, layer->ibufs.first,
+		                      layer->opacity, layer->mode, background);
 	}
 
-	if (result_ibuf) {
-		BKE_image_replace_ibuf(ima, result_ibuf);
-	}
+	BKE_image_release_ibuf(ima, ima_ibuf, NULL);
 }
 
 ImageLayer *BKE_image_add_image_layer(Image *ima, const char *name, int depth, float color[4], int order)

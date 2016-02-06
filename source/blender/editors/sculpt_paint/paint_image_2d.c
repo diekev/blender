@@ -1124,7 +1124,8 @@ static int paint_2d_op(void *state, ImBuf *ibufb, unsigned short *curveb, unsign
 
 static int paint_2d_canvas_set(ImagePaintState *s, Image *ima)
 {
-	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, s->sima ? &s->sima->iuser : NULL, NULL, IMA_IBUF_LAYER);
+	ImBuf *ibuf = (BKE_image_get_current_layer(s->image))->ibufs.first;
+	//ImBuf *ibuf = BKE_image_acquire_ibuf(ima, s->sima ? &s->sima->iuser : NULL, NULL, IMA_IBUF_LAYER);
 
 	/* verify that we can paint and set canvas */
 	if (ima == NULL) {
@@ -1147,11 +1148,12 @@ static int paint_2d_canvas_set(ImagePaintState *s, Image *ima)
 	/* set clone canvas */
 	if (s->tool == PAINT_TOOL_CLONE) {
 		ima = s->brush->clone.image;
-		ibuf = BKE_image_acquire_ibuf(ima, s->sima ? &s->sima->iuser : NULL, NULL, IMA_IBUF_LAYER);
+		ibuf = (BKE_image_get_current_layer(s->image))->ibufs.first;
+		//ibuf = BKE_image_acquire_ibuf(ima, s->sima ? &s->sima->iuser : NULL, NULL, IMA_IBUF_LAYER);
 
 		if (!ima || !ibuf || !(ibuf->rect || ibuf->rect_float)) {
-			BKE_image_release_ibuf(ima, ibuf, NULL);
-			BKE_image_release_ibuf(s->image, s->canvas, NULL);
+			//BKE_image_release_ibuf(ima, ibuf, NULL);
+			//BKE_image_release_ibuf(s->image, s->canvas, NULL);
 			return 0;
 		}
 
@@ -1173,7 +1175,7 @@ static int paint_2d_canvas_set(ImagePaintState *s, Image *ima)
 
 static void paint_2d_canvas_free(ImagePaintState *s)
 {
-	BKE_image_release_ibuf(s->image, s->canvas, NULL);
+//	BKE_image_release_ibuf(s->image, s->canvas, NULL);
 	BKE_image_release_ibuf(s->brush->clone.image, s->clonecanvas, NULL);
 
 	if (s->blurkernel) {
@@ -1189,7 +1191,8 @@ void paint_2d_stroke(void *ps, const float prev_mval[2], const float mval[2], co
 	float newuv[2], olduv[2];
 	ImagePaintState *s = ps;
 	BrushPainter *painter = s->painter;
-	ImBuf *ibuf = BKE_image_acquire_ibuf(s->image, s->sima ? &s->sima->iuser : NULL, NULL, IMA_IBUF_LAYER);
+	ImBuf *ibuf = (BKE_image_get_current_layer(s->image))->ibufs.first;
+//	ImBuf *ibuf = BKE_image_acquire_ibuf(s->image, s->sima ? &s->sima->iuser : NULL, NULL, IMA_IBUF_LAYER);
 	const bool is_data = (ibuf && ibuf->colormanage_flag & IMB_COLORMANAGE_IS_DATA);
 
 	if (!ibuf)
@@ -1239,7 +1242,7 @@ void paint_2d_stroke(void *ps, const float prev_mval[2], const float mval[2], co
 	if (paint_2d_op(s, painter->cache.ibuf, painter->cache.curve_mask, painter->cache.tex_mask, olduv, newuv))
 		s->need_redraw = true;
 
-	BKE_image_release_ibuf(s->image, ibuf, NULL);
+	//BKE_image_release_ibuf(s->image, ibuf, NULL);
 }
 
 void *paint_2d_new_stroke(bContext *C, wmOperator *op, int mode)
@@ -1289,12 +1292,13 @@ void paint_2d_redraw(const bContext *C, void *ps, bool final)
 	ImagePaintState *s = ps;
 
 	if (s->need_redraw) {
-		ImBuf *ibuf = BKE_image_acquire_ibuf(s->image, s->sima ? &s->sima->iuser : NULL, NULL, IMA_IBUF_LAYER);
+		ImBuf *ibuf = (BKE_image_get_current_layer(s->image))->ibufs.first;
+		//ImBuf *ibuf = BKE_image_acquire_ibuf(s->image, s->sima ? &s->sima->iuser : NULL, NULL, IMA_IBUF_LAYER);
 
 		imapaint_image_update(s->sima, s->image, ibuf, false);
 		ED_imapaint_clear_partial_redraw();
 
-		BKE_image_release_ibuf(s->image, ibuf, NULL);
+		//BKE_image_release_ibuf(s->image, ibuf, NULL);
 
 		s->need_redraw = false;
 	}
