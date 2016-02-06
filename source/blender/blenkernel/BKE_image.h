@@ -172,6 +172,9 @@ bool BKE_image_has_ibuf(struct Image *ima, struct ImageUser *iuser, int type_ibu
 struct ImBuf *BKE_image_acquire_ibuf(struct Image *ima, struct ImageUser *iuser, void **r_lock, int type_ibuf);
 void BKE_image_release_ibuf(struct Image *ima, struct ImBuf *ibuf, void *lock);
 
+struct ImBuf *BKE_image_acquire_layer_ibuf(struct Image *ima);
+void BKE_image_release_layer_ibuf(struct ImBuf *ibuf);
+
 struct ImagePool *BKE_image_pool_new(void);
 void BKE_image_pool_free(struct ImagePool *pool);
 struct ImBuf *BKE_image_pool_acquire_ibuf(struct Image *ima, struct ImageUser *iuser, struct ImagePool *pool, int type_ibuf);

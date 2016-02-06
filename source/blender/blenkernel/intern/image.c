@@ -4297,6 +4297,32 @@ void BKE_image_release_ibuf(Image *ima, ImBuf *ibuf, void *lock)
 	}
 }
 
+ImBuf *BKE_image_acquire_layer_ibuf(Image *ima)
+{
+	ImBuf *ibuf = NULL;
+
+	//BLI_spin_lock(&image_spin);
+
+	ImageLayer *layer = BKE_image_get_current_layer(ima);
+	if (layer && layer->ibufs.first) {
+		ibuf = layer->ibufs.first;
+		IMB_refImBuf(ibuf);
+	}
+
+	//BLI_spin_unlock(&image_spin);
+
+	return ibuf;
+}
+
+void BKE_image_release_layer_ibuf(ImBuf *ibuf)
+{
+	if (ibuf) {
+//		BLI_spin_lock(&image_spin);
+		IMB_freeImBuf(ibuf);
+//		BLI_spin_unlock(&image_spin);
+	}
+}
+
 /* checks whether there's an image buffer for given image and user */
 bool BKE_image_has_ibuf(Image *ima, ImageUser *iuser, int type_ibuf)
 {

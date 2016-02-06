@@ -298,7 +298,7 @@ static void image_undo_restore_runtime(ListBase *lb)
 
 	for (tile = lb->first; tile; tile = tile->next) {
 		Image *ima = tile->ima;
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+		ibuf = BKE_image_acquire_layer_ibuf(ima);
 
 		undo_copy_tile(tile, tmpibuf, ibuf, RESTORE);
 
@@ -309,7 +309,7 @@ static void image_undo_restore_runtime(ListBase *lb)
 			ibuf->userflags |= IB_MIPMAP_INVALID;  /* force mipmap recreatiom */
 		ibuf->userflags |= IB_DISPLAY_BUFFER_INVALID;
 
-		BKE_image_release_ibuf(ima, ibuf, NULL);
+		BKE_image_release_layer_ibuf(ima);
 	}
 
 	IMB_freeImBuf(tmpibuf);
