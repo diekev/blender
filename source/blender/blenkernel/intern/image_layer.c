@@ -777,12 +777,10 @@ struct ImageLayer *BKE_image_layer_merge(Image *ima, ImageLayer *iml, ImageLayer
 }
 
 /* Non destructive */
-void BKE_image_merge_visible_layers(Image *ima)
+void BKE_image_merge_visible_layers(Image *ima, ImBuf *ima_ibuf)
 {
 	ImageLayer *layer = ima->layers.last;
 	short background = layer->background;
-
-	ImBuf *ima_ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
 
 	for (; layer; layer = layer->prev) {
 		if ((layer->visible & IMA_LAYER_VISIBLE) == 0) {
@@ -792,8 +790,6 @@ void BKE_image_merge_visible_layers(Image *ima)
 		BKE_image_layer_blend(ima_ibuf, ima_ibuf, layer->ibufs.first,
 		                      layer->opacity, layer->mode, background);
 	}
-
-	BKE_image_release_ibuf(ima, ima_ibuf, NULL);
 }
 
 ImageLayer *BKE_image_add_image_layer(Image *ima, const char *name, int depth, float color[4], int order)

@@ -949,7 +949,10 @@ void draw_image_main(const bContext *C, ARegion *ar)
 			BKE_image_multiview_index(ima, &sima->iuser);
 	}
 
-	ibuf = ED_space_image_acquire_buffer(sima, &lock);
+	if (sima->mode != SI_MODE_PAINT)
+		ibuf = ED_space_image_acquire_buffer(sima, &lock);
+	else
+		ibuf = BKE_image_acquire_layer_ibuf(ima);
 
 	/* draw the image or grid */
 	if (ibuf == NULL) {
@@ -1092,7 +1095,10 @@ void draw_image_main(const bContext *C, ARegion *ar)
 		}
 	}
 
-	ED_space_image_release_buffer(sima, ibuf, lock);
+	if (sima->mode != SI_MODE_PAINT)
+		ED_space_image_release_buffer(sima, ibuf, lock);
+	else
+		BKE_image_release_layer_ibuf(ibuf);
 
 	/* paint helpers */
 	if (show_paint)

@@ -82,7 +82,7 @@ void BKE_image_layer_blend(struct ImBuf *dest, struct ImBuf *base, struct ImBuf 
 
 struct ImageLayer *BKE_image_layer_merge(struct Image *ima, struct ImageLayer *iml, struct ImageLayer *iml_next);
 
-void BKE_image_merge_visible_layers(struct Image *ima);
+void BKE_image_merge_visible_layers(struct Image *ima, struct ImBuf *ima_ibuf);
 
 void BKE_image_layer_get_background_color(float col[4], struct ImageLayer *layer);
 
