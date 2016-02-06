@@ -331,7 +331,7 @@ static void update_sources(Scene *scene, Object *ob, PoseidonDomainSettings *pds
 	}
 }
 
-static void step(Scene *scene, Object *ob, PoseidonModifierData *pmd, DerivedMesh *domain_dm, float fps)
+static void step(Scene *scene, Object *ob, PoseidonModifierData *pmd, DerivedMesh *domain_dm)
 {
 	PoseidonDomainSettings *pds = pmd->domain;
 
@@ -356,7 +356,7 @@ static void step(Scene *scene, Object *ob, PoseidonModifierData *pmd, DerivedMes
 	mul_v3_fl(gravity, gravity_mag);
 
 	/* adapt timestep for different framerates, dt = 0.1 is at 25fps */
-	const float dt = DT_DEFAULT * (25.0f / fps);
+	const float dt = DT_DEFAULT * (25.0f / FPS);
 
 #if 0
 	/* Disable substeps for now, since it results in numerical instability */
@@ -432,17 +432,15 @@ static void poseidon_modifier_process(PoseidonModifierData *pmd, Scene *scene,
 		}
 	}
 	else if (pmd->type & MOD_SMOKE_TYPE_DOMAIN) {
-		PoseidonDomainSettings *pds = pmd->domain;
-		int startframe, endframe;
-		float timescale;
-
-		int framenr = CFRA;
-
-		PointCache *cache = pds->cache;
 		PTCacheID pid;
 		BKE_ptcache_id_from_poseidon(&pid, ob, pmd);
-		BKE_ptcache_id_time(&pid, scene, framenr, &startframe, &endframe, &timescale);
 
+		int framenr = CFRA;
+		int startframe, endframe;
+		BKE_ptcache_id_time(&pid, scene, framenr, &startframe, &endframe, NULL);
+
+		PoseidonDomainSettings *pds = pmd->domain;
+		PointCache *cache = pds->cache;
 		if (/*!pds->fluid ||*/ framenr == startframe) {
 			BKE_poseidon_modifier_reset(pmd);
 
@@ -506,7 +504,7 @@ static void poseidon_modifier_process(PoseidonModifierData *pmd, Scene *scene,
 //			}
 
 			printf("%s\n", __func__);
-			step(scene, ob, pmd, dm, scene->r.frs_sec / scene->r.frs_sec_base);
+			step(scene, ob, pmd, dm);
 		}
 
 		BKE_ptcache_validate(cache, framenr);
