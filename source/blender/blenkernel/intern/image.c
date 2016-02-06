@@ -415,7 +415,7 @@ static ImBuf *image_get_cached_ibuf_for_index_frame(Image *ima, int index, int f
 	if (index == IMA_NO_INDEX) {
 		if (ima->layers.first) {
 	//		BLI_lock_thread(LOCK_IMAGE);
-			BKE_image_merge_visible_layers(ima);
+	//		BKE_image_merge_visible_layers(ima);
 	//		BLI_unlock_thread(LOCK_IMAGE);
 		}
 	}
@@ -4907,10 +4907,5 @@ static void image_update_views_format(Image *ima, ImageUser *iuser)
 
 void BKE_image_replace_ibuf(Image *ima, ImBuf *new_ibuf)
 {
-	if (ima->cache != NULL) {
-		IMB_moviecache_free(ima->cache);
-		ima->cache = NULL;
-	}
-
-	image_assign_ibuf(ima, new_ibuf, IMA_NO_INDEX, 0);
+	imagecache_put(ima, IMA_NO_INDEX, new_ibuf);
 }
