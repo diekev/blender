@@ -491,44 +491,6 @@ static void sima_draw_zbuffloat_pixels(Scene *scene, float x1, float y1, int rec
 	MEM_freeN(rectf);
 }
 
-static void draw_layer_buffer(const bContext *C, SpaceImage *sima, ARegion *ar, Scene *scene, ImBuf *ibuf, float fx, float fy, float zoomx, float zoomy)
-{
-	int x, y;
-
-	/* set zoom */
-	glPixelZoom(zoomx, zoomy);
-
-	glaDefine2DArea(&ar->winrct);
-
-	/* find window pixel coordinates of origin */
-	UI_view2d_view_to_region(&ar->v2d, fx, fy, &x, &y);
-
-	/* this part is generic image display */
-	if(sima->flag & SI_SHOW_ALPHA) {
-		if(ibuf->rect)
-			sima_draw_alpha_pixels(x, y, ibuf->x, ibuf->y, ibuf->rect);
-		else if(ibuf->rect_float && ibuf->channels==4)
-			sima_draw_alpha_pixelsf(x, y, ibuf->x, ibuf->y, ibuf->rect_float);
-	}
-	else if(sima->flag & SI_SHOW_ZBUF && (ibuf->zbuf || ibuf->zbuf_float || (ibuf->channels==1))) {
-		if(ibuf->zbuf)
-			sima_draw_zbuf_pixels(x, y, ibuf->x, ibuf->y, ibuf->zbuf);
-		else if(ibuf->zbuf_float)
-			sima_draw_zbuffloat_pixels(scene, x, y, ibuf->x, ibuf->y, ibuf->zbuf_float);
-		else if(ibuf->channels==1)
-			sima_draw_zbuffloat_pixels(scene, x, y, ibuf->x, ibuf->y, ibuf->rect_float);
-	}
-	else {
-		glaDrawImBuf_glsl_ctx(C, ibuf, x, y, GL_NEAREST);
-
-		if(sima->flag & SI_USE_ALPHA)
-			glDisable(GL_BLEND);
-	}
-
-	/* reset zoom */
-	glPixelZoom(1.0f, 1.0f);
-}
-
 static int draw_image_channel_offset(SpaceImage *sima)
 {
 #ifdef __BIG_ENDIAN__
@@ -981,7 +943,7 @@ void draw_image_main(const bContext *C, ARegion *ar)
 				}
 				glEnable(GL_BLEND);
 				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-				draw_layer_buffer(C, sima, ar, scene, p_ibuf, 0.0f, 0.0f, zoomx, zoomy);
+				draw_image_buffer(C, sima, ar, scene, p_ibuf, 0.0f, 0.0f, zoomx, zoomy);
 				glDisable(GL_BLEND);
 				b_x = p_ibuf->x;
 				b_y = p_ibuf->y;
