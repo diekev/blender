@@ -1081,8 +1081,6 @@ void draw_image_main(const bContext *C, ARegion *ar)
 					glDisable(GL_BLEND);
 			}
 		}
-		else
-			draw_image_buffer(C, sima, ar, scene, ibuf, 0.0f, 0.0f, zoomx, zoomy);
 		
 		if (sima->flag & SI_DRAW_METADATA) {
 			rctf frame;
