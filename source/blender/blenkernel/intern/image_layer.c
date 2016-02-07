@@ -316,87 +316,87 @@ int BKE_image_layer_remove(Image *ima, const int action)
 	return true;
 }
 
-static inline float blend_normal(float B, float L, float O)
+MINLINE float blend_normal(float B, float L, float O)
 {
 	return (O * (L) + (1.0f - O) * B);
 }
 
-static inline float blend_lighten(const float B, const float L, float O)
+MINLINE float blend_lighten(const float B, const float L, float O)
 {
 	return (O * ((L > B) ? L : B) + (1.0f - O) * B);
 }
 
-static inline float blend_darken(const float B, const float L, float O)
+MINLINE float blend_darken(const float B, const float L, float O)
 {
 	return (O * ((L > B) ? B : L) + (1.0f - O) * B);
 }
 
-static inline float blend_multiply(const float B, const float L, float O)
+MINLINE float blend_multiply(const float B, const float L, float O)
 {
 	return (O * ((B * L) / 1.0f) + (1.0f - O) * B);
 }
 
-static inline float blend_add(const float B, const float L, float O)
+MINLINE float blend_add(const float B, const float L, float O)
 {
 	return (O * (MIN2(1.0f, (B + L))) + (1.0f - O) * B);
 }
 
-static inline float blend_subtract(const float B, const float L, float O)
+MINLINE float blend_subtract(const float B, const float L, float O)
 {
 	return (O * ((B + L < 1.0f) ? 0 : (B + L - 1.0f)) + (1.0f - O) * B);
 }
 
-static inline float blend_difference(const float B, const float L, float O)
+MINLINE float blend_difference(const float B, const float L, float O)
 {
 	return (O * (abs(B - L)) + (1.0f - O) * B);
 }
 
-static inline float blend_screen(const float B, const float L, float O)
+MINLINE float blend_screen(const float B, const float L, float O)
 {
 	return (O * (1.0f - ((1.0f - B) * (1 - L))) + (1.0f - O) * B);
 }
 
-static inline float blend_exclusion(const float B, const float L, float O)
+MINLINE float blend_exclusion(const float B, const float L, float O)
 {
 	return (O * (B + L - 2 * B * L) + (1.0f - O) * B);
 }
 
-static inline float blend_overlay(const float B, const float L, float O)
+MINLINE float blend_overlay(const float B, const float L, float O)
 {
 	return (O * ((L < 0.5f) ? (2 * B * L) : (1.0f - 2 * (1.0f - B) * (1.0f - L))) + (1.0f - O) * B);
 }
 
-static inline float blend_soft_light(const float B, const float L, float O)
+MINLINE float blend_soft_light(const float B, const float L, float O)
 {
 	return (O * ((1.0f - B) * blend_multiply(B, L, O) + B * blend_screen(B, L, O)) + (1.0f - O) * B);
 }
 
-static inline float blend_hard_light(const float B, const float L, float O)
+MINLINE float blend_hard_light(const float B, const float L, float O)
 {
 	return (O * ((B < 0.5f) ? (2 * L * B) : (1.0f - 2 * (1.0f - L) * (1.0f - B))) + (1.0f - O) * B);
 }
 
-static inline float blend_color_dodge(const float B, const float L, float O)
+MINLINE float blend_color_dodge(const float B, const float L, float O)
 {
 	return (O * (B / (1.0f - L)) + (1.0f - O) * B);
 }
 
-static inline float blend_color_burn(const float B, const float L, float O)
+MINLINE float blend_color_burn(const float B, const float L, float O)
 {
 	return (O * (1.0f - ((1.0f - B) / L)) + (1.0f - O) * B);
 }
 
-static inline float blend_linear_burn(const float B, const float L, float O)
+MINLINE float blend_linear_burn(const float B, const float L, float O)
 {
 	return (O * ((B + L < 1.0f) ? 0 : (B + L - 1.0f)) + (1.0f - O) * B);
 }
 
-static inline float blend_linear_light(const float B, const float L, float O)
+MINLINE float blend_linear_light(const float B, const float L, float O)
 {
 	return (O * ((2 * L) < 0.5f) ? ((B + (2 * L) < 1.0f) ? 0 : (B + (2 * L) - 1.0f)) : (min_ff(1.0f, (B + (2 * (L - 0.5f))))) + (1.0f - O) * B);
 }
 
-static inline float blend_vivid_light(const float B, const float L, float O)
+MINLINE float blend_vivid_light(const float B, const float L, float O)
 {
 	float r;
 
@@ -409,12 +409,12 @@ static inline float blend_vivid_light(const float B, const float L, float O)
 	return (O * r + (1.0f - O) * B);
 }
 
-static inline float blend_pin_light(const float B, const float L, float O)
+MINLINE float blend_pin_light(const float B, const float L, float O)
 {
 	return (O * (L < 0.5f) ? (((2 * L) > B) ? B : (2 * L)) : (((2 * (L - 0.5f)) > B) ? (2 * (L - 0.5f)) : B) + (1.0f - O) * B);
 }
 
-static inline void copy_co(int rect, float *fp, char *cp, float co)
+MINLINE void copy_co(int rect, float *fp, char *cp, float co)
 {
 	/* rect_float */
 	if (rect == 0)
