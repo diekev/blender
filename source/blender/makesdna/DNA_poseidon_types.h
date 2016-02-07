@@ -34,14 +34,6 @@
 
 #include "DNA_listBase.h"
 
-#
-#
-typedef struct SmokeFields {
-	struct OpenVDBPrimitive *density;
-	struct OpenVDBPrimitive *velocity;
-	struct OpenVDBPrimitive *collision;
-} SmokeFields;
-
 typedef struct PoseidonFlowSettings {
 	struct PoseidonModifierData *pmd;
 	struct DerivedMesh *dm;
@@ -67,7 +59,7 @@ typedef struct PoseidonDomainSettings {
 	struct PointCache *cache;
 	ListBase ptcaches;
 
-	SmokeFields *fields;
+	struct PoseidonData *data;
 
 	float obmat[4][4];
 	float imat[4][4];

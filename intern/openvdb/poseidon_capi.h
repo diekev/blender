@@ -47,7 +47,7 @@ enum {
 	ADVECT_BFECC
 };
 
-struct PoseidonData *PoseidonData_create();
+struct PoseidonData *PoseidonData_create(void);
 void PoseidonData_free(struct PoseidonData *handle);
 
 void PoseidonData_init(struct PoseidonData *handle, float dh, int advection);
@@ -55,7 +55,7 @@ void PoseidonData_init(struct PoseidonData *handle, float dh, int advection);
 void PoseidonData_add_inflow(struct PoseidonData *handle, struct OpenVDBPrimitive *inflow);
 void PoseidonData_add_obstacle(struct PoseidonData *handle, struct OpenVDBPrimitive *obstacle);
 
-void PoseidonData_step(PoseidonData *handle, float dt);
+void PoseidonData_step(struct PoseidonData *handle, float dt);
 
 struct OpenVDBPrimitive *Poseidon_get_field(struct PoseidonData *data, int index);
 

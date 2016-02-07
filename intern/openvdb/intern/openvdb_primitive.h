@@ -42,7 +42,7 @@ public:
     openvdb::GridBase::Ptr getGridPtr();
     openvdb::GridBase::ConstPtr getConstGridPtr() const;
 
-    void setGrid(openvdb::GridBase::Ptr grid);
+    void setGridPtr(openvdb::GridBase::Ptr grid);
 	void setGrid(openvdb::GridBase::ConstPtr grid);
     void setTransform(const float mat[4][4]);
 };

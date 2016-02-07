@@ -38,7 +38,7 @@ static void initData(ModifierData *md)
 	pmd->coll = NULL;
 	pmd->domain = NULL;
 	pmd->flow = NULL;
-	pmd->time = 0;
+	pmd->time = -1;
 	pmd->type = 0;
 }
 
@@ -66,6 +66,11 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 	return BKE_poseidon_modifier_do(pmd, md->scene, ob, dm);
 }
 
+static bool dependsOnTime(ModifierData *UNUSED(md))
+{
+	return true;
+}
+
 ModifierTypeInfo modifierType_Poseidon = {
 	/* name */              "Poseidon",
 	/* structName */        "PoseidonModifierData",
@@ -88,7 +93,7 @@ ModifierTypeInfo modifierType_Poseidon = {
 	/* isDisabled */        NULL,
 	/* updateDepgraph */    NULL,
 	/* updateDepsgraph */   NULL,
-	/* dependsOnTime */     NULL,
+	/* dependsOnTime */     dependsOnTime,
 	/* dependsOnNormals */	NULL,
 	/* foreachObjectLink */ NULL,
 	/* foreachIDLink */     NULL,

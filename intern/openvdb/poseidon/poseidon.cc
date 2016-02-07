@@ -41,19 +41,27 @@ void init_data(FluidData * const data, float voxel_size, int advection)
 	data->max_vel = 0.0f;
 	data->dt = 0.1f;
 
-	ScalarGrid::Ptr density = openvdb::gridPtrCast<ScalarGrid>(data->density.getGridPtr());
-	ScalarGrid::Ptr temperature = openvdb::gridPtrCast<ScalarGrid>(data->temperature.getGridPtr());
-	ScalarGrid::Ptr pressure = openvdb::gridPtrCast<ScalarGrid>(data->pressure.getGridPtr());
-	VectorGrid::Ptr velocity = openvdb::gridPtrCast<VectorGrid>(data->velocity.getGridPtr());
-	openvdb::BoolGrid::Ptr obstacle = openvdb::gridPtrCast<openvdb::BoolGrid>(data->collision.getGridPtr());
-
+	ScalarGrid::Ptr density;
 	initialize_field<ScalarGrid>(density, "density", data->xform);
+	data->density.setGridPtr(density);
+
+	openvdb::BoolGrid::Ptr obstacle;
 	initialize_field<openvdb::BoolGrid>(obstacle, "obstacle", data->xform);
+	data->collision.setGridPtr(obstacle);
+
+	ScalarGrid::Ptr pressure;
 	initialize_field<ScalarGrid>(pressure, "pressure", data->xform);
+	data->pressure.setGridPtr(pressure);
+
+	ScalarGrid::Ptr temperature;
 	initialize_field<ScalarGrid>(temperature, "temperature", data->xform);
+	data->temperature.setGridPtr(temperature);
+
+	VectorGrid::Ptr velocity;
 	initialize_field<VectorGrid>(velocity, "velocity", data->xform,
 	                             openvdb::VEC_CONTRAVARIANT_RELATIVE,
 	                             openvdb::GRID_STAGGERED);
+	data->velocity.setGridPtr(velocity);
 }
 
 static void advect_semi_lagrange(FluidData * const data, float dt)
@@ -120,6 +128,8 @@ void add_inflow(FluidData * const data, OpenVDBPrimitive *inflow_prim)
 
 	auto density = gridPtrCast<ScalarGrid>(data->density.getGridPtr());
 	auto inflow = gridPtrCast<ScalarGrid>(inflow_prim->getGridPtr());
+
+	density->topologyUnion(*inflow);
 
 	tools::compMax(*density, *inflow);
 }

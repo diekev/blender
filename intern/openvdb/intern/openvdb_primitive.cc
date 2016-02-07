@@ -53,7 +53,7 @@ openvdb::GridBase::ConstPtr OpenVDBPrimitive::getConstGridPtr() const
     return m_grid;
 }
 
-void OpenVDBPrimitive::setGrid(openvdb::GridBase::Ptr grid)
+void OpenVDBPrimitive::setGridPtr(openvdb::GridBase::Ptr grid)
 {
     m_grid = grid->copyGrid();
 }

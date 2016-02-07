@@ -2940,7 +2940,7 @@ static int ptcache_write_needed(PTCacheID *pid, int cfra, int *overwrite)
 int BKE_ptcache_write(PTCacheID *pid, unsigned int cfra)
 {
 	PointCache *cache = pid->cache;
-	int totpoint = pid->totpoint(pid->calldata, cfra);
+	int totpoint = (pid->totpoint) ? pid->totpoint(pid->calldata, cfra) : 0;
 	int overwrite = 0, error = 0;
 
 	if (totpoint == 0 || (cfra ? pid->data_types == 0 : pid->info_types == 0))
