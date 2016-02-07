@@ -139,20 +139,23 @@ enum {
 typedef struct ImageLayer {
 	struct ImageLayer *next, *prev;
 	/* struct MovieCache *cache; */
+	struct ImBuf *preview_ibuf;
+	ListBase ibufs;
+
 	char name[64];
 	char file_path[1024];
+
 	float opacity;
-	short background;
-	short mode;
-	short type;
-	short visible;
-	short select;
-	short locked;
-	int pad1;
+	int pad;
 	float default_color[4];
-	int pad2;
-	ListBase ibufs;
-	struct ImBuf *preview_ibuf;
+
+	char background;
+	char mode;
+	char type;
+	char visible;
+	char select;
+	char locked;
+	char pad2[2];
 } ImageLayer;
 
 /* Option for open a image*/
