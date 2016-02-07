@@ -46,36 +46,6 @@
 #include "BKE_image.h"
 #include "BKE_image_layer.h"
 
-static int imagelayer_find_name_dupe(const char *name, ImageLayer *iml, Image *ima)
-{
-	ImageLayer *layer;
-
-	for (layer = ima->layers.last; layer; layer = layer->prev) {
-		if (iml != layer) {
-			if (!strcmp(layer->name, name)) {
-				return 1;
-			}
-		}
-	}
-
-	return 0;
-}
-
-static bool imagelayer_unique_check(void *arg, const char *name)
-{
-	struct {Image *ima; void *iml;} *data= arg;
-	return imagelayer_find_name_dupe(name, data->iml, data->ima);
-}
-
-static void imagelayer_unique_name(ImageLayer *iml, Image *ima)
-{
-	struct {Image *ima; void *iml;} data;
-	data.ima = ima;
-	data.iml = iml;
-
-	BLI_uniquename_cb(imagelayer_unique_check, &data, "Layer", '.', iml->name, sizeof(iml->name));
-}
-
 ImageLayer *BKE_image_layer_new(Image *ima, const char *name)
 {
 	ImageLayer *layer = MEM_callocN(sizeof(ImageLayer), "image_layer");
@@ -85,17 +55,14 @@ ImageLayer *BKE_image_layer_new(Image *ima, const char *name)
 	}
 
 	strcpy(layer->name, name);
-	imagelayer_unique_name(layer, ima);
-	layer->next = layer->prev = NULL;
+	BLI_uniquename(&ima->layers, layer, layer->name, '.', offsetof(ImageLayer, name), sizeof(layer->name));
 
 	layer->background = IMA_LAYER_BG_ALPHA;
 	layer->opacity = 1.0f;
-	layer->mode = IMA_LAYER_NORMAL;
+	layer->mode = IMB_BLEND_NORMAL;
 	layer->type = IMA_LAYER_LAYER;
 	layer->visible = IMA_LAYER_VISIBLE;
 	layer->select = IMA_LAYER_SEL_CURRENT;
-	layer->locked = 0;
-	zero_v4(layer->default_color);
 
 	return layer;
 }
@@ -193,7 +160,6 @@ void BKE_image_layer_color_fill(Image *ima, float color[4])
 		return;
 	}
 
-	void *lock;
 	ImBuf *ibuf = BKE_image_acquire_layer_ibuf(ima);
 
 	if (ibuf) {
@@ -234,7 +200,6 @@ ImageLayer *BKE_image_layer_duplicate_current(Image *ima)
 		return NULL;
 	}
 
-	void *lock;
 	ImBuf *ibuf = BKE_image_acquire_layer_ibuf(ima);
 
 	if (ibuf) {
@@ -371,11 +336,6 @@ static float blend_multiply(const float B, const float L, float O)
 	return (O * ((B * L) / 1.0f) + (1.0f - O) * B);
 }
 
-static float blend_average(const float B, const float L, float O)
-{
-	return (O * ((B + L) / 2) + (1.0f - O) * B);
-}
-
 static float blend_add(const float B, const float L, float O)
 {
 	return (O * (MIN2(1.0f, (B + L))) + (1.0f - O) * B);
@@ -389,11 +349,6 @@ static float blend_subtract(const float B, const float L, float O)
 static float blend_difference(const float B, const float L, float O)
 {
 	return (O * (abs(B - L)) + (1.0f - O) * B);
-}
-
-static float blend_negation(const float B, const float L, float O)
-{
-	return (O * (1.0f - abs(1.0f - B - L)) + (1.0f - O) * B);
 }
 
 static float blend_screen(const float B, const float L, float O)
@@ -431,29 +386,6 @@ static float blend_color_burn(const float B, const float L, float O)
 	return (O * (1.0f - ((1.0f - B) / L)) + (1.0f - O) * B);
 }
 
-static float blend_inverse_color_burn(const float B, const float L, float O)
-{
-	return (O * (1.0f - ((1.0f - L) / B)) + (1.0f - O) * B);
-}
-
-static float blend_soft_burn(const float B, const float L, float O)
-{
-	float r;
-
-	if (B + L < 1.0f) {
-		r = (O * ((0.5f * L) / (1.0f - B)) + (1.0f - O) * B);
-	}
-	else {
-		r = (O * (1.0f - (0.5f * (1.0f - B)) / L) + (1.0f - O) * B);
-	}
-	return r;
-}
-
-static float blend_linear_dodge(const float B, const float L, float O)
-{
-	return (O * (min_ff(1.0f, (B + L))) + (1.0f - O) * B);
-}
-
 static float blend_linear_burn(const float B, const float L, float O)
 {
 	return (O * ((B + L < 1.0f) ? 0 : (B + L - 1.0f)) + (1.0f - O) * B);
@@ -480,11 +412,6 @@ static float blend_vivid_light(const float B, const float L, float O)
 static float blend_pin_light(const float B, const float L, float O)
 {
 	return (O * (L < 0.5f) ? (((2 * L) > B) ? B : (2 * L)) : (((2 * (L - 0.5f)) > B) ? (2 * (L - 0.5f)) : B) + (1.0f - O) * B);
-}
-
-static float blend_hard_mix(const float B, const float L, float O)
-{
-	return (O * ((blend_vivid_light(B, L, O) < 0.5f) ? 0 : 1.0f) + (1.0f - O) * B);
 }
 
 static void copy_co(int rect, float *fp, char *cp, float co)
@@ -529,77 +456,60 @@ void BKE_image_layer_blend(ImBuf *dest, ImBuf *base, ImBuf *layer, float opacity
 	diff_x = abs(base->x - layer->x);
 
 	switch (mode) {
-		case IMA_LAYER_NORMAL:
+		default:
+		case IMB_BLEND_NORMAL:
 			blend_callback = blend_normal;
 			break;
-		case IMA_LAYER_MULTIPLY:
+		case IMB_BLEND_MUL:
 			blend_callback = blend_multiply;
 			break;
-		case IMA_LAYER_SCREEN:
+		case IMB_BLEND_SCREEN:
 			blend_callback = blend_screen;
 			break;
-		case IMA_LAYER_OVERLAY:
+		case IMB_BLEND_OVERLAY:
 			blend_callback = blend_overlay;
 			break;
-		case IMA_LAYER_SOFT_LIGHT:
+		case IMB_BLEND_SOFTLIGHT:
 			blend_callback = blend_soft_light;
 			break;
-		case IMA_LAYER_HARD_LIGHT:
+		case IMB_BLEND_HARDLIGHT:
 			blend_callback = blend_hard_light;
 			break;
-		case IMA_LAYER_COLOR_DODGE:
+		case IMB_BLEND_COLORDODGE:
 			blend_callback = blend_color_dodge;
 			break;
-		case IMA_LAYER_LINEAR_DODGE:
-			blend_callback = blend_linear_dodge;
-			break;
-		case IMA_LAYER_COLOR_BURN:
+		case IMB_BLEND_COLORBURN:
 			blend_callback = blend_color_burn;
 			break;
-		case IMA_LAYER_LINEAR_BURN:
+		case IMB_BLEND_LINEARBURN:
 			blend_callback = blend_linear_burn;
 			break;
-		case IMA_LAYER_AVERAGE:
-			blend_callback = blend_average;
-			break;
-		case IMA_LAYER_ADD:
+		case IMB_BLEND_ADD:
 			blend_callback = blend_add;
 			break;
-		case IMA_LAYER_SUBTRACT:
+		case IMB_BLEND_SUB:
 			blend_callback = blend_subtract;
 			break;
-		case IMA_LAYER_DIFFERENCE:
+		case IMB_BLEND_DIFFERENCE:
 			blend_callback = blend_difference;
 			break;
-		case IMA_LAYER_LIGHTEN:
+		case IMB_BLEND_LIGHTEN:
 			blend_callback = blend_lighten;
 			break;
-		case IMA_LAYER_DARKEN:
+		case IMB_BLEND_DARKEN:
 			blend_callback = blend_darken;
 			break;
-		case IMA_LAYER_NEGATION:
-			blend_callback = blend_negation;
-			break;
-		case IMA_LAYER_EXCLUSION:
+		case IMB_BLEND_EXCLUSION:
 			blend_callback = blend_exclusion;
 			break;
-		case IMA_LAYER_LINEAR_LIGHT:
+		case IMB_BLEND_LINEARLIGHT:
 			blend_callback = blend_linear_light;
 			break;
-		case IMA_LAYER_VIVID_LIGHT:
+		case IMB_BLEND_VIVIDLIGHT:
 			blend_callback = blend_vivid_light;
 			break;
-		case IMA_LAYER_PIN_LIGHT:
+		case IMB_BLEND_PINLIGHT:
 			blend_callback = blend_pin_light;
-			break;
-		case IMA_LAYER_HARD_MIX:
-			blend_callback = blend_hard_mix;
-			break;
-		case IMA_LAYER_INVERSE_COLOR_BURN:
-			blend_callback = blend_inverse_color_burn;
-			break;
-		case IMA_LAYER_SOFT_BURN:
-			blend_callback = blend_soft_burn;
 			break;
 	}
 

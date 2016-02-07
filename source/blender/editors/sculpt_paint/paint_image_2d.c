@@ -1036,6 +1036,8 @@ static int paint_2d_op(void *state, ImBuf *ibufb, unsigned short *curveb, unsign
 
 	paint_2d_convert_brushco(ibufb, pos, bpos);
 
+	const bool locked = ((ImageLayer *)BKE_image_get_current_layer(s->image))->locked;
+
 	/* lift from canvas */
 	if (s->tool == PAINT_TOOL_SOFTEN) {
 		paint_2d_lift_soften(s, s->canvas, ibufb, bpos, tile);
@@ -1045,14 +1047,14 @@ static int paint_2d_op(void *state, ImBuf *ibufb, unsigned short *curveb, unsign
 			return 0;
 
 		paint_2d_convert_brushco(ibufb, lastpos, blastpos);
-		paint_2d_lift_smear(s->canvas, ibufb, blastpos, tile, ((ImageLayer *)BKE_image_get_current_layer(s->image))->locked);
+		paint_2d_lift_smear(s->canvas, ibufb, blastpos, tile, locked);
 	}
 	else if (s->tool == PAINT_TOOL_CLONE && s->clonecanvas) {
 		liftpos[0] = pos[0] - offset[0] * s->canvas->x;
 		liftpos[1] = pos[1] - offset[1] * s->canvas->y;
 
 		paint_2d_convert_brushco(ibufb, liftpos, bliftpos);
-		clonebuf = paint_2d_lift_clone(s->clonecanvas, ibufb, bliftpos, ((ImageLayer *)BKE_image_get_current_layer(s->image))->locked);
+		clonebuf = paint_2d_lift_clone(s->clonecanvas, ibufb, bliftpos, locked);
 	}
 
 	frombuf = (clonebuf) ? clonebuf : ibufb;
@@ -1100,7 +1102,7 @@ static int paint_2d_op(void *state, ImBuf *ibufb, unsigned short *curveb, unsign
 					              region[a].destx, region[a].desty,
 					              origx, origy,
 					              region[a].srcx, region[a].srcy,
-								  region[a].width, region[a].height, blend, ((s->brush->flag & BRUSH_ACCUMULATE) != 0), ((ImageLayer *)BKE_image_get_current_layer(s->image))->locked);
+								  region[a].width, region[a].height, blend, ((s->brush->flag & BRUSH_ACCUMULATE) != 0), locked);
 				}
 			}
 
@@ -1112,7 +1114,7 @@ static int paint_2d_op(void *state, ImBuf *ibufb, unsigned short *curveb, unsign
 			              region[a].destx, region[a].desty,
 			              region[a].destx, region[a].desty,
 			              region[a].srcx, region[a].srcy,
-						  region[a].width, region[a].height, blend, false, ((ImageLayer *)BKE_image_get_current_layer(s->image))->locked);
+						  region[a].width, region[a].height, blend, false, locked);
 		}
 	}
 

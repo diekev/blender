@@ -61,34 +61,6 @@ static EnumPropertyItem image_source_items[] = {
 	{0, NULL, 0, NULL, NULL}
 };
 
-EnumPropertyItem rna_enum_image_layer_mode_items[] = {
-	{IMA_LAYER_NORMAL, "NORMAL", 0, "Normal", ""},
-	{IMA_LAYER_MULTIPLY, "MULTIPLY", 0, "Multiply", ""},
-	{IMA_LAYER_SCREEN, "SCREEN", 0, "Screen", ""},
-	{IMA_LAYER_OVERLAY, "OVERLAY", 0, "Overlay", ""},
-	{IMA_LAYER_SOFT_LIGHT, "SOFT_LIGHT", 0, "Soft Light", ""},
-	{IMA_LAYER_HARD_LIGHT, "HARD_LIGHT", 0, "Hard Light", ""},
-	{IMA_LAYER_COLOR_DODGE, "COLOR_DODGE", 0, "Color Dodge", ""},
-	{IMA_LAYER_LINEAR_DODGE, "LINEAR_DODGE", 0, "Linear Dodge", ""},
-	{IMA_LAYER_COLOR_BURN, "COLOR_BURN", 0, "Color Burn", ""},
-	{IMA_LAYER_LINEAR_BURN, "LINEAR_BURN", 0, "Linear Burn", ""},
-	{IMA_LAYER_AVERAGE, "AVERAGE", 0, "Average", ""},
-	{IMA_LAYER_ADD, "ADD", 0, "Add", ""},
-	{IMA_LAYER_SUBTRACT, "SUBTRACT", 0, "Subtract", ""},
-	{IMA_LAYER_DIFFERENCE, "DIFFERENCE", 0, "Difference", ""},
-	{IMA_LAYER_LIGHTEN, "LIGHTEN", 0, "Lighten", ""},
-	{IMA_LAYER_DARKEN, "DARKEN", 0, "Darken", ""},
-	{IMA_LAYER_NEGATION, "NEGATION", 0, "Negation", ""},
-	{IMA_LAYER_EXCLUSION, "EXCLUSION", 0, "Exclusion", ""},
-	{IMA_LAYER_LINEAR_LIGHT, "LINEAR_LIGHT", 0, "Linear Light", ""},
-	{IMA_LAYER_VIVID_LIGHT, "VIVID_LIGHT", 0, "Vivid Light", ""},
-	{IMA_LAYER_PIN_LIGHT, "PIN_LIGHT", 0, "Pin Light", ""},
-	{IMA_LAYER_HARD_MIX, "HARD_MIX", 0, "Hard Mix", ""},
-	{IMA_LAYER_INVERSE_COLOR_BURN, "INVERSE_COLOR_BURN", 0, "Inverse Color Burn", ""},
-	{IMA_LAYER_SOFT_BURN, "SOFT_BURN", 0, "Soft Burn", ""},
-	{0, NULL, 0, NULL, NULL}
-};
-
 #ifdef RNA_RUNTIME
 
 #include "IMB_imbuf.h"
@@ -745,7 +717,7 @@ static void rna_def_image_layer_common(StructRNA *srna)
 
 	prop = RNA_def_property(srna, "blend_type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "mode");
-	RNA_def_property_enum_items(prop, rna_enum_image_layer_mode_items);
+	RNA_def_property_enum_items(prop, rna_enum_blend_items);
 	RNA_def_property_ui_text(prop, "Blend Modes", "Determine how two Layers are blended into each other");
 	RNA_def_property_update(prop, NC_IMAGE | ND_DISPLAY, NULL);
 

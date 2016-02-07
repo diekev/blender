@@ -68,7 +68,6 @@ extern EnumPropertyItem rna_enum_image_type_items[];
 extern EnumPropertyItem rna_enum_image_color_mode_items[];
 extern EnumPropertyItem rna_enum_image_color_depth_items[];
 extern EnumPropertyItem rna_enum_image_generated_type_items[];
-extern EnumPropertyItem rna_enum_image_layer_mode_items[];
 
 extern EnumPropertyItem rna_enum_normal_space_items[];
 extern EnumPropertyItem rna_enum_normal_swizzle_items[];
@@ -111,6 +110,7 @@ extern EnumPropertyItem rna_enum_operator_return_items[];
 extern EnumPropertyItem rna_enum_brush_sculpt_tool_items[];
 extern EnumPropertyItem rna_enum_brush_vertex_tool_items[];
 extern EnumPropertyItem rna_enum_brush_image_tool_items[];
+extern EnumPropertyItem rna_enum_blend_items[];
 
 extern EnumPropertyItem rna_enum_gpencil_sculpt_brush_items[];
 

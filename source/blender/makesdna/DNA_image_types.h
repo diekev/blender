@@ -94,6 +94,48 @@ typedef struct RenderSlot {
 
 /* **************** IMAGE LAYER ********************* */
 
+#define IMA_LAYER_MAX_LEN 64
+
+/* ImageLayer.background */
+enum {
+	IMA_LAYER_BG_RGB   = (1 << 0),
+	IMA_LAYER_BG_WHITE = (1 << 1),
+	IMA_LAYER_BG_ALPHA = (1 << 2),
+	IMA_LAYER_BG_IMAGE = (1 << 3),
+};
+
+/* ImageLayer.type */
+enum {
+	IMA_LAYER_BASE  = (1 << 0),
+	IMA_LAYER_LAYER = (1 << 1),
+};
+
+/* ImageLayer.visible */
+enum {
+	IMA_LAYER_VISIBLE = (1 << 0),
+};
+
+/* ImageLayer.select */
+enum {
+	IMA_LAYER_SEL_CURRENT  = (1 << 0),
+	IMA_LAYER_SEL_PREVIOUS = (1 << 1),
+	IMA_LAYER_SEL_NEXT     = (1 << 2),
+	IMA_LAYER_SEL_TOP      = (1 << 3),
+	IMA_LAYER_SEL_BOTTOM   = (1 << 4),
+};
+
+/* ImageLayer.locked */
+enum {
+	IMA_LAYER_LOCK       = 1,
+	IMA_LAYER_LOCK_ALPHA = 2,
+};
+
+/* Option for delete the layer */
+enum {
+	IMA_LAYER_DEL_SELECTED = (1 << 0),
+	IMA_LAYER_DEL_HIDDEN   = (1 << 1),
+};
+
 typedef struct ImageLayer {
 	struct ImageLayer *next, *prev;
 	/* struct MovieCache *cache; */
@@ -112,73 +154,6 @@ typedef struct ImageLayer {
 	ListBase ibufs;
 	struct ImBuf *preview_ibuf;
 } ImageLayer;
-
-/* ImageLayer.mode */
-typedef enum ImageLayerMode {
-	IMA_LAYER_NORMAL = 0,
-
-	IMA_LAYER_MULTIPLY = 1,
-	IMA_LAYER_SCREEN = 2,
-	IMA_LAYER_OVERLAY = 3,
-	IMA_LAYER_SOFT_LIGHT = 4,
-	IMA_LAYER_HARD_LIGHT = 5,
-
-	IMA_LAYER_COLOR_DODGE = 6,
-	IMA_LAYER_LINEAR_DODGE = 7,
-	IMA_LAYER_COLOR_BURN = 8,
-	IMA_LAYER_LINEAR_BURN = 9,
-
-	IMA_LAYER_AVERAGE = 10,
-	IMA_LAYER_ADD = 11,
-	IMA_LAYER_SUBTRACT = 12,
-	IMA_LAYER_DIFFERENCE = 13,
-	IMA_LAYER_LIGHTEN = 14,
-	IMA_LAYER_DARKEN = 15,
-
-	IMA_LAYER_NEGATION = 16,
-	IMA_LAYER_EXCLUSION = 17,
-
-	IMA_LAYER_LINEAR_LIGHT = 18,
-	IMA_LAYER_VIVID_LIGHT = 19,
-	IMA_LAYER_PIN_LIGHT = 20,
-	IMA_LAYER_HARD_MIX = 21,
-	IMA_LAYER_INVERSE_COLOR_BURN = 22,
-	IMA_LAYER_SOFT_BURN = 23
-} ImageLayerMode;
-
-#define IMA_LAYER_MAX_LEN	64
-
-/* ImageLayer.background */
-#define IMA_LAYER_BG_RGB		(1 << 0)
-#define IMA_LAYER_BG_WHITE		(1 << 1)
-#define IMA_LAYER_BG_ALPHA		(1 << 2)
-#define IMA_LAYER_BG_IMAGE		(1 << 3)
-
-/* ImageLayer.type */
-#define IMA_LAYER_BASE		(1 << 0)
-#define IMA_LAYER_LAYER		(1 << 1)
-
-/* ImageLayer.visible */
-#define IMA_LAYER_VISIBLE	(1 << 0)
-
-/* ImageLayer.select */
-enum {
-	IMA_LAYER_SEL_CURRENT  = (1 << 0),
-	IMA_LAYER_SEL_PREVIOUS = (1 << 1),
-	IMA_LAYER_SEL_NEXT     = (1 << 2),
-	IMA_LAYER_SEL_TOP      = (1 << 3),
-	IMA_LAYER_SEL_BOTTOM   = (1 << 4),
-};
-
-/* ImageLayer.locked */
-#define IMA_LAYER_LOCK			1
-#define IMA_LAYER_LOCK_ALPHA	2
-
-/* Option for delete the layer */
-enum {
-	IMA_LAYER_DEL_SELECTED = (1 << 0),
-	IMA_LAYER_DEL_HIDDEN   = (1 << 1),
-};
 
 /* Option for open a image*/
 #define IMA_LAYER_OPEN_IMAGE	(1 << 0)

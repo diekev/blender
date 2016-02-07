@@ -107,6 +107,34 @@ EnumPropertyItem rna_enum_brush_image_tool_items[] = {
 	{0, NULL, 0, NULL, NULL}
 };
 
+EnumPropertyItem rna_enum_blend_items[] = {
+	{IMB_BLEND_MIX, "MIX", 0, "Mix", "Use mix blending mode while painting"},
+	{IMB_BLEND_ADD, "ADD", 0, "Add", "Use add blending mode while painting"},
+	{IMB_BLEND_SUB, "SUB", 0, "Subtract", "Use subtract blending mode while painting"},
+	{IMB_BLEND_MUL, "MUL", 0, "Multiply", "Use multiply blending mode while painting"},
+	{IMB_BLEND_LIGHTEN, "LIGHTEN", 0, "Lighten", "Use lighten blending mode while painting"},
+	{IMB_BLEND_DARKEN, "DARKEN", 0, "Darken", "Use darken blending mode while painting"},
+	{IMB_BLEND_ERASE_ALPHA, "ERASE_ALPHA", 0, "Erase Alpha", "Erase alpha while painting"},
+	{IMB_BLEND_ADD_ALPHA, "ADD_ALPHA", 0, "Add Alpha", "Add alpha while painting"},
+	{IMB_BLEND_OVERLAY, "OVERLAY", 0, "Overlay", "Use overlay blending mode while painting"},
+	{IMB_BLEND_HARDLIGHT, "HARDLIGHT", 0, "Hard light", "Use hard light blending mode while painting"},
+	{IMB_BLEND_COLORBURN, "COLORBURN", 0, "Color burn", "Use color burn blending mode while painting"},
+	{IMB_BLEND_LINEARBURN, "LINEARBURN", 0, "Linear burn", "Use linear burn blending mode while painting"},
+	{IMB_BLEND_COLORDODGE, "COLORDODGE", 0, "Color dodge", "Use color dodge blending mode while painting"},
+	{IMB_BLEND_SCREEN, "SCREEN", 0, "Screen", "Use screen blending mode while painting"},
+	{IMB_BLEND_SOFTLIGHT, "SOFTLIGHT", 0, "Soft light", "Use softlight blending mode while painting"},
+	{IMB_BLEND_PINLIGHT, "PINLIGHT", 0, "Pin light", "Use pinlight blending mode while painting"},
+	{IMB_BLEND_VIVIDLIGHT, "VIVIDLIGHT", 0, "Vivid light", "Use vividlight blending mode while painting"},
+	{IMB_BLEND_LINEARLIGHT, "LINEARLIGHT", 0, "Linear light", "Use linearlight blending mode while painting"},
+	{IMB_BLEND_DIFFERENCE, "DIFFERENCE", 0, "Difference", "Use difference blending mode while painting"},
+	{IMB_BLEND_EXCLUSION, "EXCLUSION", 0, "Exclusion", "Use exclusion blending mode while painting"},
+	{IMB_BLEND_HUE, "HUE", 0, "Hue", "Use hue blending mode while painting"},
+	{IMB_BLEND_SATURATION, "SATURATION", 0, "Saturation", "Use saturation blending mode while painting"},
+	{IMB_BLEND_LUMINOSITY, "LUMINOSITY", 0, "Luminosity", "Use luminosity blending mode while painting"},
+	{IMB_BLEND_COLOR, "COLOR", 0, "Color", "Use color blending mode while painting"},
+	{0, NULL, 0, NULL, NULL}
+};
+
 #ifdef RNA_RUNTIME
 
 #include "MEM_guardedalloc.h"
@@ -788,34 +816,6 @@ static void rna_def_brush(BlenderRNA *brna)
 	StructRNA *srna;
 	PropertyRNA *prop;
 	
-	static EnumPropertyItem prop_blend_items[] = {
-		{IMB_BLEND_MIX, "MIX", 0, "Mix", "Use mix blending mode while painting"},
-		{IMB_BLEND_ADD, "ADD", 0, "Add", "Use add blending mode while painting"},
-		{IMB_BLEND_SUB, "SUB", 0, "Subtract", "Use subtract blending mode while painting"},
-		{IMB_BLEND_MUL, "MUL", 0, "Multiply", "Use multiply blending mode while painting"},
-		{IMB_BLEND_LIGHTEN, "LIGHTEN", 0, "Lighten", "Use lighten blending mode while painting"},
-		{IMB_BLEND_DARKEN, "DARKEN", 0, "Darken", "Use darken blending mode while painting"},
-		{IMB_BLEND_ERASE_ALPHA, "ERASE_ALPHA", 0, "Erase Alpha", "Erase alpha while painting"},
-		{IMB_BLEND_ADD_ALPHA, "ADD_ALPHA", 0, "Add Alpha", "Add alpha while painting"},
-		{IMB_BLEND_OVERLAY, "OVERLAY", 0, "Overlay", "Use overlay blending mode while painting"},
-		{IMB_BLEND_HARDLIGHT, "HARDLIGHT", 0, "Hard light", "Use hard light blending mode while painting"},
-		{IMB_BLEND_COLORBURN, "COLORBURN", 0, "Color burn", "Use color burn blending mode while painting"},
-		{IMB_BLEND_LINEARBURN, "LINEARBURN", 0, "Linear burn", "Use linear burn blending mode while painting"},
-		{IMB_BLEND_COLORDODGE, "COLORDODGE", 0, "Color dodge", "Use color dodge blending mode while painting"},
-		{IMB_BLEND_SCREEN, "SCREEN", 0, "Screen", "Use screen blending mode while painting"},
-		{IMB_BLEND_SOFTLIGHT, "SOFTLIGHT", 0, "Soft light", "Use softlight blending mode while painting"},
-		{IMB_BLEND_PINLIGHT, "PINLIGHT", 0, "Pin light", "Use pinlight blending mode while painting"},
-		{IMB_BLEND_VIVIDLIGHT, "VIVIDLIGHT", 0, "Vivid light", "Use vividlight blending mode while painting"},
-		{IMB_BLEND_LINEARLIGHT, "LINEARLIGHT", 0, "Linear light", "Use linearlight blending mode while painting"},
-		{IMB_BLEND_DIFFERENCE, "DIFFERENCE", 0, "Difference", "Use difference blending mode while painting"},
-		{IMB_BLEND_EXCLUSION, "EXCLUSION", 0, "Exclusion", "Use exclusion blending mode while painting"},
-		{IMB_BLEND_HUE, "HUE", 0, "Hue", "Use hue blending mode while painting"},
-		{IMB_BLEND_SATURATION, "SATURATION", 0, "Saturation", "Use saturation blending mode while painting"},
-		{IMB_BLEND_LUMINOSITY, "LUMINOSITY", 0, "Luminosity", "Use luminosity blending mode while painting"},
-		{IMB_BLEND_COLOR, "COLOR", 0, "Color", "Use color blending mode while painting"},
-		{0, NULL, 0, NULL, NULL}
-	};
-	
 	static EnumPropertyItem brush_sculpt_plane_items[] = {
 		{SCULPT_DISP_DIR_AREA, "AREA", 0, "Area Plane", ""},
 		{SCULPT_DISP_DIR_VIEW, "VIEW", 0, "View Plane", ""},
@@ -863,7 +863,7 @@ static void rna_def_brush(BlenderRNA *brna)
 
 	/* enums */
 	prop = RNA_def_property(srna, "blend", PROP_ENUM, PROP_NONE);
-	RNA_def_property_enum_items(prop, prop_blend_items);
+	RNA_def_property_enum_items(prop, rna_enum_blend_items);
 	RNA_def_property_ui_text(prop, "Blending mode", "Brush blending mode");
 	RNA_def_property_update(prop, 0, "rna_Brush_update");
 
