@@ -52,10 +52,14 @@ if(WITH_OPENVDB)
 		intern/openvdb_primitive.cc
 		intern/openvdb_reader.cc
 		intern/openvdb_writer.cc
+		poseidon/forces.cc
+		poseidon/poseidon.cc
+		poseidon/pressure.cc
 		openvdb_capi.cc
 		openvdb_mesh_capi.cc
 		openvdb_render_capi.cc
 		openvdb_util.cc
+		poseidon_capi.cc
 
 		intern/openvdb_dense_convert.h
 		intern/openvdb_primitive.h
@@ -63,9 +67,16 @@ if(WITH_OPENVDB)
 		intern/openvdb_reader.h
 		intern/openvdb_render_utils.h
 		intern/openvdb_writer.h
+		poseidon/advection.h
+		poseidon/forces.h
+		poseidon/globals.h
+		poseidon/poseidon.h
+		poseidon/types.h
+		poseidon/util_smoke.h
 		openvdb_mesh_capi.h
 		openvdb_render_capi.h
 		openvdb_util.h
+		poseidon_capi.h
 	)
 
 	if(WITH_OPENVDB_BLOSC)
