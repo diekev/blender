@@ -440,7 +440,7 @@ static void do_multires_bake(MultiresBakeRender *bkr, Image *ima, bool require_t
 		MultiresBakeThread *handles;
 		MultiresBakeQueue queue;
 
-		ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+		ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 		MVert *mvert = dm->getVertArray(dm);
 		MPoly *mpoly = dm->getPolyArray(dm);
 		MLoop *mloop = dm->getLoopArray(dm);
@@ -676,7 +676,7 @@ static void interp_barycentric_mlooptri(DerivedMesh *dm, MLoop *mloop, const MLo
 static void *init_heights_data(MultiresBakeRender *bkr, Image *ima)
 {
 	MHeightBakeData *height_data;
-	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	DerivedMesh *lodm = bkr->lores_dm;
 	BakeImBufuserData *userdata = ibuf->userdata;
 
@@ -1211,7 +1211,7 @@ static void bake_images(MultiresBakeRender *bkr, MultiresBakeResult *result)
 
 	for (link = bkr->image.first; link; link = link->next) {
 		Image *ima = (Image *)link->data;
-		ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+		ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 
 		if (ibuf->x > 0 && ibuf->y > 0) {
 			BakeImBufuserData *userdata = MEM_callocN(sizeof(BakeImBufuserData), "MultiresBake userdata");
@@ -1245,7 +1245,7 @@ static void finish_images(MultiresBakeRender *bkr, MultiresBakeResult *result)
 
 	for (link = bkr->image.first; link; link = link->next) {
 		Image *ima = (Image *)link->data;
-		ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+		ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 		BakeImBufuserData *userdata = (BakeImBufuserData *) ibuf->userdata;
 
 		if (ibuf->x <= 0 || ibuf->y <= 0)

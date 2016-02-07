@@ -243,7 +243,7 @@ static bool paint_brush_update(bContext *C,
 		/* check here if color sampling the main brush should do color conversion. This is done here
 		 * to avoid locking up to get the image buffer during sampling */
 		if (brush->mtex.tex && brush->mtex.tex->type == TEX_IMAGE && brush->mtex.tex->ima) {
-			ImBuf *tex_ibuf = BKE_image_pool_acquire_ibuf(brush->mtex.tex->ima, &brush->mtex.tex->iuser, NULL, IMA_IBUF_IMA);
+			ImBuf *tex_ibuf = BKE_image_pool_acquire_ibuf(brush->mtex.tex->ima, &brush->mtex.tex->iuser, NULL);
 			if (tex_ibuf && tex_ibuf->rect_float == NULL) {
 				ups->do_linear_conversion = true;
 				ups->colorspace = tex_ibuf->rect_colorspace;

@@ -759,7 +759,7 @@ static unsigned char *get_alpha_clone_image(const bContext *C, Scene *scene, int
 	if (!brush || !brush->clone.image)
 		return NULL;
 	
-	ibuf = BKE_image_acquire_ibuf(brush->clone.image, NULL, NULL, IMA_IBUF_LAYER);
+	ibuf = BKE_image_acquire_ibuf(brush->clone.image, NULL, NULL);
 
 	if (!ibuf)
 		return NULL;

@@ -1334,7 +1334,7 @@ static float project_paint_uvpixel_mask(
 		Image *other_tpage = ps->stencil_ima;
 
 
-		if (other_tpage && (ibuf_other = BKE_image_acquire_ibuf(other_tpage, NULL, NULL, IMA_IBUF_LAYER))) {
+		if (other_tpage && (ibuf_other = BKE_image_acquire_layer_ibuf(other_tpage))) {
 			const MLoopTri *lt_other = &ps->dm_mlooptri[tri_index];
 			const float *lt_other_tri_uv[3] = { PS_LOOPTRI_AS_UV_3(ps->dm_mloopuv, lt_other) };
 
@@ -1351,7 +1351,7 @@ static float project_paint_uvpixel_mask(
 				mask = ((rgba_ub[0] + rgba_ub[1] + rgba_ub[2]) * (1.0f / (255.0f * 3.0f))) * (rgba_ub[3] * (1.0f / 255.0f));
 			}
 
-			BKE_image_release_ibuf(other_tpage, ibuf_other, NULL);
+			BKE_image_release_layer_ibuf(ibuf_other);
 
 			if (!ps->do_layer_stencil_inv) /* matching the gimps layer mask black/white rules, white==full opacity */
 				mask = (1.0f - mask);
@@ -1600,7 +1600,7 @@ static ProjPixel *project_paint_uvpixel_init(
 			ImBuf *ibuf_other;
 			Image *other_tpage = project_paint_face_clone_image(ps, tri_index);
 
-			if (other_tpage && (ibuf_other = BKE_image_acquire_ibuf(other_tpage, NULL, NULL, IMA_IBUF_LAYER))) {
+			if (other_tpage && (ibuf_other = BKE_image_acquire_layer_ibuf(other_tpage))) {
 				const MLoopTri *lt_other = &ps->dm_mlooptri[tri_index];
 				const float *lt_other_tri_uv[3] = { PS_LOOPTRI_AS_UV_3(ps->dm_mloopuv_clone, lt_other) };
 
@@ -1631,7 +1631,7 @@ static ProjPixel *project_paint_uvpixel_init(
 					}
 				}
 
-				BKE_image_release_ibuf(other_tpage, ibuf_other, NULL);
+				BKE_image_release_layer_ibuf(ibuf_other);
 			}
 			else {
 				if (ibuf->rect_float) {
@@ -3636,7 +3636,7 @@ static void project_paint_build_proj_ima(
 		int size;
 		projIma->ima = node->link;
 		projIma->touch = 0;
-		projIma->ibuf = BKE_image_acquire_ibuf(projIma->ima, NULL, NULL, IMA_IBUF_LAYER);
+		projIma->ibuf = BKE_image_acquire_layer_ibuf(projIma->ima);
 		size = sizeof(void **) * IMAPAINT_TILE_NUMBER(projIma->ibuf->x) * IMAPAINT_TILE_NUMBER(projIma->ibuf->y);
 		projIma->partRedrawRect =  BLI_memarena_alloc(arena, sizeof(ImagePaintPartialRedraw) * PROJ_BOUNDBOX_SQUARED);
 		memset(projIma->partRedrawRect, 0, sizeof(ImagePaintPartialRedraw) * PROJ_BOUNDBOX_SQUARED);
@@ -3763,7 +3763,7 @@ static void project_paint_prepare_all_faces(
 
 				image_index = BLI_linklist_index(image_LinkList.list, tpage);
 
-				if (image_index == -1 && BKE_image_has_ibuf(tpage, NULL, IMA_IBUF_LAYER)) { /* MemArena dosnt have an append func */
+				if (image_index == -1 && BKE_image_has_layer_ibuf(tpage)) { /* MemArena dosnt have an append func */
 					BLI_linklist_append(&image_LinkList, tpage);
 					image_index = ps->image_tot;
 					ps->image_tot++;
@@ -3911,7 +3911,7 @@ static void project_paint_end(ProjPaintState *ps)
 	if (ps->is_shared_user == false) {
 		ProjPaintImage *projIma;
 		for (a = 0, projIma = ps->projImages; a < ps->image_tot; a++, projIma++) {
-			BKE_image_release_ibuf(projIma->ima, projIma->ibuf, NULL);
+			BKE_image_release_layer_ibuf(projIma->ibuf);
 			DAG_id_tag_update(&projIma->ima->id, 0);
 		}
 	}
@@ -3922,7 +3922,7 @@ static void project_paint_end(ProjPaintState *ps)
 	if (ps->reproject_ibuf_free_uchar) {
 		imb_freerectImBuf(ps->reproject_ibuf);
 	}
-	BKE_image_release_ibuf(ps->reproject_image, ps->reproject_ibuf, NULL);
+	BKE_image_release_layer_ibuf(ps->reproject_ibuf);
 
 	MEM_freeN(ps->screenCoords);
 	MEM_freeN(ps->bucketRect);
@@ -5292,7 +5292,7 @@ static int texture_paint_camera_project_exec(bContext *C, wmOperator *op)
 	}
 
 	ps.reproject_image = image;
-	ps.reproject_ibuf = BKE_image_acquire_ibuf(image, NULL, NULL, IMA_IBUF_LAYER);
+	ps.reproject_ibuf = BKE_image_acquire_layer_ibuf(image);
 
 	if ((ps.reproject_ibuf == NULL) ||
 	    ((ps.reproject_ibuf->rect || ps.reproject_ibuf->rect_float) == false))

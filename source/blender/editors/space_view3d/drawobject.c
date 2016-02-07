@@ -625,7 +625,7 @@ void drawaxes(const float viewmat_local[4][4], float size, char drawtype)
 static void draw_empty_image(Object *ob, const short dflag, const unsigned char ob_wire_col[4])
 {
 	Image *ima = ob->data;
-	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, ob->iuser, NULL, IMA_IBUF_IMA);
+	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, ob->iuser, NULL);
 
 	if (ibuf && (ibuf->rect == NULL) && (ibuf->rect_float != NULL)) {
 		IMB_rect_from_float(ibuf);

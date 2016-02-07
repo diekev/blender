@@ -169,7 +169,7 @@ static void load_tex_task_cb_ex(void *userdata, void *UNUSED(userdata_chunck), c
 	struct ColorSpace *colorspace = NULL;
 
 	if (mtex->tex && mtex->tex->type == TEX_IMAGE && mtex->tex->ima) {
-		ImBuf *tex_ibuf = BKE_image_pool_acquire_ibuf(mtex->tex->ima, &mtex->tex->iuser, pool, IMA_IBUF_IMA);
+		ImBuf *tex_ibuf = BKE_image_pool_acquire_ibuf(mtex->tex->ima, &mtex->tex->iuser, pool);
 		/* For consistency, sampling always returns color in linear space */
 		if (tex_ibuf && tex_ibuf->rect_float == NULL) {
 			convert_to_linear = true;

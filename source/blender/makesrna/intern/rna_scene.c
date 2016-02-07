@@ -1968,7 +1968,7 @@ static void rna_Stereo3dFormat_update(Main *UNUSED(bmain), Scene *UNUSED(scene),
 		if (!BKE_image_is_stereo(ima))
 			return;
 
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock, IMA_IBUF_IMA);
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock);
 
 		if (ibuf) {
 			BKE_image_signal(ima, NULL, IMA_SIGNAL_FREE);

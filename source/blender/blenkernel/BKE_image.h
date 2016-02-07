@@ -161,23 +161,21 @@ enum {
 #define IMA_CHAN_FLAG_RGB   2
 #define IMA_CHAN_FLAG_ALPHA 4
 
-#define IMA_IBUF_IMA	1
-#define IMA_IBUF_LAYER	2
-
 /* checks whether there's an image buffer for given image and user */
-bool BKE_image_has_ibuf(struct Image *ima, struct ImageUser *iuser, int type_ibuf);
+bool BKE_image_has_ibuf(struct Image *ima, struct ImageUser *iuser);
 
 /* same as above, but can be used to retrieve images being rendered in
  * a thread safe way, always call both acquire and release */
-struct ImBuf *BKE_image_acquire_ibuf(struct Image *ima, struct ImageUser *iuser, void **r_lock, int type_ibuf);
+struct ImBuf *BKE_image_acquire_ibuf(struct Image *ima, struct ImageUser *iuser, void **r_lock);
 void BKE_image_release_ibuf(struct Image *ima, struct ImBuf *ibuf, void *lock);
 
 struct ImBuf *BKE_image_acquire_layer_ibuf(struct Image *ima);
 void BKE_image_release_layer_ibuf(struct ImBuf *ibuf);
+bool BKE_image_has_layer_ibuf(struct Image *image);
 
 struct ImagePool *BKE_image_pool_new(void);
 void BKE_image_pool_free(struct ImagePool *pool);
-struct ImBuf *BKE_image_pool_acquire_ibuf(struct Image *ima, struct ImageUser *iuser, struct ImagePool *pool, int type_ibuf);
+struct ImBuf *BKE_image_pool_acquire_ibuf(struct Image *ima, struct ImageUser *iuser, struct ImagePool *pool);
 void BKE_image_pool_release_ibuf(struct Image *ima, struct ImBuf *ibuf, struct ImagePool *pool);
 
 /* set an alpha mode based on file extension */

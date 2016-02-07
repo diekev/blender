@@ -1678,7 +1678,7 @@ static void view3d_draw_bgpic(Scene *scene, ARegion *ar, View3D *v3d,
 				}
 				else {
 					view3d_stereo_bgpic_setup(scene, v3d, ima, &bgpic->iuser);
-					ibuf = BKE_image_acquire_ibuf(ima, &bgpic->iuser, &lock, IMA_IBUF_IMA);
+					ibuf = BKE_image_acquire_ibuf(ima, &bgpic->iuser, &lock);
 					releaseibuf = ibuf;
 				}
 

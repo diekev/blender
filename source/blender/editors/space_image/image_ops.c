@@ -1532,7 +1532,7 @@ static int save_image_options_init(SaveImageOptions *simopts, SpaceImage *sima, 
 	ImBuf *ibuf = NULL;
 
 	if (sima && sima->image) {
-		ibuf = BKE_image_acquire_ibuf(sima->image, &sima->iuser, &lock, IMA_IBUF_IMA);
+		ibuf = BKE_image_acquire_ibuf(sima->image, &sima->iuser, &lock);
 	}
 
 	if (ibuf && (ibuf->rect || ibuf->rect_float)) {
@@ -1722,7 +1722,7 @@ static bool save_image_doit(bContext *C, SpaceImage *sima, wmOperator *op, SaveI
 	WM_cursor_wait(1);
 
 	if (sima && sima->image) {
-		ibuf = BKE_image_acquire_ibuf(sima->image, &sima->iuser, &lock, IMA_IBUF_IMA);
+		ibuf = BKE_image_acquire_ibuf(sima->image, &sima->iuser, &lock);
 	}
 
 	if (ibuf&& (ibuf->rect || ibuf->rect_float)) {
@@ -1849,7 +1849,7 @@ static bool save_image_doit(bContext *C, SpaceImage *sima, wmOperator *op, SaveI
 					else
 						BKE_image_multiview_index(ima, &iuser);
 
-					ibuf = BKE_image_acquire_ibuf(sima->image, &iuser, &lock, IMA_IBUF_IMA);
+					ibuf = BKE_image_acquire_ibuf(sima->image, &iuser, &lock);
 					ibuf->planes = planes;
 
 					BKE_scene_multiview_view_filepath_get(&scene->r, simopts->filepath, view, filepath);
@@ -1898,7 +1898,7 @@ static bool save_image_doit(bContext *C, SpaceImage *sima, wmOperator *op, SaveI
 						BKE_image_multiview_index(ima, &iuser);
 					}
 
-					ibuf = BKE_image_acquire_ibuf(sima->image, &iuser, &lock, IMA_IBUF_IMA);
+					ibuf = BKE_image_acquire_ibuf(sima->image, &iuser, &lock);
 
 					if (ibuf == NULL) {
 						BKE_report(op->reports, RPT_ERROR, "Did not write, unexpected error when saving stereo image");
@@ -2546,7 +2546,7 @@ static int image_operator_poll(bContext *C)
 {
 	Image *ima = CTX_data_edit_image(C);
 
-	return BKE_image_has_ibuf(ima, NULL, IMA_IBUF_IMA);
+	return BKE_image_has_ibuf(ima, NULL);
 }
 
 static void free_preview(Image *ima, char mode)
@@ -2600,10 +2600,10 @@ static int image_invert_exec(bContext *C, wmOperator *op)
 
 	ima->use_layers = false;
 	if (sima->mode == SI_MODE_PAINT) {
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+		ibuf = BKE_image_acquire_layer_ibuf(ima);
 	}
 	else {
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	}
 	ima->use_layers = true;
 
@@ -2644,7 +2644,10 @@ static int image_invert_exec(bContext *C, wmOperator *op)
 
 	WM_event_add_notifier(C, NC_IMAGE | NA_EDITED, ima);
 
-	BKE_image_release_ibuf(ima, ibuf, NULL);
+	if (sima->mode == SI_MODE_PAINT)
+		BKE_image_release_layer_ibuf(ibuf);
+	else
+		BKE_image_release_ibuf(ima, ibuf, NULL);
 
 	return OPERATOR_FINISHED;
 }
@@ -2687,9 +2690,9 @@ static int image_invert_value_exec(bContext *C, wmOperator *UNUSED(op))
 
 	ima->use_layers = false;
 	if (sima->mode == SI_MODE_PAINT)
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+		ibuf = BKE_image_acquire_layer_ibuf(ima);
 	else
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	ima->use_layers = true;
 
 	if (ibuf == NULL)  /* TODO: this should actually never happen, but does for render-results -> cleanup */
@@ -2710,7 +2713,10 @@ static int image_invert_value_exec(bContext *C, wmOperator *UNUSED(op))
 
 	WM_event_add_notifier(C, NC_IMAGE | NA_EDITED, ima);
 
-	BKE_image_release_ibuf(ima, ibuf, NULL);
+	if (sima->mode == SI_MODE_PAINT)
+		BKE_image_release_layer_ibuf(ibuf);
+	else
+		BKE_image_release_ibuf(ima, ibuf, NULL);
 
 	return OPERATOR_FINISHED;
 }
@@ -2742,9 +2748,9 @@ static int image_bright_contrast_exec(bContext *C, wmOperator *op)
 
 	ima->use_layers = false;
 	if (sima->mode == SI_MODE_PAINT)
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+		ibuf = BKE_image_acquire_layer_ibuf(ima);
 	else
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	ima->use_layers = true;
 
 	free_preview(ima, sima->mode);
@@ -2753,7 +2759,10 @@ static int image_bright_contrast_exec(bContext *C, wmOperator *op)
 	contrast = RNA_float_get(op->ptr, "contrast");
 
 	if ((bright == 0.0f) && (contrast == 0.0f)) {
-		BKE_image_release_ibuf(ima, ibuf, NULL);
+		if (sima->mode == SI_MODE_PAINT)
+			BKE_image_release_layer_ibuf(ibuf);
+		else
+			BKE_image_release_ibuf(ima, ibuf, NULL);
 		return OPERATOR_CANCELLED;
 	}
 
@@ -2772,7 +2781,10 @@ static int image_bright_contrast_exec(bContext *C, wmOperator *op)
 
 	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, ima);
 
-	BKE_image_release_ibuf(ima, ibuf, NULL);
+	if (sima->mode == SI_MODE_PAINT)
+		BKE_image_release_layer_ibuf(ibuf);
+	else
+		BKE_image_release_ibuf(ima, ibuf, NULL);
 
 	return OPERATOR_FINISHED;
 }
@@ -2790,9 +2802,9 @@ static bool image_bright_contrast_check(bContext *C, wmOperator *op)
 
 	ima->use_layers = false;
 	if (sima->mode == SI_MODE_PAINT)
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+		ibuf = BKE_image_acquire_layer_ibuf(ima);
 	else
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	ima->use_layers = true;
 
 	bright = RNA_float_get(op->ptr, "bright");
@@ -2820,7 +2832,10 @@ static bool image_bright_contrast_check(bContext *C, wmOperator *op)
 	else
 		ima->preview_ibuf = preview_ibuf;
 
-	BKE_image_release_ibuf(ima, ibuf, NULL);
+	if (sima->mode == SI_MODE_PAINT)
+		BKE_image_release_layer_ibuf(ibuf);
+	else
+		BKE_image_release_ibuf(ima, ibuf, NULL);
 	return true;
 }
 
@@ -2859,9 +2874,9 @@ static int image_desaturate_exec(bContext *C, wmOperator *op)
 
 	ima->use_layers = false;
 	if (sima->mode == SI_MODE_PAINT)
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+		ibuf = BKE_image_acquire_layer_ibuf(ima);
 	else
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	ima->use_layers = true;
 
 	IMB_desaturate(ibuf, type);
@@ -2879,7 +2894,10 @@ static int image_desaturate_exec(bContext *C, wmOperator *op)
 
 	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
 
-	BKE_image_release_ibuf(ima, ibuf, NULL);
+	if (sima->mode == SI_MODE_PAINT)
+		BKE_image_release_layer_ibuf(ibuf);
+	else
+		BKE_image_release_ibuf(ima, ibuf, NULL);
 
 	return OPERATOR_FINISHED;
 }
@@ -2923,9 +2941,9 @@ static int image_posterize_exec(bContext *C, wmOperator *op)
 
 	ima->use_layers = false;
 	if (sima->mode == SI_MODE_PAINT)
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+		ibuf = BKE_image_acquire_layer_ibuf(ima);
 	else
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	ima->use_layers = true;
 
 	free_preview(ima, sima->mode);
@@ -2945,7 +2963,10 @@ static int image_posterize_exec(bContext *C, wmOperator *op)
 
 	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
 
-	BKE_image_release_ibuf(ima, ibuf, NULL);
+	if (sima->mode == SI_MODE_PAINT)
+		BKE_image_release_layer_ibuf(ibuf);
+	else
+		BKE_image_release_ibuf(ima, ibuf, NULL);
 
 	return OPERATOR_FINISHED;
 }
@@ -2963,9 +2984,9 @@ static bool image_posterize_check(bContext *C, wmOperator *op)
 
 	ima->use_layers = false;
 	if (sima->mode == SI_MODE_PAINT)
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+		ibuf = BKE_image_acquire_layer_ibuf(ima);
 	else
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	ima->use_layers = true;
 
 	levels = RNA_int_get(op->ptr, "levels");
@@ -2992,7 +3013,11 @@ static bool image_posterize_check(bContext *C, wmOperator *op)
 	else
 		ima->preview_ibuf = preview_ibuf;
 
-	BKE_image_release_ibuf(ima, ibuf, NULL);
+	if (sima->mode == SI_MODE_PAINT)
+		BKE_image_release_layer_ibuf(ibuf);
+	else
+		BKE_image_release_ibuf(ima, ibuf, NULL);
+
 	return true;
 }
 
@@ -3032,9 +3057,9 @@ static int image_threshold_exec(bContext *C, wmOperator *op)
 
 	ima->use_layers = false;
 	if (sima->mode == SI_MODE_PAINT)
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+		ibuf = BKE_image_acquire_layer_ibuf(ima);
 	else
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	ima->use_layers = true;
 
 	free_preview(ima, sima->mode);
@@ -3054,7 +3079,10 @@ static int image_threshold_exec(bContext *C, wmOperator *op)
 
 	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
 
-	BKE_image_release_ibuf(ima, ibuf, NULL);
+	if (sima->mode == SI_MODE_PAINT)
+		BKE_image_release_layer_ibuf(ibuf);
+	else
+		BKE_image_release_ibuf(ima, ibuf, NULL);
 
 	return OPERATOR_FINISHED;
 }
@@ -3072,9 +3100,9 @@ static bool image_threshold_check(bContext *C, wmOperator *op)
 
 	ima->use_layers = false;
 	if (sima->mode == SI_MODE_PAINT)
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+		ibuf = BKE_image_acquire_layer_ibuf(ima);
 	else
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	ima->use_layers = true;
 
 	low = RNA_int_get(op->ptr, "low");
@@ -3102,7 +3130,11 @@ static bool image_threshold_check(bContext *C, wmOperator *op)
 	else
 		ima->preview_ibuf = preview_ibuf;
 
-	BKE_image_release_ibuf(ima, ibuf, NULL);
+	if (sima->mode == SI_MODE_PAINT)
+		BKE_image_release_layer_ibuf(ibuf);
+	else
+		BKE_image_release_ibuf(ima, ibuf, NULL);
+
 	return true;
 }
 
@@ -3140,9 +3172,9 @@ static int image_exposure_exec(bContext *C, wmOperator *op)
 
 	ima->use_layers = false;
 	if (sima->mode == SI_MODE_PAINT)
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+		ibuf = BKE_image_acquire_layer_ibuf(ima);
 	else
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	ima->use_layers = true;
 
 	free_preview(ima, sima->mode);
@@ -3152,7 +3184,10 @@ static int image_exposure_exec(bContext *C, wmOperator *op)
 	gamma = RNA_float_get(op->ptr, "gamma");
 
 	if ((exposure == 0.0f) && (offset == 0.0f) && (gamma == 1.0f)) {
-		BKE_image_release_ibuf(ima, ibuf, NULL);
+		if (sima->mode == SI_MODE_PAINT)
+			BKE_image_release_layer_ibuf(ibuf);
+		else
+			BKE_image_release_ibuf(ima, ibuf, NULL);
 		return OPERATOR_CANCELLED;
 	}
 
@@ -3171,7 +3206,10 @@ static int image_exposure_exec(bContext *C, wmOperator *op)
 
 	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, ima);
 
-	BKE_image_release_ibuf(ima, ibuf, NULL);
+	if (sima->mode == SI_MODE_PAINT)
+		BKE_image_release_layer_ibuf(ibuf);
+	else
+		BKE_image_release_ibuf(ima, ibuf, NULL);
 
 	return OPERATOR_FINISHED;
 }
@@ -3189,9 +3227,9 @@ static bool image_exposure_check(bContext *C, wmOperator *op)
 
 	ima->use_layers = false;
 	if (sima->mode == SI_MODE_PAINT)
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+		ibuf = BKE_image_acquire_layer_ibuf(ima);
 	else
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	ima->use_layers = true;
 
 	exposure = RNA_float_get(op->ptr, "exposure");
@@ -3220,7 +3258,11 @@ static bool image_exposure_check(bContext *C, wmOperator *op)
 	else
 		ima->preview_ibuf = preview_ibuf;
 
-	BKE_image_release_ibuf(ima, ibuf, NULL);
+	if (sima->mode == SI_MODE_PAINT)
+		BKE_image_release_layer_ibuf(ibuf);
+	else
+		BKE_image_release_ibuf(ima, ibuf, NULL);
+
 	return true;
 }
 
@@ -3262,9 +3304,9 @@ static int image_colorize_exec(bContext *C, wmOperator *op)
 
 	ima->use_layers = false;
 	if (sima->mode == SI_MODE_PAINT)
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+		ibuf = BKE_image_acquire_layer_ibuf(ima);
 	else
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	ima->use_layers = true;
 
 	free_preview(ima, sima->mode);
@@ -3284,7 +3326,10 @@ static int image_colorize_exec(bContext *C, wmOperator *op)
 
 	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
 
-	BKE_image_release_ibuf(ima, ibuf, NULL);
+	if (sima->mode == SI_MODE_PAINT)
+		BKE_image_release_layer_ibuf(ibuf);
+	else
+		BKE_image_release_ibuf(ima, ibuf, NULL);
 
 	return OPERATOR_FINISHED;
 }
@@ -3302,9 +3347,9 @@ static bool image_colorize_check(bContext *C, wmOperator *op)
 
 	ima->use_layers = false;
 	if (sima->mode == SI_MODE_PAINT)
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+		ibuf = BKE_image_acquire_layer_ibuf(ima);
 	else
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	ima->use_layers = true;
 
 	hue = RNA_int_get(op->ptr, "hue");
@@ -3333,7 +3378,11 @@ static bool image_colorize_check(bContext *C, wmOperator *op)
 	else
 		ima->preview_ibuf = preview_ibuf;
 
-	BKE_image_release_ibuf(ima, ibuf, NULL);
+	if (sima->mode == SI_MODE_PAINT)
+		BKE_image_release_layer_ibuf(ibuf);
+	else
+		BKE_image_release_ibuf(ima, ibuf, NULL);
+
 	return true;
 }
 
@@ -3366,7 +3415,7 @@ static int image_grayscale_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	ImageLayer *layer;
 	Image *ima = CTX_data_edit_image(C);
-	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 
 	if (ibuf == NULL)
 		return OPERATOR_CANCELLED;
@@ -3446,7 +3495,7 @@ static int image_duplicate_exec(bContext *C, wmOperator *op)
 
 	new_ima = BKE_image_copy(G.main, ima);
 
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	//BLI_addtail(&new_ima->ibufs, IMB_dupImBuf(ibuf));
 	new_ima->active_layer = ima->active_layer;
 	new_ima->num_layers = ima->num_layers;
@@ -3498,7 +3547,7 @@ static int image_flip_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 
 	ima->use_layers = false;
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	ima->use_layers = true;
 
 	type = RNA_enum_get(op->ptr, "type");
@@ -3559,7 +3608,7 @@ static int image_rotate_exec(bContext *C, wmOperator *op)
 	type = RNA_enum_get(op->ptr, "type");
 
 	ima->use_layers = false;
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	ima->use_layers = true;
 
 	if (type == 1) { /* ROT_90 */
@@ -3636,7 +3685,7 @@ static int image_arbitrary_rot_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 
 	ima->use_layers = false;
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	ima->use_layers = true;
 
 	if (ima->preview_ibuf) {
@@ -3680,7 +3729,7 @@ static bool image_arbitrary_rot_check(bContext *C, wmOperator *op)
 		return false;
 
 	ima->use_layers = false;
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	ima->use_layers = true;
 
 	type = RNA_enum_get(op->ptr, "type");
@@ -3749,7 +3798,7 @@ static int image_offset_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 
 	ima->use_layers = false;
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	ima->use_layers = true;
 
 	if (ima->preview_ibuf) {
@@ -3802,7 +3851,7 @@ static bool image_offset_check(bContext *C, wmOperator *op)
 		return false;
 
 	ima->use_layers = false;
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	ima->use_layers = true;
 
 	x = RNA_int_get(op->ptr, "off_x");
@@ -3877,7 +3926,7 @@ static int image_scale_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 
 	ima->use_layers = false;
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	ima->use_layers = true;
 
 	width = RNA_int_get(op->ptr, "width");
@@ -4072,9 +4121,9 @@ static int image_flatten_exec(bContext *C, wmOperator *op)
 
 		ima->use_layers = false;
 		if (sima->mode == SI_MODE_PAINT)
-			ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+			ibuf = BKE_image_acquire_layer_ibuf(ima);
 		else
-			ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+			ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 		ima->use_layers = true;
 
 		if (ibuf->rect)
@@ -4092,7 +4141,10 @@ static int image_flatten_exec(bContext *C, wmOperator *op)
 		}
 
 		ibuf->userflags |= IB_BITMAPDIRTY;
-		BKE_image_release_ibuf(ima, ibuf, NULL);
+		if (sima->mode == SI_MODE_PAINT)
+			BKE_image_release_layer_ibuf(ibuf);
+		else
+			BKE_image_release_ibuf(ima, ibuf, NULL);
 	}
 	else
 		BKE_report(op->reports, RPT_INFO, "It can not merge the layers, because the layers are hidden");
@@ -4895,7 +4947,7 @@ static int image_layer_arbitrary_rot_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 
 	ima->use_layers = false;
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+	ibuf = BKE_image_acquire_layer_ibuf(ima);
 	ima->use_layers = true;
 
 	layer = BKE_image_get_current_layer(ima);
@@ -4919,7 +4971,7 @@ static int image_layer_arbitrary_rot_exec(bContext *C, wmOperator *op)
 	layer->ibufs.last = NULL;
 	BLI_addtail(&layer->ibufs, IMB_rotation(ibuf, 0.0, 0.0, angle, type, lock, col));
 
-	BKE_image_release_ibuf(ima, ibuf, NULL);
+	BKE_image_release_layer_ibuf(ibuf);
 
 	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
 
@@ -4940,7 +4992,7 @@ static bool image_layer_arbitrary_rot_check(bContext *C, wmOperator *op)
 		return false;
 
 	ima->use_layers = false;
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+	ibuf = BKE_image_acquire_layer_ibuf(ima);
 	ima->use_layers = true;
 
 	layer = BKE_image_get_current_layer(ima);
@@ -4961,7 +5013,7 @@ static bool image_layer_arbitrary_rot_check(bContext *C, wmOperator *op)
 
 	layer->preview_ibuf = IMB_rotation(layer->preview_ibuf, 0.0, 0.0, angle, type, lock, col);
 
-	BKE_image_release_ibuf(ima, ibuf, NULL);
+	BKE_image_release_layer_ibuf(ibuf);
 	return true;
 }
 
@@ -5057,7 +5109,7 @@ static bool image_layer_offset_check(bContext *C, wmOperator *op)
 		return false;
 
 	ima->use_layers = false;
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+	ibuf = BKE_image_acquire_layer_ibuf(ima);
 	ima->use_layers = true;
 
 	layer = BKE_image_get_current_layer(ima);
@@ -5093,7 +5145,7 @@ static bool image_layer_offset_check(bContext *C, wmOperator *op)
 
 	layer->preview_ibuf = IMB_offset(layer->preview_ibuf, x, y, half, wrap, col);
 
-	BKE_image_release_ibuf(ima, ibuf, NULL);
+	BKE_image_release_layer_ibuf(ibuf);
 	return true;
 }
 
@@ -5326,7 +5378,7 @@ static int image_pack_exec(bContext *C, wmOperator *op)
 {
 	struct Main *bmain = CTX_data_main(C);
 	Image *ima = CTX_data_edit_image(C);
-	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	const bool as_png = RNA_boolean_get(op->ptr, "as_png");
 
 	if (!image_pack_test(C, op))
@@ -5360,7 +5412,7 @@ static int image_pack_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(
 	if (!image_pack_test(C, op))
 		return OPERATOR_CANCELLED;
 
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 
 	if (!as_png && (ibuf && (ibuf->userflags & IB_BITMAPDIRTY))) {
 		pup = UI_popup_menu_begin(C, IFACE_("OK"), ICON_QUESTION);
@@ -5895,7 +5947,7 @@ static int image_record_composite_apply(bContext *C, wmOperator *op)
 
 	ED_area_tag_redraw(CTX_wm_area(C));
 	
-	ibuf = BKE_image_acquire_ibuf(sima->image, &sima->iuser, NULL, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(sima->image, &sima->iuser, NULL);
 	/* save memory in flipbooks */
 	if (ibuf)
 		imb_freerectfloatImBuf(ibuf);

@@ -309,7 +309,7 @@ static void image_undo_restore_runtime(ListBase *lb)
 			ibuf->userflags |= IB_MIPMAP_INVALID;  /* force mipmap recreatiom */
 		ibuf->userflags |= IB_DISPLAY_BUFFER_INVALID;
 
-		BKE_image_release_layer_ibuf(ima);
+		BKE_image_release_layer_ibuf(ibuf);
 	}
 
 	IMB_freeImBuf(tmpibuf);
@@ -336,7 +336,7 @@ void ED_image_undo_restore(bContext *C, ListBase *lb)
 			ima = BLI_findstring(&bmain->image, tile->idname, offsetof(ID, name));
 		}
 
-		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_LAYER);
+		ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 
 		if (ima && ibuf && !STREQ(tile->ibufname, ibuf->name)) {
 			/* current ImBuf filename was changed, probably current frame

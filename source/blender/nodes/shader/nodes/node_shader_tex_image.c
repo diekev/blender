@@ -73,7 +73,7 @@ static int node_shader_gpu_tex_image(GPUMaterial *mat, bNode *node, bNodeExecDat
 	ret = GPU_stack_link(mat, "node_tex_image", in, out, GPU_image(ima, iuser, isdata));
 
 	if (ret) {
-		ImBuf *ibuf = BKE_image_acquire_ibuf(ima, iuser, NULL, IMA_IBUF_IMA);
+		ImBuf *ibuf = BKE_image_acquire_ibuf(ima, iuser, NULL);
 		if (ibuf && (ibuf->colormanage_flag & IMB_COLORMANAGE_IS_DATA) == 0 &&
 		    GPU_material_do_color_management(mat))
 		{

@@ -102,7 +102,7 @@ static SpinLock image_spin;
 
 /* prototypes */
 static int image_num_files(struct Image *ima);
-static ImBuf *image_acquire_ibuf(Image *ima, ImageUser *iuser, void **r_lock, int type_ibuf);
+static ImBuf *image_acquire_ibuf(Image *ima, ImageUser *iuser, void **r_lock);
 static void image_update_views_format(Image *ima, ImageUser *iuser);
 static void image_add_view(Image *ima, const char *viewname, const char *filepath);
 
@@ -244,7 +244,7 @@ static void de_interlace_st(struct ImBuf *ibuf) /* standard fields */
 
 void BKE_image_de_interlace(Image *ima, int odd)
 {
-	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	if (ibuf) {
 		if (odd)
 			de_interlace_st(ibuf);
@@ -686,7 +686,7 @@ bool BKE_image_scale(Image *image, int width, int height)
 	ImBuf *ibuf;
 	void *lock;
 
-	ibuf = BKE_image_acquire_ibuf(image, NULL, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(image, NULL, &lock);
 
 	if (ibuf) {
 		IMB_scaleImBuf(ibuf, width, height);
@@ -3175,7 +3175,7 @@ static ImBuf *image_get_buffer_cb(void *base, const int view_id)
 
 	BKE_image_multiview_index(ima, &iuser);
 
-	return image_acquire_ibuf(ima, &iuser, NULL, IMA_IBUF_IMA);
+	return image_acquire_ibuf(ima, &iuser, NULL);
 }
 #endif  /* WITH_OPENEXR */
 
@@ -4076,7 +4076,7 @@ static void image_get_frame_and_index(Image *ima, ImageUser *iuser, int *r_frame
  * call IMB_freeImBuf to de-reference the image buffer after
  * it's done handling it.
  */
-static ImBuf *image_get_cached_ibuf(Image *ima, ImageUser *iuser, int *r_frame, int *r_index, int ibuf_type)
+static ImBuf *image_get_cached_ibuf(Image *ima, ImageUser *iuser, int *r_frame, int *r_index)
 {
 	ImBuf *ibuf = NULL;
 	int frame = 0, index = image_get_multiview_index(ima, iuser);
@@ -4117,11 +4117,8 @@ static ImBuf *image_get_cached_ibuf(Image *ima, ImageUser *iuser, int *r_frame, 
 		}
 	}
 	else if (ima->source == IMA_SRC_FILE) {
-		if (ima->type == IMA_TYPE_IMAGE) { //|| (ima->type == IMA_TYPE_IMAGELAYER)) {
-			if (ibuf_type == IMA_IBUF_LAYER)
-				ibuf = image_get_ibuf_layer(ima);
-			else
-				ibuf = image_get_cached_ibuf_for_index_frame(ima, index, 0); //type_ibuf
+		if (ima->type == IMA_TYPE_IMAGE) {
+			ibuf = image_get_cached_ibuf_for_index_frame(ima, index, 0); //type_ibuf
 		}
 		else if (ima->type == IMA_TYPE_MULTILAYER)
 			ibuf = image_get_cached_ibuf_for_index_frame(ima, index, 0);
@@ -4166,7 +4163,7 @@ BLI_INLINE bool image_quick_test(Image *ima, ImageUser *iuser)
  *
  * not thread-safe, so callee should worry about thread locks
  */
-static ImBuf *image_acquire_ibuf(Image *ima, ImageUser *iuser, void **r_lock, int type_ibuf)
+static ImBuf *image_acquire_ibuf(Image *ima, ImageUser *iuser, void **r_lock)
 {
 	ImBuf *ibuf = NULL;
 	int frame = 0, index = 0;
@@ -4178,7 +4175,7 @@ static ImBuf *image_acquire_ibuf(Image *ima, ImageUser *iuser, void **r_lock, in
 	if (!image_quick_test(ima, iuser))
 		return NULL;
 
-	ibuf = image_get_cached_ibuf(ima, iuser, &frame, &index, type_ibuf);
+	ibuf = image_get_cached_ibuf(ima, iuser, &frame, &index);
 
 	if (ibuf == NULL) {
 		/* we are sure we have to load the ibuf, using source and type */
@@ -4262,13 +4259,13 @@ static ImBuf *image_acquire_ibuf(Image *ima, ImageUser *iuser, void **r_lock, in
  *
  * references the result, BKE_image_release_ibuf should be used to de-reference
  */
-ImBuf *BKE_image_acquire_ibuf(Image *ima, ImageUser *iuser, void **r_lock, int type_ibuf)
+ImBuf *BKE_image_acquire_ibuf(Image *ima, ImageUser *iuser, void **r_lock)
 {
 	ImBuf *ibuf;
 
 	BLI_spin_lock(&image_spin);
 
-	ibuf = image_acquire_ibuf(ima, iuser, r_lock, type_ibuf);
+	ibuf = image_acquire_ibuf(ima, iuser, r_lock);
 
 	BLI_spin_unlock(&image_spin);
 
@@ -4322,7 +4319,7 @@ void BKE_image_release_layer_ibuf(ImBuf *ibuf)
 }
 
 /* checks whether there's an image buffer for given image and user */
-bool BKE_image_has_ibuf(Image *ima, ImageUser *iuser, int type_ibuf)
+bool BKE_image_has_ibuf(Image *ima, ImageUser *iuser)
 {
 	ImBuf *ibuf;
 
@@ -4332,12 +4329,28 @@ bool BKE_image_has_ibuf(Image *ima, ImageUser *iuser, int type_ibuf)
 
 	BLI_spin_lock(&image_spin);
 
-	ibuf = image_get_cached_ibuf(ima, iuser, NULL, NULL, type_ibuf);
+	ibuf = image_get_cached_ibuf(ima, iuser, NULL, NULL);
 
 	if (!ibuf)
-		ibuf = image_acquire_ibuf(ima, iuser, NULL, type_ibuf);
+		ibuf = image_acquire_ibuf(ima, iuser, NULL);
 
 	BLI_spin_unlock(&image_spin);
+
+	IMB_freeImBuf(ibuf);
+
+	return ibuf != NULL;
+}
+
+/* checks whether there's an image buffer for given image and user */
+bool BKE_image_has_layer_ibuf(Image *ima)
+{
+	ImBuf *ibuf = NULL;
+
+//	BLI_spin_lock(&image_spin);
+
+	ibuf = BKE_image_acquire_layer_ibuf(ima);
+
+//	BLI_spin_unlock(&image_spin);
 
 	IMB_freeImBuf(ibuf);
 
@@ -4402,7 +4415,7 @@ BLI_INLINE ImBuf *image_pool_find_entry(ImagePool *pool, Image *image, int frame
 	return NULL;
 }
 
-ImBuf *BKE_image_pool_acquire_ibuf(Image *ima, ImageUser *iuser, ImagePool *pool, int type_ibuf)
+ImBuf *BKE_image_pool_acquire_ibuf(Image *ima, ImageUser *iuser, ImagePool *pool)
 {
 	ImBuf *ibuf;
 	int index, frame;
@@ -4413,7 +4426,7 @@ ImBuf *BKE_image_pool_acquire_ibuf(Image *ima, ImageUser *iuser, ImagePool *pool
 
 	if (pool == NULL) {
 		/* pool could be NULL, in this case use general acquire function */
-		return BKE_image_acquire_ibuf(ima, iuser, NULL, type_ibuf);
+		return BKE_image_acquire_ibuf(ima, iuser, NULL);
 	}
 
 	image_get_frame_and_index(ima, iuser, &frame, &index);
@@ -4432,7 +4445,7 @@ ImBuf *BKE_image_pool_acquire_ibuf(Image *ima, ImageUser *iuser, ImagePool *pool
 	if (!found) {
 		ImagePoolEntry *entry;
 
-		ibuf = image_acquire_ibuf(ima, iuser, NULL, type_ibuf);
+		ibuf = image_acquire_ibuf(ima, iuser, NULL);
 
 		entry = MEM_callocN(sizeof(ImagePoolEntry), "Image Pool Entry");
 		entry->image = ima;
@@ -4593,7 +4606,7 @@ bool BKE_image_has_alpha(struct Image *image)
 	void *lock;
 	int planes;
 
-	ibuf = BKE_image_acquire_ibuf(image, NULL, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(image, NULL, &lock);
 	planes = (ibuf ? ibuf->planes : 0);
 	BKE_image_release_ibuf(image, ibuf, lock);
 
@@ -4608,7 +4621,7 @@ void BKE_image_get_size(Image *image, ImageUser *iuser, int *width, int *height)
 	ImBuf *ibuf = NULL;
 	void *lock;
 
-	ibuf = BKE_image_acquire_ibuf(image, iuser, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(image, iuser, &lock);
 
 	if (ibuf && ibuf->x > 0 && ibuf->y > 0) {
 		*width = ibuf->x;
@@ -4662,7 +4675,7 @@ unsigned char *BKE_image_get_pixels_for_frame(struct Image *image, int frame)
 	iuser.framenr = frame;
 	iuser.ok = true;
 
-	ibuf = BKE_image_acquire_ibuf(image, &iuser, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(image, &iuser, &lock);
 
 	if (ibuf) {
 		pixels = (unsigned char *) ibuf->rect;
@@ -4689,7 +4702,7 @@ float *BKE_image_get_float_pixels_for_frame(struct Image *image, int frame)
 	iuser.framenr = frame;
 	iuser.ok = true;
 
-	ibuf = BKE_image_acquire_ibuf(image, &iuser, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(image, &iuser, &lock);
 
 	if (ibuf) {
 		pixels = ibuf->rect_float;

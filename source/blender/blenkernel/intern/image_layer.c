@@ -194,7 +194,7 @@ void BKE_image_layer_color_fill(Image *ima, float color[4])
 	}
 
 	void *lock;
-	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock, IMA_IBUF_LAYER);
+	ImBuf *ibuf = BKE_image_acquire_layer_ibuf(ima);
 
 	if (ibuf) {
 		unsigned char *rect = NULL;
@@ -208,7 +208,7 @@ void BKE_image_layer_color_fill(Image *ima, float color[4])
 		BKE_image_buf_fill_color(rect, rect_float, ibuf->x, ibuf->y, color);
 	}
 
-	BKE_image_release_ibuf(ima, ibuf, lock);
+	BKE_image_release_layer_ibuf(ibuf);
 }
 
 ImageLayer *BKE_image_layer_duplicate_current(Image *ima)
@@ -235,7 +235,7 @@ ImageLayer *BKE_image_layer_duplicate_current(Image *ima)
 	}
 
 	void *lock;
-	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock, IMA_IBUF_LAYER);
+	ImBuf *ibuf = BKE_image_acquire_layer_ibuf(ima);
 
 	if (ibuf) {
 		ImBuf *new_ibuf = IMB_dupImBuf(ibuf);
@@ -262,7 +262,7 @@ ImageLayer *BKE_image_layer_duplicate_current(Image *ima)
 		copy_v4_v4(dup_layer->default_color, layer->default_color);
 	}
 
-	BKE_image_release_ibuf(ima, ibuf, lock);
+	BKE_image_release_layer_ibuf(ibuf);
 	ima->num_layers += 1;
 
 	return dup_layer;

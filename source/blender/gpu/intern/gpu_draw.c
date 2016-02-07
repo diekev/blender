@@ -379,7 +379,7 @@ float GPU_get_anisotropic(void)
 
 static void gpu_make_repbind(Image *ima)
 {
-	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 	if (ibuf == NULL)
 		return;
 
@@ -564,7 +564,7 @@ int GPU_verify_image(Image *ima, ImageUser *iuser, int textarget, int tftile, bo
 		return 0;
 
 	/* check if we have a valid image buffer */
-	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, iuser, NULL, IMA_IBUF_IMA);
+	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, iuser, NULL);
 
 	if (ibuf == NULL)
 		return 0;
@@ -1226,7 +1226,7 @@ static bool GPU_check_scaled_image(ImBuf *ibuf, Image *ima, float *frect, int x,
 
 void GPU_paint_update_image(Image *ima, ImageUser *iuser, int x, int y, int w, int h)
 {
-	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, iuser, NULL, IMA_IBUF_LAYER);
+	ImBuf *ibuf = BKE_image_acquire_layer_ibuf(ima);
 	
 	if (ima->repbind || (GPU_get_mipmap() && !GTS.gpu_mipmap) || BKE_image_has_bindcode(ima) || !ibuf ||
 	    (w == 0) || (h == 0))
@@ -1247,7 +1247,7 @@ void GPU_paint_update_image(Image *ima, ImageUser *iuser, int x, int y, int w, i
 			
 			if (GPU_check_scaled_image(ibuf, ima, buffer, x, y, w, h)) {
 				MEM_freeN(buffer);
-				BKE_image_release_ibuf(ima, ibuf, NULL);
+				BKE_image_release_layer_ibuf(ibuf);
 				return;
 			}
 
@@ -1265,12 +1265,12 @@ void GPU_paint_update_image(Image *ima, ImageUser *iuser, int x, int y, int w, i
 				ima->tpageflag &= ~IMA_MIPMAP_COMPLETE;
 			}
 
-			BKE_image_release_ibuf(ima, ibuf, NULL);
+			BKE_image_release_layer_ibuf(ibuf);
 			return;
 		}
 
 		if (GPU_check_scaled_image(ibuf, ima, NULL, x, y, w, h)) {
-			BKE_image_release_ibuf(ima, ibuf, NULL);
+			BKE_image_release_layer_ibuf(ibuf);
 			return;
 		}
 
@@ -1300,7 +1300,7 @@ void GPU_paint_update_image(Image *ima, ImageUser *iuser, int x, int y, int w, i
 		}
 	}
 
-	BKE_image_release_ibuf(ima, ibuf, NULL);
+	BKE_image_release_layer_ibuf(ibuf);
 }
 
 void GPU_update_images_framechange(void)

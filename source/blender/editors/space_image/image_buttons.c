@@ -869,7 +869,7 @@ void uiTemplateImage(uiLayout *layout, bContext *C, PointerRNA *ptr, const char 
 		UI_block_funcN_set(block, rna_update_cb, MEM_dupallocN(cb), NULL);
 
 		if (ima->source == IMA_SRC_VIEWER) {
-			ImBuf *ibuf = BKE_image_acquire_ibuf(ima, iuser, &lock, IMA_IBUF_IMA);
+			ImBuf *ibuf = BKE_image_acquire_ibuf(ima, iuser, &lock);
 			image_info(scene, iuser, ima, ibuf, str, MAX_IMAGE_INFO_LEN);
 			BKE_image_release_ibuf(ima, ibuf, lock);
 
@@ -959,7 +959,7 @@ void uiTemplateImage(uiLayout *layout, bContext *C, PointerRNA *ptr, const char 
 
 			if (ima->source != IMA_SRC_GENERATED) {
 				if (compact == 0) { /* background image view doesnt need these */
-					ImBuf *ibuf_l = BKE_image_acquire_ibuf(ima, iuser, &lock, IMA_IBUF_LAYER);
+					ImBuf *ibuf_l = BKE_image_acquire_layer_ibuf(ima);
 					ImBuf *ibuf = BKE_image_get_first_ibuf(ima);
 					bool has_alpha = true;
 
@@ -969,7 +969,7 @@ void uiTemplateImage(uiLayout *layout, bContext *C, PointerRNA *ptr, const char 
 
 						has_alpha = (valid_channels & IMA_CHAN_FLAG_ALPHA) != 0;
 
-						BKE_image_release_ibuf(ima, ibuf_l, NULL);
+						BKE_image_release_layer_ibuf(ibuf_l);
 					}
 
 					if (multiview) {
@@ -1281,7 +1281,7 @@ void uiTemplateImageInfo(uiLayout *layout, bContext *C, Image *ima, ImageUser *i
 	if (!ima || !iuser)
 		return;
 
-	ibuf = BKE_image_acquire_ibuf(ima, iuser, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(ima, iuser, &lock);
 
 	image_info(CTX_data_scene(C), iuser, ima, ibuf, str, MAX_IMAGE_INFO_LEN);
 	BKE_image_release_ibuf(ima, ibuf, lock);

@@ -61,7 +61,7 @@ void ImagesExporter::export_UV_Image(Image *image, bool use_copies)
 
 	if (not_yet_exported) {
 
-		ImBuf *imbuf       = BKE_image_acquire_ibuf(image, NULL, NULL, IMA_IBUF_IMA);
+		ImBuf *imbuf       = BKE_image_acquire_ibuf(image, NULL, NULL);
 		if (!imbuf) {
 			fprintf(stderr, "Collada export: image does not exist:\n%s\n", image->name);
 			return;

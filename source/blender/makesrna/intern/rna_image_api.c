@@ -87,7 +87,7 @@ static void rna_Image_save_render(Image *image, bContext *C, ReportList *reports
 		iuser.scene = scene;
 		iuser.ok = 1;
 
-		ibuf = BKE_image_acquire_ibuf(image, &iuser, &lock, IMA_IBUF_IMA);
+		ibuf = BKE_image_acquire_ibuf(image, &iuser, &lock);
 
 		if (ibuf == NULL) {
 			BKE_report(reports, RPT_ERROR, "Could not acquire buffer from image");
@@ -118,7 +118,7 @@ static void rna_Image_save_render(Image *image, bContext *C, ReportList *reports
 
 static void rna_Image_save(Image *image, Main *bmain, bContext *C, ReportList *reports)
 {
-	ImBuf *ibuf = BKE_image_acquire_ibuf(image, NULL, NULL, IMA_IBUF_IMA);
+	ImBuf *ibuf = BKE_image_acquire_ibuf(image, NULL, NULL);
 	if (ibuf) {
 		char filename[FILE_MAX];
 		BLI_strncpy(filename, image->name, sizeof(filename));
@@ -153,7 +153,7 @@ static void rna_Image_pack(
         Image *image, Main *bmain, bContext *C, ReportList *reports,
         int as_png, const char *data, int data_len)
 {
-	ImBuf *ibuf = BKE_image_acquire_ibuf(image, NULL, NULL, IMA_IBUF_IMA);
+	ImBuf *ibuf = BKE_image_acquire_ibuf(image, NULL, NULL);
 
 	if (!as_png && (ibuf && (ibuf->userflags & IB_BITMAPDIRTY))) {
 		BKE_report(reports, RPT_ERROR, "Cannot pack edited image from disk, only as internal PNG");
@@ -199,7 +199,7 @@ static void rna_Image_reload(Image *image)
 
 static void rna_Image_update(Image *image, ReportList *reports)
 {
-	ImBuf *ibuf = BKE_image_acquire_ibuf(image, NULL, NULL, IMA_IBUF_IMA);
+	ImBuf *ibuf = BKE_image_acquire_ibuf(image, NULL, NULL);
 
 	if (ibuf == NULL) {
 		BKE_reportf(reports, RPT_ERROR, "Image '%s' does not have any image data", image->id.name + 2);
@@ -234,7 +234,7 @@ static int rna_Image_gl_load(Image *image, ReportList *reports, int frame, int f
 	iuser.framenr = frame;
 	iuser.ok = true;
 
-	ibuf = BKE_image_acquire_ibuf(image, &iuser, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(image, &iuser, &lock);
 
 	/* clean glError buffer */
 	while (glGetError() != GL_NO_ERROR) {}

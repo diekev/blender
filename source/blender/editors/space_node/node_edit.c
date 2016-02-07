@@ -2532,7 +2532,7 @@ static int viewer_border_exec(bContext *C, wmOperator *op)
 	ED_preview_kill_jobs(CTX_wm_manager(C), CTX_data_main(C));
 
 	ima = BKE_image_verify_viewer(IMA_TYPE_COMPOSITE, "Viewer Node");
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock);
 
 	if (ibuf) {
 		ARegion *ar = CTX_wm_region(C);

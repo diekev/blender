@@ -123,7 +123,7 @@ int imagewrap(Tex *tex, Image *ima, ImBuf *ibuf, const float texvec[3], TexResul
 		if (skip_load_image && !BKE_image_has_loaded_ibuf(ima))
 			return retval;
 
-		ibuf = BKE_image_pool_acquire_ibuf(ima, &tex->iuser, pool, IMA_IBUF_IMA);
+		ibuf = BKE_image_pool_acquire_ibuf(ima, &tex->iuser, pool);
 
 		ima->flag|= IMA_USED_FOR_RENDER;
 	}
@@ -945,7 +945,7 @@ static int imagewraposa_aniso(Tex *tex, Image *ima, ImBuf *ibuf, const float tex
 		if (skip_load_image && !BKE_image_has_loaded_ibuf(ima)) {
 			return retval;
 		}
-		ibuf = BKE_image_pool_acquire_ibuf(ima, &tex->iuser, pool, IMA_IBUF_IMA);
+		ibuf = BKE_image_pool_acquire_ibuf(ima, &tex->iuser, pool);
 	}
 
 	if ((ibuf == NULL) || ((ibuf->rect == NULL) && (ibuf->rect_float == NULL))) {
@@ -1379,7 +1379,7 @@ int imagewraposa(Tex *tex, Image *ima, ImBuf *ibuf, const float texvec[3], const
 		if (skip_load_image && !BKE_image_has_loaded_ibuf(ima))
 			return retval;
 		
-		ibuf = BKE_image_pool_acquire_ibuf(ima, &tex->iuser, pool, IMA_IBUF_IMA);
+		ibuf = BKE_image_pool_acquire_ibuf(ima, &tex->iuser, pool);
 
 		ima->flag|= IMA_USED_FOR_RENDER;
 	}
@@ -1765,7 +1765,7 @@ int imagewraposa(Tex *tex, Image *ima, ImBuf *ibuf, const float texvec[3], const
 void image_sample(Image *ima, float fx, float fy, float dx, float dy, float result[4], struct ImagePool *pool)
 {
 	TexResult texres;
-	ImBuf *ibuf = BKE_image_pool_acquire_ibuf(ima, NULL, pool, IMA_IBUF_IMA);
+	ImBuf *ibuf = BKE_image_pool_acquire_ibuf(ima, NULL, pool);
 	
 	if (UNLIKELY(ibuf == NULL)) {
 		zero_v4(result);

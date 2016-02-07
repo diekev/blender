@@ -249,7 +249,7 @@ static void cmp_node_image_create_outputs(bNodeTree *ntree, bNode *node)
 		load_iuser.framenr = offset;
 
 		/* make sure ima->type is correct */
-		ibuf = BKE_image_acquire_ibuf(ima, &load_iuser, NULL, IMA_IBUF_IMA);
+		ibuf = BKE_image_acquire_ibuf(ima, &load_iuser, NULL);
 		
 		if (ima->rr) {
 			RenderLayer *rl = BLI_findlink(&ima->rr->layers, iuser->layer);

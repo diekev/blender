@@ -247,7 +247,7 @@ static int snode_bg_viewmove_invoke(bContext *C, wmOperator *op, const wmEvent *
 	void *lock;
 
 	ima = BKE_image_verify_viewer(IMA_TYPE_COMPOSITE, "Viewer Node");
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock);
 
 	if (ibuf == NULL) {
 		BKE_image_release_ibuf(ima, ibuf, lock);
@@ -343,7 +343,7 @@ static int backimage_fit_exec(bContext *C, wmOperator *UNUSED(op))
 	float facx, facy;
 
 	ima = BKE_image_verify_viewer(IMA_TYPE_COMPOSITE, "Viewer Node");
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock);
 
 	if (ibuf == NULL) {
 		BKE_image_release_ibuf(ima, ibuf, lock);
@@ -438,7 +438,7 @@ bool ED_space_node_color_sample(Scene *scene, SpaceNode *snode, ARegion *ar, int
 	}
 
 	ima = BKE_image_verify_viewer(IMA_TYPE_COMPOSITE, "Viewer Node");
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock);
 	if (!ibuf) {
 		return false;
 	}
@@ -491,7 +491,7 @@ static void sample_apply(bContext *C, wmOperator *op, const wmEvent *event)
 	float fx, fy, bufx, bufy;
 
 	ima = BKE_image_verify_viewer(IMA_TYPE_COMPOSITE, "Viewer Node");
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock);
 	if (!ibuf) {
 		info->draw = 0;
 		return;

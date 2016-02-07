@@ -918,7 +918,7 @@ void RE_bake_ibuf_clear(Image *image, const bool is_tangent)
 	const float nor_alpha[4] = {0.5f, 0.5f, 1.0f, 0.0f};
 	const float nor_solid[4] = {0.5f, 0.5f, 1.0f, 1.0f};
 
-	ibuf = BKE_image_acquire_ibuf(image, NULL, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(image, NULL, &lock);
 	BLI_assert(ibuf);
 
 	if (is_tangent)

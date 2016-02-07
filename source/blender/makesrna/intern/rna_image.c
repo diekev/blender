@@ -139,7 +139,7 @@ static void rna_Image_fields_update(Main *UNUSED(bmain), Scene *UNUSED(scene), P
 	ImBuf *ibuf;
 	void *lock;
 
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock);
 
 	if (ibuf) {
 		short nr = 0;
@@ -183,7 +183,7 @@ static void rna_Image_views_format_update(Main *UNUSED(bmain), Scene *scene, Poi
 	ImBuf *ibuf;
 	void *lock;
 
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock);
 
 	if (ibuf) {
 		ImageUser iuser = {NULL};
@@ -249,7 +249,7 @@ static EnumPropertyItem *rna_Image_source_itemf(bContext *UNUSED(C), PointerRNA 
 static int rna_Image_file_format_get(PointerRNA *ptr)
 {
 	Image *image = (Image *)ptr->data;
-	ImBuf *ibuf = BKE_image_acquire_ibuf(image, NULL, NULL, IMA_IBUF_IMA);
+	ImBuf *ibuf = BKE_image_acquire_ibuf(image, NULL, NULL);
 	int imtype = BKE_image_ftype_to_imtype(ibuf ? ibuf->ftype : 0, ibuf ? &ibuf->foptions : NULL);
 
 	BKE_image_release_ibuf(image, ibuf, NULL);
@@ -280,7 +280,7 @@ static void rna_Image_size_get(PointerRNA *ptr, int *values)
 	ImBuf *ibuf;
 	void *lock;
 
-	ibuf = BKE_image_acquire_ibuf(im, NULL, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(im, NULL, &lock);
 	if (ibuf) {
 		values[0] = ibuf->x;
 		values[1] = ibuf->y;
@@ -299,7 +299,7 @@ static void rna_Image_resolution_get(PointerRNA *ptr, float *values)
 	ImBuf *ibuf;
 	void *lock;
 
-	ibuf = BKE_image_acquire_ibuf(im, NULL, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(im, NULL, &lock);
 	if (ibuf) {
 		values[0] = ibuf->ppm[0];
 		values[1] = ibuf->ppm[1];
@@ -318,7 +318,7 @@ static void rna_Image_resolution_set(PointerRNA *ptr, const float *values)
 	ImBuf *ibuf;
 	void *lock;
 
-	ibuf = BKE_image_acquire_ibuf(im, NULL, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(im, NULL, &lock);
 	if (ibuf) {
 		ibuf->ppm[0] = values[0];
 		ibuf->ppm[1] = values[1];
@@ -334,7 +334,7 @@ static int rna_Image_depth_get(PointerRNA *ptr)
 	void *lock;
 	int planes;
 	
-	ibuf = BKE_image_acquire_ibuf(im, NULL, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(im, NULL, &lock);
 
 	if (!ibuf)
 		planes = 0;
@@ -359,7 +359,7 @@ static int rna_Image_frame_duration_get(PointerRNA *ptr)
 	else {
 		/* acquire ensures ima->anim is set, if possible! */
 		void *lock;
-		ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock, IMA_IBUF_IMA);
+		ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock);
 		BKE_image_release_ibuf(ima, ibuf, lock);
 	}
 
@@ -372,7 +372,7 @@ static int rna_Image_pixels_get_length(PointerRNA *ptr, int length[RNA_MAX_ARRAY
 	ImBuf *ibuf;
 	void *lock;
 
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock);
 
 	if (ibuf)
 		length[0] = ibuf->x * ibuf->y * ibuf->channels;
@@ -391,7 +391,7 @@ static void rna_Image_pixels_get(PointerRNA *ptr, float *values)
 	void *lock;
 	int i, size;
 
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock);
 
 	if (ibuf) {
 		size = ibuf->x * ibuf->y * ibuf->channels;
@@ -415,7 +415,7 @@ static void rna_Image_pixels_set(PointerRNA *ptr, const float *values)
 	void *lock;
 	int i, size;
 
-	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(ima, NULL, &lock);
 
 	if (ibuf) {
 		size = ibuf->x * ibuf->y * ibuf->channels;
@@ -441,7 +441,7 @@ static int rna_Image_channels_get(PointerRNA *ptr)
 	void *lock;
 	int channels = 0;
 
-	ibuf = BKE_image_acquire_ibuf(im, NULL, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(im, NULL, &lock);
 	if (ibuf)
 		channels = ibuf->channels;
 
@@ -457,7 +457,7 @@ static int rna_Image_is_float_get(PointerRNA *ptr)
 	void *lock;
 	bool is_float = false;
 
-	ibuf = BKE_image_acquire_ibuf(im, NULL, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(im, NULL, &lock);
 	if (ibuf)
 		is_float = ibuf->rect_float != NULL;
 

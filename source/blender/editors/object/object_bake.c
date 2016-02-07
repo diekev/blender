@@ -168,7 +168,7 @@ static bool multiresbake_check(bContext *C, wmOperator *op)
 					ok = false;
 				}
 				else {
-					ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+					ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 
 					if (!ibuf) {
 						BKE_report(op->reports, RPT_ERROR, "Baking should happen to image with image buffer");
@@ -268,7 +268,7 @@ static void clear_single_image(Image *image, ClearFlag flag)
 	const float disp_solid[4] = {0.5f, 0.5f, 0.5f, 1.0f};
 
 	if ((image->id.tag & LIB_TAG_DOIT) == 0) {
-		ImBuf *ibuf = BKE_image_acquire_ibuf(image, NULL, NULL, IMA_IBUF_IMA);
+		ImBuf *ibuf = BKE_image_acquire_ibuf(image, NULL, NULL);
 
 		if (flag == CLEAR_TANGENT_NORMAL)
 			IMB_rectfill(ibuf, (ibuf->planes == R_IMF_PLANES_RGBA) ? nor_alpha : nor_solid);
@@ -629,7 +629,7 @@ static void finish_bake_internal(BakeRender *bkr)
 	/* force OpenGL reload and mipmap recalc */
 	if ((bkr->scene->r.bake_flag & R_BAKE_VCOL) == 0) {
 		for (ima = G.main->image.first; ima; ima = ima->id.next) {
-			ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL, IMA_IBUF_IMA);
+			ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
 
 			/* some of the images could have been changed during bake,
 			 * so recreate mipmaps regardless bake result status

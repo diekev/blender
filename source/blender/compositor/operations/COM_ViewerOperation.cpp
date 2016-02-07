@@ -139,7 +139,7 @@ void ViewerOperation::initImage()
 
 	/* local changes to the original ImageUser */
 	iuser.multi_index = BKE_scene_multiview_view_id_get(this->m_rd, this->m_viewName);
-	ibuf = BKE_image_acquire_ibuf(ima, &iuser, &lock, IMA_IBUF_IMA);
+	ibuf = BKE_image_acquire_ibuf(ima, &iuser, &lock);
 
 	if (!ibuf) {
 		BLI_unlock_thread(LOCK_DRAW_IMAGE);

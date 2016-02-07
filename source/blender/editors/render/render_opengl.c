@@ -439,7 +439,7 @@ static void screen_opengl_render_apply(OGLRender *oglrender)
 	RE_ReleaseResult(oglrender->re);
 
 	/* update byte from float buffer */
-	ibuf = BKE_image_acquire_ibuf(oglrender->ima, &oglrender->iuser, &lock, IMA_IBUF_LAYER);
+	ibuf = BKE_image_acquire_ibuf(oglrender->ima, &oglrender->iuser, &lock);
 
 	if (ibuf) {
 		ibuf->userflags |= IB_DISPLAY_BUFFER_INVALID;

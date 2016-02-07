@@ -78,14 +78,19 @@ ImBuf *BaseImageOperation::getImBuf()
 		iuser.multi_index = BKE_scene_multiview_view_id_get(this->m_rd, this->m_viewName);
 
 	if (iuser.use_layer_ima) {
-		ibuf = BKE_image_acquire_ibuf(this->m_image, &iuser, NULL, IMA_IBUF_LAYER);
+		ibuf = BKE_image_acquire_layer_ibuf(this->m_image);
 	}
 	else {
-		ibuf = BKE_image_acquire_ibuf(this->m_image, &iuser, NULL, IMA_IBUF_IMA);
+		ibuf = BKE_image_acquire_ibuf(this->m_image, &iuser, NULL);
 	}
 
 	if (ibuf == NULL || (ibuf->rect == NULL && ibuf->rect_float == NULL)) {
-		BKE_image_release_ibuf(this->m_image, ibuf, NULL);
+		if (iuser.use_layer_ima) {
+			BKE_image_release_layer_ibuf(ibuf);
+		}
+		else {
+			BKE_image_release_ibuf(this->m_image, ibuf, NULL);
+		}
 		return NULL;
 	}
 	return ibuf;
