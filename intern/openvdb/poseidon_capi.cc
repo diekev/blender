@@ -50,7 +50,7 @@ void PoseidonData_add_inflow(PoseidonData *handle, OpenVDBPrimitive *inflow)
 	poseidon::add_inflow(data, inflow);
 }
 
-void PoseidonData_add_obstacle(struct PoseidonData *handle, struct OpenVDBPrimitive *obstacle)
+void PoseidonData_add_obstacle(PoseidonData *handle, OpenVDBPrimitive *obstacle)
 {
 	poseidon::FluidData *data = reinterpret_cast<poseidon::FluidData *>(handle);
 	poseidon::add_obstacle(data, obstacle);
