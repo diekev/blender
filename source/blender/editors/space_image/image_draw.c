@@ -958,6 +958,7 @@ void draw_image_main(const bContext *C, ARegion *ar)
 			}
 			else {
 				ImBuf *ibuf_l = NULL, *result_ibuf = NULL;
+
 				for (layer = (ImageLayer*)ima->layers.last; layer; layer = layer->prev) {
 					if ((!first) || (layer->preview_ibuf)) {
 						if ((layer->opacity != 1.0f) || (ibuf->channels == 4) || (background & IMA_LAYER_BG_ALPHA)) {
@@ -977,10 +978,27 @@ void draw_image_main(const bContext *C, ARegion *ar)
 							ibuf_l = layer->ibufs.first;
 
 						if (ibuf_l) {
+#if 0
+							ImBuf *draw_ibuf = NULL;
+
+							if (layer->mode != 0) {
+								if (!result_ibuf) {
+									result_ibuf = IMB_dupImBuf(ibuf_l);
+								}
+
+								ImBuf *prev = layer->next->ibufs.first;
+								BKE_image_layer_blend(result_ibuf, prev, ibuf_l, layer->opacity, layer->mode, background);
+
+								draw_ibuf = result_ibuf;
+							}
+							else {
+								draw_ibuf = ibuf_l;
+							}
+#else
 							if (!result_ibuf) {
 								result_ibuf = IMB_dupImBuf(ibuf_l);
 							}
-
+#endif
 							BKE_image_layer_blend(result_ibuf, result_ibuf, ibuf_l, layer->opacity, layer->mode, background);
 
 							glEnable(GL_BLEND);
