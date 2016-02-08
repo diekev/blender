@@ -765,24 +765,24 @@ void BKE_image_add_image_layer_base(Image *ima)
 
 	ImageLayer *layer = BKE_image_layer_new(ima, "Background");
 
-	if (layer) {
-		layer->type = IMA_LAYER_BASE; /* BASE causes no free on deletion of layer */
-		ima->active_layer = 0;
-		ima->num_layers = 1;
-		//ima->use_layers = true;
-
-		/* Get ImBuf from ima */
-		ImBuf *ima_ibuf = BKE_image_get_first_ibuf(ima);
-
-		if (ima_ibuf) {
-			ImBuf *ibuf = IMB_dupImBuf(ima_ibuf);
-			BKE_image_release_ibuf(ima, ima_ibuf, NULL);
-
-			BLI_addtail(&layer->ibufs, ibuf);
-		}
-
-		BLI_addhead(&ima->layers, layer);
+	if (!layer) {
+		return;
 	}
+
+	/* BASE causes no free on deletion of layer */
+	layer->type = IMA_LAYER_BASE;
+	ima->active_layer = 0;
+	ima->num_layers = 1;
+	//ima->use_layers = true;
+
+	ImBuf *ibuf = add_ibuf_size(ima->gen_x, ima->gen_y,
+	                            layer->name, ima->gen_depth,
+	                            (ima->gen_flag & IMA_GEN_FLOAT) != 0,
+	                            ima->gen_type,
+	                            ima->gen_color, &ima->colorspace_settings);
+
+	BLI_addtail(&layer->ibufs, ibuf);
+	BLI_addhead(&ima->layers, layer);
 }
 
 void BKE_image_layer_get_background_color(float col[4], ImageLayer *layer)
