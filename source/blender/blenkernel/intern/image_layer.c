@@ -663,21 +663,9 @@ struct ImageLayer *BKE_image_layer_merge(Image *ima, ImageLayer *iml, ImageLayer
 	BKE_image_layer_blend(ibuf, ibuf, iml->ibufs.first,
 	                      iml->opacity, iml->mode, iml_next->background);
 
+	/* XXX (kevin) - what's that for? */
 	iml_next->background = IMA_LAYER_BG_RGB;
 	iml_next->file_path[0] = '\0';
-	copy_v4_fl(iml_next->default_color, -1.0f);
-
-	/* Delete old ibuf */
-	BLI_remlink(&iml_next->ibufs, ibuf);
-
-	if (ibuf->userdata) {
-		MEM_freeN(ibuf->userdata);
-		ibuf->userdata = NULL;
-	}
-	IMB_freeImBuf(ibuf);
-
-	/* add new ibuf */
-//	BLI_addtail(&iml_next->ibufs, result_ibuf);
 
 	/* delete the merged layer */
 	BLI_remlink(&ima->layers, iml);
