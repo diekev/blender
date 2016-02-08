@@ -2274,6 +2274,9 @@ static void dag_object_time_update_flags(Main *bmain, Scene *scene, Object *ob)
 					if (BKE_image_is_animated(ob->data))
 						ob->recalc |= OB_RECALC_DATA;
 				break;
+			case OB_VOLUME:
+				ob->recalc |= OB_RECALC_DATA;
+				break;
 		}
 		
 		if (animdata_use_time(adt)) {

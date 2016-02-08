@@ -29,10 +29,15 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_fileops.h"
 #include "BLI_listbase.h"
+#include "BLI_math.h"
+#include "BLI_path_util.h"
+#include "BLI_string.h"
 #include "BLI_utildefines.h"
 
 #include "DNA_object_types.h"
+#include "DNA_scene_types.h"
 #include "DNA_volume_types.h"
 
 #include "BKE_library.h"
@@ -111,4 +116,78 @@ BoundBox *BKE_volume_boundbox_get(Object *ob)
 	BKE_boundbox_init_from_minmax(ob->bb, data->bbmin, data->bbmax);
 
 	return ob->bb;
+}
+
+void BKE_volume_update(Scene *scene, Object *ob)
+{
+	Volume *volume = BKE_volume_from_object(ob);
+
+	if (volume->filename[0] == '\0' && !volume->has_file_sequence) {
+		return;
+	}
+
+	int frame, num_digits;
+	BLI_path_frame_get(volume->filename, &frame, &num_digits);
+
+	if (frame == CFRA) {
+		return;
+	}
+
+	char ext[FILE_MAX];
+	char new_filename[FILE_MAX];
+	BLI_strncpy(new_filename, volume->filename, sizeof(volume->filename));
+	BLI_path_frame_strip(new_filename, true, ext);
+	BLI_path_frame(new_filename, CFRA, num_digits);
+	BLI_ensure_extension(new_filename, sizeof(new_filename), ".vdb");
+
+	if (!BLI_exists(new_filename)) {
+		return;
+	}
+
+	BKE_volume_free(volume);
+	BKE_volume_load_from_file(volume, new_filename);
+}
+
+static void openvdb_get_grid_info(void *userdata, const char *name,
+                                  const char *value_type, bool is_color,
+                                  struct OpenVDBPrimitive *prim)
+{
+	Volume *volume = userdata;
+	VolumeData *data = MEM_mallocN(sizeof(VolumeData), "VolumeData");
+
+	BLI_strncpy(data->name, name, sizeof(data->name));
+
+	if (STREQ(value_type, "float")) {
+		data->type = VOLUME_TYPE_FLOAT;
+	}
+	else if (STREQ(value_type, "vec3s")) {
+		if (is_color)
+			data->type = VOLUME_TYPE_COLOR;
+		else
+			data->type = VOLUME_TYPE_VEC3;
+	}
+	else {
+		data->type = VOLUME_TYPE_UNKNOWN;
+	}
+
+	data->prim = prim;
+	data->buffer = NULL;
+	data->flags = 0;
+	data->display_mode = 0;
+	data->draw_nodes = NULL;
+	data->num_draw_nodes = 0;
+	zero_v3(data->bbmin);
+	zero_v3(data->bbmax);
+
+	BLI_addtail(&volume->fields, data);
+}
+
+void BKE_volume_load_from_file(Volume *volume, const char *filename)
+{
+	OpenVDB_get_grid_info(filename, openvdb_get_grid_info, volume);
+	BLI_strncpy(volume->filename, filename, sizeof(volume->filename));
+
+	/* Set the first volume field as the current one */
+	VolumeData *data = volume->fields.first;
+	data->flags |= VOLUME_DATA_CURRENT;
 }

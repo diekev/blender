@@ -57,42 +57,6 @@
 
 #include "io_volume.h"
 
-#include "openvdb_capi.h"
-
-static void openvdb_get_grid_info(void *userdata, const char *name,
-                                  const char *value_type, bool is_color,
-                                  struct OpenVDBPrimitive *prim)
-{
-	Volume *volume = userdata;
-	VolumeData *data = MEM_mallocN(sizeof(VolumeData), "VolumeData");
-
-	BLI_strncpy(data->name, name, sizeof(data->name));
-
-	if (STREQ(value_type, "float")) {
-		data->type = VOLUME_TYPE_FLOAT;
-	}
-	else if (STREQ(value_type, "vec3s")) {
-		if (is_color)
-			data->type = VOLUME_TYPE_COLOR;
-		else
-			data->type = VOLUME_TYPE_VEC3;
-	}
-	else {
-		data->type = VOLUME_TYPE_UNKNOWN;
-	}
-
-	data->prim = prim;
-	data->buffer = NULL;
-	data->flags = 0;
-	data->display_mode = 0;
-	data->draw_nodes = NULL;
-	data->num_draw_nodes = 0;
-	zero_v3(data->bbmin);
-	zero_v3(data->bbmax);
-
-	BLI_addtail(&volume->fields, data);
-}
-
 static int wm_volume_import_exec(bContext *C, wmOperator *op)
 {
 	if (!RNA_struct_property_is_set(op->ptr, "filepath")) {
@@ -119,11 +83,7 @@ static int wm_volume_import_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 	}
 
-	OpenVDB_get_grid_info(filename, openvdb_get_grid_info, volume);
-
-	/* Set the first volume field as the current one */
-	VolumeData *data = volume->fields.first;
-	data->flags |= VOLUME_DATA_CURRENT;
+	BKE_volume_load_from_file(volume, filename);
 
 	return OPERATOR_FINISHED;
 }

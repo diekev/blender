@@ -57,6 +57,7 @@
 #include "BKE_scene.h"
 #include "BKE_material.h"
 #include "BKE_image.h"
+#include "BKE_volume.h"
 
 #include "DEG_depsgraph.h"
 
@@ -232,6 +233,10 @@ void BKE_object_handle_data_update(EvaluationContext *eval_ctx,
 			if (ob->empty_drawtype == OB_EMPTY_IMAGE && ob->data)
 				if (BKE_image_is_animated(ob->data))
 					BKE_image_user_check_frame_calc(ob->iuser, (int)ctime, 0);
+			break;
+
+		case OB_VOLUME:
+			BKE_volume_update(scene, ob);
 			break;
 	}
 
