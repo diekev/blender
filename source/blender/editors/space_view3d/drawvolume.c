@@ -578,7 +578,7 @@ void draw_volume(Object *ob, const float viewnormal[3])
 		return;
 	}
 
-	VolumeData *data = get_first_scalar_field(volume);
+	VolumeData *data = BKE_volume_field_current(volume);
 
 	if (!data || !data->prim) {
 		fprintf(stderr, "No OpenVDB primitive to draw!\n");

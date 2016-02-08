@@ -120,6 +120,7 @@ static void rna_def_volume(BlenderRNA *brna)
 	                           "rna_Volume_active_field_index_set",
 	                           "rna_Volume_active_field_index_range");
 	RNA_def_property_ui_text(prop, "Active Volume Index", "");
+	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
 
 	rna_def_volume_data(brna);
 }

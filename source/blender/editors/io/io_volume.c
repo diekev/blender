@@ -120,6 +120,10 @@ static int wm_volume_import_exec(bContext *C, wmOperator *op)
 
 	OpenVDB_get_grid_info(filename, openvdb_get_grid_info, volume);
 
+	/* Set the first volume field as the current one */
+	VolumeData *data = volume->fields.first;
+	data->flags |= VOLUME_DATA_CURRENT;
+
 	return OPERATOR_FINISHED;
 }
 
