@@ -39,6 +39,7 @@
 #include "view3d_intern.h"
 
 #include "openvdb_capi.h"
+#include "openvdb_render_capi.h"
 
 /* ************************* Texture Atlas ********************** */
 

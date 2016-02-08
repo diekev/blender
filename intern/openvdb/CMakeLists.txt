@@ -53,11 +53,14 @@ if(WITH_OPENVDB)
 		intern/openvdb_reader.cc
 		intern/openvdb_writer.cc
 		openvdb_capi.cc
+		openvdb_render_capi.cc
 		openvdb_util.cc
 
 		intern/openvdb_dense_convert.h
 		intern/openvdb_reader.h
+		intern/openvdb_render_utils.h
 		intern/openvdb_writer.h
+		openvdb_render_capi.h
 		openvdb_util.h
 	)
 

@@ -58,6 +58,7 @@
 #include "view3d_intern.h"  // own include
 
 #include "openvdb_capi.h"
+#include "openvdb_render_capi.h"
 
 struct GPUTexture;
 
