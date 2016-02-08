@@ -446,16 +446,42 @@ void draw_smoke_volume(SmokeDomainSettings *sds, Object *ob,
 	GPU_shader_unbind();
 }
 
-static void draw_vdb_topology(struct OpenVDBPrimitive *prim)
+static void draw_extra_volume_data(struct OpenVDBPrimitive *prim, char mode)
 {
-	float (*verts)[3] = NULL, (*colors)[3] = NULL;
+	float (*verts)[3] = NULL, (*colors)[3] = NULL, (*normals)[3] = NULL;
 	int numverts;
 
-	OpenVDB_get_draw_buffers_nodes(prim, &verts, &colors, &numverts);
+	switch (mode) {
+		case VOLUME_DRAW_TOPOLOGY:
+			OpenVDB_get_draw_buffers_nodes(prim, &verts, &colors, &numverts);
+			break;
+		case VOLUME_DRAW_NEEDLES:
+			OpenVDB_get_draw_buffers_needles(prim, 1.0f, &verts, &colors, &normals, &numverts);
+			break;
+		case VOLUME_DRAW_BOXES:
+			OpenVDB_get_draw_buffers_boxes(prim, 1.0f, &verts, &colors, &normals, &numverts);
+			break;
+		case VOLUME_DRAW_STAGGERED:
+			OpenVDB_get_draw_buffers_staggered(prim, 1.0f, &verts, &colors, &numverts);
+			break;
+		default:
+			return;
+	}
 
 	if (numverts > 0 && verts && colors) {
 		glEnableClientState(GL_VERTEX_ARRAY);
 		glEnableClientState(GL_COLOR_ARRAY);
+
+		if (normals) {
+			glEnableClientState(GL_NORMAL_ARRAY);
+			glColorMaterial(GL_FRONT_AND_BACK, GL_DIFFUSE);
+			glEnable(GL_COLOR_MATERIAL);
+			glEnable(GL_LIGHTING);
+			glEnable(GL_DEPTH_TEST);
+
+			glNormalPointer(GL_FLOAT, 0, normals);
+		}
+
 		glDisable(GL_BLEND);
 		glEnable(GL_DEPTH_TEST);
 
@@ -466,6 +492,12 @@ static void draw_vdb_topology(struct OpenVDBPrimitive *prim)
 
 		glDrawArrays(GL_QUADS, 0, numverts);
 
+		if (normals) {
+			glDisableClientState(GL_NORMAL_ARRAY);
+			glDisable(GL_COLOR_MATERIAL);
+			glDisable(GL_LIGHTING);
+		}
+
 		glDisableClientState(GL_VERTEX_ARRAY);
 		glDisableClientState(GL_COLOR_ARRAY);
 
@@ -475,10 +507,13 @@ static void draw_vdb_topology(struct OpenVDBPrimitive *prim)
 
 	if (verts)
 		MEM_freeN(verts);
+	if (normals)
+		MEM_freeN(normals);
 	if (colors)
 		MEM_freeN(colors);
 }
 
+#if 0
 static VolumeData *get_first_scalar_field(Volume *volume)
 {
 	VolumeData *data = volume->fields.first;
@@ -491,7 +526,11 @@ static VolumeData *get_first_scalar_field(Volume *volume)
 
 	return data;
 }
+#endif
 
+//#define DRAW_TEXTURE_ATLAS
+
+#ifdef DRAW_TEXTURE_ATLAS
 static void draw_volume_nodes(VolumeDrawNode **nodes, const int num_nodes,
                               const float *viewnormal)
 {
@@ -569,6 +608,7 @@ static void draw_volume_nodes(VolumeDrawNode **nodes, const int num_nodes,
 
 	MEM_freeN(slicer.verts);
 }
+#endif
 
 void draw_volume(Object *ob, const float viewnormal[3])
 {
@@ -587,12 +627,12 @@ void draw_volume(Object *ob, const float viewnormal[3])
 
 	struct OpenVDBPrimitive *prim = data->prim;
 
-	/* draw the topology first so it blends nicely. */
-	if (data->flags & VOLUME_DRAW_TOPOLOGY) {
-		draw_vdb_topology(prim);
+	/* draw extra data so it blends nicely. */
+	for (int i = 0; i < 8; i++) {
+		draw_extra_volume_data(prim, data->display_mode & (1 << i));
 	}
 
-#if 0
+#ifdef DRAW_TEXTURE_ATLAS
 	if (!data->draw_nodes) {
 		create_volume_texture_atlas(data);
 	}

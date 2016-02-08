@@ -84,6 +84,7 @@ static void openvdb_get_grid_info(void *userdata, const char *name,
 	data->prim = prim;
 	data->buffer = NULL;
 	data->flags = 0;
+	data->display_mode = 0;
 	data->draw_nodes = NULL;
 	data->num_draw_nodes = 0;
 	zero_v3(data->bbmin);

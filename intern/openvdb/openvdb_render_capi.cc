@@ -47,7 +47,7 @@ float *OpenVDB_get_texture_buffer(struct OpenVDBPrimitive *prim,
 		return NULL;
 	}
 
-	float *buffer = (float *)MEM_mallocN(numcells * sizeof(float), "smoke VDB domain texture buffer");
+	float *buffer = (float *)MEM_mallocN(numcells * sizeof(float), "OpenVDB texture buffer");
 
 	internal::DenseTextureOp op(buffer);
 	internal::process_typed_grid(prim->getConstGridPtr(), storage, op);
@@ -73,8 +73,8 @@ void OpenVDB_get_draw_buffers_nodes(OpenVDBPrimitive *prim,
 	internal::process_typed_grid(prim->getConstGridPtr(), storage, op);
 }
 
-void OpenVDB_smoke_get_draw_buffers_boxes(OpenVDBPrimitive *prim, float value_scale,
-                                          float (**r_verts)[3], float (**r_colors)[3], float (**r_normals)[3], int *r_numverts)
+void OpenVDB_get_draw_buffers_boxes(OpenVDBPrimitive *prim, float value_scale,
+                                    float (**r_verts)[3], float (**r_colors)[3], float (**r_normals)[3], int *r_numverts)
 {
 	const int storage = internal::get_grid_storage(prim->getGrid());
 
@@ -90,8 +90,8 @@ void OpenVDB_smoke_get_draw_buffers_boxes(OpenVDBPrimitive *prim, float value_sc
 	internal::process_typed_grid(prim->getConstGridPtr(), storage, op);
 }
 
-void OpenVDB_smoke_get_draw_buffers_needles(OpenVDBPrimitive *prim, float value_scale,
-                                            float (**r_verts)[3], float (**r_colors)[3], float (**r_normals)[3], int *r_numverts)
+void OpenVDB_get_draw_buffers_needles(OpenVDBPrimitive *prim, float value_scale,
+                                      float (**r_verts)[3], float (**r_colors)[3], float (**r_normals)[3], int *r_numverts)
 {
 	const int storage = internal::get_grid_storage(prim->getGrid());
 
@@ -107,8 +107,8 @@ void OpenVDB_smoke_get_draw_buffers_needles(OpenVDBPrimitive *prim, float value_
 	internal::process_typed_grid(prim->getConstGridPtr(), storage, op);
 }
 
-void OpenVDB_smoke_get_draw_buffers_staggered(OpenVDBPrimitive *prim, float value_scale,
-                                            float (**r_verts)[3], float (**r_colors)[3], int *r_numverts)
+void OpenVDB_get_draw_buffers_staggered(OpenVDBPrimitive *prim, float value_scale,
+                                        float (**r_verts)[3], float (**r_colors)[3], int *r_numverts)
 {
 	const int storage = internal::get_grid_storage(prim->getGrid());
 
@@ -123,7 +123,7 @@ void OpenVDB_smoke_get_draw_buffers_staggered(OpenVDBPrimitive *prim, float valu
 	internal::process_typed_grid(prim->getConstGridPtr(), storage, op);
 }
 
-void OpenVDB_smoke_get_value_range(struct OpenVDBPrimitive *prim, float *bg, float *min, float *max)
+void OpenVDB_get_value_range(struct OpenVDBPrimitive *prim, float *bg, float *min, float *max)
 {
 	const int storage = internal::get_grid_storage(prim->getGrid());
 

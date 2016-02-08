@@ -85,6 +85,14 @@ static void rna_Volume_active_field_index_set(struct PointerRNA *ptr, int value)
 
 static void rna_def_volume_data(BlenderRNA *brna)
 {
+	static EnumPropertyItem display_mode_items[] = {
+	    {VOLUME_DRAW_TOPOLOGY, "TOPOLOGY", 0, "Topology", "Show the topology of the volume"},
+	    {VOLUME_DRAW_BOXES, "BOXES", 0, "Boxes", "Indicate field strength with boxes"},
+	    {VOLUME_DRAW_NEEDLES, "NEEDLES", 0, "Needles", "Show field vectors with needles"},
+	    {VOLUME_DRAW_STAGGERED, "STAGGERED", 0, "Staggered", "Show field vector components on cell faces"},
+	    {0, NULL, 0, NULL, NULL}
+	};
+
     StructRNA *srna = RNA_def_struct(brna, "VolumeData", NULL);
     RNA_def_struct_ui_text(srna, "Volume Data", "Volume Data");
 
@@ -93,9 +101,11 @@ static void rna_def_volume_data(BlenderRNA *brna)
     RNA_def_property_ui_text(prop, "Name", "Field name");
     RNA_def_struct_name_property(srna, prop);
 
-	prop = RNA_def_property(srna, "show_topology", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "flags", VOLUME_DRAW_TOPOLOGY);
-	RNA_def_property_ui_text(prop, "Draw Topology", "Show the topology of the volume");
+	prop = RNA_def_property(srna, "display_mode", PROP_ENUM, PROP_NONE);
+	RNA_def_property_flag(prop, PROP_ENUM_FLAG);
+	RNA_def_property_enum_items(prop, display_mode_items);
+	RNA_def_property_enum_default(prop, 0);
+	RNA_def_property_ui_text(prop, "Display Mode", "Mode of display for the volume data");
 	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
 }
 

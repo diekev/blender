@@ -55,7 +55,7 @@ class DATA_PT_volume_fields(VolumeButtonsPanel, Panel):
         field = volume.active_field
 
         if field:
-            layout.prop(field, "show_topology")
+            layout.props_enum(field, "display_mode")
 
 
 

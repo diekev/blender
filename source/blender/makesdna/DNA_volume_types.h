@@ -44,7 +44,14 @@ typedef enum eVolumeDataType {
 
 enum {
 	VOLUME_DATA_CURRENT  = (1 << 0),
-	VOLUME_DRAW_TOPOLOGY = (1 << 1),
+};
+
+enum {
+	VOLUME_DRAW_TOPOLOGY  = (1 << 0),
+	VOLUME_DRAW_CELLS     = (1 << 1),
+	VOLUME_DRAW_BOXES     = (1 << 2),
+	VOLUME_DRAW_NEEDLES   = (1 << 3),
+	VOLUME_DRAW_STAGGERED = (1 << 4),
 };
 
 typedef struct VolumeData {
@@ -63,7 +70,8 @@ typedef struct VolumeData {
 
 	char name[64];  /* MAX_NAME */
 	short type;
-	short flags;
+	char flags;
+	char display_mode;
 	short pad[2];
 } VolumeData;
 

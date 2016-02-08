@@ -44,7 +44,7 @@ void OpenVDB_get_draw_buffers_nodes(
         float (**r_colors)[3],
         int *r_numverts);
 
-void OpenVDB_smoke_get_draw_buffers_boxes(
+void OpenVDB_get_draw_buffers_boxes(
         struct OpenVDBPrimitive *prim,
         float value_scale,
         float (**r_verts)[3],
@@ -52,7 +52,7 @@ void OpenVDB_smoke_get_draw_buffers_boxes(
         float (**r_normals)[3],
         int *r_numverts);
 
-void OpenVDB_smoke_get_draw_buffers_needles(
+void OpenVDB_get_draw_buffers_needles(
         struct OpenVDBPrimitive *prim,
         float value_scale,
         float (**r_verts)[3],
@@ -60,14 +60,14 @@ void OpenVDB_smoke_get_draw_buffers_needles(
         float (**r_normals)[3],
         int *r_numverts);
 
-void OpenVDB_smoke_get_draw_buffers_staggered(
+void OpenVDB_get_draw_buffers_staggered(
         struct OpenVDBPrimitive *prim,
         float value_scale,
         float (**r_verts)[3],
         float (**r_colors)[3],
         int *r_numverts);
 
-void OpenVDB_smoke_get_value_range(
+void OpenVDB_get_value_range(
         struct OpenVDBPrimitive *prim,
         float *bg, float *min, float *max);
 
