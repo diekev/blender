@@ -28,6 +28,7 @@
 #include "../guardedalloc/MEM_guardedalloc.h"
 
 #include "intern/openvdb_primitive.h"
+#include "intern/openvdb_process_utils.h"
 #include "intern/openvdb_render_utils.h"
 
 struct OpenVDBInternalNode2 { int unused; };
@@ -35,31 +36,99 @@ struct OpenVDBInternalNode2 { int unused; };
 float *OpenVDB_get_texture_buffer(struct OpenVDBPrimitive *prim,
                                   int res[3], float bbmin[3], float bbmax[3])
 {
+	const int storage = internal::get_grid_storage(prim->getGrid());
 
-	openvdb::FloatGrid::Ptr grid = openvdb::gridPtrCast<openvdb::FloatGrid>(prim->getGridPtr());
+	internal::DenseTextureResOp res_op(res, bbmin, bbmax);
+	internal::process_typed_grid(prim->getConstGridPtr(), storage, res_op);
 
-	if (!internal::OpenVDB_get_dense_texture_res(grid.get(), res, bbmin, bbmax))
+	const int numcells = res[0] * res[1] * res[2];
+
+	if (numcells == 0) {
 		return NULL;
+	}
 
-	int numcells = res[0] * res[1] * res[2];
 	float *buffer = (float *)MEM_mallocN(numcells * sizeof(float), "smoke VDB domain texture buffer");
-	internal::OpenVDB_create_dense_texture(grid.get(), buffer);
+
+	internal::DenseTextureOp op(buffer);
+	internal::process_typed_grid(prim->getConstGridPtr(), storage, op);
 
 	return buffer;
 }
 
 void OpenVDB_get_draw_buffers_nodes(OpenVDBPrimitive *prim,
-                                          float (**r_verts)[3], float (**r_colors)[3], int *r_numverts)
+                                    float (**r_verts)[3], float (**r_colors)[3], int *r_numverts)
 {
 	const int min_level = 0;
 	const int max_level = 3;
 
-	openvdb::FloatGrid::Ptr grid = openvdb::gridPtrCast<openvdb::FloatGrid>(prim->getGridPtr());
+	const int storage = internal::get_grid_storage(prim->getGrid());
 
-	internal::OpenVDB_get_draw_buffer_size_cells(grid.get(), min_level, max_level, false, r_numverts);
+	internal::CellsBufferSizeOp size_op(r_numverts, min_level, max_level, false);
+	internal::process_typed_grid(prim->getConstGridPtr(), storage, size_op);
+
 	*r_verts = (float (*)[3])MEM_mallocN((*r_numverts) * sizeof(float) * 3, "OpenVDB vertex buffer");
 	*r_colors = (float (*)[3])MEM_mallocN((*r_numverts) * sizeof(float) * 3, "OpenVDB color buffer");
-	internal::OpenVDB_get_draw_buffers_cells(grid.get(), min_level, max_level, false, *r_verts, *r_colors);
+
+	internal::CellsBufferOp op(min_level, max_level, false, *r_verts, *r_colors);
+	internal::process_typed_grid(prim->getConstGridPtr(), storage, op);
+}
+
+void OpenVDB_smoke_get_draw_buffers_boxes(OpenVDBPrimitive *prim, float value_scale,
+                                          float (**r_verts)[3], float (**r_colors)[3], float (**r_normals)[3], int *r_numverts)
+{
+	const int storage = internal::get_grid_storage(prim->getGrid());
+
+	internal::BoxesBufferSizeOp size_op(r_numverts);
+	internal::process_typed_grid(prim->getConstGridPtr(), storage, size_op);
+
+	const size_t bufsize_v3 = (*r_numverts) * sizeof(float) * 3;
+	*r_verts = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB vertex buffer");
+	*r_colors = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB color buffer");
+	*r_normals = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB normal buffer");
+
+	internal::BoxesBufferOp op(value_scale, *r_verts, *r_colors, *r_normals);
+	internal::process_typed_grid(prim->getConstGridPtr(), storage, op);
+}
+
+void OpenVDB_smoke_get_draw_buffers_needles(OpenVDBPrimitive *prim, float value_scale,
+                                            float (**r_verts)[3], float (**r_colors)[3], float (**r_normals)[3], int *r_numverts)
+{
+	const int storage = internal::get_grid_storage(prim->getGrid());
+
+	internal::NeedlesBufferSizeOp size_op(r_numverts);
+	internal::process_typed_grid(prim->getConstGridPtr(), storage, size_op);
+
+	const size_t bufsize_v3 = (*r_numverts) * sizeof(float) * 3;
+	*r_verts = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB vertex buffer");
+	*r_colors = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB color buffer");
+	*r_normals = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB normal buffer");
+
+	internal::NeedlesBufferOp op(value_scale, *r_verts, *r_colors, *r_normals);
+	internal::process_typed_grid(prim->getConstGridPtr(), storage, op);
+}
+
+void OpenVDB_smoke_get_draw_buffers_staggered(OpenVDBPrimitive *prim, float value_scale,
+                                            float (**r_verts)[3], float (**r_colors)[3], int *r_numverts)
+{
+	const int storage = internal::get_grid_storage(prim->getGrid());
+
+	internal::StaggeredBufferSizeOp size_op(r_numverts);
+	internal::process_typed_grid(prim->getConstGridPtr(), storage, size_op);
+
+	const size_t bufsize_v3 = (*r_numverts) * sizeof(float) * 3;
+	*r_verts = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB vertex buffer");
+	*r_colors = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB color buffer");
+
+	internal::StaggeredBufferOp op(value_scale, *r_verts, *r_colors);
+	internal::process_typed_grid(prim->getConstGridPtr(), storage, op);
+}
+
+void OpenVDB_smoke_get_value_range(struct OpenVDBPrimitive *prim, float *bg, float *min, float *max)
+{
+	const int storage = internal::get_grid_storage(prim->getGrid());
+
+	internal::GridValueRangeOp op(min, max, bg);
+	internal::process_typed_grid(prim->getConstGridPtr(), storage, op);
 }
 
 void OpenVDB_get_internal_nodes_count(OpenVDBPrimitive *prim, int **r_nodes_counts,
@@ -194,49 +263,4 @@ void OpenVDB_node_get_leaf_indices(const OpenVDBInternalNode2 *node_handle,
 		(*indirection_map)[index] = *leaf_index;
 		(*leaf_index)++;
 	}
-}
-
-void OpenVDB_smoke_get_draw_buffers_boxes(OpenVDBPrimitive *prim, float value_scale,
-                                          float (**r_verts)[3], float (**r_colors)[3], float (**r_normals)[3], int *r_numverts)
-{
-	openvdb::FloatGrid::ConstPtr grid = openvdb::gridConstPtrCast<openvdb::FloatGrid>(prim->getConstGridPtr());
-
-	internal::OpenVDB_get_draw_buffer_size_boxes(grid.get(), r_numverts);
-	const size_t bufsize_v3 = (*r_numverts) * sizeof(float) * 3;
-	*r_verts = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB vertex buffer");
-	*r_colors = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB color buffer");
-	*r_normals = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB normal buffer");
-	internal::OpenVDB_get_draw_buffers_boxes(grid.get(), value_scale, *r_verts, *r_colors, *r_normals);
-}
-
-void OpenVDB_smoke_get_draw_buffers_needles(OpenVDBPrimitive *prim, float value_scale,
-                                            float (**r_verts)[3], float (**r_colors)[3], float (**r_normals)[3], int *r_numverts)
-{
-	openvdb::FloatGrid::ConstPtr grid = openvdb::gridConstPtrCast<openvdb::FloatGrid>(prim->getConstGridPtr());
-
-	internal::OpenVDB_get_draw_buffer_size_needles(grid.get(), r_numverts);
-	const size_t bufsize_v3 = (*r_numverts) * sizeof(float) * 3;
-	*r_verts = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB vertex buffer");
-	*r_colors = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB color buffer");
-	*r_normals = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB normal buffer");
-	internal::OpenVDB_get_draw_buffers_needles(grid.get(), value_scale, *r_verts, *r_colors, *r_normals);
-}
-
-void OpenVDB_smoke_get_draw_buffers_staggered(OpenVDBPrimitive *prim, float value_scale,
-                                            float (**r_verts)[3], float (**r_colors)[3], int *r_numverts)
-{
-	openvdb::FloatGrid::ConstPtr grid = openvdb::gridConstPtrCast<openvdb::FloatGrid>(prim->getConstGridPtr());
-
-	internal::OpenVDB_get_draw_buffer_size_staggered(grid.get(), r_numverts);
-	const size_t bufsize_v3 = (*r_numverts) * sizeof(float) * 3;
-	*r_verts = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB vertex buffer");
-	*r_colors = (float (*)[3])MEM_mallocN(bufsize_v3, "OpenVDB color buffer");
-	internal::OpenVDB_get_draw_buffers_staggered(grid.get(), value_scale, *r_verts, *r_colors);
-}
-
-void OpenVDB_smoke_get_value_range(struct OpenVDBPrimitive *prim, float *bg, float *min, float *max)
-{
-	openvdb::FloatGrid::ConstPtr grid = openvdb::gridConstPtrCast<openvdb::FloatGrid>(prim->getConstGridPtr());
-
-	internal::OpenVDB_get_grid_value_range(grid.get(), bg, min, max);
 }

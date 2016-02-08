@@ -25,7 +25,6 @@
 
 #pragma once
 
-#include <openvdb/openvdb.h>
 #include <openvdb/tools/Interpolation.h>
 #include <openvdb/tools/Statistics.h>
 
@@ -40,105 +39,126 @@ struct FloatConverter {
 };
 
 template <>
-struct FloatConverter<openvdb::Vec3f> {
-	static float get(const openvdb::Vec3f &value)
+template <typename T>
+struct FloatConverter< openvdb::math::Vec3<T> > {
+	static float get(const openvdb::math::Vec3<T> &value)
 	{
-		return value.length();
+		return static_cast<float>(value.length());
 	}
 };
 
-template <typename TreeType>
-static bool OpenVDB_get_dense_texture_res(const openvdb::Grid<TreeType> *grid, int res[3], float bbmin[3], float bbmax[3])
-{
-	if (!grid) {
-		res[0] = res[1] = res[2] = 0;
-		openvdb::Vec3f(0,0,0).toV(bbmin);
-		openvdb::Vec3f(0,0,0).toV(bbmax);
-		return false;
+template <typename T>
+struct VectorConverter {
+	static openvdb::Vec3f get(T value)
+	{
+		return openvdb::Vec3f(0.0f, 0.0f, value);
 	}
+};
 
-	if (!grid->cbeginValueOn()) {
-		res[0] = res[1] = res[2] = 0;
-		return false;
+template <>
+template <typename T>
+struct VectorConverter< openvdb::math::Vec3<T> > {
+	static openvdb::Vec3f get(const openvdb::math::Vec3<T> &value)
+	{
+		return openvdb::Vec3f(value.x(), value.y(), value.z());
 	}
+};
 
-	openvdb::CoordBBox bbox = grid->evalActiveVoxelBoundingBox();
-	res[0] = bbox.dim().x();
-	res[1] = bbox.dim().y();
-	res[2] = bbox.dim().z();
+struct DenseTextureResOp {
+	int *res;
+	float *bbmin;
+	float *bbmax;
 
-	openvdb::BBoxd vbox = grid->transform().indexToWorld(bbox);
-	vbox.min().toV(bbmin);
-	vbox.max().toV(bbmax);
+	DenseTextureResOp(int res[3], float bbmin[3], float bbmax[3])
+		: res(res)
+	    , bbmin(bbmin)
+	    , bbmax(bbmax)
+	{}
 
-	return res[0] > 0 && res[1] > 0 && res[2] > 0;
-}
+	template <typename GridType>
+	void operator()(typename GridType::ConstPtr grid)
+	{
+		if (!grid->cbeginValueOn()) {
+			res[0] = res[1] = res[2] = 0;
+			return;
+		}
 
-template <typename TreeType>
-static void OpenVDB_create_dense_texture(const openvdb::Grid<TreeType> *grid, float *buffer)
-{
-	using namespace openvdb;
-	using namespace openvdb::math;
+		openvdb::CoordBBox bbox = grid->evalActiveVoxelBoundingBox();
+		res[0] = bbox.dim().x();
+		res[1] = bbox.dim().y();
+		res[2] = bbox.dim().z();
 
-	typedef Grid<TreeType> GridType;
-	typedef typename TreeType::ValueType ValueType;
-
-	if (!grid) {
-		return;
+		openvdb::BBoxd vbox = grid->transform().indexToWorld(bbox);
+		vbox.min().toV(bbmin);
+		vbox.max().toV(bbmax);
 	}
+};
 
-	typename GridType::ConstAccessor acc = grid->getConstAccessor();
+struct DenseTextureOp {
+	float *buffer;
 
-	openvdb::CoordBBox bbox = grid->evalActiveVoxelBoundingBox();
+	DenseTextureOp(float *buffer)
+		: buffer(buffer)
+	{}
 
-	openvdb::Coord bbmin = bbox.min(), bbmax = bbox.max();
-	size_t index = 0;
-	Coord ijk;
-	int &i = ijk[0], &j = ijk[1], &k = ijk[2];
-	for (k = bbmin[2]; k <= bbmax[2]; ++k) {
-		for (j = bbmin[1]; j <= bbmax[1]; ++j) {
-			for (i = bbmin[0]; i <= bbmax[0]; ++i, ++index) {
-				buffer[index] = acc.isValueOn(ijk) ? FloatConverter<ValueType>::get(acc.getValue(ijk)) : 0.0f;
+	template <typename GridType>
+	void operator()(typename GridType::ConstPtr grid)
+	{
+		typedef typename GridType::ValueType ValueType;
+
+		typename GridType::ConstAccessor acc = grid->getConstAccessor();
+
+		openvdb::CoordBBox bbox = grid->evalActiveVoxelBoundingBox();
+
+		openvdb::Coord bbmin = bbox.min(), bbmax = bbox.max();
+		size_t index = 0;
+		openvdb::Coord ijk;
+		int &i = ijk[0], &j = ijk[1], &k = ijk[2];
+		for (k = bbmin[2]; k <= bbmax[2]; ++k) {
+			for (j = bbmin[1]; j <= bbmax[1]; ++j) {
+				for (i = bbmin[0]; i <= bbmax[0]; ++i, ++index) {
+					buffer[index] = acc.isValueOn(ijk) ? FloatConverter<ValueType>::get(acc.getValue(ijk)) : 0.0f;
+				}
 			}
 		}
 	}
-}
+};
 
-template <typename TreeType>
-static void OpenVDB_get_draw_buffer_size_cells(const openvdb::Grid<TreeType> *grid, int min_level, int max_level, bool voxels,
-                                               int *r_numverts)
-{
-	using namespace openvdb;
-	using namespace openvdb::math;
+struct CellsBufferSizeOp {
+	int *numverts;
+	int level_min, level_max;
+	bool do_voxels;
 
-	typedef typename TreeType::LeafNodeType LeafNodeType;
+	CellsBufferSizeOp(int *r_numverts, int min_level, int max_level, bool voxels)
+	    : numverts(r_numverts)
+	    , level_min(min_level)
+	    , level_max(max_level)
+	    , do_voxels(voxels)
+	{}
 
-	if (!grid) {
-		*r_numverts = 0;
-		return;
-	}
+	template <typename GridType>
+	void operator()(typename GridType::ConstPtr grid)
+	{
+		typedef typename GridType::TreeType TreeType;
 
-	/* count */
-	int numverts = 0;
-	for (typename TreeType::NodeCIter node_iter = grid->tree().cbeginNode(); node_iter; ++node_iter) {
-		const int level = node_iter.getLevel();
+		int total = 0;
 
-		if (level < min_level || level > max_level)
-			continue;
+		for (typename TreeType::NodeCIter node_iter = grid->tree().cbeginNode(); node_iter; ++node_iter) {
+			const int level = node_iter.getLevel();
 
-		numverts += 6 * 4;
-	}
+			if (level < level_min || level > level_max)
+				continue;
 
-	if (voxels) {
-		for (typename TreeType::LeafCIter leaf_iter = grid->tree().cbeginLeaf(); leaf_iter; ++leaf_iter) {
-			const LeafNodeType *leaf = leaf_iter.getLeaf();
-
-			numverts += 6 * 4 * leaf->onVoxelCount();
+			total += 6 * 4;
 		}
-	}
 
-	*r_numverts = numverts;
-}
+		if (do_voxels) {
+			total += grid->tree().activeLeafVoxelCount() * 6 * 4;
+		}
+
+		*numverts = total;
+	}
+};
 
 static void copy_v3_v3(float *r, const float *a)
 {
@@ -283,9 +303,82 @@ static void OpenVDB_get_draw_buffers_cells(const openvdb::Grid<TreeType> *grid, 
 	}
 }
 
-using namespace openvdb;
+struct CellsBufferOp {
+	int level_min, level_max;
+	bool do_voxels;
+	float (*verts)[3];
+	float (*colors)[3];
 
-static void get_normal(float nor[3], const Vec3f &v1, const Vec3f &v2, const Vec3f &v3)
+	CellsBufferOp(int min_level, int max_level, bool voxels, float (*verts)[3], float (*colors)[3])
+	    : level_min(min_level)
+	    , level_max(max_level)
+	    , do_voxels(voxels)
+	    , verts(verts)
+	    , colors(colors)
+	{}
+
+	template <typename GridType>
+	void operator()(typename GridType::ConstPtr grid)
+	{
+		using namespace openvdb;
+		using namespace openvdb::math;
+
+		typedef typename GridType::TreeType     TreeType;
+		typedef typename TreeType::LeafNodeType LeafNodeType;
+
+		/* The following colors are meant to be the same as in the example images of
+		 * "VDB: High-Resolution Sparse Volumes With Dynamic Topology", K. Museth, 2013
+		 */
+		static const Vec3f node_color[4] = {
+		    Vec3f(0.045f, 0.045f, 0.045f), // root node (black)
+		    Vec3f(0.043f, 0.330f, 0.041f), // first internal node level (green)
+		    Vec3f(0.871f, 0.394f, 0.019f), // intermediate internal node levels (orange)
+		    Vec3f(0.006f, 0.280f, 0.625f)  // leaf nodes (blue)
+		};
+		static const Vec3f voxel_color = Vec3f(1.000f, 0.000f, 0.000f); // active voxel (red)
+
+		int verts_ofs = 0;
+		for (typename TreeType::NodeCIter node_iter = grid->tree().cbeginNode(); node_iter; ++node_iter) {
+			const int level = node_iter.getLevel();
+
+			if (level < level_min || level > level_max)
+				continue;
+
+			CoordBBox bbox;
+			node_iter.getBoundingBox(bbox);
+
+			Vec3f min = Vec3f(bbox.min().x(), bbox.min().y(), bbox.min().z()) - Vec3f(0.5f, 0.5f, 0.5f);
+			Vec3f max = Vec3f(bbox.max().x(), bbox.max().y(), bbox.max().z()) + Vec3f(0.5f, 0.5f, 0.5f);
+			Vec3f wmin = grid->indexToWorld(min);
+			Vec3f wmax = grid->indexToWorld(max);
+
+			Vec3f color = node_color[std::max(3 - level, 0)];
+
+			add_box(verts, colors, NULL, &verts_ofs, wmin, wmax, color);
+		}
+
+		if (do_voxels) {
+			for (typename TreeType::LeafCIter leaf_iter = grid->tree().cbeginLeaf(); leaf_iter; ++leaf_iter) {
+				const LeafNodeType *leaf = leaf_iter.getLeaf();
+
+				for (typename LeafNodeType::ValueOnCIter value_iter = leaf->cbeginValueOn(); value_iter; ++value_iter) {
+					const Coord ijk = value_iter.getCoord();
+
+					Vec3f min = Vec3f(ijk.x(), ijk.y(), ijk.z()) - Vec3f(0.5f, 0.5f, 0.5f);
+					Vec3f max = Vec3f(ijk.x(), ijk.y(), ijk.z()) + Vec3f(0.5f, 0.5f, 0.5f);
+					Vec3f wmin = grid->indexToWorld(min);
+					Vec3f wmax = grid->indexToWorld(max);
+
+					Vec3f color = voxel_color;
+
+					add_box(verts, colors, NULL, &verts_ofs, wmin, wmax, color);
+				}
+			}
+		}
+	}
+};
+
+static void get_normal(float nor[3], const openvdb::Vec3f &v1, const openvdb::Vec3f &v2, const openvdb::Vec3f &v3)
 {
 	openvdb::Vec3f n1, n2;
 
@@ -296,7 +389,7 @@ static void get_normal(float nor[3], const Vec3f &v1, const Vec3f &v2, const Vec
 }
 
 static inline void add_tri(float (*verts)[3], float (*colors)[3], float (*normals)[3], int *verts_ofs,
-                           const Vec3f &p1, const Vec3f &p2, const Vec3f &p3, const Vec3f &color)
+                           const openvdb::Vec3f &p1, const openvdb::Vec3f &p2, const openvdb::Vec3f &p3, const openvdb::Vec3f &color)
 {
 	copy_v3_v3(verts[*verts_ofs+0], p1.asV());
 	copy_v3_v3(verts[*verts_ofs+1], p2.asV());
@@ -378,22 +471,6 @@ static void add_staggered_needle(float (*verts)[3], float (*colors)[3], int *ver
 #undef SHIFT
 }
 
-template <typename T>
-struct VectorConverter {
-	static Vec3f get(T value)
-	{
-		return value;
-	}
-};
-
-template <>
-struct VectorConverter<float> {
-	static Vec3f get(float value)
-	{
-		return Vec3f(0.0f, 0.0f, value);
-	}
-};
-
 static inline void hsv_to_rgb(float h, float s, float v, float *r, float *g, float *b)
 {
 	float nr, ng, nb;
@@ -411,236 +488,253 @@ static inline void hsv_to_rgb(float h, float s, float v, float *r, float *g, flo
 	*b = ((nb - 1.0f) * s + 1.0f) * v;
 }
 
-template <typename TreeType>
-static void OpenVDB_get_draw_buffer_size_boxes(const openvdb::Grid<TreeType> *grid,
-                                               int *r_numverts)
-{
-	using namespace openvdb;
-	using namespace openvdb::math;
+struct BoxesBufferSizeOp {
+	int *numverts;
 
-	typedef typename TreeType::LeafNodeType LeafNodeType;
+	BoxesBufferSizeOp(int *r_numverts)
+	    : numverts(r_numverts)
+	{}
 
-	if (!grid) {
-		*r_numverts = 0;
-		return;
+	template <typename GridType>
+	void operator()(typename GridType::ConstPtr grid)
+	{
+		*numverts = grid->tree().activeLeafVoxelCount() * 6 * 4;
 	}
+};
 
-	/* count */
-	int numverts = 0;
-	for (typename TreeType::LeafCIter leaf_iter = grid->tree().cbeginLeaf(); leaf_iter; ++leaf_iter) {
-		const LeafNodeType *leaf = leaf_iter.getLeaf();
+struct BoxesBufferOp {
+	float value_scale;
+	float (*verts)[3];
+	float (*colors)[3];
+	float (*normals)[3];
 
-		numverts += 6 * 4 * leaf->onVoxelCount();
-	}
+	BoxesBufferOp(float value_scale, float (*verts)[3], float (*colors)[3], float (*normals)[3])
+	    : value_scale(value_scale)
+	    , verts(verts)
+	    , colors(colors)
+	    , normals(normals)
+	{}
 
-	*r_numverts = numverts;
-}
+	template <typename GridType>
+	void operator()(typename GridType::ConstPtr grid)
+	{
+		using namespace openvdb;
+		using namespace openvdb::math;
 
-template <typename TreeType>
-static void OpenVDB_get_draw_buffers_boxes(const openvdb::Grid<TreeType> *grid, float value_scale,
-                                           float (*verts)[3], float (*colors)[3], float (*normals)[3])
-{
-	using namespace openvdb;
-	using namespace openvdb::math;
+		typedef typename GridType::TreeType     TreeType;
+		typedef typename TreeType::ValueType    ValueType;
+		typedef typename TreeType::LeafNodeType LeafNodeType;
 
-	typedef typename TreeType::ValueType ValueType;
-	typedef typename TreeType::LeafNodeType LeafNodeType;
-
-	if (!grid) {
-		return;
-	}
-
-	const float bg = FloatConverter<ValueType>::get(grid->background());
-	int verts_ofs = 0;
-
-	for (typename TreeType::LeafCIter leaf_iter = grid->tree().cbeginLeaf(); leaf_iter; ++leaf_iter) {
-		const LeafNodeType *leaf = leaf_iter.getLeaf();
-
-		for (typename LeafNodeType::ValueOnCIter value_iter = leaf->cbeginValueOn(); value_iter; ++value_iter) {
-			const Coord ijk = value_iter.getCoord();
-
-			float fac = FloatConverter<ValueType>::get(value_iter.getValue());
-			fac = (fac - bg) * value_scale;
-			fac = std::max(-1.0f, std::min(fac, 1.0f));
-
-			Vec3f center(ijk.x(), ijk.y(), ijk.z());
-			Vec3f min = center - Vec3f(0.5f, 0.5f, 0.5f) * fac;
-			Vec3f max = center + Vec3f(0.5f, 0.5f, 0.5f) * fac;
-			Vec3f wmin = grid->indexToWorld(min);
-			Vec3f wmax = grid->indexToWorld(max);
-
-			float r, g, b;
-			// -1..0..1 = red..yellow..green
-			hsv_to_rgb((fac + 1.0f) / 6.0f, 1.0f, 1.0f, &r, &g, &b);
-			Vec3f color = Vec3f(r, g, b);
-
-			add_box(verts, colors, normals, &verts_ofs, wmin, wmax, color);
+		if (!grid) {
+			return;
 		}
-	}
-}
 
-template <typename TreeType>
-static void OpenVDB_get_draw_buffer_size_needles(const openvdb::Grid<TreeType> *grid,
-                                                 int *r_numverts)
-{
-	using namespace openvdb;
-	using namespace openvdb::math;
+		const float bg = FloatConverter<ValueType>::get(grid->background());
+		int verts_ofs = 0;
 
-	typedef typename TreeType::LeafNodeType LeafNodeType;
+		for (typename TreeType::LeafCIter leaf_iter = grid->tree().cbeginLeaf(); leaf_iter; ++leaf_iter) {
+			const LeafNodeType *leaf = leaf_iter.getLeaf();
 
-	if (!grid) {
-		*r_numverts = 0;
-		return;
-	}
+			for (typename LeafNodeType::ValueOnCIter value_iter = leaf->cbeginValueOn(); value_iter; ++value_iter) {
+				const Coord ijk = value_iter.getCoord();
 
-	/* count */
-	int numverts = 0;
-	for (typename TreeType::LeafCIter leaf_iter = grid->tree().cbeginLeaf(); leaf_iter; ++leaf_iter) {
-		const LeafNodeType *leaf = leaf_iter.getLeaf();
+				float fac = FloatConverter<ValueType>::get(value_iter.getValue());
+				fac = (fac - bg) * value_scale;
+				fac = std::max(-1.0f, std::min(fac, 1.0f));
 
-		numverts += 4 * 3 * leaf->onVoxelCount();
-	}
+				Vec3f center(ijk.x(), ijk.y(), ijk.z());
+				Vec3f min = center - Vec3f(0.5f, 0.5f, 0.5f) * fac;
+				Vec3f max = center + Vec3f(0.5f, 0.5f, 0.5f) * fac;
+				Vec3f wmin = grid->indexToWorld(min);
+				Vec3f wmax = grid->indexToWorld(max);
 
-	*r_numverts = numverts;
-}
+				float r, g, b;
+				// -1..0..1 = red..yellow..green
+				hsv_to_rgb((fac + 1.0f) / 6.0f, 1.0f, 1.0f, &r, &g, &b);
+				Vec3f color = Vec3f(r, g, b);
 
-template <typename TreeType>
-static void OpenVDB_get_draw_buffers_needles(const openvdb::Grid<TreeType> *grid, float value_scale,
-                                             float (*verts)[3], float (*colors)[3], float (*normals)[3])
-{
-	using namespace openvdb;
-	using namespace openvdb::math;
-
-	typedef Grid<TreeType> GridType;
-	typedef typename TreeType::ValueType ValueType;
-	typedef typename TreeType::LeafNodeType LeafNodeType;
-
-	typedef typename GridType::ConstAccessor AccessorType;
-	typedef openvdb::tools::GridSampler<AccessorType, tools::BoxSampler> SamplerType;
-
-	if (!grid) {
-		return;
-	}
-
-	const float bg = FloatConverter<ValueType>::get(grid->background());
-	int verts_ofs = 0;
-
-	AccessorType acc(grid->tree());
-	SamplerType sampler(acc, grid->transform());
-
-	for (typename TreeType::LeafCIter leaf_iter = grid->tree().cbeginLeaf(); leaf_iter; ++leaf_iter) {
-		const LeafNodeType *leaf = leaf_iter.getLeaf();
-
-		for (typename LeafNodeType::ValueOnCIter value_iter = leaf->cbeginValueOn(); value_iter; ++value_iter) {
-			const Coord ijk = value_iter.getCoord();
-			Vec3f center = grid->indexToWorld(ijk);
-
-			Vec3f vec = VectorConverter<ValueType>::get(sampler.wsSample(center));
-			float len = vec.length();
-			if (len != 0.0f) {
-				vec /= len;
-
-				len = (len - bg) * value_scale;
-				len = std::max(-1.0f, std::min(len, 1.0f));
+				add_box(verts, colors, normals, &verts_ofs, wmin, wmax, color);
 			}
-
-			float r, g, b;
-			// -1..0..1 = red..yellow..green
-			hsv_to_rgb((len + 1.0f) / 6.0f, 1.0f, 1.0f, &r, &g, &b);
-			Vec3f color = Vec3f(r, g, b);
-
-			add_needle(verts, colors, normals, &verts_ofs, center, vec, len * grid->voxelSize().x(), color);
 		}
 	}
-}
+};
 
-template <typename TreeType>
-static void OpenVDB_get_draw_buffer_size_staggered(const openvdb::Grid<TreeType> *grid,
-                                                   int *r_numverts)
-{
-	using namespace openvdb;
-	using namespace openvdb::math;
+struct NeedlesBufferSizeOp {
+	int *numverts;
 
-	typedef typename TreeType::LeafNodeType LeafNodeType;
+	NeedlesBufferSizeOp(int *r_numverts)
+	    : numverts(r_numverts)
+	{}
 
-	if (!grid) {
-		*r_numverts = 0;
-		return;
+	template <typename GridType>
+	void operator()(typename GridType::ConstPtr grid)
+	{
+		*numverts = grid->tree().activeLeafVoxelCount() * 4 * 3;
 	}
+};
 
-	/* count */
-	int numverts = 0;
-	for (typename TreeType::LeafCIter leaf_iter = grid->tree().cbeginLeaf(); leaf_iter; ++leaf_iter) {
-		const LeafNodeType *leaf = leaf_iter.getLeaf();
+struct NeedlesBufferOp {
+	float value_scale;
+	float (*verts)[3];
+	float (*colors)[3];
+	float (*normals)[3];
 
-		numverts += 6 * 3 * leaf->onVoxelCount();
-	}
+	NeedlesBufferOp(float value_scale, float (*verts)[3], float (*colors)[3], float (*normals)[3])
+	    : value_scale(value_scale)
+	    , verts(verts)
+	    , colors(colors)
+	    , normals(normals)
+	{}
 
-	*r_numverts = numverts;
-}
+	template <typename GridType>
+	void operator()(typename GridType::ConstPtr grid)
+	{
+		using namespace openvdb;
+		using namespace openvdb::math;
 
-template <typename TreeType>
-static void OpenVDB_get_draw_buffers_staggered(const openvdb::Grid<TreeType> *grid, float value_scale,
-                                               float (*verts)[3], float (*colors)[3])
-{
-	using namespace openvdb;
-	using namespace openvdb::math;
+		typedef typename GridType::TreeType     TreeType;
+		typedef typename TreeType::ValueType    ValueType;
+		typedef typename TreeType::LeafNodeType LeafNodeType;
 
-	typedef Grid<TreeType> GridType;
-	typedef typename TreeType::ValueType ValueType;
-	typedef typename TreeType::LeafNodeType LeafNodeType;
+		typedef typename GridType::ConstAccessor AccessorType;
+		typedef openvdb::tools::GridSampler<AccessorType, tools::BoxSampler> SamplerType;
 
-	typedef typename GridType::ConstAccessor AccessorType;
-	typedef openvdb::tools::GridSampler<AccessorType, tools::BoxSampler> SamplerType;
+		if (!grid) {
+			return;
+		}
 
-	if (!grid) {
-		return;
-	}
+		const float bg = FloatConverter<ValueType>::get(grid->background());
+		int verts_ofs = 0;
 
-	const float bg = FloatConverter<ValueType>::get(grid->background());
-	int verts_ofs = 0;
+		AccessorType acc(grid->tree());
+		SamplerType sampler(acc, grid->transform());
 
-	AccessorType acc(grid->tree());
-	SamplerType sampler(acc, grid->transform());
+		for (typename TreeType::LeafCIter leaf_iter = grid->tree().cbeginLeaf(); leaf_iter; ++leaf_iter) {
+			const LeafNodeType *leaf = leaf_iter.getLeaf();
 
-	for (typename TreeType::LeafCIter leaf_iter = grid->tree().cbeginLeaf(); leaf_iter; ++leaf_iter) {
-		const LeafNodeType *leaf = leaf_iter.getLeaf();
+			for (typename LeafNodeType::ValueOnCIter value_iter = leaf->cbeginValueOn(); value_iter; ++value_iter) {
+				const Coord ijk = value_iter.getCoord();
+				Vec3f center = grid->indexToWorld(ijk);
 
-		for (typename LeafNodeType::ValueOnCIter value_iter = leaf->cbeginValueOn(); value_iter; ++value_iter) {
-			const Coord ijk = value_iter.getCoord();
-			Vec3f center = grid->indexToWorld(ijk);
+				Vec3f vec = VectorConverter<ValueType>::get(sampler.wsSample(center));
+				float len = vec.length();
+				if (len != 0.0f) {
+					vec /= len;
 
-			Vec3f vec = VectorConverter<ValueType>::get(sampler.wsSample(center));
-			float len = vec.length();
-			if (len != 0.0f) {
-				vec /= len;
+					len = (len - bg) * value_scale;
+					len = std::max(-1.0f, std::min(len, 1.0f));
+				}
 
-				len = (len - bg) * value_scale;
-				len = std::max(-1.0f, std::min(len, 1.0f));
-				vec *= len;
+				float r, g, b;
+				// -1..0..1 = red..yellow..green
+				hsv_to_rgb((len + 1.0f) / 6.0f, 1.0f, 1.0f, &r, &g, &b);
+				Vec3f color = Vec3f(r, g, b);
+
+				add_needle(verts, colors, normals, &verts_ofs, center, vec, len * grid->voxelSize().x(), color);
 			}
-
-			add_staggered_needle(verts, colors, &verts_ofs, center, grid->voxelSize().x(), vec);
 		}
 	}
-}
+};
 
-template <typename TreeType>
-static void OpenVDB_get_grid_value_range(const openvdb::Grid<TreeType> *grid, float *bg, float *min, float *max)
-{
-	typedef typename TreeType::ValueType ValueType;
+struct StaggeredBufferSizeOp {
+	int *numverts;
 
-	*bg = FloatConverter<ValueType>::get(grid->background());
+	StaggeredBufferSizeOp(int *r_numverts)
+	    : numverts(r_numverts)
+	{}
 
-	if (!grid || grid->empty()) {
-		*min = *bg;
-		*max = *bg;
-		return;
+	template <typename GridType>
+	void operator()(typename GridType::ConstPtr grid)
+	{
+		*numverts = grid->tree().activeLeafVoxelCount() * 6 * 3;
 	}
+};
 
-	math::Extrema ex = tools::extrema(grid->cbeginValueOn());
-	*min = std::min((float)ex.min(), *bg);
-	*max = std::max((float)ex.max(), *bg);
-}
+struct StaggeredBufferOp {
+	float value_scale;
+	float (*verts)[3];
+	float (*colors)[3];
+
+	StaggeredBufferOp(float value_scale, float (*verts)[3], float (*colors)[3])
+	    : value_scale(value_scale)
+	    , verts(verts)
+	    , colors(colors)
+	{}
+
+	template <typename GridType>
+	void operator()(typename GridType::ConstPtr grid)
+	{
+		using namespace openvdb;
+		using namespace openvdb::math;
+
+		typedef typename GridType::TreeType     TreeType;
+		typedef typename TreeType::ValueType    ValueType;
+		typedef typename TreeType::LeafNodeType LeafNodeType;
+
+		typedef typename GridType::ConstAccessor AccessorType;
+		typedef openvdb::tools::GridSampler<AccessorType, tools::BoxSampler> SamplerType;
+
+		if (!grid) {
+			return;
+		}
+
+		const float bg = FloatConverter<ValueType>::get(grid->background());
+		int verts_ofs = 0;
+
+		AccessorType acc(grid->tree());
+		SamplerType sampler(acc, grid->transform());
+
+		for (typename TreeType::LeafCIter leaf_iter = grid->tree().cbeginLeaf(); leaf_iter; ++leaf_iter) {
+			const LeafNodeType *leaf = leaf_iter.getLeaf();
+
+			for (typename LeafNodeType::ValueOnCIter value_iter = leaf->cbeginValueOn(); value_iter; ++value_iter) {
+				const Coord ijk = value_iter.getCoord();
+				Vec3f center = grid->indexToWorld(ijk);
+
+				Vec3f vec = VectorConverter<ValueType>::get(sampler.wsSample(center));
+				float len = vec.length();
+				if (len != 0.0f) {
+					vec /= len;
+
+					len = (len - bg) * value_scale;
+					len = std::max(-1.0f, std::min(len, 1.0f));
+					vec *= len;
+				}
+
+				add_staggered_needle(verts, colors, &verts_ofs, center, grid->voxelSize().x(), vec);
+			}
+		}
+	}
+};
+
+struct GridValueRangeOp {
+	float *min;
+	float *max;
+	float *bg;
+
+	GridValueRangeOp(float *mn, float *mx, float *bgd)
+	    : min(mn)
+	    , max(mx)
+	    , bg(bgd)
+	{}
+
+	template <typename GridType>
+	void operator()(typename GridType::ConstPtr grid)
+	{
+		typedef typename GridType::ValueType ValueType;
+
+		*bg = FloatConverter<ValueType>::get(grid->background());
+
+		if (grid->empty()) {
+			*min = *bg;
+			*max = *bg;
+			return;
+		}
+
+		openvdb::math::Extrema ex = openvdb::tools::extrema(grid->cbeginValueOn());
+		*min = std::min((float)ex.min(), *bg);
+		*max = std::max((float)ex.max(), *bg);
+	}
+};
 
 } /* namespace internal */

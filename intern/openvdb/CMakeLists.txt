@@ -57,6 +57,8 @@ if(WITH_OPENVDB)
 		openvdb_util.cc
 
 		intern/openvdb_dense_convert.h
+		intern/openvdb_primitive.h
+		intern/openvdb_process_utils.h
 		intern/openvdb_reader.h
 		intern/openvdb_render_utils.h
 		intern/openvdb_writer.h
