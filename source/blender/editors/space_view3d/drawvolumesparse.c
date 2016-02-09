@@ -80,9 +80,9 @@ static void atlas_add_texture(void *data, const float *leaf_buffer)
 {
 	AtlasBuilder *builder = data;
 
-	const int fx = builder->item_count % builder->item_count_x;
-	const int fy = (builder->item_count / builder->item_count_x) % builder->item_count_y;
-	const int fz = builder->item_count / (builder->item_count_x * builder->item_count_y);
+	const int fx = (builder->item_count % builder->item_count_x) * 8;
+	const int fy = ((builder->item_count / builder->item_count_x) % builder->item_count_y) * 8;
+	const int fz = (builder->item_count / (builder->item_count_x * builder->item_count_y)) * 8;
 
 	int index = 0;
 	for (int z = 0; z < 8; z++) {
@@ -174,7 +174,7 @@ void create_volume_texture_atlas(VolumeData *data)
 		create_atlas_builder(&builder);
 
 #if 0
-		printf("Atlas %d: number of nodes: %d\n", i, internal_nodes_counts[i]);
+		printf("Atlas %d: number of nodes: %d\n", i, atlas_nodes_counts[i]);
 		printf("Builder %d: item per dim: %d, %d, %d\n", i,
 		       builder.item_count_x, builder.item_count_y, builder.item_count_z);
 #endif
