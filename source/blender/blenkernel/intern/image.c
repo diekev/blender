@@ -415,7 +415,7 @@ static ImBuf *image_get_cached_ibuf_for_index_frame(Image *ima, int index, int f
 	ImBuf *ibuf = imagecache_get(ima, index);
 
 	if ((index == IMA_NO_INDEX) && (ima->layers.first)) {
-//		BKE_image_merge_visible_layers(ima, ibuf);
+		BKE_image_merge_visible_layers(ima, ibuf);
 	}
 
 	return ibuf;
