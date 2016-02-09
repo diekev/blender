@@ -430,7 +430,7 @@ static void image_assign_ibuf(Image *ima, ImBuf *ibuf, int index, int frame)
 
 		imagecache_put(ima, index, ibuf);
 
-		if ((ima->source == IMA_SRC_FILE) || (ima->source == IMA_SRC_GENERATED)) {
+		if (/*(ima->source == IMA_SRC_FILE) || */(ima->source == IMA_SRC_GENERATED)) {
 			if (ima->layers.first == NULL) {
 				BKE_image_add_image_layer_base(ima);
 
