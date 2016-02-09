@@ -51,4 +51,6 @@ struct BoundBox *BKE_volume_boundbox_get(struct Object *ob);
 
 struct VolumeData *BKE_volume_field_current(const struct Volume *volume);
 
+void BKE_mesh_to_volume(struct Scene *scene, struct Object *ob);
+
 #endif /* __BKE_VOLUME_H__ */

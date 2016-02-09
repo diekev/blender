@@ -87,6 +87,7 @@
 #include "BKE_screen.h"
 #include "BKE_speaker.h"
 #include "BKE_texture.h"
+#include "BKE_volume.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -1453,6 +1454,7 @@ void OBJECT_OT_duplicates_make_real(wmOperatorType *ot)
 static EnumPropertyItem convert_target_items[] = {
 	{OB_CURVE, "CURVE", ICON_OUTLINER_OB_CURVE, "Curve from Mesh/Text", ""},
 	{OB_MESH, "MESH", ICON_OUTLINER_OB_MESH, "Mesh from Curve/Meta/Surf/Text", ""},
+    {OB_VOLUME, "VOLUME", ICON_OUTLINER_OB_MESH, "Volume from Mesh", ""},
 	{0, NULL, 0, NULL, NULL}
 };
 
@@ -1602,6 +1604,31 @@ static int convert_exec(bContext *C, wmOperator *op)
 			if (newob->type == OB_CURVE) {
 				BKE_object_free_modifiers(newob);   /* after derivedmesh calls! */
 				ED_rigidbody_object_remove(bmain, scene, newob);
+			}
+		}
+		else if (ob->type == OB_MESH && target == OB_VOLUME) {
+			ob->flag |= OB_DONE;
+
+			if (keep_original) {
+				basen = duplibase_for_convert(scene, base, NULL);
+				newob = basen->object;
+
+				/* decrement original mesh's usage count  */
+				me = newob->data;
+				id_us_min(&me->id);
+
+				/* make a new copy of the mesh */
+				newob->data = BKE_mesh_copy(me);
+			}
+			else {
+				newob = ob;
+			}
+
+			BKE_mesh_to_volume(scene, newob);
+
+			if (newob->type == OB_VOLUME) {
+				BKE_object_free_modifiers(newob);   /* after derivedmesh calls! */
+				ED_rigidbody_object_remove(scene, newob);
 			}
 		}
 		else if (ob->type == OB_MESH && ob->modifiers.first) { /* converting a mesh with no modifiers causes a segfault */

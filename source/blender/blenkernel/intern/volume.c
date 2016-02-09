@@ -36,10 +36,13 @@
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
 
+#include "DNA_mesh_types.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_volume_types.h"
 
+#include "BKE_DerivedMesh.h"
+#include "BKE_global.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_object.h"
@@ -48,6 +51,7 @@
 #include "GPU_draw.h"
 
 #include "openvdb_capi.h"
+#include "openvdb_mesh_capi.h"
 
 Volume *BKE_volume_add(Main *bmain, const char *name)
 {
@@ -190,4 +194,103 @@ void BKE_volume_load_from_file(Volume *volume, const char *filename)
 	/* Set the first volume field as the current one */
 	VolumeData *data = volume->fields.first;
 	data->flags |= VOLUME_DATA_CURRENT;
+}
+
+/* ***************************** mesh conversion **************************** */
+
+typedef struct OpenVDBDerivedMeshIterator {
+	OpenVDBMeshIterator base;
+	struct MVert *vert, *vert_end;
+	const struct MLoopTri *looptri, *looptri_end;
+	struct MLoop *loop;
+} OpenVDBDerivedMeshIterator;
+
+static bool openvdb_dm_has_vertices(OpenVDBDerivedMeshIterator *it)
+{
+	return it->vert < it->vert_end;
+}
+
+static bool openvdb_dm_has_triangles(OpenVDBDerivedMeshIterator *it)
+{
+	return it->looptri < it->looptri_end;
+}
+
+static void openvdb_dm_next_vertex(OpenVDBDerivedMeshIterator *it)
+{
+	++it->vert;
+}
+
+static void openvdb_dm_next_triangle(OpenVDBDerivedMeshIterator *it)
+{
+	++it->looptri;
+}
+
+static void openvdb_dm_get_vertex(OpenVDBDerivedMeshIterator *it, float co[3])
+{
+	copy_v3_v3(co, it->vert->co);
+}
+
+static void openvdb_dm_get_triangle(OpenVDBDerivedMeshIterator *it, int *a, int *b, int *c)
+{
+	*a = it->loop[it->looptri->tri[0]].v;
+	*b = it->loop[it->looptri->tri[1]].v;
+	*c = it->loop[it->looptri->tri[2]].v;
+}
+
+static inline void openvdb_dm_iter_init(OpenVDBDerivedMeshIterator *it, DerivedMesh *dm)
+{
+	it->base.has_vertices = (OpenVDBMeshHasVerticesFn)openvdb_dm_has_vertices;
+	it->base.has_triangles = (OpenVDBMeshHasTrianglesFn)openvdb_dm_has_triangles;
+	it->base.next_vertex = (OpenVDBMeshNextVertexFn)openvdb_dm_next_vertex;
+	it->base.next_triangle = (OpenVDBMeshNextTriangleFn)openvdb_dm_next_triangle;
+	it->base.get_vertex = (OpenVDBMeshGetVertexFn)openvdb_dm_get_vertex;
+	it->base.get_triangle = (OpenVDBMeshGetTriangleFn)openvdb_dm_get_triangle;
+
+	it->vert = dm->getVertArray(dm);
+	it->vert_end = it->vert + dm->getNumVerts(dm);
+	it->looptri = dm->getLoopTriArray(dm);
+	it->looptri_end = it->looptri + dm->getNumLoopTri(dm);
+	it->loop = dm->getLoopArray(dm);
+}
+
+void BKE_mesh_to_volume(Scene *scene, Object *ob)
+{
+	/* make new mesh data from the original copy */
+	DerivedMesh *dm = mesh_get_derived_final(scene, ob, CD_MASK_MESH);
+
+	Volume *volume = BKE_volume_add(G.main, ob->id.name + 2);
+	bool needsFree = false;
+
+	OpenVDBDerivedMeshIterator it;
+	openvdb_dm_iter_init(&it, dm);
+
+	struct OpenVDBPrimitive *prim = OpenVDBPrimitive_from_mesh(&it.base, ob->obmat, 0.01f);
+
+	if (volume && prim) {
+		VolumeData *data = MEM_callocN(sizeof(VolumeData), "VolumeData");
+		data->prim = prim;
+		data->flags |= VOLUME_DATA_CURRENT;
+
+		BLI_addtail(&volume->fields, data);
+
+		id_us_min(&((Mesh *)ob->data)->id);
+
+		ob->data = volume;
+		ob->type = OB_VOLUME;
+
+		needsFree = true;
+	}
+
+	dm->needsFree = needsFree;
+	dm->release(dm);
+
+	if (needsFree) {
+		ob->derivedFinal = NULL;
+
+		/* curve object could have got bounding box only in special cases */
+		if (ob->bb) {
+			MEM_freeN(ob->bb);
+			ob->bb = NULL;
+		}
+	}
 }
