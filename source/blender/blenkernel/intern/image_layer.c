@@ -61,7 +61,6 @@ ImageLayer *BKE_image_layer_new(Image *ima, const char *name)
 	layer->opacity = 1.0f;
 	layer->mode = IMB_BLEND_NORMAL;
 	layer->type = IMA_LAYER_LAYER;
-	layer->visible = IMA_LAYER_VISIBLE;
 	layer->select = IMA_LAYER_SEL_CURRENT;
 
 	return layer;
@@ -297,17 +296,19 @@ int BKE_image_layer_remove(Image *ima, const int action)
 	else {
 		if (ima->num_layers > 1) {
 			for (layer = ima->layers.last; layer; layer = layer->prev) {
-				if (!(layer->visible & IMA_LAYER_VISIBLE)) {
-					BLI_remlink(&ima->layers, layer);
-					BKE_image_layer_free(layer);
-					if (ima->layers.first) {
-						if (BKE_image_get_current_layer_index(ima) != 1)
-							BKE_image_set_current_layer(ima, BKE_image_get_current_layer_index(ima));
-						else
-							BKE_image_set_current_layer(ima, BKE_image_get_current_layer_index(ima) - 1);
-					}
-					ima->num_layers -= 1;
+				if ((layer->visible & IMA_LAYER_HIDDEN)) {
+					continue;
 				}
+
+				BLI_remlink(&ima->layers, layer);
+				BKE_image_layer_free(layer);
+				if (ima->layers.first) {
+					if (BKE_image_get_current_layer_index(ima) != 1)
+						BKE_image_set_current_layer(ima, BKE_image_get_current_layer_index(ima));
+					else
+						BKE_image_set_current_layer(ima, BKE_image_get_current_layer_index(ima) - 1);
+				}
+				ima->num_layers -= 1;
 			}
 		}
 		else
@@ -681,7 +682,7 @@ void BKE_image_merge_visible_layers(Image *ima, ImBuf *ima_ibuf)
 	short background = layer->background;
 
 	for (; layer; layer = layer->prev) {
-		if ((layer->visible & IMA_LAYER_VISIBLE) == 0) {
+		if ((layer->visible & IMA_LAYER_HIDDEN)) {
 			continue;
 		}
 

@@ -692,8 +692,9 @@ static void rna_def_image_layer_common(StructRNA *srna)
 	RNA_def_struct_name_property(srna, prop);
 
 	prop = RNA_def_property(srna, "visible", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_ui_text(prop, "", "Hides the layer in the UV/Image Editor");
-	RNA_def_property_boolean_sdna(prop, NULL, "visible", IMA_LAYER_VISIBLE);
+	RNA_def_property_boolean_sdna(prop, NULL, "visible", IMA_LAYER_HIDDEN);
+	RNA_def_property_ui_text(prop, "", "Hide the layer");
+	RNA_def_property_ui_icon(prop, ICON_RESTRICT_VIEW_OFF, 1);
 	RNA_def_property_update(prop, NC_IMAGE | ND_DISPLAY, NULL);
 
 	prop = RNA_def_property(srna, "locked", PROP_BOOLEAN, PROP_NONE);

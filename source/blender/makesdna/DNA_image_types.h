@@ -112,7 +112,7 @@ enum {
 
 /* ImageLayer.visible */
 enum {
-	IMA_LAYER_VISIBLE = (1 << 0),
+	IMA_LAYER_HIDDEN = (1 << 0),
 };
 
 /* ImageLayer.select */

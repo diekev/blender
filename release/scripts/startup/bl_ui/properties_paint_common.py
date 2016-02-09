@@ -17,7 +17,7 @@
 # ##### END GPL LICENSE BLOCK #####
 
 # <pep8 compliant>
-from bpy.types import Menu
+from bpy.types import Menu, UIList
 
 
 class UnifiedPaintPanel:
@@ -308,3 +308,80 @@ def brush_mask_texture_settings(layout, brush):
     split = layout.split()
     split.prop(mask_tex_slot, "offset")
     split.prop(mask_tex_slot, "scale")
+        
+
+class IMAGE_PT_image_layer_specials(Menu):
+    bl_label = "Vertex Group Specials"
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
+
+    def draw(self, context):
+        layout = self.layout
+        
+        layout.operator("image.layer_duplicate")
+        layout.operator("image.layer_add_above")
+        layout.operator("image.layer_add_below")
+        layout.separator()
+        layout.operator("image.layer_clean")
+        layout.operator("image.layer_remove", text="Remove Hidden Layers").action = 'HIDDEN'
+        layout.separator()
+        layout.operator("image.layer_merge", text="Merge Down").type = 'DOWN'
+        layout.operator("image.layer_merge", text="Merge Visible").type = 'VISIBLE'
+        layout.operator("image.layer_merge", text="Merge All").type = 'ONE'
+        layout.separator()
+        layout.operator("image.layer_move", icon='TRIA_UP_BAR', text="Move To Top").type = 'TOP'
+        layout.operator("image.layer_move", icon='TRIA_DOWN_BAR', text="Merge To Bottom").type = 'BOTTOM'
+        layout.operator("image.layer_move", text="Reverse Order").type = 'INVERT'
+
+
+class IMAGE_UL_ima_layers(UIList):
+    def draw_item(self, context, layout, data, item, icon,
+                  active_data, active_propname, index):
+        layer = item
+        if self.layout_type in {'DEFAULT', 'COMPACT'}:
+            split = layout.split()
+            split.label(text=layer.name, icon_value=icon)
+            row = split.row()
+            row.alignment = 'RIGHT'
+            row.prop(layer, "locked", text="", emboss=False)
+            row.prop(layer, "locked_alpha", text="", emboss=False)
+            row.prop(layer, "visible", text="", emboss=False, index=index)
+        elif self.layout_type in {'GRID'}:
+            layout.alignment = 'CENTER'
+            layout.label("", icon_value=icon)
+
+
+def image_layers_settings(layout, image):
+    layers = image.image_layers
+    layer = layers.active_image_layer
+    row = layout.row()
+
+    rows = 5 if layer else 2
+    row.template_list("IMAGE_UL_ima_layers", "", image, "image_layers",
+                      layers, "active_image_layer_index", 
+                      rows=rows)
+
+    col = row.column(align=True)
+    col.operator("image.layer_add_default", text="", icon='ZOOMIN')
+    col.operator("image.layer_remove", text="", icon='ZOOMOUT').action = 'SELECTED'
+    col.menu("IMAGE_PT_image_layer_specials", icon='DOWNARROW_HLT', text="")
+
+    if layer:
+        col.separator()
+
+        sub = col.column(align=True)
+        sub.enabled = (layer.type != 'BASE')
+        sub.operator("image.layer_move", text="", icon='TRIA_UP').type = 'UP'
+        sub.operator("image.layer_move", text="", icon='TRIA_DOWN').type = 'DOWN'
+
+        split = layout.split(percentage=0.35)
+        col = split.column()
+        col.label(text="Name")
+        col.label(text="Opacity:")
+        col.label(text="Blend Modes:")
+        col = split.column()
+        col.prop(layer, "name", text="")
+
+        sub = col.column()                
+        sub.enabled = not (((layer.background != 'ALPHA') and (layer.type == 'BASE')) or (layer.visible))
+        sub.prop(layer, "opacity", text="")
+        sub.prop(layer, "blend_type", text="")

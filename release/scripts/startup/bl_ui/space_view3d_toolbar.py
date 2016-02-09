@@ -29,6 +29,7 @@ from bl_ui.properties_paint_common import (
         brush_texture_settings,
         brush_texpaint_common,
         brush_mask_texture_settings,
+        image_layers_settings,
         )
 
 
@@ -856,24 +857,7 @@ class VIEW3D_PT_imapaint_tools_missing(Panel, View3DPaintPanel):
             col.operator("image.new", text="New").gen_context = 'PAINT_STENCIL'
 
 
-class IMAGE_UL_ima_layers(UIList):
-    def draw_item(self, context, layout, data, item, icon,
-                  active_data, active_propname, index):
-        layer = item
-        if self.layout_type in {'DEFAULT', 'COMPACT'}:
-            split = layout.split()
-            split.label(text=layer.name, icon_value=icon)
-            row = split.row()
-            row.alignment = 'RIGHT'
-            row.prop(layer, "locked", text="", emboss=False)
-            row.prop(layer, "locked_alpha", text="", emboss=False)
-            row.prop(layer, "visible", text="", index=index)
-        elif self.layout_type in {'GRID'}:
-            layout.alignment = 'CENTER'
-            layout.label("", icon_value=icon)
-
-
-class IMAGE_PT_image_layers(Panel, View3DPaintPanel):
+class VIEW3D_PT_image_layers(Panel, View3DPaintPanel):
     bl_category = "Slots"
     bl_label = "Image Layers"
 
@@ -886,46 +870,9 @@ class IMAGE_PT_image_layers(Panel, View3DPaintPanel):
         ob = context.active_object
         mat = ob.active_material
         ima = mat.texture_paint_images[mat.paint_active_slot]
-        layers = ima.image_layers
 
         if ima:
-            row = layout.row()
-
-            rows = 5 if layers.active_image_layer else 2
-            row.template_list("IMAGE_UL_ima_layers", "", ima, "image_layers",
-                              ima.image_layers, "active_image_layer_index", 
-                              rows=rows)
-
-            col = row.column(align=True)
-            col.operator("image.layer_add_default", text="", icon='NEW')
-
-            if layers.active_image_layer:
-                col.operator("image.layer_duplicate", text="", icon='GHOST')
-                sub = col.column()
-
-                if (layers.active_image_layer.type == 'BASE'):
-                    sub.enabled = False
-                else:
-                    sub.enabled = True
-                sub.operator("image.layer_remove", text="", icon='CANCEL').action = 'SELECTED'
-                col.operator("image.layer_move", text="", icon='TRIA_UP').type = 'UP'
-                col.operator("image.layer_move", text="", icon='TRIA_DOWN').type = 'DOWN'
-                split = layout.split(percentage=0.35)
-                col = split.column()
-                col.label(text="Name")
-                col.label(text="Opacity:")
-                col.label(text="Blend Modes:")
-                col = split.column()
-                col.prop(layers.active_image_layer, "name", text="")
-                sub = col.column()
-                if (((layers.active_image_layer.background != 'ALPHA') and 
-                    (layers.active_image_layer.type == 'BASE')) or
-                    (not layers.active_image_layer.visible)):
-                    sub.enabled = False
-                else:
-                    sub.enabled = True
-                sub.prop(layers.active_image_layer, "opacity", text="")
-                sub.prop(layers.active_image_layer, "blend_type", text="")
+            image_layers_settings(layout, ima)
         else:
             layout.label(text="No Image found!")
 

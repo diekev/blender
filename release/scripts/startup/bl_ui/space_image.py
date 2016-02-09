@@ -24,6 +24,7 @@ from bl_ui.properties_paint_common import (
         brush_texture_settings,
         brush_texpaint_common,
         brush_mask_texture_settings,
+        image_layers_settings,
         )
 from bl_ui.properties_grease_pencil_common import (
         GreasePencilDrawingToolsPanel,
@@ -317,28 +318,9 @@ class IMAGE_MT_layers(Menu):
     def draw(self, context):
         layout = self.layout
 
-        layout.menu("IMAGE_MT_layers_new", icon='NEW')
-        layout.operator("image.layer_duplicate", icon='GHOST')
-        layout.operator("image.layer_clean", icon='FILE')
-        layout.menu("IMAGE_MT_layers_remove", icon='CANCEL')
-        layout.menu("IMAGE_MT_layers_merge", icon='LINK_AREA')
-        layout.separator()
         layout.menu("IMAGE_MT_layers_select", icon='FILE_TICK')
-        layout.menu("IMAGE_MT_layers_order", icon='SORTALPHA')
         layout.menu("IMAGE_MT_layers_transform", icon='MANIPUL')
         layout.menu("IMAGE_MT_layers_scale", icon='MAN_SCALE')
-
-
-class IMAGE_MT_layers_new(Menu):
-    bl_label = "Add"
-
-    def draw(self, context):
-        layout = self.layout
-
-        layout.operator("image.layer_add", icon='NEW')
-        layout.separator()
-        layout.operator("image.layer_add_above", icon='TRIA_UP')
-        layout.operator("image.layer_add_below", icon='TRIA_DOWN')
 
 
 class IMAGE_MT_layers_select(Menu):
@@ -351,20 +333,6 @@ class IMAGE_MT_layers_select(Menu):
         layout.operator("image.layer_select", text="Select Next Layer" ).action = 'NEXT'
         layout.operator("image.layer_select", text="Select Top Layer").action = 'TOP'
         layout.operator("image.layer_select", text="Select Bottom Layer").action = 'BOTTOM'
-
-
-class IMAGE_MT_layers_order(Menu):
-    bl_label = "Order"
-
-    def draw(self, context):
-        layout = self.layout
-
-        layout.operator("image.layer_move", text="Layer the Top").type = 'TOP'
-        layout.operator("image.layer_move", text="Raise Layer", icon='TRIA_UP').type = 'UP'
-        layout.operator("image.layer_move", text="Lower Layer", icon='TRIA_DOWN').type = 'DOWN'
-        layout.operator("image.layer_move", text="Layer the Bottom").type = 'BOTTOM'
-        layout.separator()
-        layout.operator("image.layer_move", text="Invert").type = 'INVERT'
 
 
 class IMAGE_MT_layers_transform(Menu):
@@ -392,27 +360,6 @@ class IMAGE_MT_layers_scale(Menu):
 
         layout.operator("image.layer_size")
         layout.operator("image.layer_scale")
-
-
-class IMAGE_MT_layers_remove(Menu):
-    bl_label = "Remove"
-
-    def draw(self, context):
-        layout = self.layout
-
-        layout.operator("image.layer_remove", text="Layer").action = 'SELECTED'
-        layout.operator("image.layer_remove", text="Hidden Layers" ).action = 'HIDDEN'
-
-
-class IMAGE_MT_layers_merge(Menu):
-    bl_label = "Merge"
-
-    def draw(self, context):
-        layout = self.layout
-
-        layout.operator("image.layer_merge", text="Merge Down").type = 'DOWN'
-        layout.operator("image.layer_merge", text="Merge Visible" ).type = 'VISIBLE'
-        layout.operator("image.layer_merge", text="Merge All" ).type = 'ONE'
 
 
 class IMAGE_MT_uvs_showhide(Menu):
@@ -892,23 +839,6 @@ class IMAGE_PT_tools_transform_uvs(Panel, UVToolsPanel):
         col.operator("transform.shear")
 
 
-class IMAGE_UL_ima_layers(UIList):
-    def draw_item(self, context, layout, data, item, icon,
-                  active_data, active_propname, index):
-        layer = item
-        if self.layout_type in {'DEFAULT', 'COMPACT'}:
-            split = layout.split()
-            split.label(text=layer.name, icon_value=icon)
-            row = split.row()
-            row.alignment = 'RIGHT'
-            row.prop(layer, "locked", text="", emboss=False)
-            row.prop(layer, "locked_alpha", text="", emboss=False)
-            row.prop(layer, "visible", text="", index=index)
-        elif self.layout_type in {'GRID'}:
-            layout.alignment = 'CENTER'
-            layout.label("", icon_value=icon)
-
-
 class IMAGE_PT_image_layers(Panel, ImagePaintPanel):
     bl_category = "Layers"
     bl_label = "Image Layers"
@@ -922,46 +852,9 @@ class IMAGE_PT_image_layers(Panel, ImagePaintPanel):
         layout = self.layout
         sima = context.space_data
         ima = sima.image
-        layers = ima.image_layers
 
         if ima:
-            row = layout.row()
-
-            rows = 5 if layers.active_image_layer else 2
-            row.template_list("IMAGE_UL_ima_layers", "", ima, "image_layers",
-                              ima.image_layers, "active_image_layer_index", 
-                              rows=rows)
-
-            col = row.column(align=True)
-            col.operator("image.layer_add_default", text="", icon='NEW')
-
-            if layers.active_image_layer:
-                col.operator("image.layer_duplicate", text="", icon='GHOST')
-                sub = col.column()
-
-                if (layers.active_image_layer.type == 'BASE'):
-                    sub.enabled = False
-                else:
-                    sub.enabled = True
-                sub.operator("image.layer_remove", text="", icon='CANCEL').action = 'SELECTED'
-                col.operator("image.layer_move", text="", icon='TRIA_UP').type = 'UP'
-                col.operator("image.layer_move", text="", icon='TRIA_DOWN').type = 'DOWN'
-                split = layout.split(percentage=0.35)
-                col = split.column()
-                col.label(text="Name")
-                col.label(text="Opacity:")
-                col.label(text="Blend Modes:")
-                col = split.column()
-                col.prop(layers.active_image_layer, "name", text="")
-                sub = col.column()
-                if (((layers.active_image_layer.background != 'ALPHA') and 
-                    (layers.active_image_layer.type == 'BASE')) or
-                    (not layers.active_image_layer.visible)):
-                    sub.enabled = False
-                else:
-                    sub.enabled = True
-                sub.prop(layers.active_image_layer, "opacity", text="")
-                sub.prop(layers.active_image_layer, "blend_type", text="")
+            image_layers_settings(layout, ima)
 
 
 class IMAGE_PT_paint(Panel, ImagePaintPanel):

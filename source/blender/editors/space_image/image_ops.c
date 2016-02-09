@@ -4007,7 +4007,7 @@ static int image_merge_exec(bContext *C, wmOperator *op)
 	discard = RNA_boolean_get(op->ptr, "discard");
 
 	for (layer = (ImageLayer *)ima->layers.first; layer; layer = layer->next) {
-		if (layer->visible & IMA_LAYER_VISIBLE) {
+		if (!(layer->visible & IMA_LAYER_HIDDEN)) {
 			flag = 1;
 			break;
 		}
@@ -4015,7 +4015,7 @@ static int image_merge_exec(bContext *C, wmOperator *op)
 	if (flag == 1) {
 		prec = NULL;
 		for (layer = (ImageLayer *)ima->layers.first; layer; layer = layer->next) {
-			if (layer->visible & IMA_LAYER_VISIBLE) {
+			if (!(layer->visible & IMA_LAYER_HIDDEN)) {
 				if (prec == NULL) {
 					prec = layer;
 				}
@@ -4024,7 +4024,6 @@ static int image_merge_exec(bContext *C, wmOperator *op)
 					ima->num_layers--;
 					prec = layer;
 				}
-
 			}
 			else {
 				if (discard) {
@@ -4086,7 +4085,7 @@ static int image_flatten_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 
 	for (layer = (ImageLayer *)ima->layers.first; layer; layer = layer->next) {
-		if (layer->visible & IMA_LAYER_VISIBLE) {
+		if (!(layer->visible & IMA_LAYER_HIDDEN)) {
 			flag = 1;
 			break;
 		}
@@ -4094,7 +4093,7 @@ static int image_flatten_exec(bContext *C, wmOperator *op)
 	if (flag == 1) {
 		prec = NULL;
 		for (layer = (ImageLayer *)ima->layers.first; layer; layer = layer->next) {
-			if (layer->visible & IMA_LAYER_VISIBLE) {
+			if (!(layer->visible & IMA_LAYER_HIDDEN)) {
 				if (prec == NULL) {
 					prec = layer;
 				}
@@ -4625,14 +4624,14 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 			ImageLayer *next;
 
 			next = layer->next;
-			if ((next->visible & IMA_LAYER_VISIBLE) && (!(next->locked & IMA_LAYER_LOCK))) {
+			if ((next->visible & IMA_LAYER_HIDDEN) && (!(next->locked & IMA_LAYER_LOCK))) {
 				BKE_image_layer_merge(ima, layer, next);
 
 				BKE_image_set_current_layer(ima, BKE_image_get_current_layer_index(ima));
 				ima->num_layers--;
 			}
 			else
-				if (!(next->visible & IMA_LAYER_VISIBLE))
+				if (next->visible & IMA_LAYER_HIDDEN)
 					BKE_report(op->reports, RPT_INFO, "It can not merge the layers, because the next layer is hidden");
 				else
 					BKE_report(op->reports, RPT_INFO, "It can not merge the layers, because the next layer is locked");
@@ -4642,7 +4641,7 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 		int i = 0;
 		ImageLayer *next;
 		for (layer = (ImageLayer *)ima->layers.first; layer; layer = layer->next) {
-			if (layer->visible & IMA_LAYER_VISIBLE) {
+			if (!(layer->visible & IMA_LAYER_HIDDEN)) {
 				i = 1;
 				break;
 			}
@@ -4651,7 +4650,7 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 			next = layer;
 			while ((next != NULL) && (layer->type != IMA_LAYER_BASE)) {
 				next = layer->next;
-				while ((next != NULL) && (!(next->visible & IMA_LAYER_VISIBLE)))
+				while ((next != NULL) && (next->visible & IMA_LAYER_HIDDEN))
 					next = next->next;
 
 				if (next) {
@@ -4669,7 +4668,7 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 		static float white_color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 
 		for (layer = (ImageLayer *)ima->layers.first; layer; layer = layer->next) {
-			if (layer->visible & IMA_LAYER_VISIBLE) {
+			if (!(layer->visible & IMA_LAYER_HIDDEN)) {
 				break;
 			}
 			else {
@@ -4682,7 +4681,7 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 			next = layer;
 			while ((next != NULL) && (layer->type != IMA_LAYER_BASE)) {
 				next = layer->next;
-				while ((next != NULL) && (!(next->visible & IMA_LAYER_VISIBLE))) {
+				while ((next != NULL) && (next->visible & IMA_LAYER_HIDDEN)) {
 					app = next;
 					next = next->next;
 

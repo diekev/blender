@@ -971,43 +971,45 @@ void draw_image_main(const bContext *C, ARegion *ar)
 						}
 					}
 
-					if (layer->visible & IMA_LAYER_VISIBLE) {
-						if (layer->preview_ibuf)
-							ibuf_l = layer->preview_ibuf;
-						else
-							ibuf_l = layer->ibufs.first;
+					if (layer->visible & IMA_LAYER_HIDDEN) {
+						continue;
+					}
 
-						if (ibuf_l) {
+					if (layer->preview_ibuf)
+						ibuf_l = layer->preview_ibuf;
+					else
+						ibuf_l = layer->ibufs.first;
+
+					if (ibuf_l) {
 #if 0
-							ImBuf *draw_ibuf = NULL;
+						ImBuf *draw_ibuf = NULL;
 
-							if (layer->mode != 0) {
-								if (!result_ibuf) {
-									result_ibuf = IMB_dupImBuf(ibuf_l);
-								}
-
-								ImBuf *prev = layer->next->ibufs.first;
-								BKE_image_layer_blend(result_ibuf, prev, ibuf_l, layer->opacity, layer->mode, background);
-
-								draw_ibuf = result_ibuf;
-							}
-							else {
-								draw_ibuf = ibuf_l;
-							}
-#else
+						if (layer->mode != 0) {
 							if (!result_ibuf) {
 								result_ibuf = IMB_dupImBuf(ibuf_l);
 							}
-#endif
-							BKE_image_layer_blend(result_ibuf, result_ibuf, ibuf_l, layer->opacity, layer->mode, background);
 
-							glEnable(GL_BLEND);
-							glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+							ImBuf *prev = layer->next->ibufs.first;
+							BKE_image_layer_blend(result_ibuf, prev, ibuf_l, layer->opacity, layer->mode, background);
 
-							glColor4f(1.0f, 1.0f, 1.0f, layer->opacity);
-							draw_image_buffer(C, sima, ar, scene, result_ibuf, 0.0f, 0.0f, zoomx, zoomy);
-							glDisable(GL_BLEND);
+							draw_ibuf = result_ibuf;
 						}
+						else {
+							draw_ibuf = ibuf_l;
+						}
+#else
+						if (!result_ibuf) {
+							result_ibuf = IMB_dupImBuf(ibuf_l);
+						}
+#endif
+						BKE_image_layer_blend(result_ibuf, result_ibuf, ibuf_l, layer->opacity, layer->mode, background);
+
+						glEnable(GL_BLEND);
+						glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+						glColor4f(1.0f, 1.0f, 1.0f, layer->opacity);
+						draw_image_buffer(C, sima, ar, scene, result_ibuf, 0.0f, 0.0f, zoomx, zoomy);
+						glDisable(GL_BLEND);
 					}
 
 					if (UI_GetThemeValue(TH_SHOW_BOUNDARY_LAYER)) {
