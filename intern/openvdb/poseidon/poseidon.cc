@@ -106,6 +106,7 @@ void step_smoke(FluidData * const data, float dt)
 	VectorGrid::Ptr velocity = openvdb::gridPtrCast<VectorGrid>(data->velocity.getGridPtr());
 	openvdb::BoolGrid::Ptr obstacle = openvdb::gridPtrCast<openvdb::BoolGrid>(data->collision.getGridPtr());
 
+	temperature->topologyUnion(*density);
 	velocity->topologyUnion(*density);
 	flags = build_flag_grid(density, obstacle);
 
