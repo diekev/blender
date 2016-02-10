@@ -68,6 +68,11 @@ static void rna_def_poseidon_domain_settings(BlenderRNA *brna)
 	RNA_def_struct_ui_text(srna, "Domain Settings", "Poseidon domain settings");
 	RNA_def_struct_sdna(srna, "PoseidonDomainSettings");
 	RNA_def_struct_path_func(srna, "rna_PoseidonDomainSettings_path");
+
+	PropertyRNA *prop = RNA_def_property(srna, "cache", PROP_POINTER, PROP_NONE);
+	RNA_def_property_flag(prop, PROP_NEVER_NULL);
+	RNA_def_property_pointer_sdna(prop, NULL, "cache");
+	RNA_def_property_ui_text(prop, "Point Cache", "");
 }
 
 static void rna_def_poseidon_flow_settings(BlenderRNA *brna)

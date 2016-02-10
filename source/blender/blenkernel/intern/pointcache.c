@@ -86,6 +86,7 @@
 #ifdef WITH_OPENVDB
 #include "openvdb_capi.h"
 #endif
+#include "poseidon_capi.h"
 
 #ifdef WITH_LZO
 #  ifdef WITH_SYSTEM_LZO
@@ -1182,13 +1183,42 @@ static int ptcache_smoke_openvdb_read(struct OpenVDBReader *reader, void *smoke_
 
 static int ptcache_poseidon_write(struct OpenVDBWriter *writer, void *smoke_v)
 {
-	UNUSED_VARS(writer, smoke_v);
-	return 0;
+	PoseidonModifierData *smd = (PoseidonModifierData *)smoke_v;
+
+	if (!smd) {
+		return 0;
+	}
+
+	PoseidonDomainSettings *sds = smd->domain;
+	struct OpenVDBPrimitive *prim;
+
+	prim = Poseidon_get_field(sds->data, POSEIDON_FIELD_COLLISION);
+	OpenVDBWriter_add_primitive(writer, prim);
+
+	prim = Poseidon_get_field(sds->data, POSEIDON_FIELD_DENSITY);
+	OpenVDBWriter_add_primitive(writer, prim);
+
+	prim = Poseidon_get_field(sds->data, POSEIDON_FIELD_VELOCITY);
+	OpenVDBWriter_add_primitive(writer, prim);
+
+	prim = Poseidon_get_field(sds->data, POSEIDON_FIELD_TEMPERATURE);
+	OpenVDBWriter_add_primitive(writer, prim);
+
+	prim = Poseidon_get_field(sds->data, POSEIDON_FIELD_PRESSURE);
+	OpenVDBWriter_add_primitive(writer, prim);
+
+	prim = Poseidon_get_field(sds->data, POSEIDON_FIELD_FLAGS);
+	OpenVDBWriter_add_primitive(writer, prim);
+
+	return 1;
 }
 
 static int ptcache_poseidon_read(struct OpenVDBReader *reader, void *smoke_v)
 {
-	UNUSED_VARS(reader, smoke_v);
+	UNUSED_VARS(smoke_v);
+
+	OpenVDBReader_free(reader);
+
 	return 0;
 }
 
@@ -2943,8 +2973,10 @@ int BKE_ptcache_write(PTCacheID *pid, unsigned int cfra)
 	int totpoint = (pid->totpoint) ? pid->totpoint(pid->calldata, cfra) : 0;
 	int overwrite = 0, error = 0;
 
-	if (totpoint == 0 || (cfra ? pid->data_types == 0 : pid->info_types == 0))
-		return 0;
+	if (pid->file_type != PTCACHE_FILE_OPENVDB) {
+		if (totpoint == 0 || (cfra ? pid->data_types == 0 : pid->info_types == 0))
+			return 0;
+	}
 
 	if (ptcache_write_needed(pid, cfra, &overwrite)==0)
 		return 0;

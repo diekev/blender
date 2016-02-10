@@ -134,7 +134,7 @@ def point_cache_ui(self, context, cache, enabled, cachetype):
         if cache_info:
             layout.label(text=cache_info)
     else:
-        if cachetype in {'SMOKE', 'DYNAMIC_PAINT'}:
+        if cachetype in {'SMOKE', 'DYNAMIC_PAINT', 'POSEIDON'}:
             if not bpy.data.is_saved:
                 layout.label(text="Cache is disabled until the file is saved")
                 layout.enabled = False
@@ -146,15 +146,15 @@ def point_cache_ui(self, context, cache, enabled, cachetype):
             row.enabled = enabled
             row.prop(cache, "frame_start")
             row.prop(cache, "frame_end")
-        if cachetype not in {'SMOKE', 'CLOTH', 'DYNAMIC_PAINT', 'RIGID_BODY'}:
+        if cachetype not in {'SMOKE', 'CLOTH', 'DYNAMIC_PAINT', 'RIGID_BODY', 'POSEIDON'}:
             row.prop(cache, "frame_step")
 
-        if cachetype != 'SMOKE':
+        if cachetype not in {'SMOKE', 'POSEIDON'}:
             layout.label(text=cache.info)
 
         can_bake = True
 
-        if cachetype not in {'SMOKE', 'DYNAMIC_PAINT', 'RIGID_BODY'}:
+        if cachetype not in {'SMOKE', 'DYNAMIC_PAINT', 'RIGID_BODY', 'POSEIDON'}:
             split = layout.split()
             split.enabled = enabled and bpy.data.is_saved
 

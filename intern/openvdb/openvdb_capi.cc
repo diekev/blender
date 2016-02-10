@@ -228,6 +228,11 @@ void OpenVDBWriter_add_meta_mat4(OpenVDBWriter *writer, const char *name, float 
 	writer->insertMat4sMeta(name, value);
 }
 
+void OpenVDBWriter_add_primitive(OpenVDBWriter *writer, OpenVDBPrimitive *prim)
+{
+	writer->insert(prim->getGridPtr());
+}
+
 void OpenVDBWriter_write(OpenVDBWriter *writer, const char *filename)
 {
 	writer->write(filename);

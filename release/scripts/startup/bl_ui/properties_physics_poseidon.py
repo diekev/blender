@@ -20,6 +20,10 @@
 import bpy
 from bpy.types import Panel
 
+from bl_ui.properties_physics_common import (
+        point_cache_ui,
+        )
+
 
 class PhysicButtonsPanel:
     bl_space_type = 'PROPERTIES'
@@ -43,6 +47,25 @@ class PHYSICS_PT_poseidon(PhysicButtonsPanel, Panel):
         ob = context.object
 
         layout.prop(md, "smoke_type", expand=True)
+
+
+class PHYSICS_PT_smoke_cache(PhysicButtonsPanel, Panel):
+    bl_label = "Smoke Cache"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    @classmethod
+    def poll(cls, context):
+        md = context.poseidon
+        rd = context.scene.render
+        return md and (md.smoke_type == 'DOMAIN') and (not rd.use_game_engine)
+
+    def draw(self, context):
+        layout = self.layout
+
+        domain = context.poseidon.domain_settings
+
+        cache = domain.cache
+        point_cache_ui(self, context, cache, (cache.is_baked is False), 'POSEIDON')
 
 
 if __name__ == "__main__":  # only for live edit.

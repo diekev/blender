@@ -39,8 +39,11 @@ OpenVDBWriter::~OpenVDBWriter()
 
 void OpenVDBWriter::insert(const openvdb::GridBase::Ptr &grid)
 {
-	grid->setSaveFloatAsHalf(m_save_as_half);
-	m_grids->push_back(grid);
+	/* XXX - workaround for empty primitives */
+	if (grid.get()) {
+		grid->setSaveFloatAsHalf(m_save_as_half);
+		m_grids->push_back(grid);
+	}
 }
 
 void OpenVDBWriter::insert(const openvdb::GridBase &grid)
