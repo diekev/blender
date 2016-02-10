@@ -162,6 +162,11 @@ static void poseidon_domain_free(PoseidonDomainSettings *domain)
 	PoseidonData_free(domain->data);
 	domain->data = NULL;
 
+	if (domain->buffer) {
+		MEM_freeN(domain->buffer);
+		domain->buffer = NULL;
+	}
+
 	MEM_freeN(domain);
 }
 
@@ -223,6 +228,12 @@ static int poseidon_modifier_init(PoseidonModifierData *pmd, Object *ob, Scene *
 {
 	UNUSED_VARS(ob, dm);
 	if ((pmd->type & MOD_SMOKE_TYPE_DOMAIN) && pmd->domain) {
+		if (pmd->time != CFRA && pmd->domain->buffer) {
+			printf("Freeing domain buffer!\n");
+			MEM_freeN(pmd->domain->buffer);
+			pmd->domain->buffer = NULL;
+		}
+
 		pmd->time = CFRA;
 
 		/* initialize poseidon data */
@@ -524,6 +535,13 @@ static void poseidon_modifier_process(PoseidonModifierData *pmd, Scene *scene,
 
 			printf("%s\n", __func__);
 			step(scene, ob, pmd, dm);
+
+			/* XXX - do that elsewhere! */
+			if (pmd->domain->buffer) {
+				printf("Freeing domain buffer!\n");
+				MEM_freeN(pmd->domain->buffer);
+				pmd->domain->buffer = NULL;
+			}
 		}
 
 		BKE_ptcache_validate(cache, framenr);

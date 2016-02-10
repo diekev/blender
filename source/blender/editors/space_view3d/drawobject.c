@@ -37,6 +37,7 @@
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_meta_types.h"
+#include "DNA_poseidon_types.h"
 #include "DNA_rigidbody_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_smoke_types.h"
@@ -7468,6 +7469,7 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 	const bool has_particles = (ob->particlesystem.first != NULL);
 	bool skip_object = false;  /* Draw particles but not their emitter object. */
 	SmokeModifierData *smd = NULL;
+	PoseidonModifierData *pmd = NULL;
 
 	if (ob != scene->obedit) {
 		if (ob->restrictflag & OB_RESTRICT_VIEW)
@@ -7509,6 +7511,28 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 		smd = (SmokeModifierData *)md;
 
 		if (smd->domain) {
+			if (!v3d->transp && (dflag & DRAW_PICKING) == 0) {
+				if (!v3d->xray && !(ob->dtx & OB_DRAWXRAY)) {
+					/* object has already been drawn so skip drawing it */
+					ED_view3d_after_add(&v3d->afterdraw_transp, base, dflag);
+					return;
+				}
+				else if (v3d->xray) {
+					/* object has already been drawn so skip drawing it */
+					ED_view3d_after_add(&v3d->afterdraw_xraytransp, base, dflag);
+					return;
+				}
+			}
+		}
+	}
+
+	if (((base->flag & OB_FROMDUPLI) == 0) &&
+	    (md = modifiers_findByType(ob, eModifierType_Poseidon)) &&
+	    (modifier_isEnabled(scene, md, eModifierMode_Realtime)))
+	{
+		pmd = (PoseidonModifierData *)md;
+
+		if (pmd->domain) {
 			if (!v3d->transp && (dflag & DRAW_PICKING) == 0) {
 				if (!v3d->xray && !(ob->dtx & OB_DRAWXRAY)) {
 					/* object has already been drawn so skip drawing it */
@@ -7982,6 +8006,17 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 #endif
 			}
 		}
+	}
+
+	if (pmd && pmd->domain) {
+		float viewnormal[3];
+
+		/* get view vector */
+		invert_m4_m4(ob->imat, ob->obmat);
+		mul_v3_mat3_m4v3(viewnormal, ob->imat, rv3d->viewinv[2]);
+		normalize_v3(viewnormal);
+
+		draw_poseidon_volume(pmd->domain, ob, viewnormal);
 	}
 
 	if (!render_override) {

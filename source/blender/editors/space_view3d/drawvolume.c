@@ -830,3 +830,99 @@ void draw_smoke_heat(SmokeDomainSettings *domain, Object *ob)
 			}
 }
 #endif
+
+#include "DNA_poseidon_types.h"
+#include "poseidon_capi.h"
+
+void draw_poseidon_volume(PoseidonDomainSettings *sds, Object *ob,
+                          const float viewnormal[3])
+{
+	UNUSED_VARS(ob);
+
+	struct OpenVDBPrimitive *prim = Poseidon_get_field(sds->data, POSEIDON_FIELD_DENSITY);
+
+	if (sds->buffer == NULL) {
+		sds->buffer = OpenVDB_get_texture_buffer(prim, sds->res, sds->bbmin, sds->bbmax);
+	}
+
+	if (!sds->buffer) {
+		fprintf(stderr, "Could not allocate OpenVDB buffer!\n");
+		return;
+	}
+
+	/* XXX - TODO */
+	const float ob_sizei[3] = {
+	    1.0f, 1.0f, 1.0f
+	};
+
+	const float size[3] = {
+	    sds->bbmax[0] - sds->bbmin[0],
+	    sds->bbmax[1] - sds->bbmin[1],
+	    sds->bbmax[2] - sds->bbmin[2]
+	};
+
+	const float invsize[3] = {
+	    1.0f / size[0],
+	    1.0f / size[1],
+	    1.0f / size[2]
+	};
+
+	const float dx = sds->voxel_size;
+
+	/* setup smoke shader */
+	GPUShader *shader = GPU_shader_get_builtin_shader(GPU_SHADER_OPENVDB);
+
+	if (!shader) {
+		fprintf(stderr, "Could not create volume shader!\n");
+		return;
+	}
+
+	int soot_location = GPU_shader_get_uniform(shader, "soot_texture");
+	int invsize_location = GPU_shader_get_uniform(shader, "invsize");
+	int ob_sizei_location = GPU_shader_get_uniform(shader, "ob_sizei");
+	int min_location = GPU_shader_get_uniform(shader, "min");
+	int N_location = GPU_shader_get_uniform(shader, "N");
+	int step_size_location = GPU_shader_get_uniform(shader, "step_size");
+
+	GPUTexture *tex = GPU_texture_create_3D(sds->res[0], sds->res[1], sds->res[2], 1, sds->buffer);
+
+	if (!tex) {
+		fprintf(stderr, "Could not allocate 3D texture!\n");
+		return;
+	}
+
+	GPU_shader_bind(shader);
+
+	GPU_texture_bind(tex, 0);
+	GPU_shader_uniform_texture(shader, soot_location, tex);
+
+	GPU_shader_uniform_vector(shader, min_location, 3, 1, sds->bbmin);
+	GPU_shader_uniform_vector(shader, ob_sizei_location, 3, 1, ob_sizei);
+	GPU_shader_uniform_vector(shader, invsize_location, 3, 1, invsize);
+	GPU_shader_uniform_vector(shader, N_location, 3, 1, viewnormal);
+	GPU_shader_uniform_vector(shader, step_size_location, 1, 1, &dx);
+
+	/* setup slicing information */
+
+	const int max_slices = 256;
+	const int max_points = max_slices * 12;
+
+	VolumeSlicer slicer;
+	copy_v3_v3(slicer.min, sds->bbmin);
+	copy_v3_v3(slicer.max, sds->bbmax);
+	copy_v3_v3(slicer.size, size);
+	slicer.verts = MEM_mallocN(sizeof(float) * 3 * max_points, "smoke_slice_vertices");
+
+	const int num_points = create_view_aligned_slices(&slicer, max_slices, viewnormal);
+
+	/* setup buffer and draw */
+
+	draw_slices(&slicer.verts[0][0], sizeof(float) * 3 * num_points, GL_STATIC_DRAW);
+
+	GPU_texture_unbind(tex);
+	GPU_texture_free(tex);
+
+	GPU_shader_unbind();
+
+	MEM_freeN(slicer.verts);
+}

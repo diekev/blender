@@ -66,6 +66,12 @@ typedef struct PoseidonDomainSettings {
 
 	float voxel_size;
 	int pad;
+
+	/* Dense buffer drawing */
+	float *buffer;
+	float bbmin[3], bbmax[3];
+	int res[3];
+	int pad2;
 } PoseidonDomainSettings;
 
 #endif /* __DNA_POSEIDON_TYPES_H__ */

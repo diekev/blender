@@ -40,6 +40,7 @@ struct ARegionType;
 struct BoundBox;
 struct DerivedMesh;
 struct Object;
+struct PoseidonDomainSettings;
 struct SmokeDomainSettings;
 struct bAnimVizSettings;
 struct bContext;
@@ -292,6 +293,10 @@ void draw_box(const float vec[8][3], bool solid);
 void draw_smoke_volume(struct SmokeDomainSettings *sds, struct Object *ob,
                        const float min[3], const float max[3],
                        const float viewnormal[3]);
+
+/* draw_volume.c */
+void draw_poseidon_volume(struct PoseidonDomainSettings *sds, struct Object *ob,
+                          const float viewnormal[3]);
 
 
 void draw_volume(struct Object *ob, const float viewnormal[3]);
