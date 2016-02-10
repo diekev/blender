@@ -218,8 +218,13 @@ CCL_NAMESPACE_BEGIN
 #undef BVH_NAME_EVAL
 #undef BVH_FUNCTION_FULL_NAME
 
-ccl_device_intersect bool scene_intersect(KernelGlobals *kg, const Ray *ray, const uint visibility, Intersection *isect,
-					 uint *lcg_state, float difl, float extmax)
+ccl_device_intersect bool scene_intersect(KernelGlobals *kg,
+                                          const Ray *ray,
+                                          const uint visibility,
+                                          Intersection *isect,
+                                          uint *lcg_state,
+                                          float difl,
+                                          float extmax)
 {
 	isect->t = ray->t;
 	isect->u = 0.0f;
