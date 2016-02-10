@@ -583,54 +583,73 @@ void mix_dodge(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 	fac = clamp(fac, 0.0, 1.0);
 	outcol = col1;
 
-	if(col1.r == 0.0)
-		outcol.r = 0.0;
-	else if(col2.r == 1.0)
-		outcol.r = 1.0;
-	else
-		outcol.r = mix(col1.r, min(1.0, col1.r / (1.0 - col2.r)), fac);
-
-	if(col1.g == 0.0)
-		outcol.g = 0.0;
-	else if(col2.g == 1.0)
-		outcol.g = 1.0;
-	else
-		outcol.g = mix(col1.g, min(1.0, col1.g / (1.0 - col2.g)), fac);
-
-	if(col1.b == 0.0)
-		outcol.b = 0.0;
-	else if(col2.b == 1.0)
-		outcol.b = 1.0;
-	else
-		outcol.b = mix(col1.b, min(1.0, col1.b / (1.0 - col2.b)), fac);
+	if(outcol.r != 0.0) {
+		float tmp = 1.0 - fac*col2.r;
+		if(tmp <= 0.0)
+			outcol.r = 1.0;
+		else if((tmp = outcol.r/tmp) > 1.0)
+			outcol.r = 1.0;
+		else
+			outcol.r = tmp;
+	}
+	if(outcol.g != 0.0) {
+		float tmp = 1.0 - fac*col2.g;
+		if(tmp <= 0.0)
+			outcol.g = 1.0;
+		else if((tmp = outcol.g/tmp) > 1.0)
+			outcol.g = 1.0;
+		else
+			outcol.g = tmp;
+	}
+	if(outcol.b != 0.0) {
+		float tmp = 1.0 - fac*col2.b;
+		if(tmp <= 0.0)
+			outcol.b = 1.0;
+		else if((tmp = outcol.b/tmp) > 1.0)
+			outcol.b = 1.0;
+		else
+			outcol.b = tmp;
+	}
 }
 
 void mix_burn(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 {
 	fac = clamp(fac, 0.0, 1.0);
+	float tmp, facm = 1.0 - fac;
+
 	outcol = col1;
 
-	if(col1.r == 1.0)
-		outcol.r = 1.0;
-	else if(col2.r == 0.0)
+	tmp = facm + fac*col2.r;
+	if(tmp <= 0.0)
 		outcol.r = 0.0;
+	else if((tmp = (1.0 - (1.0 - outcol.r)/tmp)) < 0.0)
+		outcol.r = 0.0;
+	else if(tmp > 1.0)
+		outcol.r = 1.0;
 	else
-		outcol.r = mix(col1.r, 1.0 - min(1.0, (1.0 - col1.r) / col2.r), fac);
+		outcol.r = tmp;
 
-	if(col1.g == 1.0)
-		outcol.g = 1.0;
-	else if(col2.g == 0.0)
+	tmp = facm + fac*col2.g;
+	if(tmp <= 0.0)
 		outcol.g = 0.0;
+	else if((tmp = (1.0 - (1.0 - outcol.g)/tmp)) < 0.0)
+		outcol.g = 0.0;
+	else if(tmp > 1.0)
+		outcol.g = 1.0;
 	else
-		outcol.g = mix(col1.g, 1.0 - min(1.0, (1.0 - col1.g) / col2.g), fac);
+		outcol.g = tmp;
 
-	if(col1.b == 1.0)
-		outcol.b = 1.0;
-	else if(col2.b == 0.0)
+	tmp = facm + fac*col2.b;
+	if(tmp <= 0.0)
 		outcol.b = 0.0;
+	else if((tmp = (1.0 - (1.0 - outcol.b)/tmp)) < 0.0)
+		outcol.b = 0.0;
+	else if(tmp > 1.0)
+		outcol.b = 1.0;
 	else
-		outcol.b = mix(col1.b, 1.0 - min(1.0, (1.0 - col1.b) / col2.b), fac);
+		outcol.b = tmp;
 }
+
 
 void mix_hue(float fac, vec4 col1, vec4 col2, out vec4 outcol)
 {
