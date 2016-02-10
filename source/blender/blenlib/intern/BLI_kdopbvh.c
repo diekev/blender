@@ -29,7 +29,12 @@
  *  \ingroup bli
  *  \brief BVH-tree implementation.
  *
- * KD-Overlap-BVH, implements a bvh-tree structure with support for:
+ * k-DOP BVH (Discrete Oriented Polytope, Bounding Volume Hierarchy).
+ * A k-DOP is represented as k/2 pairs of min , max values for k/2 directions (intervals, "slabs").
+ *
+ * See: http://www.gris.uni-tuebingen.de/people/staff/jmezger/papers/bvh.pdf
+ *
+ * implements a bvh-tree structure with support for:
  *
  * - Ray-cast:
  *   #BLI_bvhtree_ray_cast, #BVHRayCastData
@@ -37,6 +42,8 @@
  *   #BLI_bvhtree_find_nearest, #BVHNearestData
  * - Overlapping 2 trees:
  *   #BLI_bvhtree_overlap, #BVHOverlapData_Shared, #BVHOverlapData_Thread
+ * - Range Query:
+ *   #BLI_bvhtree_range_query
  */
 
 #include <assert.h>
@@ -88,7 +95,7 @@ struct BVHTree {
 	float epsilon;          /* epslion is used for inflation of the k-dop	   */
 	int totleaf;            /* leafs */
 	int totbranch;
-	axis_t start_axis, stop_axis;  /* KDOP_AXES array indices according to axis */
+	axis_t start_axis, stop_axis;  /* bvhtree_kdop_axes array indices according to axis */
 	axis_t axis;                   /* kdop type (6 => OBB, 7 => AABB, ...) */
 	char tree_type;                /* type of tree (4 => quadtree) */
 };
@@ -146,6 +153,17 @@ typedef struct BVHRayCastData {
 	BVHTreeRayHit hit;
 } BVHRayCastData;
 
+typedef struct BVHNearestRayData {
+	BVHTree *tree;
+	BVHTree_NearestToRayCallback callback;
+	void    *userdata;
+	BVHTreeRay ray;
+
+	struct NearestRayToAABB_Precalc nearest_precalc;
+
+	bool pick_smallest[3];
+	BVHTreeNearest nearest;
+} BVHNearestRayData;
 
 /**
  * Bounding Volume Hierarchy Definition
@@ -155,7 +173,7 @@ typedef struct BVHRayCastData {
  * Notes: You can choose the tree type --> binary, quad, octree, choose below
  */
 
-static const float KDOP_AXES[13][3] = {
+const float bvhtree_kdop_axes[13][3] = {
 	{1.0, 0, 0}, {0, 1.0, 0}, {0, 0, 1.0}, {1.0, 1.0, 1.0}, {1.0, -1.0, 1.0}, {1.0, 1.0, -1.0},
 	{1.0, -1.0, -1.0}, {1.0, 1.0, 0}, {1.0, 0, 1.0}, {0, 1.0, 1.0}, {1.0, -1.0, 0}, {1.0, 0, -1.0},
 	{0, 1.0, -1.0}
@@ -450,7 +468,7 @@ static void create_kdop_hull(BVHTree *tree, BVHNode *node, const float *co, int 
 	for (k = 0; k < numpoints; k++) {
 		/* for all Axes. */
 		for (axis_iter = tree->start_axis; axis_iter < tree->stop_axis; axis_iter++) {
-			newminmax = dot_v3v3(&co[k * 3], KDOP_AXES[axis_iter]);
+			newminmax = dot_v3v3(&co[k * 3], bvhtree_kdop_axes[axis_iter]);
 			if (newminmax < bv[2 * axis_iter])
 				bv[2 * axis_iter] = newminmax;
 			if (newminmax > bv[(2 * axis_iter) + 1])
@@ -1300,15 +1318,15 @@ static float calc_nearest_point_squared(const float proj[3], BVHNode *node, floa
 	/* nearest on a general hull */
 	copy_v3_v3(nearest, data->co);
 	for (i = data->tree->start_axis; i != data->tree->stop_axis; i++, bv += 2) {
-		float proj = dot_v3v3(nearest, KDOP_AXES[i]);
+		float proj = dot_v3v3(nearest, bvhtree_kdop_axes[i]);
 		float dl = bv[0] - proj;
 		float du = bv[1] - proj;
 
 		if (dl > 0) {
-			madd_v3_v3fl(nearest, KDOP_AXES[i], dl);
+			madd_v3_v3fl(nearest, bvhtree_kdop_axes[i], dl);
 		}
 		else if (du < 0) {
-			madd_v3_v3fl(nearest, KDOP_AXES[i], du);
+			madd_v3_v3fl(nearest, bvhtree_kdop_axes[i], du);
 		}
 	}
 #endif
@@ -1470,7 +1488,7 @@ int BLI_bvhtree_find_nearest(BVHTree *tree, const float co[3], BVHTreeNearest *n
 	data.userdata = userdata;
 
 	for (axis_iter = data.tree->start_axis; axis_iter != data.tree->stop_axis; axis_iter++) {
-		data.proj[axis_iter] = dot_v3v3(data.co, KDOP_AXES[axis_iter]);
+		data.proj[axis_iter] = dot_v3v3(data.co, bvhtree_kdop_axes[axis_iter]);
 	}
 
 	if (nearest) {
@@ -1669,7 +1687,7 @@ static void bvhtree_ray_cast_data_precalc(BVHRayCastData *data, int flag)
 	int i;
 
 	for (i = 0; i < 3; i++) {
-		data->ray_dot_axis[i] = dot_v3v3(data->ray.direction, KDOP_AXES[i]);
+		data->ray_dot_axis[i] = dot_v3v3(data->ray.direction, bvhtree_kdop_axes[i]);
 		data->idot_axis[i] = 1.0f / data->ray_dot_axis[i];
 
 		if (fabsf(data->ray_dot_axis[i]) < FLT_EPSILON) {
@@ -1808,6 +1826,102 @@ int BLI_bvhtree_ray_cast_all(
 	return BLI_bvhtree_ray_cast_all_ex(tree, co, dir, radius, callback, userdata, BVH_RAYCAST_DEFAULT);
 }
 
+static float calc_dist_sq_to_ray(BVHNearestRayData *data, BVHNode *node)
+{
+	const float *bv = node->bv;
+	const float bb_min[3] = {bv[0], bv[2], bv[4]};
+	const float bb_max[3] = {bv[1], bv[3], bv[5]};
+	return dist_squared_ray_to_aabb_v3(&data->nearest_precalc, bb_min, bb_max, data->pick_smallest);
+}
+
+static void dfs_find_nearest_to_ray_dfs(BVHNearestRayData *data, BVHNode *node)
+{
+	if (node->totnode == 0) {
+		if (data->callback) {
+			data->callback(data->userdata, node->index, &data->ray, &data->nearest);
+		}
+		else {
+			const float dist_sq = calc_dist_sq_to_ray(data, node);
+			if (dist_sq != FLT_MAX) {  /* not an invalid ray */
+				data->nearest.index = node->index;
+				data->nearest.dist_sq = dist_sq;
+				/* TODO: return a value to the data->nearest.co
+				 * not urgent however since users currently define own callbacks */
+			}
+		}
+	}
+	else {
+		int i;
+		/* First pick the closest node to dive on */
+		if (data->pick_smallest[node->main_axis]) {
+			for (i = 0; i != node->totnode; i++) {
+				if (calc_dist_sq_to_ray(data, node->children[i]) >= data->nearest.dist_sq) {
+					continue;
+				}
+				dfs_find_nearest_to_ray_dfs(data, node->children[i]);
+			}
+		}
+		else {
+			for (i = node->totnode - 1; i >= 0; i--) {
+				if (calc_dist_sq_to_ray(data, node->children[i]) >= data->nearest.dist_sq) {
+					continue;
+				}
+				dfs_find_nearest_to_ray_dfs(data, node->children[i]);
+			}
+		}
+	}
+}
+
+static void dfs_find_nearest_to_ray_begin(BVHNearestRayData *data, BVHNode *node)
+{
+	float dist_sq = calc_dist_sq_to_ray(data, node);
+	if (dist_sq >= data->nearest.dist_sq) {
+		return;
+	}
+	dfs_find_nearest_to_ray_dfs(data, node);
+}
+
+int BLI_bvhtree_find_nearest_to_ray(
+	BVHTree *tree, const float co[3], const float dir[3], float radius, BVHTreeNearest *nearest,
+	BVHTree_NearestToRayCallback callback, void *userdata)
+{
+	BVHNearestRayData data;
+	BVHNode *root = tree->nodes[tree->totleaf];
+
+	BLI_ASSERT_UNIT_V3(dir);
+
+	data.tree = tree;
+
+	data.callback = callback;
+	data.userdata = userdata;
+
+	copy_v3_v3(data.ray.origin, co);
+	copy_v3_v3(data.ray.direction, dir);
+	data.ray.radius = radius;
+
+	dist_squared_ray_to_aabb_v3_precalc(&data.nearest_precalc, co, dir);
+
+	if (nearest) {
+		memcpy(&data.nearest, nearest, sizeof(*nearest));
+	}
+	else {
+		data.nearest.index = -1;
+		data.nearest.dist_sq = FLT_MAX;
+	}
+
+	/* dfs search */
+	if (root) {
+		dfs_find_nearest_to_ray_begin(&data, root);
+	}
+
+	/* copy back results */
+	if (nearest) {
+		memcpy(nearest, &data.nearest, sizeof(*nearest));
+	}
+
+	return data.nearest.index;
+}
+
 /**
  * Range Query - as request by broken :P
  *
@@ -1884,3 +1998,79 @@ int BLI_bvhtree_range_query(BVHTree *tree, const float co[3], float radius, BVHT
 
 	return data.hits;
 }
+
+
+/* -------------------------------------------------------------------- */
+
+/** \name BLI_bvhtree_walk_dfs
+ * \{ */
+
+/**
+ * Runs first among nodes children of the first node before going to the next node in the same layer.
+ *
+ * \return false to break out of the search early.
+ */
+static bool bvhtree_walk_dfs_recursive(
+        BVHTree_WalkParentCallback walk_parent_cb,
+        BVHTree_WalkLeafCallback walk_leaf_cb,
+        BVHTree_WalkOrderCallback walk_order_cb,
+        const BVHNode *node, void *userdata)
+{
+	if (node->totnode == 0) {
+		return walk_leaf_cb((const BVHTreeAxisRange *)node->bv, node->index, userdata);
+	}
+	else {
+		/* First pick the closest node to recurse into */
+		if (walk_order_cb((const BVHTreeAxisRange *)node->bv, node->main_axis, userdata)) {
+			for (int i = 0; i != node->totnode; i++) {
+				if (walk_parent_cb((const BVHTreeAxisRange *)node->bv, userdata)) {
+					if (!bvhtree_walk_dfs_recursive(
+					        walk_parent_cb, walk_leaf_cb, walk_order_cb,
+					        node->children[i], userdata))
+					{
+						return false;
+					}
+				}
+			}
+		}
+		else {
+			for (int i = node->totnode - 1; i >= 0; i--) {
+				if (walk_parent_cb((const BVHTreeAxisRange *)node->bv, userdata)) {
+					if (!bvhtree_walk_dfs_recursive(
+					        walk_parent_cb, walk_leaf_cb, walk_order_cb,
+					        node->children[i], userdata))
+					{
+						return false;
+					}
+				}
+			}
+		}
+	}
+	return true;
+}
+
+/**
+ * This is a generic function to perform a depth first search on the BVHTree
+ * where the search order and nodes traversed depend on callbacks passed in.
+ *
+ * \param tree: Tree to walk.
+ * \param walk_parent_cb: Callback on a parents bound-box to test if it should be traversed.
+ * \param walk_leaf_cb: Callback to test leaf nodes, callback must store its own result,
+ * returning false exits early.
+ * \param walk_order_cb: Callback that indicates which direction to search,
+ * either from the node with the lower or higher k-dop axis value.
+ * \param userdata: Argument passed to all callbacks.
+ */
+void BLI_bvhtree_walk_dfs(
+        BVHTree *tree,
+        BVHTree_WalkParentCallback walk_parent_cb,
+        BVHTree_WalkLeafCallback walk_leaf_cb,
+        BVHTree_WalkOrderCallback walk_order_cb, void *userdata)
+{
+	const BVHNode *root = tree->nodes[tree->totleaf];
+	if (root != NULL) {
+		bvhtree_walk_dfs_recursive(walk_parent_cb, walk_leaf_cb, walk_order_cb, root, userdata);
+	}
+}
+
+/** \} */

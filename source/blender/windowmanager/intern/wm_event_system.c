@@ -1691,8 +1691,15 @@ static int wm_handler_operator_call(bContext *C, ListBase *handlers, wmEventHand
 				if (ot->flag & OPTYPE_UNDO)
 					wm->op_undo_depth--;
 
-				if (retval & (OPERATOR_CANCELLED | OPERATOR_FINISHED))
+				if (retval & (OPERATOR_CANCELLED | OPERATOR_FINISHED)) {
 					wm_operator_reports(C, op, retval, false);
+				}
+				else {
+					/* not very common, but modal operators may report before finishing */
+					if (!BLI_listbase_is_empty(&op->reports->list)) {
+						wm_add_reports(op->reports);
+					}
+				}
 
 				/* important to run 'wm_operator_finished' before NULLing the context members */
 				if (retval & OPERATOR_FINISHED) {
@@ -1883,7 +1890,9 @@ static int wm_handler_fileselect_do(bContext *C, ListBase *handlers, wmEventHand
 					WM_operator_last_properties_store(handler->op);
 				}
 
-				WM_operator_free(handler->op);
+				if (retval & (OPERATOR_CANCELLED | OPERATOR_FINISHED)) {
+					WM_operator_free(handler->op);
+				}
 			}
 			else {
 				if (handler->op->type->cancel) {
@@ -3401,11 +3410,12 @@ void wm_event_add_ghostevent(wmWindowManager *wm, wmWindow *win, int type, int U
 			if (event.keymodifier == event.type)
 				event.keymodifier = 0;
 						
-			/* this case happened with an external numpad, it's not really clear
-			 * why, but it's also impossible to map a key modifier to an unknown
-			 * key, so it shouldn't harm */
-			if (event.keymodifier == UNKNOWNKEY)
-				event.keymodifier = 0;
+			/* this case happens with an external numpad, and also when using 'dead keys' (to compose complex latin
+			 * characters e.g.), it's not really clear why.
+			 * Since it's impossible to map a key modifier to an unknown key, it shouldn't harm to clear it. */
+			if (event.keymodifier == UNKNOWNKEY) {
+				evt->keymodifier = event.keymodifier = 0;
+			}
 			
 			/* if test_break set, it catches this. Do not set with modifier presses. XXX Keep global for now? */
 			if ((event.type == ESCKEY && event.val == KM_PRESS) &&
