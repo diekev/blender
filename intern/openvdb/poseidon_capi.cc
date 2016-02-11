@@ -82,4 +82,6 @@ OpenVDBPrimitive *Poseidon_get_field(PoseidonData *handle, int index)
 		default:
 			assert(false);
 	}
+
+	return NULL;
 }
