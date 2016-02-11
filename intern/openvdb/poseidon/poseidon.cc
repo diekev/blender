@@ -128,11 +128,27 @@ void add_inflow(FluidData * const data, OpenVDBPrimitive *inflow_prim)
 	using namespace openvdb;
 
 	auto density = gridPtrCast<ScalarGrid>(data->density.getGridPtr());
+	auto temperature = gridPtrCast<ScalarGrid>(data->temperature.getGridPtr());
 	auto inflow = gridPtrCast<ScalarGrid>(inflow_prim->getGridPtr());
 
-	density->topologyUnion(*inflow);
+//	density->topologyUnion(*inflow);
 
-	tools::compMax(*density, *inflow);
+//	tools::compMax(*density, *(inflow->copyGrid(CopyPolicy::CP_NEW)));
+//	tools::compMax(*temperature, *(inflow->copyGrid(CopyPolicy::CP_NEW)));
+
+	ScalarAccessor dacc = density->getAccessor();
+	ScalarAccessor tacc = temperature->getAccessor();
+
+	typedef FloatTree::LeafNodeType LeafType;
+
+	for (FloatTree::LeafIter lit = inflow->tree().beginLeaf(); lit; ++lit) {
+		LeafType &leaf = *lit;
+
+		for (typename LeafType::ValueOnIter it = leaf.beginValueOn(); it; ++it) {
+			dacc.setValue(it.getCoord(), 1.0f);
+			tacc.setValue(it.getCoord(), 1.0f);
+		}
+	}
 }
 
 void add_obstacle(FluidData * const data, OpenVDBPrimitive *obstacle_prim)
