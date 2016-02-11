@@ -348,6 +348,26 @@ static void update_sources(Scene *scene, Object *ob, PoseidonDomainSettings *pds
 	}
 }
 
+/* set domain transformations and base resolution from object derivedmesh */
+static void smoke_set_domain_from_derivedmesh(PoseidonDomainSettings *sds, DerivedMesh *dm)
+{
+	float min[3] = {FLT_MAX, FLT_MAX, FLT_MAX}, max[3] = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
+	MVert *verts = dm->getVertArray(dm);
+
+	/* get BB of domain */
+	for (size_t i = 0; i < dm->getNumVerts(dm); i++) {
+		min[0] = MIN2(min[0], verts[i].co[0]);
+		min[1] = MIN2(min[1], verts[i].co[1]);
+		min[2] = MIN2(min[2], verts[i].co[2]);
+
+		max[0] = MAX2(max[0], verts[i].co[0]);
+		max[1] = MAX2(max[1], verts[i].co[1]);
+		max[2] = MAX2(max[2], verts[i].co[2]);
+	}
+
+	PoseidonData_add_domain_walls(sds->data, min, max);
+}
+
 static void step(Scene *scene, Object *ob, PoseidonModifierData *pmd, DerivedMesh *domain_dm)
 {
 	PoseidonDomainSettings *pds = pmd->domain;
@@ -357,7 +377,7 @@ static void step(Scene *scene, Object *ob, PoseidonModifierData *pmd, DerivedMes
 	/* update object state */
 	invert_m4_m4(pds->imat, ob->obmat);
 	copy_m4_m4(pds->obmat, ob->obmat);
-//	smoke_set_domain_from_derivedmesh(sds, ob, domain_dm, (sds->flags & MOD_SMOKE_ADAPTIVE_DOMAIN) != 0);
+	smoke_set_domain_from_derivedmesh(pds, domain_dm);
 
 	/* use global gravity if enabled */
 	if (scene->physics_settings.flag & PHYS_GLOBAL_GRAVITY) {

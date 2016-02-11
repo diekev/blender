@@ -54,6 +54,7 @@ void PoseidonData_init(struct PoseidonData *handle, float dh);
 
 void PoseidonData_add_inflow(struct PoseidonData *handle, struct OpenVDBPrimitive *inflow);
 void PoseidonData_add_obstacle(struct PoseidonData *handle, struct OpenVDBPrimitive *obstacle);
+void PoseidonData_add_domain_walls(struct PoseidonData *handle, float min[3], float max[3]);
 
 void PoseidonData_step(struct PoseidonData *handle, float dt, int advection);
 

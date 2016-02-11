@@ -65,6 +65,41 @@ void init_data(FluidData * const data, float voxel_size)
 	data->velocity.setGridPtr(velocity);
 }
 
+void create_domain_walls(FluidData * const data, const openvdb::math::BBox<openvdb::Vec3d> &wbbox)
+{
+	using namespace openvdb;
+	using namespace openvdb::math;
+
+	auto collision = gridPtrCast<openvdb::BoolGrid>(data->collision.getGridPtr());
+
+	Transform xform = collision->transform();
+	CoordBBox bbox = xform.worldToIndexCellCentered(wbbox);
+
+	auto min = bbox.min();
+	auto max = bbox.max();
+
+	/* X slabs */
+	CoordBBox bbox_xmin(min, Coord(min[0], max[1], max[2]));
+	collision->tree().fill(bbox_xmin, true);
+
+	CoordBBox bbox_xmax(Coord(max[0], min[1], min[2]), max);
+	collision->tree().fill(bbox_xmax, true);
+
+	/* Y slabs */
+	CoordBBox bbox_ymin(min, Coord(max[0], min[1], max[2]));
+	collision->tree().fill(bbox_ymin, true);
+
+	CoordBBox bbox_ymax(Coord(min[0], max[1], min[2]), max);
+	collision->tree().fill(bbox_ymax, true);
+
+	/* Z slabs */
+	CoordBBox bbox_zmin(min, Coord(max[0], max[1], min[2]));
+	collision->tree().fill(bbox_zmin, true);
+
+	CoordBBox bbox_zmax(Coord(min[0], min[1], max[2]), max);
+	collision->tree().fill(bbox_zmax, true);
+}
+
 static void advect_semi_lagrange(FluidData * const data, float dt)
 {
 	Timer(__func__);

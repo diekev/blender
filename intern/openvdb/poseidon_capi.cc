@@ -56,6 +56,12 @@ void PoseidonData_add_obstacle(PoseidonData *handle, OpenVDBPrimitive *obstacle)
 	poseidon::add_obstacle(data, obstacle);
 }
 
+void PoseidonData_add_domain_walls(PoseidonData *handle, float min[3], float max[3])
+{
+	poseidon::FluidData *data = reinterpret_cast<poseidon::FluidData *>(handle);
+	poseidon::create_domain_walls(data, openvdb::BBoxd(min, max));
+}
+
 void PoseidonData_step(PoseidonData *handle, float dt, int advection)
 {
 	poseidon::FluidData *data = reinterpret_cast<poseidon::FluidData *>(handle);
