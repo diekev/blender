@@ -1215,11 +1215,36 @@ static int ptcache_poseidon_write(struct OpenVDBWriter *writer, void *smoke_v)
 
 static int ptcache_poseidon_read(struct OpenVDBReader *reader, void *smoke_v)
 {
-	UNUSED_VARS(smoke_v);
+	PoseidonModifierData *smd = (PoseidonModifierData *)smoke_v;
+
+	if (!smd) {
+		return 0;
+	}
+
+	PoseidonDomainSettings *sds = smd->domain;
+	struct OpenVDBPrimitive *prim;
+
+	prim = Poseidon_get_field(sds->data, POSEIDON_FIELD_COLLISION);
+	OpenVDBReader_read_primitive(reader, prim, "collision");
+
+	prim = Poseidon_get_field(sds->data, POSEIDON_FIELD_DENSITY);
+	OpenVDBReader_read_primitive(reader, prim, "density");
+
+	prim = Poseidon_get_field(sds->data, POSEIDON_FIELD_VELOCITY);
+	OpenVDBReader_read_primitive(reader, prim, "velocity");
+
+	prim = Poseidon_get_field(sds->data, POSEIDON_FIELD_TEMPERATURE);
+	OpenVDBReader_read_primitive(reader, prim, "temperature");
+
+	prim = Poseidon_get_field(sds->data, POSEIDON_FIELD_PRESSURE);
+	OpenVDBReader_read_primitive(reader, prim, "pressure");
+
+	prim = Poseidon_get_field(sds->data, POSEIDON_FIELD_FLAGS);
+	OpenVDBReader_read_primitive(reader, prim, "flags");
 
 	OpenVDBReader_free(reader);
 
-	return 0;
+	return 1;
 }
 
 static int ptcache_dynamicpaint_totpoint(void *sd, int UNUSED(cfra))

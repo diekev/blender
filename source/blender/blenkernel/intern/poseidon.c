@@ -484,6 +484,13 @@ static void poseidon_modifier_process(PoseidonModifierData *pmd, Scene *scene,
 		if (BKE_ptcache_read(&pid, (float)framenr) == PTCACHE_READ_EXACT) {
 			BKE_ptcache_validate(cache, framenr);
 			pmd->time = framenr;
+
+			/* XXX - do that elsewhere! */
+			if (pmd->domain->buffer) {
+				MEM_freeN(pmd->domain->buffer);
+				pmd->domain->buffer = NULL;
+			}
+
 			return;
 		}
 

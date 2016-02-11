@@ -278,6 +278,15 @@ void OpenVDBReader_get_meta_mat4(OpenVDBReader *reader, const char *name, float 
 	reader->mat4sMeta(name, value);
 }
 
+void OpenVDBReader_read_primitive(OpenVDBReader *reader, OpenVDBPrimitive *prim, const char *name)
+{
+	if (!reader->hasGrid(name)) {
+		return;
+	}
+
+	prim->setGridPtr(reader->getGrid(name));
+}
+
 OpenVDBPrimitive *OpenVDBPrimitive_create()
 {
 	return new OpenVDBPrimitive();

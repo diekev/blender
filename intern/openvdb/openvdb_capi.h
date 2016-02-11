@@ -110,6 +110,7 @@ void OpenVDBReader_get_meta_int(struct OpenVDBReader *reader, const char *name, 
 void OpenVDBReader_get_meta_v3(struct OpenVDBReader *reader, const char *name, float value[3]);
 void OpenVDBReader_get_meta_v3_int(struct OpenVDBReader *reader, const char *name, int value[3]);
 void OpenVDBReader_get_meta_mat4(struct OpenVDBReader *reader, const char *name, float value[4][4]);
+void OpenVDBReader_read_primitive(struct OpenVDBReader *reader, struct OpenVDBPrimitive *prim, const char *name);
 
 struct OpenVDBPrimitive *OpenVDBPrimitive_create(void);
 void OpenVDBPrimitive_free(struct OpenVDBPrimitive *vdb_prim);
