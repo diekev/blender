@@ -34,10 +34,10 @@
 
 namespace poseidon {
 
-void init_data(FluidData * const data, float voxel_size, int advection)
+void init_data(FluidData * const data, float voxel_size)
 {
 	data->dh = voxel_size;
-	data->advection_scheme = advection;
+	data->advection_scheme = ADVECT_SEMI;
 	data->xform = *openvdb::math::Transform::createLinearTransform(data->dh);
 	data->max_vel = 0.0f;
 	data->dt = 0.1f;
@@ -102,7 +102,7 @@ static void advect_semi_lagrange(FluidData * const data, float dt)
 //	velocity.swap(result);
 }
 
-void step_smoke(FluidData * const data, float dt)
+void step_smoke(FluidData * const data, float dt, int advection)
 {
 	ScalarGrid::Ptr density = openvdb::gridPtrCast<ScalarGrid>(data->density.getGridPtr());
 	ScalarGrid::Ptr temperature = openvdb::gridPtrCast<ScalarGrid>(data->temperature.getGridPtr());
@@ -116,6 +116,7 @@ void step_smoke(FluidData * const data, float dt)
 	data->flags.setGridPtr(flags);
 
 	/* start step */
+	data->advection_scheme = advection;
 
 	advect_semi_lagrange(data, dt);
 

@@ -231,7 +231,7 @@ static int poseidon_modifier_init(PoseidonModifierData *pmd, Object *ob, Scene *
 		/* initialize poseidon data */
 		if (!pmd->domain->data) {
 			pmd->domain->data = PoseidonData_create();
-			PoseidonData_init(pmd->domain->data, pmd->domain->voxel_size, pmd->domain->advection);
+			PoseidonData_init(pmd->domain->data, pmd->domain->voxel_size);
 
 			/* Only set time if there is no data. */
 			pmd->time = CFRA;
@@ -404,7 +404,7 @@ static void step(Scene *scene, Object *ob, PoseidonModifierData *pmd, DerivedMes
 
 		 // DG TODO? problem --> uses forces instead of velocity, need to check how they need to be changed with variable dt
 		//update_effectors(scene, ob, pds, dtSubdiv);
-		PoseidonData_step(pds->data, dtSubdiv);
+		PoseidonData_step(pds->data, dtSubdiv, pds->advection);
 	}
 }
 

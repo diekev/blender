@@ -41,8 +41,8 @@ struct FluidData {
 	openvdb::math::Transform xform;
 };
 
-void step_smoke(FluidData * const data, float dt);
-void init_data(FluidData * const data, float voxel_size, int advection);
+void step_smoke(FluidData * const data, float dt, int advection);
+void init_data(FluidData * const data, float voxel_size);
 void add_inflow(FluidData * const data, OpenVDBPrimitive *inflow_prim);
 void add_obstacle(FluidData * const data, OpenVDBPrimitive *obstacle_prim);
 

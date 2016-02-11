@@ -38,10 +38,10 @@ void PoseidonData_free(PoseidonData *handle)
 	delete data;
 }
 
-void PoseidonData_init(PoseidonData *handle, float dh, int advection)
+void PoseidonData_init(PoseidonData *handle, float dh)
 {
 	poseidon::FluidData *data = reinterpret_cast<poseidon::FluidData *>(handle);
-	poseidon::init_data(data, dh, advection);
+	poseidon::init_data(data, dh);
 }
 
 void PoseidonData_add_inflow(PoseidonData *handle, OpenVDBPrimitive *inflow)
@@ -56,10 +56,10 @@ void PoseidonData_add_obstacle(PoseidonData *handle, OpenVDBPrimitive *obstacle)
 	poseidon::add_obstacle(data, obstacle);
 }
 
-void PoseidonData_step(PoseidonData *handle, float dt)
+void PoseidonData_step(PoseidonData *handle, float dt, int advection)
 {
 	poseidon::FluidData *data = reinterpret_cast<poseidon::FluidData *>(handle);
-	poseidon::step_smoke(data, dt);
+	poseidon::step_smoke(data, dt, advection);
 }
 
 OpenVDBPrimitive *Poseidon_get_field(PoseidonData *handle, int index)
