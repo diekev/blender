@@ -23,6 +23,7 @@
 #include "poseidon.h"
 
 #include <openvdb/tools/Composite.h>
+#include <openvdb/tools/LevelSetUtil.h>
 
 #include "advection.h"
 #include "forces.h"
@@ -87,14 +88,18 @@ static void advect_semi_lagrange(FluidData * const data, float dt)
 	ScalarGrid::Ptr sresult;
 
 	sresult = advector.advect<ScalarGrid, Sampler>(*density, dt);
-	density.swap(sresult);
+	data->density.setGridPtr(sresult);
+
+//	density.swap(sresult);
 
 	sresult = advector.advect<ScalarGrid, Sampler>(*temperature, dt);
-	temperature.swap(sresult);
+	data->temperature.setGridPtr(sresult);
+//	temperature.swap(sresult);
 
 	VectorGrid::Ptr result;
 	result = advector.advect<VectorGrid, Sampler>(*velocity, dt);
-	velocity.swap(result);
+	data->velocity.setGridPtr(result);
+//	velocity.swap(result);
 }
 
 void step_smoke(FluidData * const data, float dt)
@@ -102,17 +107,21 @@ void step_smoke(FluidData * const data, float dt)
 	ScalarGrid::Ptr density = openvdb::gridPtrCast<ScalarGrid>(data->density.getGridPtr());
 	ScalarGrid::Ptr temperature = openvdb::gridPtrCast<ScalarGrid>(data->temperature.getGridPtr());
 	ScalarGrid::Ptr pressure = openvdb::gridPtrCast<ScalarGrid>(data->pressure.getGridPtr());
-	openvdb::Int32Grid::Ptr flags = openvdb::gridPtrCast<openvdb::Int32Grid>(data->flags.getGridPtr());
 	VectorGrid::Ptr velocity = openvdb::gridPtrCast<VectorGrid>(data->velocity.getGridPtr());
 	openvdb::BoolGrid::Ptr obstacle = openvdb::gridPtrCast<openvdb::BoolGrid>(data->collision.getGridPtr());
 
-	temperature->topologyUnion(*density);
 	velocity->topologyUnion(*density);
-	flags = build_flag_grid(density, obstacle);
+
+	auto flags = build_flag_grid(density, obstacle);
+	data->flags.setGridPtr(flags);
 
 	/* start step */
 
 	advect_semi_lagrange(data, dt);
+
+	density = openvdb::gridPtrCast<ScalarGrid>(data->density.getGridPtr());
+	temperature = openvdb::gridPtrCast<ScalarGrid>(data->temperature.getGridPtr());
+	velocity = openvdb::gridPtrCast<VectorGrid>(data->velocity.getGridPtr());
 
 	set_neumann_boundary(*velocity, flags);
 	add_buoyancy(dt, velocity, density, temperature, flags);
@@ -130,6 +139,8 @@ void add_inflow(FluidData * const data, OpenVDBPrimitive *inflow_prim)
 	auto density = gridPtrCast<ScalarGrid>(data->density.getGridPtr());
 	auto temperature = gridPtrCast<ScalarGrid>(data->temperature.getGridPtr());
 	auto inflow = gridPtrCast<ScalarGrid>(inflow_prim->getGridPtr());
+
+	tools::sdfToFogVolume(*inflow);
 
 //	density->topologyUnion(*inflow);
 
