@@ -51,6 +51,10 @@ typedef struct PoseidonCollSettings {
 	short pad;
 } PoseidonCollSettings;
 
+enum {
+	MOD_POSEIDON_FILE_LOAD = (1 << 0),
+};
+
 typedef struct PoseidonDomainSettings {
 	struct PoseidonModifierData *pmd;
 	struct Group *fluid_group;
@@ -71,7 +75,8 @@ typedef struct PoseidonDomainSettings {
 	float *buffer;
 	float bbmin[3], bbmax[3];
 	int res[3];
-	int pad2;
+	char flags;
+	char pad2[3];
 } PoseidonDomainSettings;
 
 #endif /* __DNA_POSEIDON_TYPES_H__ */

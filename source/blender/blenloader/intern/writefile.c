@@ -119,6 +119,7 @@
 #include "DNA_object_force.h"
 #include "DNA_packedFile_types.h"
 #include "DNA_particle_types.h"
+#include "DNA_poseidon_types.h"
 #include "DNA_property_types.h"
 #include "DNA_rigidbody_types.h"
 #include "DNA_scene_types.h"
@@ -1589,6 +1590,21 @@ static void write_modifiers(WriteData *wd, ListBase *modbase)
 				writestruct(wd, DATA, "SmokeFlowSettings", 1, smd->flow);
 			else if (smd->type & MOD_SMOKE_TYPE_COLL)
 				writestruct(wd, DATA, "SmokeCollSettings", 1, smd->coll);
+		}
+		else if (md->type==eModifierType_Poseidon) {
+			PoseidonModifierData *pmd = (PoseidonModifierData*) md;
+
+			if (pmd->type & MOD_SMOKE_TYPE_DOMAIN) {
+				if (pmd->domain) {
+					write_pointcaches(wd, &(pmd->domain->ptcaches));
+				}
+
+				writestruct(wd, DATA, "PoseidonDomainSettings", 1, pmd->domain);
+			}
+			else if (pmd->type & MOD_SMOKE_TYPE_FLOW)
+				writestruct(wd, DATA, "PoseidonFlowSettings", 1, pmd->flow);
+			else if (pmd->type & MOD_SMOKE_TYPE_COLL)
+				writestruct(wd, DATA, "PoseidonCollSettings", 1, pmd->coll);
 		}
 		else if (md->type==eModifierType_Fluidsim) {
 			FluidsimModifierData *fluidmd = (FluidsimModifierData*) md;

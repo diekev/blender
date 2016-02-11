@@ -83,6 +83,7 @@
 #include "DNA_object_types.h"
 #include "DNA_packedFile_types.h"
 #include "DNA_particle_types.h"
+#include "DNA_poseidon_types.h"
 #include "DNA_property_types.h"
 #include "DNA_rigidbody_types.h"
 #include "DNA_text_types.h"
@@ -4892,6 +4893,14 @@ static void lib_link_object(FileData *fd, Main *main)
 					smd->domain->flags |= MOD_SMOKE_FILE_LOAD; /* flag for refreshing the simulation after loading */
 				}
 			}
+
+			{
+				PoseidonModifierData *smd = (PoseidonModifierData *)modifiers_findByType(ob, eModifierType_Poseidon);
+
+				if (smd && (smd->type == MOD_SMOKE_TYPE_DOMAIN) && smd->domain) {
+					smd->domain->flags |= MOD_POSEIDON_FILE_LOAD; /* flag for refreshing the simulation after loading */
+				}
+			}
 			
 			/* texture field */
 			if (ob->pd)
@@ -5091,6 +5100,44 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 					smd->flow = NULL;
 					smd->domain = NULL;
 					smd->coll = NULL;
+				}
+			}
+		}
+		else if (md->type == eModifierType_Poseidon) {
+			PoseidonModifierData *pmd = (PoseidonModifierData *)md;
+
+			if (pmd->type == MOD_SMOKE_TYPE_DOMAIN) {
+				pmd->flow = NULL;
+				pmd->coll = NULL;
+				pmd->domain = newdataadr(fd, pmd->domain);
+				pmd->domain->pmd = pmd;
+
+				direct_link_pointcache_list(fd, &(pmd->domain->ptcaches), &(pmd->domain->cache), 1);
+			}
+			else if (pmd->type == MOD_SMOKE_TYPE_FLOW) {
+				pmd->domain = NULL;
+				pmd->coll = NULL;
+				pmd->flow = newdataadr(fd, pmd->flow);
+				pmd->flow->pmd = pmd;
+				pmd->flow->dm = NULL;
+				pmd->flow->verts_old = NULL;
+				pmd->flow->numverts = 0;
+			}
+			else if (pmd->type == MOD_SMOKE_TYPE_COLL) {
+				pmd->flow = NULL;
+				pmd->domain = NULL;
+				pmd->coll = newdataadr(fd, pmd->coll);
+				if (pmd->coll) {
+					pmd->coll->pmd = pmd;
+					pmd->coll->verts_old = NULL;
+					pmd->coll->numverts = 0;
+					pmd->coll->dm = NULL;
+				}
+				else {
+					pmd->type = 0;
+					pmd->flow = NULL;
+					pmd->domain = NULL;
+					pmd->coll = NULL;
 				}
 			}
 		}

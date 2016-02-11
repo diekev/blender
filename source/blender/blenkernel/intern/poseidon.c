@@ -474,10 +474,10 @@ static void poseidon_modifier_process(PoseidonModifierData *pmd, Scene *scene,
 			cache->flag &= ~PTCACHE_REDO_NEEDED;
 		}
 
-//		if (!pds->data && (framenr != startframe)/* && (pds->flags & MOD_SMOKE_FILE_LOAD) == 0*/ && (cache->flag & PTCACHE_BAKED) == 0)
-//			return;
+		if (!pds->data && (framenr != startframe) && (pds->flags & MOD_POSEIDON_FILE_LOAD) == 0 && (cache->flag & PTCACHE_BAKED) == 0)
+			return;
 
-//		pds->flags &= ~MOD_SMOKE_FILE_LOAD;
+		pds->flags &= ~MOD_POSEIDON_FILE_LOAD;
 		CLAMP(framenr, startframe, endframe);
 
 		/* If already viewing a pre/after frame, no need to reload */
