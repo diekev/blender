@@ -228,18 +228,13 @@ static int poseidon_modifier_init(PoseidonModifierData *pmd, Object *ob, Scene *
 {
 	UNUSED_VARS(ob, dm);
 	if ((pmd->type & MOD_SMOKE_TYPE_DOMAIN) && pmd->domain) {
-		if (pmd->time != CFRA && pmd->domain->buffer) {
-			printf("Freeing domain buffer!\n");
-			MEM_freeN(pmd->domain->buffer);
-			pmd->domain->buffer = NULL;
-		}
-
-		pmd->time = CFRA;
-
 		/* initialize poseidon data */
 		if (!pmd->domain->data) {
 			pmd->domain->data = PoseidonData_create();
 			PoseidonData_init(pmd->domain->data, pmd->domain->voxel_size, pmd->domain->advection);
+
+			/* Only set time if there is no data. */
+			pmd->time = CFRA;
 		}
 
 		return true;
@@ -293,8 +288,6 @@ void BKE_poseidon_modifier_reset(PoseidonModifierData *pmd)
 
 static void update_obstacles(Scene *scene, Object *ob, PoseidonDomainSettings *pds)
 {
-//	OpenVDB_smoke_clear_obstacles(sds->data);
-
 	unsigned int numflowobj = 0;
 	Object **collobjs = get_collisionobjects(scene, ob, pds->coll_group, &numflowobj, eModifierType_Poseidon);
 
@@ -334,7 +327,6 @@ static void update_sources(Scene *scene, Object *ob, PoseidonDomainSettings *pds
 
 		/* check for initialized smoke object */
 		if ((smd2->type & MOD_SMOKE_TYPE_FLOW) && smd2->flow) {
-			printf("%s\n", __func__);
 			PoseidonFlowSettings *pfs = smd2->flow;
 
 			float mat[4][4];
@@ -420,7 +412,6 @@ static void poseidon_modifier_process(PoseidonModifierData *pmd, Scene *scene,
                                       Object *ob, DerivedMesh *dm)
 {
 	if ((pmd->type & MOD_SMOKE_TYPE_FLOW)) {
-		printf("%s: %s\n", __func__, "(pmd->type & MOD_SMOKE_TYPE_FLOW)");
 		if (CFRA >= pmd->time) {
 			poseidon_modifier_init(pmd, ob, scene, dm);
 		}
@@ -438,7 +429,6 @@ static void poseidon_modifier_process(PoseidonModifierData *pmd, Scene *scene,
 		}
 	}
 	else if (pmd->type & MOD_SMOKE_TYPE_COLL) {
-		printf("%s: %s\n", __func__, "(pmd->type & MOD_SMOKE_TYPE_COLL)");
 		if (CFRA >= pmd->time) {
 			poseidon_modifier_init(pmd, ob, scene, dm);
 		}
@@ -458,7 +448,6 @@ static void poseidon_modifier_process(PoseidonModifierData *pmd, Scene *scene,
 		}
 	}
 	else if (pmd->type & MOD_SMOKE_TYPE_DOMAIN) {
-		printf("%s: %s\n", __func__, "(pmd->type & MOD_SMOKE_TYPE_DOMAIN)");
 		PTCacheID pid;
 		BKE_ptcache_id_from_poseidon(&pid, ob, pmd);
 
@@ -466,12 +455,9 @@ static void poseidon_modifier_process(PoseidonModifierData *pmd, Scene *scene,
 		int startframe, endframe;
 		BKE_ptcache_id_time(&pid, scene, framenr, &startframe, &endframe, NULL);
 
-		printf("frame start: %d, end %d\n", startframe, endframe);
-
 		PoseidonDomainSettings *pds = pmd->domain;
 		PointCache *cache = pds->cache;
 		if (!pds->data || framenr == startframe) {
-			printf("%s: %s\n", __func__, "(!pds->data || framenr == startframe)");
 			BKE_poseidon_modifier_reset(pmd);
 
 			BKE_ptcache_id_reset(scene, &pid, PTCACHE_RESET_OUTDATED);
@@ -487,34 +473,27 @@ static void poseidon_modifier_process(PoseidonModifierData *pmd, Scene *scene,
 
 		/* If already viewing a pre/after frame, no need to reload */
 		if ((pmd->time == framenr) && (framenr != CFRA)) {
-			printf("%s: %s\n", __func__, "(pmd->time == framenr) && (framenr != CFRA)");
 			return;
 		}
 
 		if (!poseidon_modifier_init(pmd, ob, scene, dm)) {
-			printf("Warning: bad Poseidon initialization!\n");
 			return;
 		}
 
 		/* try to read from cache */
 		if (BKE_ptcache_read(&pid, (float)framenr) == PTCACHE_READ_EXACT) {
-			printf("%s: %s\n", __func__, "BKE_ptcache_read(&pid, (float)framenr) == PTCACHE_READ_EXACT");
 			BKE_ptcache_validate(cache, framenr);
 			pmd->time = framenr;
 			return;
 		}
 
 		/* only calculate something when we advanced a single frame */
-		// XXX - why is this failing?
-//		if (framenr != (int)pmd->time + 1) {
-//			printf("%s: %s\n", __func__, "(framenr != (int)pmd->time + 1), ");
-//			printf("framnr: %d, pmd time + 1: %d\n", framenr, (int)pmd->time + 1);
-//			return;
-//		}
+		if (framenr != (int)pmd->time + 1) {
+			return;
+		}
 
 		/* don't simulate if viewing start frame, but scene frame is not real start frame */
 		if (framenr != CFRA) {
-			printf("%s: %s\n", __func__, "(framenr != CFRA)");
 			return;
 		}
 
@@ -532,19 +511,15 @@ static void poseidon_modifier_process(PoseidonModifierData *pmd, Scene *scene,
 
 		/* do simulation */
 
-		// simulate the actual smoke (c++ code in intern/smoke)
-		// DG: interesting commenting this line + deactivating loading of noise files
 		if (framenr != startframe) {
 //			if (pds->flags & MOD_SMOKE_DISSOLVE) {
 //				smoke_dissolve(pds->fluid, pds->diss_speed, pds->flags & MOD_SMOKE_DISSOLVE_LOG);
 //			}
 
-			printf("%s\n", __func__);
 			step(scene, ob, pmd, dm);
 
 			/* XXX - do that elsewhere! */
 			if (pmd->domain->buffer) {
-				printf("Freeing domain buffer!\n");
 				MEM_freeN(pmd->domain->buffer);
 				pmd->domain->buffer = NULL;
 			}
@@ -565,7 +540,6 @@ static void poseidon_modifier_process(PoseidonModifierData *pmd, Scene *scene,
 DerivedMesh *BKE_poseidon_modifier_do(PoseidonModifierData *smd, Scene *scene,
                                       Object *ob, DerivedMesh *dm)
 {
-	printf("%s\n", __func__);
 	poseidon_modifier_process(smd, scene, ob, dm);
 	return CDDM_copy(dm);
 }
