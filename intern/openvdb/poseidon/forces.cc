@@ -66,14 +66,14 @@ void add_buoyancy(const float dt,
 
 		for (typename LeafType::ValueOnIter it = leaf.beginValueOn(); it; ++it) {
 			const Coord co(it.getCoord());
-			const Coord co_y(co.offsetBy(0, -1, 0));
+			const Coord co_z(co.offsetBy(0, 0, -1));
 
-			if (facc.getValue(co_y) == FLUID) {
+			if (facc.getValue(co_z) == FLUID) {
 				Vec3s vel = vacc.getValue(co);
-				const float temp = (tacc.getValue(co) + tacc.getValue(co_y)) * 0.5f;
-				const float dens = (dacc.getValue(co) + dacc.getValue(co_y)) * 0.5f;
+				const float temp = (tacc.getValue(co) + tacc.getValue(co_z)) * 0.5f;
+				const float dens = (dacc.getValue(co) + dacc.getValue(co_z)) * 0.5f;
 
-				vel.y() += (alpha * dens + beta * (tmp_amb - temp)) * dt;
+				vel.z() += (alpha * dens + beta * (tmp_amb - temp)) * dt;
 				vacc.setValue(co, vel);
 			}
 		}
