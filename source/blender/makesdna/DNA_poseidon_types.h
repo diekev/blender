@@ -69,7 +69,8 @@ typedef struct PoseidonDomainSettings {
 	float imat[4][4];
 
 	float voxel_size;
-	int pad;
+	char advection;
+	char pad[3];
 
 	/* Dense buffer drawing */
 	float *buffer;

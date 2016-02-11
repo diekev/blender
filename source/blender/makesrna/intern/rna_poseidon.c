@@ -20,15 +20,70 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
+#include "DNA_object_types.h"
 #include "DNA_modifier_types.h"
 #include "DNA_poseidon_types.h"
 
 #include "RNA_define.h"
 #include "rna_internal.h"
 
+#include "BKE_pointcache.h"
 #include "BKE_poseidon.h"
 
+#include "WM_types.h"
+
+#include "poseidon_capi.h"
+
 #ifdef RNA_RUNTIME
+
+#include "BKE_depsgraph.h"
+
+static void rna_Poseidon_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	DAG_id_tag_update(ptr->id.data, OB_RECALC_DATA);
+	UNUSED_VARS(bmain, scene);
+}
+
+static void rna_Poseidon_dependency_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	rna_Poseidon_update(bmain, scene, ptr);
+	DAG_relations_tag_update(bmain);
+}
+
+static void rna_Poseidon_resetCache(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	PoseidonDomainSettings *settings = (PoseidonDomainSettings *)ptr->data;
+
+	if (settings->pmd && settings->pmd->domain) {
+		settings->pmd->domain->cache->flag |= PTCACHE_OUTDATED;
+	}
+
+	DAG_id_tag_update(ptr->id.data, OB_RECALC_DATA);
+	UNUSED_VARS(bmain, scene);
+}
+
+static void rna_Poseidon_reset(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	PoseidonDomainSettings *settings = (PoseidonDomainSettings *)ptr->data;
+
+	BKE_poseidon_modifier_reset(settings->pmd);
+	rna_Poseidon_resetCache(bmain, scene, ptr);
+
+	rna_Poseidon_update(bmain, scene, ptr);
+}
+
+static void rna_Poseidon_reset_dependency(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	PoseidonDomainSettings *settings = (PoseidonDomainSettings *)ptr->data;
+
+	BKE_poseidon_modifier_reset(settings->pmd);
+
+	if (settings->pmd && settings->pmd->domain) {
+		settings->pmd->domain->cache->flag |= PTCACHE_OUTDATED;
+	}
+
+	rna_Poseidon_dependency_update(bmain, scene, ptr);
+}
 
 static char *rna_PoseidonDomainSettings_path(PointerRNA *ptr)
 {
@@ -73,6 +128,28 @@ static void rna_def_poseidon_domain_settings(BlenderRNA *brna)
 	RNA_def_property_flag(prop, PROP_NEVER_NULL);
 	RNA_def_property_pointer_sdna(prop, NULL, "cache");
 	RNA_def_property_ui_text(prop, "Point Cache", "");
+
+	static EnumPropertyItem advection_scheme_items[] = {
+	    { ADVECT_SEMI, "SEMI_LAGRANGIAN", 0, "Semi-Lagrangian", "" },
+	    { ADVECT_MID, "MID_POINT", 0, "Mid-Point", "" },
+	    { ADVECT_RK3, "RK3", 0, "3rd Order Runge-Kutta", "" },
+	    { ADVECT_RK4, "RK4", 0, "4th Order Runge-Kutta", "" },
+	    { ADVECT_BFECC, "BFECC", 0, "BEFCC", "Back and Forth Error Compensation" },
+	    { 0, NULL, 0, NULL, NULL },
+	};
+
+	prop = RNA_def_property(srna, "advection_scheme", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "advection");
+	RNA_def_property_enum_items(prop, advection_scheme_items);
+	RNA_def_property_ui_text(prop, "Advection Scheme", "");
+	RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, NULL);
+
+	prop = RNA_def_property(srna, "voxel_size", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "voxel_size");
+	RNA_def_property_range(prop, 0.0, 10.0);
+	RNA_def_property_ui_range(prop, 0.0, 10.0, 0.02, 3);
+	RNA_def_property_ui_text(prop, "Voxel Size", "Size of the voxels");
+	RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Poseidon_reset");
 }
 
 static void rna_def_poseidon_flow_settings(BlenderRNA *brna)

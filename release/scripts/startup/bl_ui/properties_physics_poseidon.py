@@ -46,7 +46,13 @@ class PHYSICS_PT_poseidon(PhysicButtonsPanel, Panel):
         md = context.poseidon
         ob = context.object
 
+        smoke_type = md.smoke_type
         layout.prop(md, "smoke_type", expand=True)
+
+        if smoke_type == 'DOMAIN':
+            domain = md.domain_settings
+            layout.prop(domain, "voxel_size")
+            layout.prop(domain, "advection_scheme")
 
 
 class PHYSICS_PT_smoke_cache(PhysicButtonsPanel, Panel):

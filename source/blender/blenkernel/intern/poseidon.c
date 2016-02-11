@@ -239,7 +239,7 @@ static int poseidon_modifier_init(PoseidonModifierData *pmd, Object *ob, Scene *
 		/* initialize poseidon data */
 		if (!pmd->domain->data) {
 			pmd->domain->data = PoseidonData_create();
-			PoseidonData_init(pmd->domain->data, pmd->domain->voxel_size, 0);
+			PoseidonData_init(pmd->domain->data, pmd->domain->voxel_size, pmd->domain->advection);
 		}
 
 		return true;
@@ -267,6 +267,11 @@ void BKE_poseidon_modifier_reset(PoseidonModifierData *pmd)
 	}
 
 	if (pmd->domain) {
+		if (pmd->domain->data) {
+			PoseidonData_free(pmd->domain->data);
+			pmd->domain->data = NULL;
+		}
+
 		pmd->time = -1;
 	}
 	else if (pmd->flow) {

@@ -346,6 +346,7 @@ blender_include_dirs(
 	../../../../intern/atomic
 	../../../../intern/memutil
 	../../../../intern/smoke/extern
+	../../../../intern/openvdb
 )
 
 blender_include_dirs_sys(
