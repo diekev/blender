@@ -8009,14 +8009,16 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 	}
 
 	if (pmd && pmd->domain) {
-		float viewnormal[3];
+		if (pmd->domain->data && CFRA >= pmd->domain->cache->startframe) {
+			float viewnormal[3];
 
-		/* get view vector */
-		invert_m4_m4(ob->imat, ob->obmat);
-		mul_v3_mat3_m4v3(viewnormal, ob->imat, rv3d->viewinv[2]);
-		normalize_v3(viewnormal);
+			/* get view vector */
+			invert_m4_m4(ob->imat, ob->obmat);
+			mul_v3_mat3_m4v3(viewnormal, ob->imat, rv3d->viewinv[2]);
+			normalize_v3(viewnormal);
 
-		draw_poseidon_volume(pmd->domain, ob, viewnormal);
+			draw_poseidon_volume(pmd->domain, ob, viewnormal);
+		}
 	}
 
 	if (!render_override) {

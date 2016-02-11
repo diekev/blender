@@ -32,6 +32,7 @@
 
 class OpenVDBPrimitive {
     openvdb::GridBase::Ptr m_grid;
+	bool m_is_empty;
 
 public:
     OpenVDBPrimitive();
@@ -45,6 +46,8 @@ public:
     void setGridPtr(openvdb::GridBase::Ptr grid);
 	void setGrid(openvdb::GridBase::ConstPtr grid);
     void setTransform(const float mat[4][4]);
+
+	bool isEmpty() const;
 };
 
 #endif /* __OPENVDB_PRIMITIVE_H__ */

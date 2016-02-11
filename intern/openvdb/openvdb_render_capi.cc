@@ -33,13 +33,18 @@
 
 struct OpenVDBInternalNode2 { int unused; };
 
-float *OpenVDB_get_texture_buffer(struct OpenVDBPrimitive *prim,
+float *OpenVDB_get_texture_buffer(OpenVDBPrimitive *prim,
                                   int res[3], float bbmin[3], float bbmax[3])
 {
-	const int storage = internal::get_grid_storage(prim->getGrid());
+	if (prim->isEmpty()) {
+		return nullptr;
+	}
+
+	const auto grid = prim->getConstGridPtr();
+	const int storage = internal::get_grid_storage(*grid);
 
 	internal::DenseTextureResOp res_op(res, bbmin, bbmax);
-	internal::process_typed_grid(prim->getConstGridPtr(), storage, res_op);
+	internal::process_typed_grid(grid, storage, res_op);
 
 	const size_t numcells = static_cast<size_t>(res[0]) * static_cast<size_t>(res[1]) * static_cast<size_t>(res[2]);
 
@@ -50,7 +55,7 @@ float *OpenVDB_get_texture_buffer(struct OpenVDBPrimitive *prim,
 	float *buffer = (float *)MEM_mallocN(numcells * sizeof(float), "OpenVDB texture buffer");
 
 	internal::DenseTextureOp op(buffer);
-	internal::process_typed_grid(prim->getConstGridPtr(), storage, op);
+	internal::process_typed_grid(grid, storage, op);
 
 	return buffer;
 }

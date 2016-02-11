@@ -5111,6 +5111,8 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 				pmd->coll = NULL;
 				pmd->domain = newdataadr(fd, pmd->domain);
 				pmd->domain->pmd = pmd;
+				pmd->domain->buffer = NULL;
+				pmd->domain->data = NULL;
 
 				direct_link_pointcache_list(fd, &(pmd->domain->ptcaches), &(pmd->domain->cache), 1);
 			}

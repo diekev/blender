@@ -28,6 +28,7 @@
 #include "openvdb_primitive.h"
 
 OpenVDBPrimitive::OpenVDBPrimitive()
+    : m_is_empty(true)
 {}
 
 OpenVDBPrimitive::~OpenVDBPrimitive()
@@ -56,11 +57,13 @@ openvdb::GridBase::ConstPtr OpenVDBPrimitive::getConstGridPtr() const
 void OpenVDBPrimitive::setGridPtr(openvdb::GridBase::Ptr grid)
 {
     m_grid = grid->copyGrid();
+	m_is_empty = false;
 }
 
 void OpenVDBPrimitive::setGrid(openvdb::GridBase::ConstPtr grid)
 {
     m_grid = grid->copyGrid();
+	m_is_empty = false;
 }
 
 static openvdb::Mat4R convertMatrix(const float mat[4][4])
@@ -95,5 +98,10 @@ void OpenVDBPrimitive::setTransform(const float mat[4][4])
     using namespace openvdb::math;
 
     Transform::Ptr transform = Transform::Ptr(new Transform(createAffineMap(mat)));
-    m_grid->setTransform(transform);
+	m_grid->setTransform(transform);
+}
+
+bool OpenVDBPrimitive::isEmpty() const
+{
+	return m_is_empty;
 }

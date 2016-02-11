@@ -500,6 +500,7 @@ static void poseidon_modifier_process(PoseidonModifierData *pmd, Scene *scene,
 		}
 
 		/* only calculate something when we advanced a single frame */
+		// XXX - why is this failing?
 //		if (framenr != (int)pmd->time + 1) {
 //			printf("%s: %s\n", __func__, "(framenr != (int)pmd->time + 1), ");
 //			printf("framnr: %d, pmd time + 1: %d\n", framenr, (int)pmd->time + 1);
