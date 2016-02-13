@@ -528,7 +528,6 @@ if(UNIX AND NOT APPLE)
 			install(
 				DIRECTORY ${PYTHON_LIBPATH}/python${PYTHON_VERSION}
 				DESTINATION ${TARGETDIR_VER}/python/${_target_LIB}
-				PATTERN ".svn" EXCLUDE
 				PATTERN "__pycache__" EXCLUDE               # * any cache *
 				PATTERN "distutils" EXCLUDE                 # ./distutils
 				PATTERN "lib2to3" EXCLUDE                   # ./lib2to3
