@@ -5694,6 +5694,7 @@ static bool proj_paint_add_slot(bContext *C, wmOperator *op)
 				mtex->mapto = type;
 
 				if (mtex->tex) {
+					set_current_material_texture(ma, mtex->tex);
 					ima = mtex->tex->ima = proj_paint_image_create(op, bmain);
 				}
 

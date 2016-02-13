@@ -153,7 +153,7 @@ int BKE_image_layer_is_locked(Image *ima)
 	return 0;
 }
 
-void BKE_image_layer_color_fill(Image *ima, float color[4])
+void BKE_image_layer_color_fill(Image *ima, const float color[4])
 {
 	if (ima == NULL) {
 		return;

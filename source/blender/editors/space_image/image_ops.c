@@ -49,6 +49,7 @@
 #include "BLT_translation.h"
 
 #include "DNA_object_types.h"
+#include "DNA_material_types.h"
 #include "DNA_node_types.h"
 #include "DNA_packedFile_types.h"
 #include "DNA_scene_types.h"
@@ -63,12 +64,14 @@
 #include "BKE_global.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
+#include "BKE_material.h"
 #include "BKE_packedFile.h"
 #include "BKE_paint.h"
 #include "BKE_report.h"
 #include "BKE_screen.h"
 #include "BKE_sound.h"
 #include "BKE_scene.h"
+#include "BKE_texture.h"
 
 #include "GPU_draw.h"
 #include "GPU_buffers.h"
@@ -4179,8 +4182,11 @@ static int image_layer_poll(bContext *C)
 	SpaceImage *sima = CTX_wm_space_image(C);
 	if (sima)
 		return ED_space_image_show_paint(sima);
-	else
-		return 0;
+
+	if (CTX_wm_region_view3d(C))
+		return true;
+
+	return false;
 }
 
 static void image_layer_preview_cancel(bContext *C, wmOperator *UNUSED(op))
@@ -4198,16 +4204,39 @@ static void image_layer_preview_cancel(bContext *C, wmOperator *UNUSED(op))
 	}
 }
 
+static Image *get_image_from_context(bContext *C)
+{
+	SpaceImage *sima = CTX_wm_space_image(C);
+
+	if (sima) {
+		return CTX_data_edit_image(C);
+	}
+	else if (CTX_wm_region_view3d(C)) {
+		/* get image from paint slot */
+		Object *ob = CTX_data_active_object(C);
+		Material *ma = give_current_material(ob, ob->actcol);
+		Tex *tex = give_current_material_texture(ma);
+
+		if (tex && tex->ima) {
+			return tex->ima;
+		}
+	}
+
+	return NULL;
+}
+
 static int image_layer_add_exec(bContext *C, wmOperator *op)
 {
+	Image *ima = get_image_from_context(C);
+
+	if (!ima) {
+		BKE_report(op->reports, RPT_ERROR, "Could not add layer: no image found!");
+		return OPERATOR_CANCELLED;
+	}
+
 	char name[22];
 	float color[4];
-	int alpha, order;
-	Scene *scene;
-	Image *ima = CTX_data_edit_image(C);
-	ImageLayer *iml;
-
-	scene = (Scene*)CTX_data_scene(C);
+	bool alpha;
 
 	if (strcmp(op->idname, "IMAGE_OT_layer_add_default") != 0) {
 		RNA_string_get(op->ptr, "name", name);
@@ -4220,22 +4249,25 @@ static int image_layer_add_exec(bContext *C, wmOperator *op)
 		alpha = 1;
 	}
 
-	order = 2;
+	int order = 2;
 	if (strcmp(op->idname, "IMAGE_OT_layer_add_above") == 0)
 		order = 1;
 	else if (strcmp(op->idname, "IMAGE_OT_layer_add_below") == 0)
 		order = -1;
 
+	Scene *scene = CTX_data_scene(C);
 	if (scene->r.color_mgt_flag & R_COLOR_MANAGEMENT)
 		linearrgb_to_srgb_v3_v3(color, color);
 
 	if (!alpha)
 		color[3] = 1.0f;
 
-	iml = BKE_image_add_image_layer(ima, name, alpha ? 32 : 24, color, order);
+	ImageLayer *layer = BKE_image_add_image_layer(ima, name, alpha ? 32 : 24, color, order);
 
-	if (!iml)
+	if (!layer) {
+		BKE_report(op->reports, RPT_ERROR, "Could not add layer!");
 		return OPERATOR_CANCELLED;
+	}
 
 	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, ima);
 
@@ -4332,17 +4364,18 @@ void IMAGE_OT_layer_add_default(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
-static int image_layer_duplicate_exec(bContext *C, wmOperator *UNUSED(op))
+static int image_layer_duplicate_exec(bContext *C, wmOperator *op)
 {
-	Image *ima = CTX_data_edit_image(C);
-	ImageLayer *iml;
+	Image *ima = get_image_from_context(C);
 
-	if (!ima)
+	if (!ima) {
+		BKE_report(op->reports, RPT_ERROR, "Unable to find image!");
 		return OPERATOR_CANCELLED;
+	}
 
-	iml = BKE_image_layer_duplicate_current(ima);
+	ImageLayer *layer = BKE_image_layer_duplicate_current(ima);
 
-	if (!iml)
+	if (!layer)
 		return OPERATOR_CANCELLED;
 
 	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, ima);
@@ -4367,11 +4400,14 @@ void IMAGE_OT_layer_duplicate(wmOperatorType *ot)
 
 static int image_layer_remove_exec(bContext *C, wmOperator *op)
 {
-	Image *ima = CTX_data_edit_image(C);
-	int action = RNA_enum_get(op->ptr, "action");
+	Image *ima = get_image_from_context(C);
 
-	if (!ima)
+	if (!ima) {
+		BKE_report(op->reports, RPT_ERROR, "Unable to find image!");
 		return OPERATOR_CANCELLED;
+	}
+
+	int action = RNA_enum_get(op->ptr, "action");
 
 	if (BKE_image_layer_remove(ima, action) == -1)
 		BKE_report(op->reports, RPT_INFO, "Impossible to remove only one layer");
@@ -4407,20 +4443,21 @@ void IMAGE_OT_layer_remove(wmOperatorType *ot)
 
 static int image_layer_move_exec(bContext *C, wmOperator *op)
 {
-	Image *ima = CTX_data_edit_image(C);
-	ImageLayer *layer, *tmp;
-	int type, layerID;
+	Image *ima = get_image_from_context(C);
 
-	if (!ima)
+	if (!ima) {
+		BKE_report(op->reports, RPT_ERROR, "Unable to find image!");
 		return OPERATOR_CANCELLED;
+	}
 
-	layer = BKE_image_get_current_layer(ima);
+	ImageLayer *layer = BKE_image_get_current_layer(ima);
+	ImageLayer *tmp;
 
 	if (!layer)
 		return OPERATOR_CANCELLED;
 
-	type = RNA_enum_get(op->ptr, "type");
-	layerID = BKE_image_get_current_layer_index(ima);
+	int type = RNA_enum_get(op->ptr, "type");
+	int layerID = BKE_image_get_current_layer_index(ima);
 
 	if (!(layer->type & IMA_LAYER_BASE)) {
 		if (type == -1) { /* Move direction: Up */
@@ -4437,7 +4474,7 @@ static int image_layer_move_exec(bContext *C, wmOperator *op)
 				BKE_image_set_current_layer(ima, layerID - 1);
 			}
 		}
-		else if (type == 1){ /* Move direction: Down */
+		else if (type == 1) { /* Move direction: Down */
 			if (layerID < (ima->num_layers - 1)) {
 				tmp = layer->next;
 				if (!(tmp->type & IMA_LAYER_BASE)) {
@@ -4544,11 +4581,15 @@ void IMAGE_OT_layer_move(wmOperatorType *ot)
 
 static int image_layer_select_exec(bContext *C, wmOperator *op)
 {
-	Image *ima = CTX_data_edit_image(C);
-	ImageLayer *layer;
-	int action = RNA_enum_get(op->ptr, "action");
+	Image *ima = get_image_from_context(C);
 
-	layer = BKE_image_get_current_layer(ima);
+	if (!ima) {
+		BKE_report(op->reports, RPT_ERROR, "Unable to find image!");
+		return OPERATOR_CANCELLED;
+	}
+
+	ImageLayer *layer = BKE_image_get_current_layer(ima);
+	const int action = RNA_enum_get(op->ptr, "action");
 
 	switch (action) {
 		case IMA_LAYER_SEL_PREVIOUS:
@@ -4606,14 +4647,15 @@ void IMAGE_OT_layer_select(wmOperatorType *ot)
 
 static int image_layer_merge_exec(bContext *C, wmOperator *op)
 {
-	Image *ima = CTX_data_edit_image(C);
-	ImageLayer *layer;
-	int type;
+	Image *ima = get_image_from_context(C);
 
-	if (!ima)
+	if (!ima) {
+		BKE_report(op->reports, RPT_ERROR, "Unable to find image!");
 		return OPERATOR_CANCELLED;
+	}
 
-	type = RNA_enum_get(op->ptr, "type");
+	const int type = RNA_enum_get(op->ptr, "type");
+	ImageLayer *layer;
 
 	if (type == 1) { /* Merge Layers */
 		layer = BKE_image_get_current_layer(ima);
@@ -4621,10 +4663,8 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 			return OPERATOR_CANCELLED;
 
 		if (!(layer->type & IMA_LAYER_BASE)) {
-			ImageLayer *next;
-
-			next = layer->next;
-			if ((next->visible & IMA_LAYER_HIDDEN) && (!(next->locked & IMA_LAYER_LOCK))) {
+			ImageLayer *next = layer->next;
+			if (!(next->visible & IMA_LAYER_HIDDEN) && (!(next->locked & IMA_LAYER_LOCK))) {
 				BKE_image_layer_merge(ima, layer, next);
 
 				BKE_image_set_current_layer(ima, BKE_image_get_current_layer_index(ima));
@@ -4632,9 +4672,9 @@ static int image_layer_merge_exec(bContext *C, wmOperator *op)
 			}
 			else
 				if (next->visible & IMA_LAYER_HIDDEN)
-					BKE_report(op->reports, RPT_INFO, "It can not merge the layers, because the next layer is hidden");
+					BKE_report(op->reports, RPT_INFO, "Can not merge layers: next layer is hidden");
 				else
-					BKE_report(op->reports, RPT_INFO, "It can not merge the layers, because the next layer is locked");
+					BKE_report(op->reports, RPT_INFO, "Can not merge layers: next layer is locked");
 		}
 	}
 	else if (type == 2) { /* Merge Visible */
@@ -4769,14 +4809,19 @@ void IMAGE_OT_layer_merge(wmOperatorType *ot)
 	RNA_def_enum(ot->srna, "type", slot_merge, 0, "Type", "");
 }
 
-static int image_layer_clean_exec(bContext *C, wmOperator *UNUSED(op))
+static int image_layer_clean_exec(bContext *C, wmOperator *op)
 {
-	Image *ima = CTX_data_edit_image(C);
-	ImageLayer *layer;
-	static float alpha_color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-	static float white_color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+	Image *ima = get_image_from_context(C);
 
-	layer = BKE_image_get_current_layer(ima);
+	if (!ima) {
+		BKE_report(op->reports, RPT_ERROR, "Unable to find image!");
+		return OPERATOR_CANCELLED;
+	}
+
+	const float alpha_color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+	const float white_color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+
+	ImageLayer *layer = BKE_image_get_current_layer(ima);
 
 	if (layer->background & IMA_LAYER_BG_IMAGE) {
 		int flag;
@@ -4824,22 +4869,21 @@ void IMAGE_OT_layer_clean(wmOperatorType *ot)
 static int image_layer_flip_exec(bContext *C, wmOperator *op)
 {
 	Image *ima = CTX_data_edit_image(C);
-	ImageLayer *layer;
-	int type;
 
-	if (!ima)
+	if (!ima) {
 		return OPERATOR_CANCELLED;
+	}
 
-	type = RNA_enum_get(op->ptr, "type");
+	ImageLayer *layer = BKE_image_get_current_layer(ima);
+	const int type = RNA_enum_get(op->ptr, "type");
 
-	layer = BKE_image_get_current_layer(ima);
 	if (!layer)
 		return OPERATOR_CANCELLED;
 
 	if (type == 1) /* Flip Horizontally */
-		IMB_flipx((ImBuf *)layer->ibufs.first);
+		IMB_flipx(layer->ibufs.first);
 	else if (type == 2) /* Flip Vertically */
-		IMB_flipy((ImBuf *)layer->ibufs.first);
+		IMB_flipy(layer->ibufs.first);
 
 	WM_event_add_notifier(C, NC_IMAGE | ND_DRAW, NULL);
 
@@ -4873,23 +4917,23 @@ void IMAGE_OT_layer_flip(wmOperatorType *ot)
 static int image_layer_rotate_exec(bContext *C, wmOperator *op)
 {
 	Image *ima = CTX_data_edit_image(C);
-	ImageLayer *layer;
-	ImBuf *ibuf;
-	int type;
-	float col[4];
 
-	if (!ima)
+	if (!ima) {
 		return OPERATOR_CANCELLED;
+	}
 
-	type = RNA_enum_get(op->ptr, "type");
+	ImageLayer *layer = BKE_image_get_current_layer(ima);
 
-	layer = BKE_image_get_current_layer(ima);
 	if (!layer)
 		return OPERATOR_CANCELLED;
 
+	const int type = RNA_enum_get(op->ptr, "type");
+
+	float col[4];
 	BKE_image_layer_get_background_color(col, layer);
 
-	ibuf = (ImBuf*)((ImageLayer*)layer->ibufs.first);
+	ImBuf *ibuf = layer->ibufs.first;
+
 	if (type == 1) { /* ROT_90 */
 		layer->ibufs.first = NULL;
 		layer->ibufs.last = NULL;
@@ -4939,21 +4983,13 @@ void IMAGE_OT_layer_rotate(wmOperatorType *ot)
 static int image_layer_arbitrary_rot_exec(bContext *C, wmOperator *op)
 {
 	Image *ima = CTX_data_edit_image(C);
-	ImageLayer *layer;
-	ImBuf *ibuf;
-	float angle;
-	float col[4];
-	short type;
-	int lock;
 
-	if (!ima)
+	if (!ima) {
 		return OPERATOR_CANCELLED;
+	}
 
-	ima->use_layers = false;
-	ibuf = BKE_image_acquire_layer_ibuf(ima);
-	ima->use_layers = true;
+	ImageLayer *layer = BKE_image_get_current_layer(ima);
 
-	layer = BKE_image_get_current_layer(ima);
 	if (!layer)
 		return OPERATOR_CANCELLED;
 
@@ -4962,14 +4998,14 @@ static int image_layer_arbitrary_rot_exec(bContext *C, wmOperator *op)
 		layer->preview_ibuf = NULL;
 	}
 
-	type = RNA_enum_get(op->ptr, "type");
-	angle = RNA_float_get(op->ptr, "angle");
-	lock = RNA_boolean_get(op->ptr, "lock_size");
+	short type = RNA_enum_get(op->ptr, "type");
+	float angle = RNA_float_get(op->ptr, "angle") * (-1);
+	bool lock = RNA_boolean_get(op->ptr, "lock_size");
+
+	float col[4];
 	BKE_image_layer_get_background_color(col, layer);
 
-	angle = angle * (-1);
-
-	ibuf = (ImBuf *)layer->ibufs.first;
+	ImBuf *ibuf = layer->ibufs.first;
 	layer->ibufs.first = NULL;
 	layer->ibufs.last = NULL;
 	BLI_addtail(&layer->ibufs, IMB_rotation(ibuf, 0.0, 0.0, angle, type, lock, col));
@@ -4991,8 +5027,9 @@ static bool image_layer_arbitrary_rot_check(bContext *C, wmOperator *op)
 	short type;
 	int lock;
 
-	if (!ima)
+	if (!ima) {
 		return false;
+	}
 
 	ima->use_layers = false;
 	ibuf = BKE_image_acquire_layer_ibuf(ima);

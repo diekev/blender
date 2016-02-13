@@ -76,7 +76,7 @@ struct ImageLayer *BKE_image_get_current_layer(struct Image *ima);
 int BKE_image_layer_is_locked(struct Image *ima);
  
 /* Fills the current selected image layer with the color given */
-void BKE_image_layer_color_fill(struct Image *ima, float color[4]);
+void BKE_image_layer_color_fill(struct Image *ima, const float color[4]);
 
 void BKE_image_layer_blend(struct ImBuf *dest, struct ImBuf *base, struct ImBuf *layer, float opacity, short mode, short background);
 
