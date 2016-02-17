@@ -116,6 +116,10 @@ static GPUTexture *create_flame_spectrum_texture(void)
 
 static void draw_slices(const float *slices, const size_t size, const int num_points)
 {
+	if (slices == NULL || num_points == 0) {
+		return;
+	}
+
 	int gl_depth = 0, gl_blend = 0;
 	glGetBooleanv(GL_BLEND, (GLboolean *)&gl_blend);
 	glGetBooleanv(GL_DEPTH_TEST, (GLboolean *)&gl_depth);
@@ -917,7 +921,7 @@ void draw_poseidon_volume(PoseidonDomainSettings *sds, Object *ob,
 
 	/* setup buffer and draw */
 
-	draw_slices(&slicer.verts[0][0], sizeof(float) * 3 * num_points, GL_STATIC_DRAW);
+	draw_slices(&slicer.verts[0][0], sizeof(float) * 3 * num_points, num_points);
 
 	GPU_texture_unbind(tex);
 	GPU_texture_free(tex);
