@@ -27,6 +27,7 @@
 
 #include "advection.h"
 #include "forces.h"
+#include "particles.h"
 #include "types.h"
 #include "util_smoke.h"
 
@@ -166,6 +167,44 @@ void step_smoke(FluidData * const data, float dt, int advection)
 	set_neumann_boundary(*velocity, flags);
 }
 
+void step_flip(FluidData * const data, float dt)
+{
+	auto density = openvdb::gridPtrCast<ScalarGrid>(data->density.getGridPtr());
+	auto pressure = openvdb::gridPtrCast<ScalarGrid>(data->pressure.getGridPtr());
+	auto velocity = openvdb::gridPtrCast<VectorGrid>(data->velocity.getGridPtr());
+	auto obstacle = openvdb::gridPtrCast<openvdb::BoolGrid>(data->collision.getGridPtr());
+
+	auto index_grid = openvdb::tools::createPointIndexGrid<PointIndexGrid>(data->particles, data->xform);
+
+	// 2. Transfer particle velocities to a staggered grid.
+	rasterize_particles(data->particles, *index_grid, *velocity, *density);
+
+	auto flags = build_flag_grid(density, obstacle);
+
+	// 3. FLIP: Save a copy of the grid velocities
+	auto velocity_old = velocity->deepCopy();
+
+	// 4. Calculate and apply external forces.
+	add_force(dt, velocity);
+
+	// 7. Calculate the pseudo-pressure gradient using a Preconditioned
+	// Conjugate Gradient method
+	solve_pressure(dt, *velocity, *pressure, *flags);
+
+	interpolate_pic_flip(velocity, velocity_old, data->particles);
+
+	// 11. Update the particle positions
+	advect_particles(data->particles, velocity, dt);
+	index_grid = openvdb::tools::getValidPointIndexGrid<PointIndexGrid>(data->particles, index_grid);
+
+	resample_particles(data->particles);
+
+	auto bbox = velocity->evalActiveVoxelBoundingBox();
+
+	assert(!openvdb::math::isExactlyEqual(bbox.min(), openvdb::math::Coord(std::numeric_limits<int>::min())));
+	assert(!openvdb::math::isExactlyEqual(bbox.max(), openvdb::math::Coord(std::numeric_limits<int>::max())));
+}
+
 void add_inflow(FluidData * const data, OpenVDBPrimitive *inflow_prim)
 {
 	Timer(__func__);
@@ -196,6 +235,12 @@ void add_inflow(FluidData * const data, OpenVDBPrimitive *inflow_prim)
 			tacc.setValue(it.getCoord(), 1.0f);
 		}
 	}
+}
+
+void add_particle_inflow(FluidData * const data, OpenVDBPrimitive *inflow_prim)
+{
+	auto level_set = openvdb::gridPtrCast<ScalarGrid>(inflow_prim->getGridPtr());
+	create_particles(level_set, data->particles);
 }
 
 void add_obstacle(FluidData * const data, OpenVDBPrimitive *obstacle_prim)

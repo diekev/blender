@@ -55,6 +55,11 @@ enum {
 	MOD_POSEIDON_FILE_LOAD = (1 << 0),
 };
 
+enum {
+	MOD_POSEIDON_TYPE_GAS    = 0,
+	MOD_POSEIDON_TYPE_LIQUID = 1,
+};
+
 typedef struct PoseidonDomainSettings {
 	struct PoseidonModifierData *pmd;
 	struct Group *fluid_group;
@@ -70,7 +75,8 @@ typedef struct PoseidonDomainSettings {
 
 	float voxel_size;
 	char advection;
-	char pad[3];
+	char fluid_type;
+	char pad[2];
 
 	/* Dense buffer drawing */
 	float *buffer;

@@ -31,6 +31,8 @@ void add_buoyancy(const float dt,
                   ScalarGrid::Ptr &temperature,
                   const openvdb::Int32Grid::Ptr &flags);
 
+void add_force(const float dt, VectorGrid::Ptr &velocity);
+
 Vec3s accumulate_forces(const std::vector<Vec3s> &forces);
 
 void set_neumann_boundary(VectorGrid &velocity, const openvdb::Int32Grid::Ptr &flags);

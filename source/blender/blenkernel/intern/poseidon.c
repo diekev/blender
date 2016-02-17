@@ -131,6 +131,7 @@ void BKE_poseidon_modifier_create_type(PoseidonModifierData *pmd)
 		pmd->domain->data = NULL;
 
 		pmd->domain->voxel_size = 0.1f;
+		pmd->domain->fluid_type = MOD_POSEIDON_TYPE_GAS;
 	}
 	else if (pmd->type & MOD_SMOKE_TYPE_FLOW) {
 		if (pmd->flow) {
@@ -337,7 +338,12 @@ static void update_sources(Scene *scene, Object *ob, PoseidonDomainSettings *pds
 
 			struct OpenVDBPrimitive *prim = OpenVDBPrimitive_from_mesh(&iter.base, mat, pds->voxel_size);
 
-			PoseidonData_add_inflow(pds->data, prim);
+			if (pds->fluid_type == MOD_POSEIDON_TYPE_GAS) {
+				PoseidonData_add_inflow(pds->data, prim);
+			}
+			else {
+				PoseidonData_add_particle_inflow(pds->data, prim);
+			}
 
 			OpenVDBPrimitive_free(prim);
 		}
@@ -424,7 +430,13 @@ static void step(Scene *scene, Object *ob, PoseidonModifierData *pmd, DerivedMes
 
 		 // DG TODO? problem --> uses forces instead of velocity, need to check how they need to be changed with variable dt
 		//update_effectors(scene, ob, pds, dtSubdiv);
-		PoseidonData_step(pds->data, dtSubdiv, pds->advection);
+
+		if (pds->fluid_type == MOD_POSEIDON_TYPE_GAS) {
+			PoseidonData_step(pds->data, dtSubdiv, pds->advection);
+		}
+		else {
+			PoseidonData_step_liquid(pds->data, dtSubdiv);
+		}
 	}
 }
 

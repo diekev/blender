@@ -53,6 +53,7 @@ if(WITH_OPENVDB)
 		intern/openvdb_reader.cc
 		intern/openvdb_writer.cc
 		poseidon/forces.cc
+		poseidon/particles.cc
 		poseidon/poseidon.cc
 		poseidon/pressure.cc
 		openvdb_capi.cc
@@ -70,6 +71,7 @@ if(WITH_OPENVDB)
 		poseidon/advection.h
 		poseidon/forces.h
 		poseidon/globals.h
+		poseidon/particles.h
 		poseidon/poseidon.h
 		poseidon/types.h
 		poseidon/util_smoke.h

@@ -22,6 +22,8 @@
 
 #include "poseidon_capi.h"
 
+#include "../guardedalloc/MEM_guardedalloc.h"
+
 #include "poseidon/poseidon.h"
 
 typedef struct PoseidonData { int unused; } PoseidonData;
@@ -50,6 +52,12 @@ void PoseidonData_add_inflow(PoseidonData *handle, OpenVDBPrimitive *inflow)
 	poseidon::add_inflow(data, inflow);
 }
 
+void PoseidonData_add_particle_inflow(PoseidonData *handle, OpenVDBPrimitive *inflow)
+{
+	poseidon::FluidData *data = reinterpret_cast<poseidon::FluidData *>(handle);
+	poseidon::add_particle_inflow(data, inflow);
+}
+
 void PoseidonData_add_obstacle(PoseidonData *handle, OpenVDBPrimitive *obstacle)
 {
 	poseidon::FluidData *data = reinterpret_cast<poseidon::FluidData *>(handle);
@@ -66,6 +74,32 @@ void PoseidonData_step(PoseidonData *handle, float dt, int advection)
 {
 	poseidon::FluidData *data = reinterpret_cast<poseidon::FluidData *>(handle);
 	poseidon::step_smoke(data, dt, advection);
+}
+
+void PoseidonData_step_liquid(PoseidonData *handle, float dt)
+{
+	poseidon::FluidData *data = reinterpret_cast<poseidon::FluidData *>(handle);
+	poseidon::step_flip(data, dt);
+}
+
+void PoseidonData_get_particle_draw_buffer(PoseidonData *handle, int *r_numpoints, float (**r_buffer)[3])
+{
+	poseidon::FluidData *data = reinterpret_cast<poseidon::FluidData *>(handle);
+
+	if (data->particles.size() == 0) {
+		*r_numpoints = 0;
+		*r_buffer = nullptr;
+	}
+
+	*r_numpoints = data->particles.size();
+	*r_buffer = (float (*)[3])MEM_mallocN((*r_numpoints) * sizeof(float) * 3, "Poseidon particle buffer");
+
+	for (int i = 0; i < *r_numpoints; ++i) {
+		auto p = data->particles[i];
+		*r_buffer[i][0] = p.x();
+		*r_buffer[i][1] = p.y();
+		*r_buffer[i][2] = p.z();
+	}
 }
 
 OpenVDBPrimitive *Poseidon_get_field(PoseidonData *handle, int index)

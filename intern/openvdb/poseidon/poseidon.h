@@ -23,6 +23,7 @@
 #pragma once
 
 #include "intern/openvdb_primitive.h"
+#include "particles.h"
 
 namespace poseidon {
 
@@ -33,6 +34,9 @@ struct FluidData {
 	OpenVDBPrimitive pressure;
 	OpenVDBPrimitive collision;
 	OpenVDBPrimitive flags;
+	OpenVDBPrimitive index_grid;
+
+	ParticleList particles;
 
 	float dt;  /* time step */
 	float dh;  /* voxel size, sometimes refered to as dx or dTau */
@@ -42,8 +46,10 @@ struct FluidData {
 };
 
 void step_smoke(FluidData * const data, float dt, int advection);
+void step_flip(FluidData * const data, float dt);
 void init_data(FluidData * const data, float voxel_size);
 void add_inflow(FluidData * const data, OpenVDBPrimitive *inflow_prim);
+void add_particle_inflow(FluidData * const data, OpenVDBPrimitive *inflow_prim);
 void add_obstacle(FluidData * const data, OpenVDBPrimitive *obstacle_prim);
 void create_domain_walls(FluidData * const data, const openvdb::math::BBox<openvdb::Vec3d> &wbbox);
 

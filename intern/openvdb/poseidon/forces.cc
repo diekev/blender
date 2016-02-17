@@ -80,6 +80,27 @@ void add_buoyancy(const float dt,
 	}
 }
 
+void add_force(const float dt, VectorGrid::Ptr &velocity)
+{
+	Timer(__func__);
+
+	using namespace openvdb;
+	using namespace openvdb::math;
+
+	typedef VectorTree::LeafNodeType LeafType;
+
+	VectorAccessor vacc = velocity->getAccessor();
+
+	for (VectorTree::LeafIter lit = velocity->tree().beginLeaf(); lit; ++lit) {
+		LeafType &leaf = *lit;
+
+		for (typename LeafType::ValueOnIter it = leaf.beginValueOn(); it; ++it) {
+			const Coord co(it.getCoord());
+			vacc.setValue(co, vacc.getValue(co) + Vec3s(0.0f, 0.0, 0.9f) * dt);
+		}
+	}
+}
+
 void set_neumann_boundary(VectorGrid &velocity, const openvdb::Int32Grid::Ptr &flags)
 {
 	Timer(__func__);

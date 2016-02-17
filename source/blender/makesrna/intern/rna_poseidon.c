@@ -144,6 +144,18 @@ static void rna_def_poseidon_domain_settings(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Advection Scheme", "");
 	RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, NULL);
 
+	static EnumPropertyItem fluid_type_items[] = {
+	    { MOD_POSEIDON_TYPE_GAS, "GAS", 0, "Gas", "Simulate Gaseous Fluids" },
+	    { MOD_POSEIDON_TYPE_LIQUID, "LIQUID", 0, "Liquid", "Simulate Liquid Fluids" },
+	    { 0, NULL, 0, NULL, NULL },
+	};
+
+	prop = RNA_def_property(srna, "fluid_type", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "fluid_type");
+	RNA_def_property_enum_items(prop, fluid_type_items);
+	RNA_def_property_ui_text(prop, "Fluid Type", "");
+	RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, NULL);
+
 	prop = RNA_def_property(srna, "voxel_size", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "voxel_size");
 	RNA_def_property_range(prop, 0.0, 10.0);

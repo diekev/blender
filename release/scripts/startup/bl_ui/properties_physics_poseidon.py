@@ -51,6 +51,7 @@ class PHYSICS_PT_poseidon(PhysicButtonsPanel, Panel):
 
         if smoke_type == 'DOMAIN':
             domain = md.domain_settings
+            layout.prop(domain, "fluid_type")
             layout.prop(domain, "voxel_size")
             layout.prop(domain, "advection_scheme")
 
