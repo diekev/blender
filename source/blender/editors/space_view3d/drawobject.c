@@ -8017,7 +8017,12 @@ void draw_object(Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short
 			mul_v3_mat3_m4v3(viewnormal, ob->imat, rv3d->viewinv[2]);
 			normalize_v3(viewnormal);
 
-			draw_poseidon_volume(pmd->domain, ob, viewnormal);
+			if (pmd->domain->fluid_type == MOD_POSEIDON_TYPE_GAS) {
+				draw_poseidon_volume(pmd->domain, ob, viewnormal);
+			}
+			else {
+				draw_poseidon_particles(pmd->domain);
+			}
 		}
 	}
 

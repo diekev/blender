@@ -96,7 +96,7 @@ void add_force(const float dt, VectorGrid::Ptr &velocity)
 
 		for (typename LeafType::ValueOnIter it = leaf.beginValueOn(); it; ++it) {
 			const Coord co(it.getCoord());
-			vacc.setValue(co, vacc.getValue(co) + Vec3s(0.0f, 0.0, 0.9f) * dt);
+			vacc.setValue(co, vacc.getValue(co) + Vec3s(0.0f, 0.0, -0.981f) * dt);
 		}
 	}
 }

@@ -930,3 +930,34 @@ void draw_poseidon_volume(PoseidonDomainSettings *sds, Object *ob,
 
 	MEM_freeN(slicer.verts);
 }
+
+void draw_poseidon_particles(PoseidonDomainSettings *sds)
+{
+	if (sds->pbuffer == NULL) {
+		PoseidonData_get_particle_draw_buffer(sds->data, &sds->res[0], &sds->pbuffer);
+	}
+
+	if (!sds->pbuffer) {
+		//fprintf(stderr, "Could not allocate OpenVDB particle buffer!\n");
+		return;
+	}
+
+	glEnableClientState(GL_VERTEX_ARRAY);
+
+	glDisable(GL_BLEND);
+	glEnable(GL_DEPTH_TEST);
+
+	glVertexPointer(3, GL_FLOAT, 0, sds->pbuffer);
+
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+	glDrawArrays(GL_POINTS, 0, sds->res[0]);
+
+	glDisableClientState(GL_VERTEX_ARRAY);
+
+	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+	glDisable(GL_DEPTH_TEST);
+
+	MEM_freeN(sds->pbuffer);
+	sds->pbuffer = NULL;
+}

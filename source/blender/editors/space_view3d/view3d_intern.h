@@ -298,6 +298,8 @@ void draw_smoke_volume(struct SmokeDomainSettings *sds, struct Object *ob,
 void draw_poseidon_volume(struct PoseidonDomainSettings *sds, struct Object *ob,
                           const float viewnormal[3]);
 
+void draw_poseidon_particles(struct PoseidonDomainSettings *sds);
+
 
 void draw_volume(struct Object *ob, const float viewnormal[3]);
 void create_volume_texture_atlas(struct VolumeData *data);

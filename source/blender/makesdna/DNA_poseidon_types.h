@@ -80,6 +80,7 @@ typedef struct PoseidonDomainSettings {
 
 	/* Dense buffer drawing */
 	float *buffer;
+	float (*pbuffer)[3];
 	float bbmin[3], bbmax[3];
 	int res[3];
 	char flags;

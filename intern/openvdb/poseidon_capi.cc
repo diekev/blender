@@ -89,6 +89,7 @@ void PoseidonData_get_particle_draw_buffer(PoseidonData *handle, int *r_numpoint
 	if (data->particles.size() == 0) {
 		*r_numpoints = 0;
 		*r_buffer = nullptr;
+		return;
 	}
 
 	*r_numpoints = data->particles.size();
@@ -96,9 +97,9 @@ void PoseidonData_get_particle_draw_buffer(PoseidonData *handle, int *r_numpoint
 
 	for (int i = 0; i < *r_numpoints; ++i) {
 		auto p = data->particles[i];
-		*r_buffer[i][0] = p.x();
-		*r_buffer[i][1] = p.y();
-		*r_buffer[i][2] = p.z();
+		(*r_buffer)[i][0] = p.x();
+		(*r_buffer)[i][1] = p.y();
+		(*r_buffer)[i][2] = p.z();
 	}
 }
 
