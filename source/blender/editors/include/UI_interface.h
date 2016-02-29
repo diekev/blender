@@ -62,6 +62,7 @@ struct uiFontStyle;
 struct uiWidgetColors;
 struct Image;
 struct ImageUser;
+struct wmKeyConfig;
 struct wmOperatorType;
 struct uiWidgetColors;
 struct MTex;
@@ -776,6 +777,7 @@ void UI_popup_handlers_remove_all(struct bContext *C, struct ListBase *handlers)
 void UI_init(void);
 void UI_init_userdef(void);
 void UI_reinit_font(void);
+void UI_reinit_gl_state(void);
 void UI_exit(void);
 
 /* Layout
@@ -977,7 +979,13 @@ void uiItemEnumR(uiLayout *layout, const char *name, int icon, struct PointerRNA
 void uiItemEnumR_string(uiLayout *layout, struct PointerRNA *ptr, const char *propname, const char *value, const char *name, int icon);
 void uiItemsEnumR(uiLayout *layout, struct PointerRNA *ptr, const char *propname);
 void uiItemPointerR(uiLayout *layout, struct PointerRNA *ptr, const char *propname, struct PointerRNA *searchptr, const char *searchpropname, const char *name, int icon);
-void uiItemsFullEnumO(uiLayout *layout, const char *opname, const char *propname, struct IDProperty *properties, int context, int flag);
+void uiItemsFullEnumO(
+        uiLayout *layout, const char *opname, const char *propname,
+        struct IDProperty *properties, int context, int flag);
+void uiItemsFullEnumO_items(
+        uiLayout *layout, struct wmOperatorType *ot, PointerRNA ptr, PropertyRNA *prop,
+        IDProperty *properties, int context, int flag,
+        const EnumPropertyItem *item_array, int totitem);
 
 void uiItemL(uiLayout *layout, const char *name, int icon); /* label */
 void uiItemLDrag(uiLayout *layout, struct PointerRNA *ptr, const char *name, int icon); /* label icon for dragging */
@@ -996,7 +1004,9 @@ typedef struct uiDragColorHandle {
 	bool gamma_corrected;
 } uiDragColorHandle;
 
-void ED_button_operatortypes(void);
+void ED_operatortypes_ui(void);
+void ED_keymap_ui(struct wmKeyConfig *keyconf);
+
 void UI_drop_color_copy(struct wmDrag *drag, struct wmDropBox *drop);
 int UI_drop_color_poll(struct bContext *C, struct wmDrag *drag, const struct wmEvent *event);
 

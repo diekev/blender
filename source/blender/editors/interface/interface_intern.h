@@ -42,6 +42,7 @@ struct ARegion;
 struct bContext;
 struct uiHandleButtonData;
 struct wmEvent;
+struct wmKeyConfig;
 struct wmOperatorType;
 struct wmTimer;
 struct uiStyle;
@@ -181,6 +182,9 @@ enum {
 };
 
 #define PIE_CLICK_THRESHOLD_SQ 50.0f
+
+/* max amount of items a radial menu (pie menu) can contain */
+#define PIE_MAX_ITEMS 8
 
 typedef struct uiLinkLine {  /* only for draw/edit */
 	struct uiLinkLine *next, *prev;
@@ -332,6 +336,10 @@ typedef struct ColorPickerData {
 } ColorPickerData;
 
 struct PieMenuData {
+	/* store title and icon to allow access when pie levels are created */
+	const char *title;
+	int icon;
+
 	float pie_dir[2];
 	float pie_center_init[2];
 	float pie_center_spawned[2];
@@ -477,7 +485,9 @@ extern uiButExtraIconType ui_but_icon_extra_get(uiBut *but);
 
 extern void ui_but_default_set(struct bContext *C, const bool all, const bool use_afterfunc);
 
+extern void ui_but_update_ex(uiBut *but, const bool validate);
 extern void ui_but_update(uiBut *but);
+extern void ui_but_update_edited(uiBut *but);
 extern bool ui_but_is_float(const uiBut *but) ATTR_WARN_UNUSED_RESULT;
 extern bool ui_but_is_bool(const uiBut *but) ATTR_WARN_UNUSED_RESULT;
 extern bool ui_but_is_unit(const uiBut *but) ATTR_WARN_UNUSED_RESULT;
@@ -603,6 +613,10 @@ uiPopupBlockHandle *ui_popup_menu_create(
         struct bContext *C, struct ARegion *butregion, uiBut *but,
         uiMenuCreateFunc create_func, void *arg);
 
+void ui_pie_menu_level_create(
+        uiBlock *block, struct wmOperatorType *ot, const char *propname, IDProperty *properties,
+        const EnumPropertyItem *items, int totitem, int context, int flag);
+
 void ui_popup_block_free(struct bContext *C, uiPopupBlockHandle *handle);
 
 int  ui_but_menu_step(uiBut *but, int step);
@@ -724,6 +738,7 @@ bool ui_but_anim_expression_create(uiBut *but, const char *str);
 void ui_but_anim_autokey(struct bContext *C, uiBut *but, struct Scene *scene, float cfra);
 
 /* interface_eyedropper.c */
+struct wmKeyMap *eyedropper_modal_keymap(struct wmKeyConfig *keyconf);
 void UI_OT_eyedropper_color(struct wmOperatorType *ot);
 void UI_OT_eyedropper_id(struct wmOperatorType *ot);
 void UI_OT_eyedropper_depth(struct wmOperatorType *ot);

@@ -23,13 +23,14 @@
 
 #include "../../kernel_film.h"
 
-#ifdef __COMPILE_ONLY_MEGAKERNEL__
+#if defined(__COMPILE_ONLY_MEGAKERNEL__) || !defined(__NO_BAKING__)
 #include "../../kernel_path.h"
 #include "../../kernel_path_branched.h"
 #else  /* __COMPILE_ONLY_MEGAKERNEL__ */
 /* Include only actually used headers for the case
  * when path tracing kernels are not needed.
  */
+#include "../../kernel_random.h"
 #include "../../kernel_differential.h"
 #include "../../kernel_montecarlo.h"
 #include "../../kernel_projection.h"
@@ -38,7 +39,7 @@
 #include "../../kernel_accumulate.h"
 #include "../../kernel_camera.h"
 #include "../../kernel_shader.h"
-#endif  /* __COMPILE_ONLY_MEGAKERNEL__ */
+#endif  /* defined(__COMPILE_ONLY_MEGAKERNEL__) || !defined(__NO_BAKING__) */
 
 #include "../../kernel_bake.h"
 
