@@ -374,7 +374,7 @@ static void smoke_set_domain_from_derivedmesh(PoseidonDomainSettings *sds, Deriv
 	PoseidonData_add_domain_walls(sds->data, min, max);
 }
 
-static void step(Scene *scene, Object *ob, PoseidonModifierData *pmd, DerivedMesh *domain_dm)
+static void step(Scene *scene, Object *ob, PoseidonModifierData *pmd, DerivedMesh *domain_dm, bool do_sources)
 {
 	PoseidonDomainSettings *pds = pmd->domain;
 
@@ -424,8 +424,12 @@ static void step(Scene *scene, Object *ob, PoseidonModifierData *pmd, DerivedMes
 #endif
 
 	for (int substep = 0; substep < totalSubsteps; substep++) {
-		// calc animated obstacle velocities
-		update_sources(scene, ob, pds);
+		/* TODO(kevin): for now only update sources for liquids on the first
+		 * frame, needs a better approach */
+		if (do_sources || pds->fluid_type == MOD_POSEIDON_TYPE_GAS) {
+			update_sources(scene, ob, pds);
+		}
+
 		update_obstacles(scene, ob, pds);
 
 		 // DG TODO? problem --> uses forces instead of velocity, need to check how they need to be changed with variable dt
@@ -555,7 +559,7 @@ static void poseidon_modifier_process(PoseidonModifierData *pmd, Scene *scene,
 //				smoke_dissolve(pds->fluid, pds->diss_speed, pds->flags & MOD_SMOKE_DISSOLVE_LOG);
 //			}
 
-			step(scene, ob, pmd, dm);
+			step(scene, ob, pmd, dm, (framenr == startframe + 1));
 
 			/* XXX - do that elsewhere! */
 			if (pmd->domain->buffer) {

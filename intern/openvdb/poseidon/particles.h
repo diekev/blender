@@ -121,8 +121,7 @@ void create_particles(openvdb::FloatGrid::Ptr level_set, ParticleList &particles
 
 /* Transfer velocity values from the grid to the particles */
 void rasterize_particles(ParticleList &particles, const PointIndexGrid &index_grid,
-                         openvdb::Vec3SGrid &velocity,
-                         openvdb::FloatGrid &density);
+                         openvdb::Vec3SGrid &velocity);
 
 void advect_particles(ParticleList &particles, openvdb::Vec3SGrid::Ptr velocity, const float dt);
 

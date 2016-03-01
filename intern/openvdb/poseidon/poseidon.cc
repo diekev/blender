@@ -177,9 +177,11 @@ void step_flip(FluidData * const data, float dt)
 	auto index_grid = openvdb::tools::createPointIndexGrid<PointIndexGrid>(data->particles, data->xform);
 
 	// 2. Transfer particle velocities to a staggered grid.
-	rasterize_particles(data->particles, *index_grid, *velocity, *density);
+	rasterize_particles(data->particles, *index_grid, *velocity);
 
 	auto flags = build_flag_grid(density, obstacle);
+
+	set_neumann_boundary(*velocity, flags);
 
 	// 3. FLIP: Save a copy of the grid velocities
 	auto velocity_old = velocity->deepCopy();
@@ -193,8 +195,11 @@ void step_flip(FluidData * const data, float dt)
 
 	interpolate_pic_flip(velocity, velocity_old, data->particles);
 
+	set_neumann_boundary(*velocity, flags);
+
 	// 11. Update the particle positions
 	advect_particles(data->particles, velocity, dt);
+
 	index_grid = openvdb::tools::getValidPointIndexGrid<PointIndexGrid>(data->particles, index_grid);
 
 	resample_particles(data->particles);

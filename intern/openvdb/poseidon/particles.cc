@@ -56,7 +56,6 @@ struct RasterizeOp {
 	const float m_radius;
 	float m_weight_sum;
 	ParticleList::value_type m_vel_sum;
-	float m_dens_sum;
 	const float m_inv_radius;
 
 	RasterizeOp(ParticleList &particles, const float radius)
@@ -64,7 +63,6 @@ struct RasterizeOp {
 	    , m_radius(radius)
 	    , m_weight_sum(0.0)
 	    , m_vel_sum(0.0)
-	    , m_dens_sum(0.0f)
 	    , m_inv_radius(1.0f / radius)
 	{}
 
@@ -79,24 +77,17 @@ struct RasterizeOp {
 		const float weight = 1.0f - openvdb::math::Sqrt(dist_sqr) * m_inv_radius;
 		m_weight_sum += weight;
 		m_vel_sum += weight * m_particles.at(index)->vel;
-		m_dens_sum += weight * m_particles.at(index)->density;
 	}
 
 	ParticleList::value_type velocity() const
 	{
 		return (m_weight_sum > 0.0f) ? m_vel_sum / m_weight_sum : ParticleList::value_type::zero();
 	}
-
-	float density() const
-	{
-		return (m_weight_sum > 0.0f) ? m_dens_sum / m_weight_sum : 0.0f;
-	}
 };
 
 void rasterize_particles(ParticleList &particles,
                          const PointIndexGrid &index_grid,
-                         openvdb::Vec3SGrid &velocity,
-                         openvdb::FloatGrid &density)
+                         openvdb::Vec3SGrid &velocity)
 {
 	using namespace openvdb;
 	using namespace openvdb::math;
@@ -108,10 +99,8 @@ void rasterize_particles(ParticleList &particles,
 
 	/* prepare grids for insertion of values */
 	velocity.topologyUnion(index_grid);
-	density.topologyUnion(index_grid);
 
 	VectorAccessor vacc = velocity.getAccessor();
-	ScalarAccessor dacc = density.getAccessor();
 
 	tools::PointIndexFilter<ParticleList> filter(particles,
 	                                             index_grid.tree(),
@@ -127,7 +116,6 @@ void rasterize_particles(ParticleList &particles,
 		filter.searchAndApply(pos, radius, op);
 
 		vacc.setValue(co, op.velocity());
-		dacc.setValue(co, op.density());
 	}
 }
 
@@ -137,7 +125,7 @@ void advect_particles(ParticleList &particles, openvdb::Vec3SGrid::Ptr velocity,
 
 	Timer(__func__);
 
-	tools::PointAdvect<Vec3SGrid, ParticleList, true> integrator(*velocity);
+	tools::PointAdvect<Vec3SGrid, ParticleList, false> integrator(*velocity);
 
 	/* perform forward euler integration */
 	integrator.setIntegrationOrder(1);
@@ -172,11 +160,14 @@ void interpolate_pic_flip(openvdb::Vec3SGrid::Ptr &velocity,
 	/* flip ratio */
 	const float alpha = 0.95f;
 
+	auto vacc_new = velocity->getConstAccessor();
+	auto vacc_old = velocity_old->getConstAccessor();
+
 	tbb::parallel_for(tbb::blocked_range<size_t>(0, particles.size()),
 	                  [&](const tbb::blocked_range<size_t>& r)
 	{
-		LinearVectorSampler sampler_new(velocity->getConstAccessor(), velocity->transform());
-		LinearVectorSampler sampler_old(velocity_old->getConstAccessor(), velocity_old->transform());
+		LinearVectorSampler sampler_new(vacc_new, velocity->transform());
+		LinearVectorSampler sampler_old(vacc_old, velocity_old->transform());
 
 		for (size_t i = r.begin(); i != r.end(); ++i) {
 			Particle *p = particles.at(i);
