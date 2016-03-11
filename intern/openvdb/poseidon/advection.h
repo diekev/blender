@@ -24,14 +24,7 @@
 
 #include <openvdb/tools/VolumeAdvect.h>
 
-enum {
-	ADVECT_SEMI = 0,
-	ADVECT_MID,
-	ADVECT_RK3,
-	ADVECT_RK4,
-	ADVECT_MAC,
-	ADVECT_BFECC
-};
+#include "../poseidon_capi.h"
 
 static openvdb::tools::Scheme::SemiLagrangian advection_scheme(int scheme)
 {
@@ -49,5 +42,18 @@ static openvdb::tools::Scheme::SemiLagrangian advection_scheme(int scheme)
 			return openvdb::tools::Scheme::MAC;
 		case ADVECT_BFECC:
 			return openvdb::tools::Scheme::BFECC;
+	}
+}
+
+static openvdb::tools::Scheme::Limiter limiter_scheme(int scheme)
+{
+	switch (scheme) {
+		default:
+		case LIMITER_NONE:
+			return openvdb::tools::Scheme::NO_LIMITER;
+		case LIMITER_CLAMP:
+			return openvdb::tools::Scheme::CLAMP;
+		case LIMITER_REVERT:
+			return openvdb::tools::Scheme::REVERT;
 	}
 }

@@ -38,6 +38,7 @@ enum {
 	POSEIDON_FIELD_FLAGS,
 };
 
+/* Advection scheme for fog/smoke volume advection */
 enum {
 	ADVECT_SEMI = 0,
 	ADVECT_MID,
@@ -45,6 +46,23 @@ enum {
 	ADVECT_RK4,
 	ADVECT_MAC,
 	ADVECT_BFECC
+};
+
+/* Limiter for MacCormack and BFECC schemes */
+enum {
+	LIMITER_NONE = 0,
+	LIMITER_CLAMP,
+	LIMITER_REVERT,
+};
+
+/* Advection/integration order for points/particles
+ * Note: OpenVDB doesn't have a set enum for this, the values mimic the
+ * integration order values used in openvdb/tools/VelocityFields.h */
+enum {
+	INTEGR_RK1 = 1,
+	INTEGR_RK2 = 2,
+	INTEGR_RK3 = 3,
+	INTEGR_RK4 = 4,
 };
 
 struct PoseidonData *PoseidonData_create(void);
@@ -57,8 +75,8 @@ void PoseidonData_add_particle_inflow(struct PoseidonData *handle, struct OpenVD
 void PoseidonData_add_obstacle(struct PoseidonData *handle, struct OpenVDBPrimitive *obstacle);
 void PoseidonData_add_domain_walls(struct PoseidonData *handle, float min[3], float max[3]);
 
-void PoseidonData_step(struct PoseidonData *handle, float dt, int advection);
-void PoseidonData_step_liquid(struct PoseidonData *handle, float dt);
+void PoseidonData_step(struct PoseidonData *handle, float dt, int advection, int limiter);
+void PoseidonData_step_liquid(struct PoseidonData *handle, float dt, int point_integration);
 
 void PoseidonData_get_particle_draw_buffer(struct PoseidonData *handle, int *r_numpoints, float (**r_buffer)[3]);
 

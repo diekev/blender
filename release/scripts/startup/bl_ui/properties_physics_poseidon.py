@@ -50,10 +50,23 @@ class PHYSICS_PT_poseidon(PhysicButtonsPanel, Panel):
         layout.prop(md, "smoke_type", expand=True)
 
         if smoke_type == 'DOMAIN':
+            layout.separator()
+
             domain = md.domain_settings
-            layout.prop(domain, "fluid_type")
-            layout.prop(domain, "voxel_size")
-            layout.prop(domain, "advection_scheme")
+            col = layout.column()
+            col.prop(domain, "fluid_type")
+            col.separator()
+
+            col.prop(domain, "voxel_size")
+            col.separator()
+
+            if domain.fluid_type == 'GAS':
+                col.prop(domain, "advection_scheme")
+                row = col.row()
+                row.active = domain.advection_scheme in { 'MAC', 'BFECC' }
+                row.prop(domain, "limiter_scheme")
+            else:
+                col.prop(domain, "point_advect")
 
 
 class PHYSICS_PT_smoke_cache(PhysicButtonsPanel, Panel):

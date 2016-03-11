@@ -119,16 +119,14 @@ void rasterize_particles(ParticleList &particles,
 	}
 }
 
-void advect_particles(ParticleList &particles, openvdb::Vec3SGrid::Ptr velocity, const float dt)
+void advect_particles(ParticleList &particles, openvdb::Vec3SGrid::Ptr velocity, const float dt, const int order)
 {
 	using namespace openvdb;
 
 	Timer(__func__);
 
 	tools::PointAdvect<Vec3SGrid, ParticleList, false> integrator(*velocity);
-
-	/* perform forward euler integration */
-	integrator.setIntegrationOrder(1);
+	integrator.setIntegrationOrder(order);
 	integrator.advect(particles, dt);
 }
 

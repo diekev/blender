@@ -41,12 +41,13 @@ struct FluidData {
 	float dt;  /* time step */
 	float dh;  /* voxel size, sometimes refered to as dx or dTau */
 	int advection_scheme;
+	int limiter;
 	float max_vel;
 	openvdb::math::Transform xform;
 };
 
-void step_smoke(FluidData * const data, float dt, int advection);
-void step_flip(FluidData * const data, float dt);
+void step_smoke(FluidData * const data, float dt, int advection, int limiter);
+void step_flip(FluidData * const data, float dt, int point_integration);
 void init_data(FluidData * const data, float voxel_size);
 void add_inflow(FluidData * const data, OpenVDBPrimitive *inflow_prim);
 void add_particle_inflow(FluidData * const data, OpenVDBPrimitive *inflow_prim);

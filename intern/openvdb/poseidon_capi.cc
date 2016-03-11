@@ -70,16 +70,16 @@ void PoseidonData_add_domain_walls(PoseidonData *handle, float min[3], float max
 	poseidon::create_domain_walls(data, openvdb::BBoxd(min, max));
 }
 
-void PoseidonData_step(PoseidonData *handle, float dt, int advection)
+void PoseidonData_step(PoseidonData *handle, float dt, int advection, int limiter)
 {
 	poseidon::FluidData *data = reinterpret_cast<poseidon::FluidData *>(handle);
-	poseidon::step_smoke(data, dt, advection);
+	poseidon::step_smoke(data, dt, advection, limiter);
 }
 
-void PoseidonData_step_liquid(PoseidonData *handle, float dt)
+void PoseidonData_step_liquid(PoseidonData *handle, float dt, int point_integration)
 {
 	poseidon::FluidData *data = reinterpret_cast<poseidon::FluidData *>(handle);
-	poseidon::step_flip(data, dt);
+	poseidon::step_flip(data, dt, point_integration);
 }
 
 void PoseidonData_get_particle_draw_buffer(PoseidonData *handle, int *r_numpoints, float (**r_buffer)[3])

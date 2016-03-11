@@ -113,6 +113,7 @@ static void advect_semi_lagrange(FluidData * const data, float dt)
 
 	openvdb::tools::VolumeAdvection<VectorGrid, false> advector(*velocity);
 	advector.setIntegrator(advection_scheme(data->advection_scheme));
+	advector.setLimiter(limiter_scheme(data->limiter));
 
 	data->max_vel = advector.getMaxVelocity();
 	const int n = advector.getMaxDistance(*density, dt);
@@ -138,7 +139,7 @@ static void advect_semi_lagrange(FluidData * const data, float dt)
 //	velocity.swap(result);
 }
 
-void step_smoke(FluidData * const data, float dt, int advection)
+void step_smoke(FluidData * const data, float dt, int advection, int limiter)
 {
 	ScalarGrid::Ptr density = openvdb::gridPtrCast<ScalarGrid>(data->density.getGridPtr());
 	ScalarGrid::Ptr temperature = openvdb::gridPtrCast<ScalarGrid>(data->temperature.getGridPtr());
@@ -153,6 +154,7 @@ void step_smoke(FluidData * const data, float dt, int advection)
 
 	/* start step */
 	data->advection_scheme = advection;
+	data->limiter = limiter;
 
 	advect_semi_lagrange(data, dt);
 
@@ -167,7 +169,7 @@ void step_smoke(FluidData * const data, float dt, int advection)
 	set_neumann_boundary(*velocity, flags);
 }
 
-void step_flip(FluidData * const data, float dt)
+void step_flip(FluidData * const data, float dt, int point_integration)
 {
 	auto density = openvdb::gridPtrCast<ScalarGrid>(data->density.getGridPtr());
 	auto pressure = openvdb::gridPtrCast<ScalarGrid>(data->pressure.getGridPtr());
@@ -198,7 +200,7 @@ void step_flip(FluidData * const data, float dt)
 	set_neumann_boundary(*velocity, flags);
 
 	// 11. Update the particle positions
-	advect_particles(data->particles, velocity, dt);
+	advect_particles(data->particles, velocity, dt, point_integration);
 
 	index_grid = openvdb::tools::getValidPointIndexGrid<PointIndexGrid>(data->particles, index_grid);
 

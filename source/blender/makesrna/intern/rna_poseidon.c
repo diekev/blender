@@ -134,6 +134,7 @@ static void rna_def_poseidon_domain_settings(BlenderRNA *brna)
 	    { ADVECT_MID, "MID_POINT", 0, "Mid-Point", "" },
 	    { ADVECT_RK3, "RK3", 0, "3rd Order Runge-Kutta", "" },
 	    { ADVECT_RK4, "RK4", 0, "4th Order Runge-Kutta", "" },
+	    { ADVECT_MAC, "MAC", 0, "MacCormack", "" },
 	    { ADVECT_BFECC, "BFECC", 0, "BEFCC", "Back and Forth Error Compensation" },
 	    { 0, NULL, 0, NULL, NULL },
 	};
@@ -142,6 +143,33 @@ static void rna_def_poseidon_domain_settings(BlenderRNA *brna)
 	RNA_def_property_enum_sdna(prop, NULL, "advection");
 	RNA_def_property_enum_items(prop, advection_scheme_items);
 	RNA_def_property_ui_text(prop, "Advection Scheme", "");
+	RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, NULL);
+
+	static EnumPropertyItem limiter_scheme_items[] = {
+	    { LIMITER_NONE, "NONE", 0, "None", "" },
+	    { LIMITER_CLAMP, "CLAMP", 0, "Clamp", "" },
+	    { LIMITER_REVERT, "REVERT", 0, "Revert to First Order", "" },
+	    { 0, NULL, 0, NULL, NULL },
+	};
+
+	prop = RNA_def_property(srna, "limiter_scheme", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "limiter");
+	RNA_def_property_enum_items(prop, limiter_scheme_items);
+	RNA_def_property_ui_text(prop, "Limiter Scheme", "");
+	RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, NULL);
+
+	static EnumPropertyItem point_advect_items[] = {
+	    { INTEGR_RK1, "RK1", 0, "Forward Euler", "" },
+	    { INTEGR_RK2, "RK2", 0, "2nd Order Runge-Kutta", "" },
+	    { INTEGR_RK3, "RK3", 0, "3rd Order Runge-Kutta", "" },
+	    { INTEGR_RK4, "RK4", 0, "4th Order Runge-Kutta", "" },
+	    { 0, NULL, 0, NULL, NULL },
+	};
+
+	prop = RNA_def_property(srna, "point_advect", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "point_advect");
+	RNA_def_property_enum_items(prop, point_advect_items);
+	RNA_def_property_ui_text(prop, "Integration:", "");
 	RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, NULL);
 
 	static EnumPropertyItem fluid_type_items[] = {

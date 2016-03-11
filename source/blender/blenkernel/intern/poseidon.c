@@ -132,6 +132,7 @@ void BKE_poseidon_modifier_create_type(PoseidonModifierData *pmd)
 
 		pmd->domain->voxel_size = 0.1f;
 		pmd->domain->fluid_type = MOD_POSEIDON_TYPE_GAS;
+		pmd->domain->point_advect = INTEGR_RK1;
 	}
 	else if (pmd->type & MOD_SMOKE_TYPE_FLOW) {
 		if (pmd->flow) {
@@ -436,10 +437,10 @@ static void step(Scene *scene, Object *ob, PoseidonModifierData *pmd, DerivedMes
 		//update_effectors(scene, ob, pds, dtSubdiv);
 
 		if (pds->fluid_type == MOD_POSEIDON_TYPE_GAS) {
-			PoseidonData_step(pds->data, dtSubdiv, pds->advection);
+			PoseidonData_step(pds->data, dtSubdiv, pds->advection, pds->limiter);
 		}
 		else {
-			PoseidonData_step_liquid(pds->data, dtSubdiv);
+			PoseidonData_step_liquid(pds->data, dtSubdiv, pds->point_advect);
 		}
 	}
 }
