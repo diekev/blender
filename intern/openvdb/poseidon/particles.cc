@@ -26,9 +26,10 @@
 #include <openvdb/tools/PointScatter.h>
 
 #include "globals.h"
+#include "openvdb_util.h"
 #include "particles.h"
 #include "types.h"
-#include "openvdb_util.h"
+#include "util_threading.h"
 
 void create_particles(openvdb::FloatGrid::Ptr level_set, ParticleList &particles)
 {
@@ -90,33 +91,38 @@ void rasterize_particles(ParticleList &particles,
                          openvdb::Vec3SGrid &velocity)
 {
 	using namespace openvdb;
-	using namespace openvdb::math;
 
 	Timer(__func__);
 
-	const float radius = velocity.transform().voxelSize()[0] * 2.0f;
-	RasterizeOp op(particles, radius);
+	openvdb::math::Transform xform = velocity.transform();
+	const float radius = xform.voxelSize()[0] * 2.0f;
+
+	VectorAccessor main_acc = velocity.getAccessor();
 
 	/* prepare grids for insertion of values */
 	velocity.topologyUnion(index_grid);
 
-	VectorAccessor vacc = velocity.getAccessor();
+	util::parallel_for(tbb::blocked_range<size_t>(0, particles.size()),
+	                   [&](const tbb::blocked_range<size_t>& r)
+	{
+		RasterizeOp op(particles, radius);
 
-	tools::PointIndexFilter<ParticleList> filter(particles,
-	                                             index_grid.tree(),
-	                                             index_grid.transform());
+		tools::PointIndexFilter<ParticleList> filter(particles,
+		                                             index_grid.tree(),
+		                                             index_grid.transform());
 
-	Transform xform = velocity.transform();
+		VectorAccessor vacc = VectorAccessor(main_acc);
 
-	for (size_t n = 0, N = particles.size(); n < N; ++n) {
-		Vec3s pos = particles[n];
-		Coord co = xform.worldToIndexCellCentered(pos);
+		for (size_t i = r.begin(); i != r.end(); ++i) {
+			Vec3s pos = particles[i];
+			Coord co = xform.worldToIndexCellCentered(pos);
 
-		op.reset();
-		filter.searchAndApply(pos, radius, op);
+			op.reset();
+			filter.searchAndApply(pos, radius, op);
 
-		vacc.setValue(co, op.velocity());
-	}
+			vacc.setValue(co, op.velocity());
+		}
+	});
 }
 
 void advect_particles(ParticleList &particles, openvdb::Vec3SGrid::Ptr velocity, const float dt, const int order)
@@ -134,8 +140,8 @@ void resample_particles(ParticleList &particles)
 {
 	Timer(__func__);
 
-	tbb::parallel_for(tbb::blocked_range<size_t>(0, particles.size()),
-	                  [&](const tbb::blocked_range<size_t>& r)
+	util::parallel_for(tbb::blocked_range<size_t>(0, particles.size()),
+	                   [&](const tbb::blocked_range<size_t>& r)
 	{
 		for (size_t i = r.begin(); i != r.end(); ++i) {
 			Particle *particle = particles.at(i);
@@ -161,11 +167,11 @@ void interpolate_pic_flip(openvdb::Vec3SGrid::Ptr &velocity,
 	auto vacc_new = velocity->getConstAccessor();
 	auto vacc_old = velocity_old->getConstAccessor();
 
-	tbb::parallel_for(tbb::blocked_range<size_t>(0, particles.size()),
-	                  [&](const tbb::blocked_range<size_t>& r)
+	util::parallel_for(tbb::blocked_range<size_t>(0, particles.size()),
+	                   [&](const tbb::blocked_range<size_t>& r)
 	{
-		LinearVectorSampler sampler_new(vacc_new, velocity->transform());
-		LinearVectorSampler sampler_old(vacc_old, velocity_old->transform());
+		LinearVectorSampler sampler_new(ConstVectorAccessor(vacc_new), velocity->transform());
+		LinearVectorSampler sampler_old(ConstVectorAccessor(vacc_old), velocity_old->transform());
 
 		for (size_t i = r.begin(); i != r.end(); ++i) {
 			Particle *p = particles.at(i);
