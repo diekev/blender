@@ -29,12 +29,8 @@
 typedef openvdb::tools::PointIndexGrid PointIndexGrid;
 
 struct Particle {
-	size_t index;
-	float density;
 	openvdb::math::Vec3s vel;
-	openvdb::math::Vec3s vel_t;
 	openvdb::math::Vec3s pos;
-	openvdb::math::Vec3s pos_t;
 };
 
 /**
@@ -48,16 +44,13 @@ struct Particle {
  *       coherency?
  */
 class ParticleList {
-	std::vector<Particle *> m_particles;
-	size_t m_particle_index;
+	std::vector<Particle> m_particles;
 
 public:
 	/* Required for bucketing */
 	typedef openvdb::math::Vec3s value_type;
 
-	ParticleList()
-	    : m_particle_index(0)
-	{}
+	ParticleList() = default;
 
 	~ParticleList()
 	{
@@ -80,9 +73,14 @@ public:
 	/**
 	 * Return the particle at the n'th position in the array.
 	 */
-	Particle *at(const size_t n) const
+	Particle *at(const size_t n)
 	{
-		return m_particles[n];
+		return &(m_particles[n]);
+	}
+
+	const Particle *at(const size_t n) const
+	{
+		return &(m_particles[n]);
 	}
 
 	/* Required methods. */
@@ -92,12 +90,9 @@ public:
 	 */
 	void add(const value_type &pos)
 	{
-		Particle *part = new Particle;
-
-		part->pos = part->pos_t = pos;
-		part->density = 1.0f;
-		part->index = m_particle_index++;
-		part->vel = part->vel_t = value_type(0.0f);
+		Particle part;
+		part.pos = pos;
+		part.vel = value_type(0.0f);
 
 		m_particles.push_back(part);
 	}
@@ -107,12 +102,12 @@ public:
 	 */
 	void getPos(const size_t n, value_type &pos) const
 	{
-		pos = m_particles[n]->pos;
+		pos = m_particles[n].pos;
 	}
 
 	value_type &operator[](const size_t n)
 	{
-		return m_particles[n]->pos;
+		return m_particles[n].pos;
 	}
 };
 

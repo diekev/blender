@@ -90,7 +90,8 @@ void rasterize_particles(ParticleList &particles,
                          const PointIndexGrid &index_grid,
                          openvdb::Vec3SGrid &velocity)
 {
-	using namespace openvdb;
+	using openvdb::math::Vec3s;
+	using openvdb::math::Coord;
 
 	Timer(__func__);
 
@@ -107,7 +108,7 @@ void rasterize_particles(ParticleList &particles,
 	{
 		RasterizeOp op(particles, radius);
 
-		tools::PointIndexFilter<ParticleList> filter(particles,
+		openvdb::tools::PointIndexFilter<ParticleList> filter(particles,
 		                                             index_grid.tree(),
 		                                             index_grid.transform());
 
@@ -136,28 +137,18 @@ void advect_particles(ParticleList &particles, openvdb::Vec3SGrid::Ptr velocity,
 	integrator.advect(particles, dt);
 }
 
-void resample_particles(ParticleList &particles)
+void resample_particles(ParticleList &/*particles*/)
 {
 	Timer(__func__);
 
-	util::parallel_for(tbb::blocked_range<size_t>(0, particles.size()),
-	                   [&](const tbb::blocked_range<size_t>& r)
-	{
-		for (size_t i = r.begin(); i != r.end(); ++i) {
-			Particle *particle = particles.at(i);
-			particle->vel = particle->pos - particle->pos_t;
-			particle->pos_t = particle->pos;
-			particle->density *= (1.0f - (1.0f / 5.0f));
-		}
-	});
+	/* TODO: check number of particles per voxel (needs to be 3 <= x <= 12) */
 }
 
 void interpolate_pic_flip(openvdb::Vec3SGrid::Ptr &velocity,
                           openvdb::Vec3SGrid::Ptr &velocity_old,
                           ParticleList &particles)
 {
-	using namespace openvdb;
-	using namespace openvdb::math;
+	using openvdb::math::Vec3s;
 
 	Timer(__func__);
 
