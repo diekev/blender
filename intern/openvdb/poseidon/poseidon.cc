@@ -169,7 +169,7 @@ void step_smoke(FluidData * const data, float dt, int advection, int limiter)
 	set_neumann_boundary(*velocity, flags);
 }
 
-void step_flip(FluidData * const data, float dt, int point_integration)
+void step_flip(FluidData * const data, float dt, int point_integration, float flip_ratio)
 {
 	auto density = openvdb::gridPtrCast<ScalarGrid>(data->density.getGridPtr());
 	auto pressure = openvdb::gridPtrCast<ScalarGrid>(data->pressure.getGridPtr());
@@ -195,7 +195,7 @@ void step_flip(FluidData * const data, float dt, int point_integration)
 	// Conjugate Gradient method
 	solve_pressure(dt, *velocity, *pressure, *flags);
 
-	interpolate_pic_flip(velocity, velocity_old, data->particles);
+	interpolate_pic_flip(velocity, velocity_old, data->particles, flip_ratio);
 
 	set_neumann_boundary(*velocity, flags);
 
@@ -244,10 +244,11 @@ void add_inflow(FluidData * const data, OpenVDBPrimitive *inflow_prim)
 	}
 }
 
-void add_particle_inflow(FluidData * const data, OpenVDBPrimitive *inflow_prim)
+void add_particle_inflow(FluidData * const data, OpenVDBPrimitive *inflow_prim,
+                         const int part_per_cell)
 {
 	auto level_set = openvdb::gridPtrCast<ScalarGrid>(inflow_prim->getGridPtr());
-	create_particles(level_set, data->particles);
+	create_particles(level_set, data->particles, part_per_cell);
 }
 
 void add_obstacle(FluidData * const data, OpenVDBPrimitive *obstacle_prim)

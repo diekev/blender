@@ -133,6 +133,8 @@ void BKE_poseidon_modifier_create_type(PoseidonModifierData *pmd)
 		pmd->domain->voxel_size = 0.1f;
 		pmd->domain->fluid_type = MOD_POSEIDON_TYPE_GAS;
 		pmd->domain->point_advect = INTEGR_RK1;
+		pmd->domain->part_per_cell = 8;
+		pmd->domain->flip_ratio = 0.95f;
 	}
 	else if (pmd->type & MOD_SMOKE_TYPE_FLOW) {
 		if (pmd->flow) {
@@ -343,7 +345,7 @@ static void update_sources(Scene *scene, Object *ob, PoseidonDomainSettings *pds
 				PoseidonData_add_inflow(pds->data, prim);
 			}
 			else {
-				PoseidonData_add_particle_inflow(pds->data, prim);
+				PoseidonData_add_particle_inflow(pds->data, prim, pds->part_per_cell);
 			}
 
 			OpenVDBPrimitive_free(prim);
@@ -440,7 +442,8 @@ static void step(Scene *scene, Object *ob, PoseidonModifierData *pmd, DerivedMes
 			PoseidonData_step(pds->data, dtSubdiv, pds->advection, pds->limiter);
 		}
 		else {
-			PoseidonData_step_liquid(pds->data, dtSubdiv, pds->point_advect);
+			PoseidonData_step_liquid(pds->data, dtSubdiv, pds->point_advect,
+			                         pds->flip_ratio);
 		}
 	}
 }

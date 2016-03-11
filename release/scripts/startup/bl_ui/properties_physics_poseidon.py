@@ -69,6 +69,24 @@ class PHYSICS_PT_poseidon(PhysicButtonsPanel, Panel):
                 col.prop(domain, "point_advect")
 
 
+class PHYSICS_PT_flip_settings(PhysicButtonsPanel, Panel):
+    bl_label = "Flip Settings"
+
+    @classmethod
+    def poll(cls, context):
+        md = context.poseidon
+        return md and (md.smoke_type == 'DOMAIN') and (md.domain_settings.fluid_type == 'LIQUID')
+
+    def draw(self, context):
+        layout = self.layout
+
+        md = context.poseidon
+        domain = md.domain_settings
+
+        layout.prop(domain, "part_per_cell")
+        layout.prop(domain, "flip_ratio")
+
+
 class PHYSICS_PT_smoke_cache(PhysicButtonsPanel, Panel):
     bl_label = "Smoke Cache"
     bl_options = {'DEFAULT_CLOSED'}

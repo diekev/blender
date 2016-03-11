@@ -79,6 +79,10 @@ typedef struct PoseidonDomainSettings {
 	char limiter;
 	char point_advect;
 
+	float flip_ratio;
+	char part_per_cell;
+	char pad3[3];
+
 	/* Dense buffer drawing */
 	float *buffer;
 	float (*pbuffer)[3];

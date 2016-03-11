@@ -190,6 +190,19 @@ static void rna_def_poseidon_domain_settings(BlenderRNA *brna)
 	RNA_def_property_ui_range(prop, 0.0, 10.0, 0.02, 3);
 	RNA_def_property_ui_text(prop, "Voxel Size", "Size of the voxels");
 	RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Poseidon_reset");
+
+	prop = RNA_def_property(srna, "flip_ratio", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "flip_ratio");
+	RNA_def_property_range(prop, 0.0, 1.0);
+	RNA_def_property_ui_range(prop, 0.0, 1.0, 0.02, 3);
+	RNA_def_property_ui_text(prop, "Flip Ratio", "");
+	RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, NULL);
+
+	prop = RNA_def_property(srna, "part_per_cell", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "part_per_cell");
+	RNA_def_property_range(prop, 3.0, 12.0);
+	RNA_def_property_ui_text(prop, "Particles Count", "Number of Particles Per Voxel");
+	RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, NULL);
 }
 
 static void rna_def_poseidon_flow_settings(BlenderRNA *brna)

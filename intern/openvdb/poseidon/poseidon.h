@@ -47,10 +47,10 @@ struct FluidData {
 };
 
 void step_smoke(FluidData * const data, float dt, int advection, int limiter);
-void step_flip(FluidData * const data, float dt, int point_integration);
+void step_flip(FluidData * const data, float dt, int point_integration, float flip_ratio);
 void init_data(FluidData * const data, float voxel_size);
 void add_inflow(FluidData * const data, OpenVDBPrimitive *inflow_prim);
-void add_particle_inflow(FluidData * const data, OpenVDBPrimitive *inflow_prim);
+void add_particle_inflow(FluidData * const data, OpenVDBPrimitive *inflow_prim, const int part_per_cell);
 void add_obstacle(FluidData * const data, OpenVDBPrimitive *obstacle_prim);
 void create_domain_walls(FluidData * const data, const openvdb::math::BBox<openvdb::Vec3d> &wbbox);
 

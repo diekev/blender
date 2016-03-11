@@ -31,13 +31,14 @@
 #include "types.h"
 #include "util_threading.h"
 
-void create_particles(openvdb::FloatGrid::Ptr level_set, ParticleList &particles)
+void create_particles(openvdb::FloatGrid::Ptr level_set,
+                      ParticleList &particles,
+                      const int part_per_cell)
 {
 	using namespace openvdb;
 
 	Timer(__func__);
 
-	const int part_per_cell = 8;
 	std::mt19937 rng(19937);
 
 	// create bool mask of inside region
@@ -146,14 +147,12 @@ void resample_particles(ParticleList &/*particles*/)
 
 void interpolate_pic_flip(openvdb::Vec3SGrid::Ptr &velocity,
                           openvdb::Vec3SGrid::Ptr &velocity_old,
-                          ParticleList &particles)
+                          ParticleList &particles,
+                          const float flip_ratio)
 {
 	using openvdb::math::Vec3s;
 
 	Timer(__func__);
-
-	/* flip ratio */
-	const float alpha = 0.95f;
 
 	auto vacc_new = velocity->getConstAccessor();
 	auto vacc_old = velocity_old->getConstAccessor();
@@ -171,7 +170,7 @@ void interpolate_pic_flip(openvdb::Vec3SGrid::Ptr &velocity,
 			const Vec3s v     =     sampler_new.wsSample(pos);
 			const Vec3s delta = v - sampler_old.wsSample(pos);
 
-			p->vel = alpha * (p->vel + delta) + (1.0f - alpha) * v;
+			p->vel = flip_ratio * (p->vel + delta) + (1.0f - flip_ratio) * v;
 		}
 	});
 }

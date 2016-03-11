@@ -52,10 +52,11 @@ void PoseidonData_add_inflow(PoseidonData *handle, OpenVDBPrimitive *inflow)
 	poseidon::add_inflow(data, inflow);
 }
 
-void PoseidonData_add_particle_inflow(PoseidonData *handle, OpenVDBPrimitive *inflow)
+void PoseidonData_add_particle_inflow(PoseidonData *handle, OpenVDBPrimitive *inflow,
+                                      const int part_per_cell)
 {
 	poseidon::FluidData *data = reinterpret_cast<poseidon::FluidData *>(handle);
-	poseidon::add_particle_inflow(data, inflow);
+	poseidon::add_particle_inflow(data, inflow, part_per_cell);
 }
 
 void PoseidonData_add_obstacle(PoseidonData *handle, OpenVDBPrimitive *obstacle)
@@ -76,10 +77,10 @@ void PoseidonData_step(PoseidonData *handle, float dt, int advection, int limite
 	poseidon::step_smoke(data, dt, advection, limiter);
 }
 
-void PoseidonData_step_liquid(PoseidonData *handle, float dt, int point_integration)
+void PoseidonData_step_liquid(PoseidonData *handle, float dt, int point_integration, float flip_ratio)
 {
 	poseidon::FluidData *data = reinterpret_cast<poseidon::FluidData *>(handle);
-	poseidon::step_flip(data, dt, point_integration);
+	poseidon::step_flip(data, dt, point_integration, flip_ratio);
 }
 
 void PoseidonData_get_particle_draw_buffer(PoseidonData *handle, int *r_numpoints, float (**r_buffer)[3])

@@ -112,16 +112,23 @@ public:
 };
 
 /* Scatters particles in the interior of a level set */
-void create_particles(openvdb::FloatGrid::Ptr level_set, ParticleList &particles);
+void create_particles(openvdb::FloatGrid::Ptr level_set,
+                      ParticleList &particles,
+                      const int part_per_cell);
 
-/* Transfer velocity values from the grid to the particles */
-void rasterize_particles(ParticleList &particles, const PointIndexGrid &index_grid,
+/* Transfer velocity values from the particles to the grid */
+void rasterize_particles(ParticleList &particles,
+                         const PointIndexGrid &index_grid,
                          openvdb::Vec3SGrid &velocity);
 
-void advect_particles(ParticleList &particles, openvdb::Vec3SGrid::Ptr velocity, const float dt, const int order);
+void advect_particles(ParticleList &particles,
+                      openvdb::Vec3SGrid::Ptr velocity,
+                      const float dt,
+                      const int order);
 
 void resample_particles(ParticleList &particles);
 
-void interpolate_pic_flip(openvdb::Vec3SGrid::Ptr &velocity, openvdb::Vec3SGrid::Ptr &velocity_old,
-                          ParticleList &particles);
-
+void interpolate_pic_flip(openvdb::Vec3SGrid::Ptr &velocity,
+                          openvdb::Vec3SGrid::Ptr &velocity_old,
+                          ParticleList &particles,
+                          const float flip_ratio);
