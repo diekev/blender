@@ -72,6 +72,8 @@
 #include "NOD_shader.h"
 #include "NOD_texture.h"
 
+#define NODE_DEFAULT_MAX_WIDTH 700
+
 /* Fallback types for undefined tree, nodes, sockets */
 bNodeTreeType NodeTreeTypeUndefined;
 bNodeType NodeTypeUndefined;
@@ -2065,7 +2067,7 @@ static void extern_local_ntree(bNodeTree *ntree)
 	}
 }
 
-void ntreeMakeLocal(bNodeTree *ntree)
+void ntreeMakeLocal(bNodeTree *ntree, bool id_in_mainlist)
 {
 	Main *bmain = G.main;
 	bool lib = false, local = false;
@@ -2077,7 +2079,7 @@ void ntreeMakeLocal(bNodeTree *ntree)
 	
 	if (ntree->id.lib == NULL) return;
 	if (ntree->id.us == 1) {
-		id_clear_lib_data(bmain, (ID *)ntree);
+		id_clear_lib_data_ex(bmain, (ID *)ntree, id_in_mainlist);
 		extern_local_ntree(ntree);
 		return;
 	}
@@ -2098,7 +2100,7 @@ void ntreeMakeLocal(bNodeTree *ntree)
 	
 	/* if all users are local, we simply make tree local */
 	if (local && !lib) {
-		id_clear_lib_data(bmain, (ID *)ntree);
+		id_clear_lib_data_ex(bmain, (ID *)ntree, id_in_mainlist);
 		extern_local_ntree(ntree);
 	}
 	else if (local && lib) {
@@ -3509,16 +3511,16 @@ void node_type_size_preset(struct bNodeType *ntype, eNodeSizePreset size)
 {
 	switch (size) {
 		case NODE_SIZE_DEFAULT:
-			node_type_size(ntype, 140, 100, 320);
+			node_type_size(ntype, 140, 100, NODE_DEFAULT_MAX_WIDTH);
 			break;
 		case NODE_SIZE_SMALL:
-			node_type_size(ntype, 100, 80, 320);
+			node_type_size(ntype, 100, 80, NODE_DEFAULT_MAX_WIDTH);
 			break;
 		case NODE_SIZE_MIDDLE:
-			node_type_size(ntype, 150, 120, 320);
+			node_type_size(ntype, 150, 120, NODE_DEFAULT_MAX_WIDTH);
 			break;
 		case NODE_SIZE_LARGE:
-			node_type_size(ntype, 240, 140, 320);
+			node_type_size(ntype, 240, 140, NODE_DEFAULT_MAX_WIDTH);
 			break;
 	}
 }

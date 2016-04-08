@@ -1574,7 +1574,9 @@ static bool snapDerivedMesh(
 					bb = &bb_temp;
 				}
 
-				len_diff = local_depth;
+				/* was local_depth, see: T47838 */
+				len_diff = BVH_RAYCAST_DIST_MAX;
+
 				if (!BKE_boundbox_ray_hit_check(bb, ray_start_local, ray_normal_local, &len_diff)) {
 					return retval;
 				}
@@ -1673,7 +1675,7 @@ static bool snapDerivedMesh(
 				nearest.dist_sq = local_depth * local_depth;
 				if (treedata.tree &&
 				    BLI_bvhtree_find_nearest_to_ray(
-				        treedata.tree, ray_start_local, ray_normal_local, 0.0f,
+				        treedata.tree, ray_start_local, ray_normal_local,
 				        &nearest, NULL, NULL) != -1)
 				{
 					const MVert *v = &treedata.vert[nearest.index];

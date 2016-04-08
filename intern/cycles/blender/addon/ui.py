@@ -610,9 +610,9 @@ class Cycles_PT_context_material(CyclesButtonsPanel, Panel):
         ob = context.object
         slot = context.material_slot
         space = context.space_data
-        is_sortable = len(ob.material_slots) > 1
 
         if ob:
+            is_sortable = len(ob.material_slots) > 1
             rows = 1
             if (is_sortable):
                 rows = 4
@@ -1526,7 +1526,7 @@ class CyclesRender_PT_debug(CyclesButtonsPanel, Panel):
 
     @classmethod
     def poll(cls, context):
-        return bpy.app.debug_value == 256
+        return CyclesButtonsPanel.poll(context) and bpy.app.debug_value == 256
 
     def draw(self, context):
         layout = self.layout

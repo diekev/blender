@@ -14,7 +14,15 @@ include(cmake/external_libs.cmake)
 # todo: this code could be refactored a bit to avoid duplication
 # note: CXX_HAS_SSE is needed in case passing SSE flags fails altogether (gcc-arm)
 
-if(NOT WITH_CPU_SSE)
+if(WITH_CYCLES_NATIVE_ONLY)
+	set(CXX_HAS_SSE FALSE)
+	set(CXX_HAS_AVX FALSE)
+	set(CXX_HAS_AVX2 FALSE)
+	add_definitions(
+		-DWITH_KERNEL_NATIVE
+	)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+elseif(NOT WITH_CPU_SSE)
 	set(CXX_HAS_SSE FALSE)
 	set(CXX_HAS_AVX FALSE)
 	set(CXX_HAS_AVX2 FALSE)
@@ -212,15 +220,22 @@ endif()
 if(CMAKE_COMPILER_IS_GNUCXX)
 	ADD_CHECK_CXX_COMPILER_FLAG(CMAKE_CXX_FLAGS _has_cxxflag_float_conversion "-Werror=float-conversion")
 	ADD_CHECK_CXX_COMPILER_FLAG(CMAKE_CXX_FLAGS _has_cxxflag_double_promotion "-Werror=double-promotion")
+	ADD_CHECK_CXX_COMPILER_FLAG(CMAKE_CXX_FLAGS _has_no_error_unused_macros "-Wno-error=unused-macros")
 	unset(_has_cxxflag_float_conversion)
 	unset(_has_cxxflag_double_promotion)
+	unset(_has_no_error_unused_macros)
 endif()
 
 
 # Subdirectories
 
 if(WITH_CYCLES_BLENDER)
+	add_definitions(-DWITH_BLENDER_GUARDEDALLOC)
 	add_subdirectory(blender)
+endif()
+
+if(WITH_CYCLES_NETWORK)
+	add_definitions(-DWITH_NETWORK)
 endif()
 
 if(WITH_CYCLES_STANDALONE OR WITH_CYCLES_NETWORK)
