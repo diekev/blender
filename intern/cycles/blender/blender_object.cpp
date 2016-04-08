@@ -499,8 +499,10 @@ Object *BlenderSync::sync_object(BL::Object& b_parent,
 		for(b_ob.material_slots.begin(slot); slot != b_ob.material_slots.end(); ++slot) {
 			if(material_override)
 				find_shader(material_override, used_shaders, scene->default_surface);
-			else
-				find_shader(slot->material(), used_shaders, scene->default_surface);
+			else {
+				BL::Material slot_material = slot->material();
+				find_shader(slot_material, used_shaders, scene->default_surface);
+			}
 		}
 
 		if(used_shaders.empty()) {

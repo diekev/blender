@@ -17,7 +17,9 @@
 #ifndef __UTIL_LEVELSETS_H__
 #define __UTIL_LEVELSETS_H__
 
-namespace openvdb{
+#include <stdio.h>
+
+namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tools {

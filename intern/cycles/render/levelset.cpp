@@ -161,7 +161,7 @@ bool LevelSet::intersect(const Ray* ray, Intersection *isect)
 
 	vdb_ray_t vdbray(P, D, 1e-5f, max_ray_t);
 	vdb_ray_t::Vec3Type pos(0.0), normal;
-	double t;
+	float t;
 
 	bool intersects = false;
 

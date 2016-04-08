@@ -65,11 +65,11 @@ public:
 
 #if 1
 	   typedef openvdb::tools::CyclesLinearSearchImpl<openvdb::FloatGrid,
-	                                                  openvdb::math::BoxStencil<openvdb::FloatGrid>, 1, double> LinearSearchImpl;
+	                                                  openvdb::math::BoxStencil<openvdb::FloatGrid>, 1, float> LinearSearchImpl;
 #else
-	   typedef openvdb::tools::LinearSearchImpl<openvdb::FloatGrid, 1, double> LinearSearchImpl;
+	   typedef openvdb::tools::LinearSearchImpl<openvdb::FloatGrid, 1, float> LinearSearchImpl;
 #endif
-	   typedef openvdb::math::Ray<double> vdb_ray_t;
+	   typedef openvdb::math::Ray<float> vdb_ray_t;
        typedef openvdb::tools::LevelSetRayIntersector<openvdb::FloatGrid,
 	                                                  LinearSearchImpl,
 	                                                  openvdb::FloatTree::RootNodeType::ChildNodeType::LEVEL,
