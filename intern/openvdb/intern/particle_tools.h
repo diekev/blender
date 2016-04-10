@@ -46,6 +46,7 @@ protected:
 public:
 	/* Required for bucketing */
 	typedef openvdb::Vec3R value_type;
+	typedef openvdb::Vec3R PosType;
 
 	ParticleList(size_t size, openvdb::Real rad_scale = 1.0, openvdb::Real vel_scale = 1.0);
 

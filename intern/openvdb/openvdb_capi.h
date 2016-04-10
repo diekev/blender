@@ -122,8 +122,6 @@ struct OpenVDBFloatGrid;
 struct OpenVDBIntGrid;
 struct OpenVDBVectorGrid;
 
-int OpenVDB_getVersionHex(void);
-
 enum {
 	VEC_INVARIANT = 0,
 	VEC_COVARIANT = 1,

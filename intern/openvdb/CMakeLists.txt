@@ -58,7 +58,6 @@ if(WITH_OPENVDB)
 		intern/openvdb_writer.cc
 		intern/particle_tools.cpp
 		openvdb_capi.cc
-		openvdb_capi.cpp
 		openvdb_util.cc
 
 		intern/openvdb_dense_convert.h
