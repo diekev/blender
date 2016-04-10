@@ -5235,6 +5235,7 @@ static void direct_link_modifiers(FileData *fd, ListBase *lb)
 			ParticleMesherModifierData *pmmd = (ParticleMesherModifierData *)md;
 
 			pmmd->psys = newdataadr(fd, pmmd->psys);
+			pmmd->source_ob = newdataadr(fd, pmmd->source_ob);
 			link_list(fd, &pmmd->filters);
 			pmmd->mesher_mask = NULL;
 		}
