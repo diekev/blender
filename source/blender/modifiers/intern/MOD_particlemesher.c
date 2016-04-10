@@ -109,6 +109,10 @@ static void foreachObjectLink(ModifierData *md, Object *ob, ObjectWalkFunc walk,
 	if (pmmd->mesher_mask_ob) {
 		walk(userData, ob, &pmmd->mesher_mask_ob, IDWALK_NOP);
 	}
+
+	if (pmmd->source_ob) {
+		walk(userData, ob, &pmmd->source_ob, IDWALK_NOP);
+	}
 }
 
 static void updateDepsgraph(ModifierData *md,
@@ -121,6 +125,13 @@ static void updateDepsgraph(ModifierData *md,
 
 	if (pmmd->mesher_mask_ob != NULL) {
 		DEG_add_object_relation(node, pmmd->mesher_mask_ob, DEG_OB_COMP_TRANSFORM,
+		                        "Particle Mesher Modifier");
+	}
+
+	if (pmmd->source_ob != NULL) {
+		DEG_add_object_relation(node, pmmd->source_ob, DEG_OB_COMP_TRANSFORM,
+		                        "Particle Mesher Modifier");
+		DEG_add_object_relation(node, pmmd->source_ob, DEG_OB_COMP_GEOMETRY,
 		                        "Particle Mesher Modifier");
 	}
 
@@ -137,6 +148,13 @@ static void updateDepgraph(ModifierData *md, DagForest *forest,
 
 	if (pmmd->mesher_mask_ob) {
 		DagNode *curNode = dag_get_node(forest, pmmd->mesher_mask_ob);
+
+		dag_add_relation(forest, curNode, obNode, DAG_RL_OB_DATA,
+		                 "Particle Mesher Modifier");
+	}
+
+	if (pmmd->source_ob) {
+		DagNode *curNode = dag_get_node(forest, pmmd->source_ob);
 
 		dag_add_relation(forest, curNode, obNode, DAG_RL_OB_DATA,
 		                 "Particle Mesher Modifier");
