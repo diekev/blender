@@ -670,7 +670,7 @@ NUMPY_SOURCE=( "http://sourceforge.net/projects/numpy/files/NumPy/$NUMPY_VERSION
 
 _boost_version_nodots=`echo "$BOOST_VERSION" | sed -r 's/\./_/g'`
 BOOST_SOURCE=( "http://sourceforge.net/projects/boost/files/boost/$BOOST_VERSION/boost_$_boost_version_nodots.tar.bz2/download" )
-BOOST_BUILD_MODULES="--with-system --with-filesystem --with-thread --with-regex --with-locale --with-date_time --with-wave"
+BOOST_BUILD_MODULES="--with-system --with-filesystem --with-thread --with-regex --with-locale --with-date_time --with-wave --with-iostreams"
 
 OCIO_SOURCE=( "https://github.com/imageworks/OpenColorIO/tarball/v$OCIO_VERSION" )
 
@@ -1090,7 +1090,7 @@ clean_Boost() {
 
 compile_Boost() {
   # To be changed each time we make edits that would modify the compiled result!
-  boost_magic=9
+  boost_magic=10
 
   _init_boost
 
@@ -1808,7 +1808,7 @@ clean_OSD() {
 
 compile_OSD() {
   # To be changed each time we make edits that would modify the compiled result!
-  osd_magic=0
+  osd_magic=1
   _init_osd
 
   # Clean install if needed!
@@ -1857,7 +1857,7 @@ compile_OSD() {
     cmake_d="$cmake_d -D CMAKE_INSTALL_PREFIX=$_inst"
     # ptex is only needed when nicholas bishop is ready
     cmake_d="$cmake_d -D NO_PTEX=1"
-    cmake_d="$cmake_d -D NO_CLEW=1"
+    cmake_d="$cmake_d -D NO_CLEW=1 -D NO_CUDA=1 -D NO_OPENCL=1"
     # maya plugin, docs, tutorials, regression tests and examples are not needed
     cmake_d="$cmake_d -D NO_MAYA=1 -D NO_DOC=1 -D NO_TUTORIALS=1 -D NO_REGRESSION=1 -DNO_EXAMPLES=1"
 
@@ -2642,22 +2642,22 @@ install_DEB() {
     INFO "Forced LLVM building, as requested..."
     _do_compile_llvm=true
   else
-    check_package_DEB llvm-$LLVM_VERSION-dev
+    check_package_DEB clang-$LLVM_VERSION
     if [ $? -eq 0 ]; then
       install_packages_DEB llvm-$LLVM_VERSION-dev clang-$LLVM_VERSION
       have_llvm=true
       LLVM_VERSION_FOUND=$LLVM_VERSION
       clean_LLVM
     else
-      check_package_version_ge_DEB llvm-dev $LLVM_VERSION_MIN
-      if [ $? -eq 0 ]; then
-        install_packages_DEB llvm-dev clang
-        have_llvm=true
-        LLVM_VERSION_FOUND=""  # Using default one, no need to specify it!
-        clean_LLVM
-      else
-        _do_compile_llvm=true
-      fi
+      #~ check_package_version_ge_DEB llvm-dev $LLVM_VERSION_MIN
+      #~ if [ $? -eq 0 ]; then
+        #~ install_packages_DEB llvm-dev clang
+        #~ have_llvm=true
+        #~ LLVM_VERSION_FOUND=""  # Using default one, no need to specify it!
+        #~ clean_LLVM
+      #~ else
+      _do_compile_llvm=true
+      #~ fi
     fi
   fi
 
@@ -3089,7 +3089,7 @@ install_RPM() {
     INFO "Forced Boost building, as requested..."
     compile_Boost
   else
-    check_package_version_ge_RPM boost-devel $BOOST_VERSION
+    check_package_version_ge_RPM boost-devel $BOOST_VERSION_MIN
     if [ $? -eq 0 ]; then
       install_packages_RPM boost-devel
       clean_Boost
@@ -3161,21 +3161,28 @@ install_RPM() {
     _do_compile_llvm=true
   else
     # Problem compiling with LLVM 3.2 so match version 3.1 ...
-    check_package_version_match_RPM llvm $LLVM_VERSION
-    if [ $? -eq 0 ]; then
-      if [ "$RPM" = "SUSE" ]; then
+    if [ "$RPM" = "SUSE" ]; then
+      check_package_version_match_RPM llvm-clang-devel $LLVM_VERSION
+      if [ $? -eq 0 ]; then
         install_packages_RPM llvm-devel llvm-clang-devel
+        have_llvm=true
+        LLVM_VERSION_FOUND=$LLVM_VERSION
+        clean_LLVM
       else
-        install_packages_RPM llvm-devel clang-devel
+        # Better to compile it than use minimum version from repo...
+        _do_compile_llvm=true
       fi
-      have_llvm=true
-      LLVM_VERSION_FOUND=$LLVM_VERSION
-      clean_LLVM
     else
-      #
-      # Better to compile it than use minimum version from repo...
-      #
-      _do_compile_llvm=true
+      check_package_version_match_RPM clang-devel $LLVM_VERSION
+      if [ $? -eq 0 ]; then
+        install_packages_RPM llvm-devel clang-devel
+        have_llvm=true
+        LLVM_VERSION_FOUND=$LLVM_VERSION
+        clean_LLVM
+      else
+        # Better to compile it than use minimum version from repo...
+        _do_compile_llvm=true
+      fi
     fi
   fi
 
@@ -3563,11 +3570,11 @@ install_ARCH() {
     INFO "Forced LLVM building, as requested..."
     _do_compile_llvm=true
   else
-    check_package_version_ge_ARCH llvm $LLVM_VERSION_MIN
+    check_package_version_match_ARCH clang $LLVM_VERSION
     if [ $? -eq 0 ]; then
       install_packages_ARCH llvm clang
       have_llvm=true
-      LLVM_VERSION=`check_package_version_ge_ARCH llvm $LLVM_VERSION_MIN`
+      LLVM_VERSION=`check_package_version_ge_ARCH clang $LLVM_VERSION_MIN`
       LLVM_VERSION_FOUND=$LLVM_VERSION
       clean_LLVM
     else
@@ -3940,15 +3947,17 @@ print_info() {
   PRINT ""
   PRINT "If you're using CMake add this to your configuration flags:"
 
-  _buildargs=""
+  _buildargs="-U *SNDFILE* -U *PYTHON* -U *BOOST* -U *Boost*"
+  _buildargs="$_buildargs -U *OPENCOLORIO* -U *OPENEXR* -U *OPENIMAGEIO* -U *LLVM* -U *CYCLES*"
+  _buildargs="$_buildargs -U *OPENSUBDIV* -U *COLLADA* -U *FFMPEG*"
 
   _1="-D WITH_CODEC_SNDFILE=ON"
   PRINT "  $_1"
-  _buildargs="$_buildargs -U *SNDFILE* $_1"
+  _buildargs="$_buildargs $_1"
 
   _1="-D PYTHON_VERSION=$PYTHON_VERSION_MIN"
   PRINT "  $_1"
-  _buildargs="$_buildargs -U *PYTHON* $_1"
+  _buildargs="$_buildargs $_1"
   if [ -d $INST/python-$PYTHON_VERSION_MIN ]; then
     _1="-D PYTHON_ROOT_DIR=$INST/python-$PYTHON_VERSION_MIN"
     PRINT "  $_1"
@@ -3960,7 +3969,7 @@ print_info() {
     _2="-D Boost_NO_SYSTEM_PATHS=ON"
     PRINT "  $_1"
     PRINT "  $_2"
-    _buildargs="$_buildargs -U *BOOST* -U *Boost* $_1 $_2"
+    _buildargs="$_buildargs $_1 $_2"
   fi
 
   if [ -d $INST/ocio ]; then
@@ -3968,13 +3977,13 @@ print_info() {
     _2="-D OPENCOLORIO_ROOT_DIR=$INST/ocio"
     PRINT "  $_1"
     PRINT "  $_2"
-    _buildargs="$_buildargs -U *OPENCOLORIO* $_1 $_2"
+    _buildargs="$_buildargs $_1 $_2"
   fi
 
   if [ -d $INST/openexr ]; then
     _1="-D OPENEXR_ROOT_DIR=$INST/openexr"
     PRINT "  $_1"
-    _buildargs="$_buildargs -U *OPENEXR* $_1"
+    _buildargs="$_buildargs $_1"
   fi
 
   if [ -d $INST/oiio ]; then
@@ -3982,7 +3991,7 @@ print_info() {
     _2="-D OPENIMAGEIO_ROOT_DIR=$INST/oiio"
     PRINT "  $_1"
     PRINT "  $_2"
-    _buildargs="$_buildargs -U *OPENIMAGEIO* $_1 $_2"
+    _buildargs="$_buildargs $_1 $_2"
   fi
 
   if [ "$OSL_SKIP" = false ]; then
@@ -3992,7 +4001,7 @@ print_info() {
     PRINT "  $_1"
     PRINT "  $_2"
     PRINT "  $_3"
-    _buildargs="$_buildargs -U *LLVM* -U *CYCLES* $_1 $_2 $_3"
+    _buildargs="$_buildargs $_1 $_2 $_3"
     if [ -d $INST/osl ]; then
       _1="-D CYCLES_OSL=$INST/osl"
       PRINT "  $_1"
@@ -4018,13 +4027,13 @@ print_info() {
     _2="-D OPENSUBDIV_ROOT_DIR=$INST/osd"
     PRINT "  $_1"
     PRINT "  $_2"
-    _buildargs="$_buildargs -U *OPENSUBDIV* $_1 $_2"
+    _buildargs="$_buildargs $_1 $_2"
   fi
 
   if [ "$WITH_OPENCOLLADA" = true ]; then
     _1="-D WITH_OPENCOLLADA=ON"
     PRINT "  $_1"
-    _buildargs="$_buildargs -U *COLLADA* $_1"
+    _buildargs="$_buildargs $_1"
   fi
 
   if [ "$FFMPEG_SKIP" = false ]; then
@@ -4032,7 +4041,7 @@ print_info() {
     _2="-D FFMPEG_LIBRARIES='avformat;avcodec;avutil;avdevice;swscale;swresample;lzma;rt;`print_info_ffmpeglink`'"
     PRINT "  $_1"
     PRINT "  $_2"
-    _buildargs="$_buildargs -U *FFMPEG* $_1 $_2"
+    _buildargs="$_buildargs $_1 $_2"
     if [ -d $INST/ffmpeg ]; then
       _1="-D FFMPEG=$INST/ffmpeg"
       PRINT "  $_1"

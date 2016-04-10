@@ -685,6 +685,14 @@ static Sequence *cut_seq_hard(Scene *scene, Sequence *seq, int cutframe)
 	/* First Strip! */
 	/* strips with extended stillfames before */
 	
+	/* Precaution, needed because the length saved on-disk may not match the length saved in the blend file,
+	 * or our code may have minor differences reading file length between versions.
+	 * This causes hard-cut to fail, see: T47862 */
+	if (seq->type != SEQ_TYPE_META) {
+		BKE_sequence_reload_new_file(scene, seq, true);
+		BKE_sequence_calc(scene, seq);
+	}
+
 	if ((seq->startstill) && (cutframe < seq->start)) {
 		/* don't do funny things with METAs ... */
 		if (seq->type == SEQ_TYPE_META) {
@@ -2426,7 +2434,7 @@ void SEQUENCER_OT_images_separate(wmOperatorType *ot)
 	
 	/* api callbacks */
 	ot->exec = sequencer_separate_images_exec;
-	ot->invoke = WM_operator_props_popup;
+	ot->invoke = WM_operator_props_popup_confirm;
 	ot->poll = sequencer_edit_poll;
 	
 	/* flags */

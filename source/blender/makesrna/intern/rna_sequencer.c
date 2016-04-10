@@ -1027,8 +1027,9 @@ static int rna_SequenceModifier_otherSequence_poll(PointerRNA *ptr, PointerRNA v
 	Sequence *seq = sequence_get_by_modifier(ed, ptr->data);
 	Sequence *cur = (Sequence *) value.data;
 
-	if (seq == cur)
+	if ((seq == cur) || (cur->type == SEQ_TYPE_SOUND_RAM)) {
 		return false;
+	}
 
 	return true;
 }
@@ -1044,7 +1045,7 @@ static SequenceModifierData *rna_Sequence_modifier_new(Sequence *seq, bContext *
 		Scene *scene = CTX_data_scene(C);
 		SequenceModifierData *smd;
 
-		smd = BKE_sequence_modifier_new(seq, name, type, scene);
+		smd = BKE_sequence_modifier_new(seq, name, type);
 
 		BKE_sequence_invalidate_cache_for_modifier(scene, seq);
 
@@ -2386,7 +2387,7 @@ static EffectInfo def_effects[] = {
 	{"TransformSequence", "Transform Sequence",
 	 "Sequence strip applying affine transformations to other strips", rna_def_transform, 1},
 	{"WipeSequence", "Wipe Sequence", "Sequence strip creating a wipe transition",
-	 rna_def_wipe, 1},
+	 rna_def_wipe, 2},
 	{"GaussianBlurSequence", "Gaussian Blur Sequence", "Sequence strip creating a gaussian blur",
 	 rna_def_gaussian_blur, 1},
 	{"TextSequence", "Text Sequence", "Sequence strip creating text",

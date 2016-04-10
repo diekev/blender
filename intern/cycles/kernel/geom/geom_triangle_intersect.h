@@ -49,13 +49,12 @@ typedef struct IsectPrecalc {
 	float Sx, Sy, Sz;
 } IsectPrecalc;
 
-#if defined(__KERNEL_CUDA__)
-ccl_device_inline
-#elif defined(__KERNEL_OPENCL_APPLE__)
+#if (defined(__KERNEL_OPENCL_APPLE__)) || \
+    (defined(__KERNEL_CUDA__) && (defined(i386) || defined(_M_IX86)))
 ccl_device_noinline
-#else  /* defined(__KERNEL_OPENCL_APPLE__) */
+#else
 ccl_device_inline
-#endif  /* defined(__KERNEL_OPENCL_APPLE__) */
+#endif
 void triangle_intersect_precalc(float3 dir,
                                 IsectPrecalc *isect_precalc)
 {
@@ -317,11 +316,11 @@ ccl_device_inline float3 triangle_refine(KernelGlobals *kg,
 		if(UNLIKELY(t == 0.0f)) {
 			return P;
 		}
-#ifdef __OBJECT_MOTION__
+#  ifdef __OBJECT_MOTION__
 		Transform tfm = ccl_fetch(sd, ob_itfm);
-#else
+#  else
 		Transform tfm = object_fetch_transform(kg, isect->object, OBJECT_INVERSE_TRANSFORM);
-#endif
+#  endif
 
 		P = transform_point(&tfm, P);
 		D = transform_direction(&tfm, D*t);
@@ -343,11 +342,11 @@ ccl_device_inline float3 triangle_refine(KernelGlobals *kg,
 	P = P + D*rt;
 
 	if(isect->object != OBJECT_NONE) {
-#ifdef __OBJECT_MOTION__
+#  ifdef __OBJECT_MOTION__
 		Transform tfm = ccl_fetch(sd, ob_tfm);
-#else
+#  else
 		Transform tfm = object_fetch_transform(kg, isect->object, OBJECT_TRANSFORM);
-#endif
+#  endif
 
 		P = transform_point(&tfm, P);
 	}
