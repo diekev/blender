@@ -1554,6 +1554,11 @@ typedef struct LevelSetFilter {
 #define LVLSETFILTER_CURRENT 1
 #define LVLSETFILTER_MUTE	 2
 
+enum {
+	SOURCE_TYPE_PARTICLES,
+	SOURCE_TYPE_OBJECT,
+};
+
 typedef struct ParticleMesherModifierData {
 	ModifierData modifier;
 
@@ -1561,6 +1566,7 @@ typedef struct ParticleMesherModifierData {
 	struct ParticleList *part_list; /* OpenVDB particle list */
 	struct OpenVDBPrimitive *level_set, *mesher_mask;
 	struct Object *mesher_mask_ob;
+	struct Object *source_ob;
 	ListBase filters;
 
 	/* particles converter options */
@@ -1583,7 +1589,8 @@ typedef struct ParticleMesherModifierData {
 	short invert_mask;
 
 	/* Padding */
-	short draw_vdb_tree;
+	char draw_vdb_tree;
+	char source;
 } ParticleMesherModifierData;
 
 enum {

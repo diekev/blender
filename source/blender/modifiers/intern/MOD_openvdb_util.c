@@ -102,6 +102,31 @@ static void populate_particle_list(ParticleMesherModifierData *pmmd, Scene *scen
 	}
 }
 
+static void populate_vertex_list(ParticleMesherModifierData *pmmd, Scene *scene, Object *ob)
+{
+	DerivedMesh *dm = pmmd->source_ob->derivedFinal;
+
+	if (!dm) {
+		return;
+	}
+
+	float vel[3];
+	zero_v3(vel);
+
+	const int totpoint = dm->getNumVerts(dm);
+
+	for (int i = 0; i < totpoint; i++) {
+		float pos[3];
+		MVert vert;
+
+		dm->getVert(dm, i, &vert);
+
+		mul_v3_m4v3(pos, ob->imat, vert.co);
+
+		OpenVDB_add_particle(pmmd->part_list, pos, 1.0f, vel);
+	}
+}
+
 static void compute_vdb_prim_matrix(struct Object *ob,
                                     struct OpenVDBPrimitive *level_set,
                                     const float voxel_size)
@@ -233,11 +258,21 @@ DerivedMesh *NewParticleDerivedMesh(DerivedMesh *dm, struct Object *ob,
 	compute_vdb_prim_matrix(ob, pmmd->level_set, pmmd->voxel_size);
 
 	/* Generate a particle list */
-	pmmd->part_list = OpenVDB_create_part_list(pmmd->psys->totpart,
-	                                           pmmd->part_scale_factor,
-	                                           pmmd->part_vel_factor);
 
-	populate_particle_list(pmmd, scene, ob);
+	if (pmmd->source == SOURCE_TYPE_PARTICLES) {
+		pmmd->part_list = OpenVDB_create_part_list(pmmd->psys->totpart,
+		                                           pmmd->part_scale_factor,
+		                                           pmmd->part_vel_factor);
+
+		populate_particle_list(pmmd, scene, ob);
+	}
+	else {
+		pmmd->part_list = OpenVDB_create_part_list(1000,
+		                                           pmmd->part_scale_factor,
+		                                           pmmd->part_vel_factor);
+
+		populate_vertex_list(pmmd, scene, ob);
+	}
 
 	if (pmmd->generate_mask) {
 		filter_mask = OpenVDBPrimitive_create_level_set(pmmd->voxel_size, pmmd->half_width);

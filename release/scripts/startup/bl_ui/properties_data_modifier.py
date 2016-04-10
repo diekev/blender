@@ -1464,8 +1464,15 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
             return
 
         row = layout.row()
-        row.label(text="Particle System:")
-        row.prop_search(md, "particle_system", ob, "particle_systems", text="")
+        row.prop(md, "source")
+
+        if md.source == 'PARTICLES':
+            row.label(text="Particle System:")
+            row.prop_search(md, "particle_system", ob, "particle_systems", text="")
+        else:
+            row.label(text="Object")
+            row.prop(md, "source_object", text="")
+
         layout.separator()
 
         split = layout.split()

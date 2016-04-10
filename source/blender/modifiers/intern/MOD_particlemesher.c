@@ -90,7 +90,10 @@ static bool isDisabled(ModifierData *md, int useRenderParams)
 {
 	ParticleMesherModifierData *pmmd = (ParticleMesherModifierData *) md;
 
-	return !pmmd->psys;
+	if (pmmd->source == SOURCE_TYPE_PARTICLES)
+		return !pmmd->psys;
+
+	return !pmmd->source_ob;
 
 	UNUSED_VARS(useRenderParams);
 }

@@ -4929,6 +4929,25 @@ static void rna_def_modifier_particlemesher(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Leaves", "Draw leaf nodes");
 	RNA_def_property_update(prop, NC_OBJECT | ND_DRAW, NULL);
 
+	static EnumPropertyItem part_mesher_source_items[] = {
+		{ SOURCE_TYPE_PARTICLES, "PARTICLES", 0, "Particles", "" },
+		{ SOURCE_TYPE_OBJECT, "OBJECT", 0, "Object", "" },
+		{ 0, NULL, 0, NULL, NULL }
+	};
+
+	prop = RNA_def_property(srna, "source", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "source");
+	RNA_def_property_enum_items(prop, part_mesher_source_items);
+	RNA_def_property_ui_text(prop, "Source", "");
+	RNA_def_property_update(prop, 0, "rna_Modifier_update");
+
+	prop = RNA_def_property(srna, "source_object", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "source_ob");
+	RNA_def_property_struct_type(prop, "Object");
+	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_SELF_CHECK);
+	RNA_def_property_ui_text(prop, "Object", "Object whose vertices are used for meshing");
+	RNA_def_property_update(prop, NC_OBJECT | ND_MODIFIER, "rna_Modifier_dependency_update");
+
 	rna_def_level_set_filter(brna);
 }
 
