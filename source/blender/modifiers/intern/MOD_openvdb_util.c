@@ -48,61 +48,65 @@ static void populate_particle_list(ParticleMesherModifierData *pmmd, Scene *scen
 {
 	ParticleSystem *psys = pmmd->psys;
 
-	if (psys) {
-		ParticleSimulationData sim;
-		ParticleKey state;
-		int p;
+	if (!psys) {
+		return;
+	}
 
-		if (psys->part->size > 0.0f) {
-//			part_list.has_radius(true);
+	ParticleSimulationData sim;
+	ParticleKey state;
+
+	/* TODO */
+#if 0
+	if (psys->part->size > 0.0f) {
+		part_list.has_radius(true);
+	}
+
+	/* TODO(kevin): this isn't right at all */
+	if (psys->part->normfac > 0.0f) {
+		part_list.has_velocity(true);
+	}
+#endif
+
+	sim.scene = scene;
+	sim.ob = ob;
+	sim.psys = psys;
+
+	psys->lattice_deform_data = psys_create_lattice_deform_data(&sim);
+
+	for (int p = 0; p < psys->totpart; p++) {
+		float pos[3], vel[3];
+
+		if (psys->particles[p].flag & (PARS_NO_DISP | PARS_UNEXIST)) {
+			continue;
 		}
 
-		/* TODO(kevin): this isn't right at all */
-		if (psys->part->normfac > 0.0f) {
-//			part_list.has_velocity(true);
+		state.time = BKE_scene_frame_get(scene);
+
+		if (psys_get_particle_state(&sim, p, &state, 0) == 0) {
+			continue;
 		}
 
-		sim.scene = scene;
-		sim.ob = ob;
-		sim.psys = psys;
+		/* location */
+		mul_v3_m4v3(pos, ob->imat, state.co);
 
-		psys->lattice_deform_data = psys_create_lattice_deform_data(&sim);
+		/* velocity */
+		sub_v3_v3v3(vel, state.co, psys->particles[p].prev_state.co);
 
-		for (p = 0; p < psys->totpart; p++) {
-			float pos[3], vel[3];
+		mul_v3_fl(vel, psys->part->normfac);
 
-			if (psys->particles[p].flag & (PARS_NO_DISP | PARS_UNEXIST)) {
-				continue;
-			}
+		OpenVDB_add_particle(pmmd->part_list,
+		                     pos,
+		                     psys->particles[p].size,
+		                     vel);
+	}
 
-			state.time = BKE_scene_frame_get(scene);
-
-			if (psys_get_particle_state(&sim, p, &state, 0) == 0) {
-				continue;
-			}
-
-			/* location */
-			mul_v3_m4v3(pos, ob->imat, state.co);
-
-			/* velocity */
-			sub_v3_v3v3(vel, state.co, psys->particles[p].prev_state.co);
-
-			mul_v3_fl(vel, psys->part->normfac);
-
-			OpenVDB_add_particle(pmmd->part_list,
-			                     pos,
-			                     psys->particles[p].size,
-			                     vel);
-		}
-
-		if (psys->lattice_deform_data) {
-			end_latt_deform(psys->lattice_deform_data);
-			psys->lattice_deform_data = NULL;
-		}
+	if (psys->lattice_deform_data) {
+		end_latt_deform(psys->lattice_deform_data);
+		psys->lattice_deform_data = NULL;
 	}
 }
 
-static void populate_vertex_list(ParticleMesherModifierData *pmmd, Scene *scene, Object *ob)
+static void populate_vertex_list(ParticleMesherModifierData *pmmd, Object *ob)
 {
 	DerivedMesh *dm = pmmd->source_ob->derivedFinal;
 
@@ -144,32 +148,26 @@ static void compute_vdb_prim_matrix(struct Object *ob,
 
 static struct OpenVDBGeom *VDBGeom_from_DerivedMesh(Object *ob, DerivedMesh *dm)
 {
-	struct OpenVDBGeom *geom = NULL;
-	MVert *mverts;
-	MPoly *mpolys;
-	MLoop *mloops;
 	const int num_verts = dm->getNumVerts(dm);
 	const int num_polys = dm->getNumPolys(dm);
-	int i;
 
-	geom = OpenVDBGeom_create(num_verts, num_polys);
+	struct OpenVDBGeom *geom = OpenVDBGeom_create(num_verts, num_polys);
 
-	mverts = dm->getVertArray(dm);
-	for (i = 0; i < num_verts; i++) {
+	MVert *mverts = dm->getVertArray(dm);
+	for (int i = 0; i < num_verts; i++) {
 		float coord[3];
 		mul_v3_m4v3(coord, ob->obmat,  mverts[i].co);
 		OpenVDBGeom_add_point(geom, coord);
 	}
 
-	mpolys = dm->getPolyArray(dm);
-	mloops = dm->getLoopArray(dm);
-	for (i = 0; i < num_polys; i++) {
+	MPoly *mpolys = dm->getPolyArray(dm);
+	MLoop *mloops = dm->getLoopArray(dm);
+	for (int i = 0; i < num_polys; i++) {
 		MPoly *poly = &mpolys[i];
 		MLoop *loop = mloops + poly->loopstart;
 		int quad[4] = { INT_MAX };
-		int j;
 
-		for (j = 0; j < poly->totloop; j++) {
+		for (int j = 0; j < poly->totloop; j++) {
 			quad[j] = loop->v;
 		}
 
@@ -181,34 +179,29 @@ static struct OpenVDBGeom *VDBGeom_from_DerivedMesh(Object *ob, DerivedMesh *dm)
 
 static DerivedMesh *DerivedMesh_from_VDBGeom(struct OpenVDBGeom *geom, Object *ob)
 {
-	DerivedMesh *dm = NULL;
-	MVert *mverts;
-	MPoly *mpolys;
-	MLoop *mloops;
-	int num_verts = OpenVDBGeom_get_num_points(geom);
-	int num_quads = OpenVDBGeom_get_num_quads(geom);
-	int num_tris = OpenVDBGeom_get_num_tris(geom);
-	int num_polys = num_tris + num_quads;
-	int num_loops = num_tris * 3 + num_quads * 4;
-	int i, loop_index = 0, poly_index = 0;
+	const int num_verts = OpenVDBGeom_get_num_points(geom);
+	const int num_quads = OpenVDBGeom_get_num_quads(geom);
+	const int num_tris = OpenVDBGeom_get_num_tris(geom);
+	const int num_polys = num_tris + num_quads;
+	const int num_loops = num_tris * 3 + num_quads * 4;
+	int loop_index = 0, poly_index = 0;
 
-	dm = CDDM_new(num_verts, 0, 0, num_loops, num_polys);
-	mverts = dm->getVertArray(dm);
-	mpolys = dm->getPolyArray(dm);
-	mloops = dm->getLoopArray(dm);
+	DerivedMesh *dm = CDDM_new(num_verts, 0, 0, num_loops, num_polys);
+	MVert *mverts = dm->getVertArray(dm);
+	MPoly *mpolys = dm->getPolyArray(dm);
+	MLoop *mloops = dm->getLoopArray(dm);
 
-	for (i = 0; i < num_verts; i++) {
+	for (int i = 0; i < num_verts; i++) {
 		OpenVDBGeom_get_point(geom, i, mverts[i].co);
 	}
 
-	for (i = 0; i < num_quads; i++, poly_index++) {
+	for (int i = 0; i < num_quads; i++, poly_index++) {
 		MPoly *poly = &mpolys[poly_index];
 		int start_loop_index = loop_index;
 		int quad[4];
-		int j;
 
 		OpenVDBGeom_get_quad(geom, i, quad);
-		for (j = 0; j < 4; j++) {
+		for (int j = 0; j < 4; j++) {
 			MLoop *loop = &mloops[loop_index++];
 			loop->v = quad[j];
 		}
@@ -218,14 +211,13 @@ static DerivedMesh *DerivedMesh_from_VDBGeom(struct OpenVDBGeom *geom, Object *o
 		poly->flag |= ME_SMOOTH;
 	}
 
-	for (i = 0; i < num_tris; i++, poly_index++) {
+	for (int i = 0; i < num_tris; i++, poly_index++) {
 		MPoly *poly = &mpolys[poly_index];
 		int start_loop_index = loop_index;
 		int triangle[3];
-		int j;
 
 		OpenVDBGeom_get_triangle(geom, i, triangle);
-		for (j = 0; j < 3; j++) {
+		for (int j = 0; j < 3; j++) {
 			MLoop *loop = &mloops[loop_index++];
 			loop->v = triangle[j];
 		}
@@ -239,17 +231,14 @@ static DerivedMesh *DerivedMesh_from_VDBGeom(struct OpenVDBGeom *geom, Object *o
 	dm->dirty |= DM_DIRTY_NORMALS;
 
 	return dm;
+
+	UNUSED_VARS(ob);
 }
 
 DerivedMesh *NewParticleDerivedMesh(DerivedMesh *dm, struct Object *ob,
 									DerivedMesh *cutter_dm, struct Object *cutter_ob,
 									ParticleMesherModifierData *pmmd, Scene *scene)
 {
-	struct OpenVDBPrimitive *filter_mask = NULL;
-	struct OpenVDBGeom *mask_geom = NULL, *output_geom = NULL;
-	LevelSetFilter *filter = NULL;
-	DerivedMesh *output_dm = NULL;
-
 	if (dm == NULL) {
 		return NULL;
 	}
@@ -271,9 +260,10 @@ DerivedMesh *NewParticleDerivedMesh(DerivedMesh *dm, struct Object *ob,
 		                                           pmmd->part_scale_factor,
 		                                           pmmd->part_vel_factor);
 
-		populate_vertex_list(pmmd, scene, ob);
+		populate_vertex_list(pmmd, ob);
 	}
 
+	struct OpenVDBPrimitive *filter_mask = NULL;
 	if (pmmd->generate_mask) {
 		filter_mask = OpenVDBPrimitive_create_level_set(pmmd->voxel_size, pmmd->half_width);
 	}
@@ -285,7 +275,7 @@ DerivedMesh *NewParticleDerivedMesh(DerivedMesh *dm, struct Object *ob,
 	                       pmmd->generate_trails, pmmd->trail_size);
 
 	/* Apply some filters to the level set */
-	for (filter = pmmd->filters.first; filter; filter = filter->next) {
+	for (LevelSetFilter *filter = pmmd->filters.first; filter; filter = filter->next) {
 		if (!(filter->flag & LVLSETFILTER_MUTE)) {
 			OpenVDB_filter_level_set(pmmd->level_set, filter_mask,
 			                         filter->accuracy, filter->type,
@@ -295,6 +285,7 @@ DerivedMesh *NewParticleDerivedMesh(DerivedMesh *dm, struct Object *ob,
 	}
 
 	/* Convert the level set to a mesh and output it */
+	struct OpenVDBGeom *mask_geom = NULL;
 	if (cutter_dm != NULL) {
 		mask_geom = VDBGeom_from_DerivedMesh(cutter_ob, cutter_dm);
 
@@ -309,8 +300,11 @@ DerivedMesh *NewParticleDerivedMesh(DerivedMesh *dm, struct Object *ob,
 		}
 	}
 
-	output_geom = OpenVDB_to_polygons(pmmd->level_set, pmmd->mesher_mask, pmmd->isovalue, pmmd->adaptivity, pmmd->mask_offset, pmmd->invert_mask);
-	output_dm = DerivedMesh_from_VDBGeom(output_geom, ob);
+	struct OpenVDBGeom *output_geom = OpenVDB_to_polygons(
+	            pmmd->level_set, pmmd->mesher_mask, pmmd->isovalue,
+	            pmmd->adaptivity, pmmd->mask_offset, pmmd->invert_mask);
+
+	DerivedMesh *output_dm = DerivedMesh_from_VDBGeom(output_geom, ob);
 	OpenVDBGeom_free(output_geom);
 
 	output_dm->cd_flag |= dm->cd_flag;

@@ -74,6 +74,8 @@ static void initData(ModifierData *md)
 	pmmd->ext_band = 3.0f;
 	pmmd->int_band = 3.0f;
 	pmmd->draw_vdb_tree = (VDB_DRAW_LEAVES | VDB_DRAW_LEVEL_1 | VDB_DRAW_LEVEL_2 | VDB_DRAW_ROOT);
+	pmmd->source = SOURCE_TYPE_PARTICLES;
+	pmmd->source_ob = NULL;
 }
 
 static void copyData(ModifierData *md, ModifierData *target)
@@ -90,8 +92,9 @@ static bool isDisabled(ModifierData *md, int useRenderParams)
 {
 	ParticleMesherModifierData *pmmd = (ParticleMesherModifierData *) md;
 
-	if (pmmd->source == SOURCE_TYPE_PARTICLES)
+	if (pmmd->source == SOURCE_TYPE_PARTICLES) {
 		return !pmmd->psys;
+	}
 
 	return !pmmd->source_ob;
 
