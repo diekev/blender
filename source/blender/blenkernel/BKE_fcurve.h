@@ -93,7 +93,11 @@ void bezt_add_to_cfra_elem(ListBase *lb, struct BezTriple *bezt);
 void fcurve_free_driver(struct FCurve *fcu);
 struct ChannelDriver *fcurve_copy_driver(struct ChannelDriver *driver);
 
-void driver_free_variable(struct ChannelDriver *driver, struct DriverVar *dvar);
+void driver_variables_copy(struct ListBase *dst_list, const struct ListBase *src_list);
+
+void driver_free_variable(struct ListBase *variables, struct DriverVar *dvar);
+void driver_free_variable_ex(struct ChannelDriver *driver, struct DriverVar *dvar);
+
 void driver_change_variable_type(struct DriverVar *dvar, int type);
 void driver_variable_name_validate(struct DriverVar *dvar);
 struct DriverVar *driver_add_new_variable(struct ChannelDriver *driver);
@@ -275,7 +279,7 @@ void correct_bezpart(float v1[2], float v2[2], float v3[2], float v4[2]);
 /* evaluate fcurve */
 float evaluate_fcurve(struct FCurve *fcu, float evaltime);
 /* evaluate fcurve and store value */
-void calculate_fcurve(struct FCurve *fcu, float ctime);
+float calculate_fcurve(struct FCurve *fcu, float evaltime);
 
 /* ************* F-Curve Samples API ******************** */
 

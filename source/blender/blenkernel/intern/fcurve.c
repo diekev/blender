@@ -1600,8 +1600,8 @@ static const DriverVarTypeInfo *get_dvar_typeinfo(int type)
 
 /* Driver API --------------------------------- */
 
-/* This frees the driver variable itself */
-void driver_free_variable(ChannelDriver *driver, DriverVar *dvar)
+/* Perform actual freeing driver variable and remove it from the given list */
+void driver_free_variable(ListBase *variables, DriverVar *dvar)
 {
 	/* sanity checks */
 	if (dvar == NULL)
@@ -1621,13 +1621,38 @@ void driver_free_variable(ChannelDriver *driver, DriverVar *dvar)
 	DRIVER_TARGETS_LOOPER_END
 	
 	/* remove the variable from the driver */
-	BLI_freelinkN(&driver->variables, dvar);
+	BLI_freelinkN(variables, dvar);
+}
 
+/* Free the driver variable and do extra updates */
+void driver_free_variable_ex(ChannelDriver *driver, DriverVar *dvar)
+{
+	/* remove and free the driver variable */
+	driver_free_variable(&driver->variables, dvar);
+	
 #ifdef WITH_PYTHON
 	/* since driver variables are cached, the expression needs re-compiling too */
 	if (driver->type == DRIVER_TYPE_PYTHON)
 		driver->flag |= DRIVER_FLAG_RENAMEVAR;
 #endif
+}
+
+/* Copy driver variables from src_vars list to dst_vars list */
+void driver_variables_copy(ListBase *dst_vars, const ListBase *src_vars)
+{
+	BLI_assert(BLI_listbase_is_empty(dst_vars));
+	BLI_duplicatelist(dst_vars, src_vars);
+	
+	for (DriverVar *dvar = dst_vars->first; dvar; dvar = dvar->next) {
+		/* need to go over all targets so that we don't leave any dangling paths */
+		DRIVER_TARGETS_LOOPER(dvar) 
+		{
+			/* make a copy of target's rna path if available */
+			if (dtar->rna_path)
+				dtar->rna_path = MEM_dupallocN(dtar->rna_path);
+		}
+		DRIVER_TARGETS_LOOPER_END
+	}
 }
 
 /* Change the type of driver variable */
@@ -1770,7 +1795,7 @@ void fcurve_free_driver(FCurve *fcu)
 	/* free driver targets */
 	for (dvar = driver->variables.first; dvar; dvar = dvarn) {
 		dvarn = dvar->next;
-		driver_free_variable(driver, dvar);
+		driver_free_variable_ex(driver, dvar);
 	}
 
 #ifdef WITH_PYTHON
@@ -1788,7 +1813,6 @@ void fcurve_free_driver(FCurve *fcu)
 ChannelDriver *fcurve_copy_driver(ChannelDriver *driver)
 {
 	ChannelDriver *ndriver;
-	DriverVar *dvar;
 	
 	/* sanity checks */
 	if (driver == NULL)
@@ -1799,19 +1823,8 @@ ChannelDriver *fcurve_copy_driver(ChannelDriver *driver)
 	ndriver->expr_comp = NULL;
 	
 	/* copy variables */
-	BLI_listbase_clear(&ndriver->variables);
-	BLI_duplicatelist(&ndriver->variables, &driver->variables);
-	
-	for (dvar = ndriver->variables.first; dvar; dvar = dvar->next) {
-		/* need to go over all targets so that we don't leave any dangling paths */
-		DRIVER_TARGETS_LOOPER(dvar) 
-		{
-			/* make a copy of target's rna path if available */
-			if (dtar->rna_path)
-				dtar->rna_path = MEM_dupallocN(dtar->rna_path);
-		}
-		DRIVER_TARGETS_LOOPER_END
-	}
+	BLI_listbase_clear(&ndriver->variables); /* to get rid of refs to non-copied data (that's still used on original) */ 
+	driver_variables_copy(&ndriver->variables, &driver->variables);
 	
 	/* return the new driver */
 	return ndriver;
@@ -2658,7 +2671,7 @@ float evaluate_fcurve(FCurve *fcu, float evaltime)
 }
 
 /* Calculate the value of the given F-Curve at the given frame, and set its curval */
-void calculate_fcurve(FCurve *fcu, float ctime)
+float calculate_fcurve(FCurve *fcu, float evaltime)
 {
 	/* only calculate + set curval (overriding the existing value) if curve has 
 	 * any data which warrants this...
@@ -2667,7 +2680,12 @@ void calculate_fcurve(FCurve *fcu, float ctime)
 	    list_has_suitable_fmodifier(&fcu->modifiers, 0, FMI_TYPE_GENERATE_CURVE))
 	{
 		/* calculate and set curval (evaluates driver too if necessary) */
-		fcu->curval = evaluate_fcurve(fcu, ctime);
+		float curval = evaluate_fcurve(fcu, evaltime);
+		fcu->curval = curval;  /* debug display only, not thread safe! */
+		return curval;
+	}
+	else {
+		return 0.0f;
 	}
 }
 
