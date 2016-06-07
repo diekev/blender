@@ -60,7 +60,7 @@
 
 #include "PIL_time.h"
 
-#include "BKE_blender.h"
+#include "BKE_blender_undo.h"
 #include "BKE_brush.h"
 #include "BKE_colortools.h"
 #include "BKE_context.h"
@@ -634,6 +634,15 @@ PointerRNA *ui_handle_afterfunc_add_operator(wmOperatorType *ot, int opcontext, 
 	return ptr;
 }
 
+/**
+ * Check if a #uiAfterFunc is needed for this button.
+ */
+static bool ui_afterfunc_check(const uiBlock *block, const uiBut *but)
+{
+	return (but->func || but->funcN || but->rename_func || but->optype || but->rnaprop || block->handle_func ||
+	        (but->type == UI_BTYPE_BUT_MENU && block->butm_func));
+}
+
 static void ui_apply_but_func(bContext *C, uiBut *but)
 {
 	uiAfterFunc *after;
@@ -643,9 +652,7 @@ static void ui_apply_but_func(bContext *C, uiBut *but)
 	 * handling is done, i.e. menus are closed, in order to avoid conflicts
 	 * with these functions removing the buttons we are working with */
 
-	if (but->func || but->funcN || block->handle_func || but->rename_func ||
-	    (but->type == UI_BTYPE_BUT_MENU && block->butm_func) || but->optype || but->rnaprop)
-	{
+	if (ui_afterfunc_check(block, but)) {
 		after = ui_afterfunc_new();
 
 		if (but->func && ELEM(but, but->func_arg1, but->func_arg2)) {
@@ -899,7 +906,8 @@ static void ui_apply_but_TEX(bContext *C, uiBut *but, uiHandleButtonData *data)
 		 * having typed something already. */
 		but->rename_orig = BLI_strdup(data->origstr);
 	}
-	else {
+	/* only if there are afterfuncs, otherwise 'renam_orig' isn't freed */
+	else if (ui_afterfunc_check(but->block, but)) {
 		but->rename_orig = data->origstr;
 		data->origstr = NULL;
 	}
@@ -2945,18 +2953,6 @@ static bool ui_textedit_copypaste(uiBut *but, uiHandleButtonData *data, const in
 }
 
 #ifdef WITH_INPUT_IME
-/* test if the translation context allows IME input - used to
- * avoid weird character drawing if IME inputs non-ascii chars */
-static bool ui_ime_is_lang_supported(void)
-{
-	const char *uilng = BLT_lang_get();
-	const bool is_lang_supported = STREQ(uilng, "zh_CN") ||
-	                               STREQ(uilng, "zh_TW") ||
-	                               STREQ(uilng, "ja_JP");
-
-	return ((U.transopts & USER_DOTRANSLATE) && is_lang_supported);
-}
-
 /* enable ime, and set up uibut ime data */
 static void ui_textedit_ime_begin(wmWindow *win, uiBut *UNUSED(but))
 {
@@ -3078,7 +3074,7 @@ static void ui_textedit_begin(bContext *C, uiBut *but, uiHandleButtonData *data)
 	WM_cursor_modal_set(win, BC_TEXTEDITCURSOR);
 
 #ifdef WITH_INPUT_IME
-	if (is_num_but == false && ui_ime_is_lang_supported()) {
+	if (is_num_but == false && BLT_lang_is_ime_supported()) {
 		ui_textedit_ime_begin(win, but);
 	}
 #endif
@@ -3405,7 +3401,7 @@ static void ui_do_but_textedit(bContext *C, uiBlock *block, uiBut *but, uiHandle
 #ifdef WITH_INPUT_IME
 		    &&
 		    !is_ime_composing &&
-		    !WM_event_is_ime_switch(event)
+		    (!WM_event_is_ime_switch(event) || !BLT_lang_is_ime_supported())
 #endif
 		    )
 		{
@@ -6537,7 +6533,6 @@ static void menu_add_shortcut_cancel(struct bContext *C, void *arg1)
 static void popup_change_shortcut_func(bContext *C, void *arg1, void *UNUSED(arg2))
 {
 	uiBut *but = (uiBut *)arg1;
-	UI_but_tooltip_timer_remove(C, but);
 	UI_popup_block_invoke(C, menu_change_shortcut, but);
 }
 
@@ -6559,7 +6554,6 @@ static void remove_shortcut_func(bContext *C, void *arg1, void *UNUSED(arg2))
 static void popup_add_shortcut_func(bContext *C, void *arg1, void *UNUSED(arg2))
 {
 	uiBut *but = (uiBut *)arg1;
-	UI_but_tooltip_timer_remove(C, but);
 	UI_popup_block_ex(C, menu_add_shortcut, NULL, menu_add_shortcut_cancel, but);
 }
 
@@ -6608,8 +6602,6 @@ static bool ui_but_menu(bContext *C, uiBut *but)
 		return false;
 	}
 	
-	UI_but_tooltip_timer_remove(C, but);
-
 	/* highly unlikely getting the label ever fails */
 	UI_but_string_info_get(C, but, &label, NULL);
 
@@ -6778,10 +6770,19 @@ static bool ui_but_menu(bContext *C, uiBut *but)
 			        ICON_NONE, "UI_OT_unset_property_button");
 		}
 		
+		if (is_array_component) {
+			uiItemBooleanO(layout, CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Copy All To Selected"),
+			               ICON_NONE, "UI_OT_copy_to_selected_button", "all", true);
+			uiItemBooleanO(layout, CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Copy Single To Selected"),
+			               ICON_NONE, "UI_OT_copy_to_selected_button", "all", false);
+		}
+		else {
+			uiItemBooleanO(layout, CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Copy To Selected"),
+		                   ICON_NONE, "UI_OT_copy_to_selected_button", "all", true);
+		}
+
 		uiItemO(layout, CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Copy Data Path"),
 		        ICON_NONE, "UI_OT_copy_data_path_button");
-		uiItemO(layout, CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Copy To Selected"),
-		        ICON_NONE, "UI_OT_copy_to_selected_button");
 
 		uiItemS(layout);
 	}
@@ -7378,7 +7379,6 @@ static void ui_blocks_set_tooltips(ARegion *ar, const bool enable)
 
 static bool ui_region_contains_point_px(ARegion *ar, int x, int y)
 {
-	uiBlock *block = ar->uiblocks.first;
 	rcti winrct;
 
 	/* scale down area rect to exclude shadow */
@@ -7386,7 +7386,7 @@ static bool ui_region_contains_point_px(ARegion *ar, int x, int y)
 
 	/* check if the mouse is in the region */
 	if (!BLI_rcti_isect_pt(&winrct, x, y)) {
-		for (block = ar->uiblocks.first; block; block = block->next)
+		for (uiBlock *block = ar->uiblocks.first; block; block = block->next)
 			block->auto_open = false;
 		
 		return false;
@@ -7879,6 +7879,19 @@ static void button_activate_exit(
 		/* autokey & undo push */
 		ui_apply_but_undo(but);
 		ui_apply_but_autokey(C, but);
+
+#ifdef USE_ALLSELECT
+		{
+			/* only RNA from this button is used */
+			uiBut but_temp = *but;
+			uiSelectContextStore  *selctx_data = &data->select_others;
+			for (int i = 0; i < selctx_data->elems_len; i++) {
+				uiSelectContextElem *other = &selctx_data->elems[i];
+				but_temp.rnapoin = other->ptr;
+				ui_apply_but_autokey(C, &but_temp);
+			}
+		}
+#endif
 
 		/* popup menu memory */
 		if (block->flag & UI_BLOCK_POPUP_MEMORY)
@@ -8446,8 +8459,8 @@ static int ui_handle_list_event(bContext *C, const wmEvent *event, ARegion *ar, 
 	}
 
 	if (val == KM_PRESS) {
-		if (ELEM(type, UPARROWKEY, DOWNARROWKEY) ||
-		    ((ELEM(type, WHEELUPMOUSE, WHEELDOWNMOUSE) && event->ctrl)))
+		if ((ELEM(type, UPARROWKEY, DOWNARROWKEY) && !IS_EVENT_MOD(event, shift, ctrl, alt, oskey)) ||
+		    ((ELEM(type, WHEELUPMOUSE, WHEELDOWNMOUSE) && event->ctrl && !IS_EVENT_MOD(event, shift, alt, oskey))))
 		{
 			const int value_orig = RNA_property_int_get(&listbox->rnapoin, listbox->rnaprop);
 			int value, min, max, inc;
@@ -9818,8 +9831,16 @@ static int ui_region_handler(bContext *C, const wmEvent *event, void *UNUSED(use
 
 	retval = ui_handler_panel_region(C, event, ar, listbox ? listbox : but);
 
-	if (retval == WM_UI_HANDLER_CONTINUE && listbox)
+	if (retval == WM_UI_HANDLER_CONTINUE && listbox) {
 		retval = ui_handle_list_event(C, event, ar, listbox);
+
+		/* interactions with the listbox should disable tips */
+		if (retval == WM_UI_HANDLER_BREAK) {
+			if (but) {
+				UI_but_tooltip_timer_remove(C, but);
+			}
+		}
+	}
 
 	if (retval == WM_UI_HANDLER_CONTINUE) {
 		if (but)
