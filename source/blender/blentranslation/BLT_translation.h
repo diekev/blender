@@ -147,6 +147,7 @@ bool BLT_lang_is_ime_supported(void);
 #define BLT_I18NCONTEXT_ID_TEXTURE              "Texture"
 #define BLT_I18NCONTEXT_ID_TEXT                 "Text"
 #define BLT_I18NCONTEXT_ID_VFONT                "VFont"
+#define BLT_I18NCONTEXT_ID_VOLUME               "Volume"
 #define BLT_I18NCONTEXT_ID_WORLD                "World"
 #define BLT_I18NCONTEXT_ID_WINDOWMANAGER        "WindowManager"
 #define BLT_I18NCONTEXT_ID_MOVIECLIP            "MovieClip"
