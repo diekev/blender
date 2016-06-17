@@ -49,6 +49,7 @@ class ParticleList {
 public:
 	/* Required for bucketing */
 	typedef openvdb::math::Vec3s value_type;
+	typedef openvdb::math::Vec3s PosType;
 
 	ParticleList() = default;
 
