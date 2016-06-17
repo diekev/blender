@@ -30,5 +30,5 @@ void main()
 	float w = 0.5 * (1.0 + dot(normalized_normal, vec3(0.0, 1.0, 0.0)));
 	vec4 color = w * soot + (1.0 - w) * (soot * 0.3);
 
-	gl_FragColor = vec4(normalized_normal, 1.0) * soot;
+	gl_FragColor = vec4(color.rgb, 1.0) * soot;
 }

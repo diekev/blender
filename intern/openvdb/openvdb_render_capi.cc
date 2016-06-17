@@ -41,7 +41,7 @@ float *OpenVDB_get_texture_buffer(struct OpenVDBPrimitive *prim,
 	internal::DenseTextureResOp res_op(res, bbmin, bbmax);
 	internal::process_typed_grid(prim->getConstGridPtr(), storage, res_op);
 
-	const int numcells = res[0] * res[1] * res[2];
+	const size_t numcells = static_cast<size_t>(res[0]) * static_cast<size_t>(res[1]) * static_cast<size_t>(res[2]);
 
 	if (numcells == 0) {
 		return NULL;

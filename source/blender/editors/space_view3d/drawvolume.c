@@ -544,14 +544,14 @@ static void draw_volume_nodes(VolumeDrawNode **nodes, const int num_nodes,
 		return;
 	}
 
-	int invsize_location = GPU_shader_get_uniform(shader, "invsize");
-	int min_location = GPU_shader_get_uniform(shader, "min");
-	int soot_location = GPU_shader_get_uniform(shader, "soot_texture");
-	int indtex_location = GPU_shader_get_uniform(shader, "nodeIndirectionSampler");
-	int first_node_location = GPU_shader_get_uniform(shader, "first_node_index");
-	int max_leaf_location = GPU_shader_get_uniform(shader, "max_leaf_per_node");
-	int max_leaf_atlas_location = GPU_shader_get_uniform(shader, "maxLeafCountPerAtlasDimension");
-	int max_leaf_intern_location = GPU_shader_get_uniform(shader, "maxLeafCountPerInternalNodeDimension");
+	const int invsize_location = GPU_shader_get_uniform(shader, "invsize");
+	const int min_location = GPU_shader_get_uniform(shader, "min_location");
+	const int soot_location = GPU_shader_get_uniform(shader, "soot_texture");
+	const int indtex_location = GPU_shader_get_uniform(shader, "nodeIndirectionSampler");
+	const int first_node_location = GPU_shader_get_uniform(shader, "first_node_index");
+	const int max_leaf_location = GPU_shader_get_uniform(shader, "max_leaf_per_node");
+	const int max_leaf_atlas_location = GPU_shader_get_uniform(shader, "maxLeafCountPerAtlasDimension");
+	const int max_leaf_intern_location = GPU_shader_get_uniform(shader, "maxLeafCountPerInternalNodeDimension");
 
 	VolumeSlicer slicer;
 	slicer.verts = MEM_mallocN(sizeof(float) * 3 * max_points, "smoke_slice_vertices");
@@ -677,12 +677,12 @@ void draw_volume(Object *ob, const float viewnormal[3])
 		return;
 	}
 
-	int soot_location = GPU_shader_get_uniform(shader, "soot_texture");
-	int invsize_location = GPU_shader_get_uniform(shader, "invsize");
-	int ob_sizei_location = GPU_shader_get_uniform(shader, "ob_sizei");
-	int min_location = GPU_shader_get_uniform(shader, "min");
-	int N_location = GPU_shader_get_uniform(shader, "N");
-	int step_size_location = GPU_shader_get_uniform(shader, "step_size");
+	const int soot_location = GPU_shader_get_uniform(shader, "soot_texture");
+	const int invsize_location = GPU_shader_get_uniform(shader, "invsize");
+	const int ob_sizei_location = GPU_shader_get_uniform(shader, "ob_sizei");
+	const int min_location = GPU_shader_get_uniform(shader, "min_location");
+	const int N_location = GPU_shader_get_uniform(shader, "N");
+	const int step_size_location = GPU_shader_get_uniform(shader, "step_size");
 
 	GPUTexture *tex = GPU_texture_create_3D(data->res[0], data->res[1], data->res[2], 1, data->buffer);
 
