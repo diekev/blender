@@ -66,6 +66,7 @@
 #include "DNA_scene_types.h"
 #include "DNA_smoke_types.h"
 #include "DNA_freestyle_types.h"
+#include "DNA_volume_types.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_utildefines.h"
@@ -651,6 +652,12 @@ void BKE_bpath_traverse_id(Main *bmain, ID *id, BPathVisitor visit_cb, const int
 		{
 			MovieClip *clip = (MovieClip *)id;
 			rewrite_path_fixed(clip->name, visit_cb, absbase, bpath_user_data);
+			break;
+		}
+		case ID_VL:
+		{
+			Volume *volume = (Volume *)id;
+			rewrite_path_fixed(volume->filename, visit_cb, absbase, bpath_user_data);
 			break;
 		}
 		default:

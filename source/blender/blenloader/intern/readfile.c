@@ -100,6 +100,7 @@
 #include "DNA_world_types.h"
 #include "DNA_movieclip_types.h"
 #include "DNA_mask_types.h"
+#include "DNA_volume_types.h"
 
 #include "MEM_guardedalloc.h"
 
@@ -2258,6 +2259,25 @@ static PackedFile *direct_link_packedfile(FileData *fd, PackedFile *oldpf)
 	}
 	
 	return pf;
+}
+
+/* ************ READ Volume *************** */
+static void lib_link_volume(FileData *UNUSED(fd), Main *main)
+{
+	Volume *volume;
+
+	/* only link ID pointers */
+	for (volume = main->volumes.first; volume; volume = volume->id.next) {
+		if (volume->id.tag & LIB_TAG_NEED_LINK) {
+			volume->id.tag &= ~LIB_TAG_NEED_LINK;
+		}
+	}
+}
+
+static void direct_link_volume(FileData *fd, Volume *volume)
+{
+	/* palette itself has been read */
+	link_list(fd, &volume->fields);
 }
 
 /* ************ READ ANIMATION STUFF ***************** */
@@ -7896,6 +7916,7 @@ static const char *dataname(short id_code)
 		case ID_MC: return "Data from MC";
 		case ID_MSK: return "Data from MSK";
 		case ID_LS: return "Data from LS";
+		case ID_VL: return "Data from VL";
 	}
 	return "Data from Lib Block";
 	
@@ -8133,6 +8154,9 @@ static BHead *read_libblock(FileData *fd, Main *main, BHead *bhead, const short 
 		case ID_PC:
 			direct_link_paint_curve(fd, (PaintCurve *)id);
 			break;
+		case ID_VL:
+			direct_link_volume(fd, (Volume *)id);
+			break;
 	}
 	
 	oldnewmap_free_unused(fd->datamap);
@@ -8326,6 +8350,7 @@ static void lib_link_all(FileData *fd, Main *main)
 	lib_link_mask(fd, main);
 	lib_link_linestyle(fd, main);
 	lib_link_gpencil(fd, main);
+	lib_link_volume(fd, main);
 
 	lib_link_mesh(fd, main);		/* as last: tpage images with users at zero */
 	

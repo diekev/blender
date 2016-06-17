@@ -80,6 +80,7 @@ EnumPropertyItem rna_enum_id_type_items[] = {
 	{ID_TE, "TEXTURE", ICON_TEXTURE_DATA, "Texture", ""},
 	{ID_WM, "WINDOWMANAGER", ICON_FULLSCREEN, "Window Manager", ""},
 	{ID_WO, "WORLD", ICON_WORLD_DATA, "World", ""},
+    {ID_VL, "VOLUME", ICON_MOD_SMOKE, "Volume", ""},
 	{0, NULL, 0, NULL, NULL}
 };
 

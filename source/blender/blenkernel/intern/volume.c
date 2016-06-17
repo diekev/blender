@@ -122,6 +122,72 @@ BoundBox *BKE_volume_boundbox_get(Object *ob)
 	return ob->bb;
 }
 
+void BKE_volume_make_local(Volume *volume)
+{
+	if (volume->id.lib == NULL) {
+		return;
+	}
+
+	Main *bmain = G.main;
+
+	/* - only lib users: do nothing
+	 * - only local users: set flag
+	 * - mixed: make copy
+	 */
+
+	if (volume->id.us == 1) {
+		id_clear_lib_data(bmain, &volume->id);
+		return;
+	}
+
+	bool is_local = false, is_lib = false;
+
+	Object *ob;
+	for (ob = bmain->object.first; ob && ELEM(false, is_lib, is_local); ob = ob->id.next) {
+		if (ob->data == volume) {
+			*((ob->id.lib) ? &is_lib : &is_local) = true;
+		}
+	}
+
+	if (is_local && is_lib == false) {
+		id_clear_lib_data(bmain, &volume->id);
+	}
+	else if (is_local && is_lib) {
+		Volume *volume_new = BKE_volume_copy(volume);
+		volume_new->id.us = 0;
+
+		/* Remap paths of new ID using old library as base. */
+		BKE_id_lib_local_paths(bmain, volume->id.lib, &volume_new->id);
+
+		ob = bmain->object.first;
+		while (ob) {
+			if (ob->data == volume) {
+
+				if (ob->id.lib == NULL) {
+					ob->data = volume_new;
+					id_us_plus(&volume_new->id);
+					id_us_min(&volume->id);
+				}
+			}
+
+			ob = ob->id.next;
+		}
+	}
+}
+
+Volume *BKE_volume_copy(Volume *volume)
+{
+	Volume *copy = BKE_libblock_copy(&volume->id);
+
+	/* TODO: copy data. */
+
+	if (volume->id.lib) {
+		BKE_id_lib_local_paths(G.main, volume->id.lib, &copy->id);
+	}
+
+	return copy;
+}
+
 void BKE_volume_update(Scene *scene, Object *ob)
 {
 	Volume *volume = BKE_volume_from_object(ob);

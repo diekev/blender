@@ -137,6 +137,7 @@
 #include "DNA_windowmanager_types.h"
 #include "DNA_movieclip_types.h"
 #include "DNA_mask_types.h"
+#include "DNA_volume_types.h"
 
 #include "MEM_guardedalloc.h" // MEM_freeN
 #include "BLI_bitmap.h"
@@ -2352,6 +2353,19 @@ static void write_lamps(WriteData *wd, ListBase *idbase)
 	}
 }
 
+static void write_volumes(WriteData *wd, ListBase *idbase)
+{
+	for (Volume *volume = idbase->first; volume; volume = volume->id.next) {
+		if (volume->id.us < 0 && !wd->current) {
+			continue;
+		}
+
+		/* write LibData */
+		writestruct(wd, ID_VL, "Volume", 1, volume);
+		write_iddata(wd, &volume->id);
+	}
+}
+
 static void write_sequence_modifiers(WriteData *wd, ListBase *modbase)
 {
 	SequenceModifierData *smd;
@@ -3761,6 +3775,7 @@ static int write_file_handle(
 	write_paintcurves (wd, &mainvar->paintcurves);
 	write_gpencils (wd, &mainvar->gpencil);
 	write_linestyles(wd, &mainvar->linestyle);
+	write_volumes(wd, &mainvar->volumes);
 	write_libraries(wd,  mainvar->next);
 
 	if (write_user_block) {

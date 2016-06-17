@@ -201,6 +201,7 @@ typedef struct {
 	BLT_I18NCONTEXTS_ITEM(BLT_I18NCONTEXT_ID_TEXTURE, "id_texture"),                                                   \
 	BLT_I18NCONTEXTS_ITEM(BLT_I18NCONTEXT_ID_TEXT, "id_text"),                                                         \
 	BLT_I18NCONTEXTS_ITEM(BLT_I18NCONTEXT_ID_VFONT, "id_vfont"),                                                       \
+	BLT_I18NCONTEXTS_ITEM(BLT_I18NCONTEXT_ID_VOLUME, "id_volume"),                                                     \
 	BLT_I18NCONTEXTS_ITEM(BLT_I18NCONTEXT_ID_WORLD, "id_world"),                                                       \
 	BLT_I18NCONTEXTS_ITEM(BLT_I18NCONTEXT_ID_WINDOWMANAGER, "id_windowmanager"),                                       \
 	{NULL, NULL, NULL}                                                                                                 \

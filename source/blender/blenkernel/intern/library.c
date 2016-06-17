@@ -359,6 +359,9 @@ bool id_make_local(ID *id, bool test)
 			return false; /* not implemented */
 		case ID_LS:
 			return false; /* not implemented */
+		case ID_VL:
+			if (!test) BKE_volume_make_local((Volume *)id);
+			return false;
 	}
 
 	return false;
@@ -458,6 +461,9 @@ bool id_copy(ID *id, ID **newid, bool test)
 			return true;
 		case ID_LS:
 			if (!test) *newid = (ID *)BKE_linestyle_copy(G.main, (FreestyleLineStyle *)id);
+			return true;
+		case ID_VL:
+			if (!test) *newid = (ID *)BKE_volume_copy((Volume *)id);
 			return true;
 	}
 	
@@ -593,7 +599,7 @@ ListBase *which_libbase(Main *mainlib, short type)
 		case ID_PC:
 			return &(mainlib->paintcurves);
 		case ID_VL:
-			return &(mainlib->volume);
+			return &(mainlib->volumes);
 	}
 	return NULL;
 }
@@ -720,7 +726,7 @@ int set_listbasepointers(Main *main, ListBase **lb)
 	lb[a++] = &(main->mesh);
 	lb[a++] = &(main->curve);
 	lb[a++] = &(main->mball);
-	lb[a++] = &(main->volume);
+	lb[a++] = &(main->volumes);
 
 	lb[a++] = &(main->latt);
 	lb[a++] = &(main->lamp);

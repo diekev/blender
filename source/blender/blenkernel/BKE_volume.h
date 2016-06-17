@@ -47,6 +47,10 @@ void BKE_volume_load_from_file(struct Volume *volume, const char *filename);
 
 void BKE_volume_free(struct Volume *volume);
 
+void BKE_volume_make_local(struct Volume *volume);
+
+struct Volume *BKE_volume_copy(struct Volume *volume);
+
 struct BoundBox *BKE_volume_boundbox_get(struct Object *ob);
 
 struct VolumeData *BKE_volume_field_current(const struct Volume *volume);
