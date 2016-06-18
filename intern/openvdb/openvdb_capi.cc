@@ -41,28 +41,23 @@ int OpenVDB_getVersionHex()
 	return openvdb::OPENVDB_LIBRARY_VERSION;
 }
 
-void OpenVDB_get_grid_info(const char *filename, OpenVDBGridInfoCallback cb, void *userdata)
+static void openvdb_get_grids_ex(const openvdb::GridPtrVecPtr &grids,
+                                 OpenVDBGetGridCallback cb, void *userdata)
 {
-	Timer(__func__);
-
 	using namespace openvdb;
 
-	initialize();
-
-	io::File file(filename);
-	file.open();
-
-	GridPtrVecPtr grids = file.getGrids();
-	int grid_num = grids->size();
+	const size_t grid_num = grids->size();
 
 	for (size_t i = 0; i < grid_num; ++i) {
 		GridBase::ConstPtr grid = (*grids)[i];
 
-		Name name = grid->getName();
-		Name value_type = grid->valueType();
+		const Name name = grid->getName();
+		const Name value_type = grid->valueType();
 		bool is_color = false;
-		if (grid->getMetadata< TypedMetadata<bool> >("is_color"))
+
+		if (grid->getMetadata< TypedMetadata<bool> >("is_color")) {
 			is_color = grid->metaValue<bool>("is_color");
+		}
 
 		OpenVDBPrimitive *prim = new OpenVDBPrimitive;
 		prim->setGrid(grid);
@@ -71,6 +66,21 @@ void OpenVDB_get_grid_info(const char *filename, OpenVDBGridInfoCallback cb, voi
 	}
 }
 
+void OpenVDB_get_grid_info(const char *filename, OpenVDBGetGridCallback cb, void *userdata)
+{
+	Timer(__func__);
+
+	openvdb::initialize();
+
+	openvdb::io::File file(filename);
+	file.open();
+
+	openvdb_get_grids_ex(file.getGrids(), cb, userdata);
+}
+
+/* Wrapper to create a buffer for a stream from a char*.
+ * See: https://stackoverflow.com/questions/7781898/get-an-istream-from-a-char
+ */
 struct membuf : std::streambuf {
     membuf(char *begin, char *end) {
         this->setg(begin, begin, end);
@@ -78,38 +88,19 @@ struct membuf : std::streambuf {
 };
 
 void OpenVDB_get_packed_grids(char *data, unsigned data_size,
-                              OpenVDBGridInfoCallback cb, void *userdata)
+                              OpenVDBGetGridCallback cb, void *userdata)
 {
 	Timer(__func__);
 
-	using namespace openvdb;
+	openvdb::initialize();
 
 	membuf sbuf(data, data + data_size);
 	std::istream in_stream(&sbuf);
 
-	initialize();
+	openvdb::io::Stream stream(in_stream);
 
-	io::Stream stream(in_stream);
-
-	GridPtrVecPtr grids = stream.getGrids();
-	int grid_num = grids->size();
-
-	for (size_t i = 0; i < grid_num; ++i) {
-		GridBase::ConstPtr grid = (*grids)[i];
-
-		Name name = grid->getName();
-		Name value_type = grid->valueType();
-		bool is_color = false;
-		if (grid->getMetadata< TypedMetadata<bool> >("is_color"))
-			is_color = grid->metaValue<bool>("is_color");
-
-		OpenVDBPrimitive *prim = new OpenVDBPrimitive;
-		prim->setGrid(grid);
-
-		cb(userdata, name.c_str(), value_type.c_str(), is_color, prim);
-	}
+	openvdb_get_grids_ex(stream.getGrids(), cb, userdata);
 }
-
 
 OpenVDBFloatGrid *OpenVDB_export_grid_fl(
         OpenVDBWriter *writer,

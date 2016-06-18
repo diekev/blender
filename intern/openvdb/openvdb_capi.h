@@ -39,17 +39,17 @@ struct OpenVDBVectorGrid;
 
 int OpenVDB_getVersionHex(void);
 
-typedef void (*OpenVDBGridInfoCallback)(void *userdata, const char *name,
+typedef void (*OpenVDBGetGridCallback)(void *userdata, const char *name,
                                         const char *value_type, bool is_color,
                                         struct OpenVDBPrimitive *prim);
 
 void OpenVDB_get_grid_info(const char *filename,
-                           OpenVDBGridInfoCallback cb,
+                           OpenVDBGetGridCallback cb,
                            void *userdata);
 
 void OpenVDB_get_packed_grids(char *data,
                               unsigned data_size,
-                              OpenVDBGridInfoCallback cb,
+                              OpenVDBGetGridCallback cb,
                               void *userdata);
 
 enum {
