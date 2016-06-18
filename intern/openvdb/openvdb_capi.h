@@ -47,6 +47,11 @@ void OpenVDB_get_grid_info(const char *filename,
                            OpenVDBGridInfoCallback cb,
                            void *userdata);
 
+void OpenVDB_get_packed_grids(char *data,
+                              unsigned data_size,
+                              OpenVDBGridInfoCallback cb,
+                              void *userdata);
+
 enum {
 	VEC_INVARIANT = 0,
 	VEC_COVARIANT = 1,

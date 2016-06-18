@@ -38,6 +38,7 @@
 
 #include "DNA_mesh_types.h"
 #include "DNA_object_types.h"
+#include "DNA_packedFile_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_volume_types.h"
 
@@ -194,11 +195,6 @@ Volume *BKE_volume_copy(Volume *volume)
 	return copy;
 }
 
-void BKE_volume_load(Main *bmain, Volume *volume)
-{
-	UNUSED_VARS(bmain, volume);
-}
-
 void BKE_volume_update(Scene *scene, Object *ob)
 {
 	Volume *volume = BKE_volume_from_object(ob);
@@ -229,9 +225,9 @@ void BKE_volume_update(Scene *scene, Object *ob)
 	BKE_volume_load_from_file(volume, new_filename);
 }
 
-static void openvdb_get_grid_info(void *userdata, const char *name,
-                                  const char *value_type, bool is_color,
-                                  struct OpenVDBPrimitive *prim)
+static void openvdb_get_grid_cb(void *userdata, const char *name,
+                                const char *value_type, bool is_color,
+                                struct OpenVDBPrimitive *prim)
 {
 	Volume *volume = userdata;
 	VolumeData *data = MEM_mallocN(sizeof(VolumeData), "VolumeData");
@@ -265,12 +261,33 @@ static void openvdb_get_grid_info(void *userdata, const char *name,
 
 void BKE_volume_load_from_file(Volume *volume, const char *filename)
 {
-	OpenVDB_get_grid_info(filename, openvdb_get_grid_info, volume);
+	OpenVDB_get_grid_info(filename, openvdb_get_grid_cb, volume);
 	BLI_strncpy(volume->filename, filename, sizeof(volume->filename));
 
 	/* Set the first volume field as the current one */
 	VolumeData *data = volume->fields.first;
 	data->flags |= VOLUME_DATA_CURRENT;
+}
+
+void BKE_volume_load(Main *bmain, Volume *volume)
+{
+	if (volume->packedfile) {
+		/* TODO. */
+		PackedFile *pf = volume->packedfile;
+
+		OpenVDB_get_packed_grids((char *)pf->data, pf->size, openvdb_get_grid_cb, volume);
+
+		/* Set the first volume field as the current one */
+		VolumeData *data = volume->fields.first;
+		data->flags |= VOLUME_DATA_CURRENT;
+	}
+	else {
+		if (BLI_path_is_rel(volume->filename)) {
+			BLI_path_abs(volume->filename, bmain->name);
+		}
+
+		BKE_volume_load_from_file(volume, volume->filename);
+	}
 }
 
 /* ***************************** mesh conversion **************************** */

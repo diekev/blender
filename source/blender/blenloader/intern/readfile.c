@@ -145,7 +145,7 @@
 #include "BKE_sequencer.h"
 #include "BKE_outliner_treehash.h"
 #include "BKE_sound.h"
-
+#include "BKE_volume.h"
 
 #include "NOD_common.h"
 #include "NOD_socket.h"
@@ -2280,6 +2280,8 @@ static void lib_link_volume(FileData *UNUSED(fd), Main *main)
 	for (volume = main->volumes.first; volume; volume = volume->id.next) {
 		if (volume->id.tag & LIB_TAG_NEED_LINK) {
 			volume->id.tag &= ~LIB_TAG_NEED_LINK;
+
+			BKE_volume_load(main, volume);
 		}
 	}
 }

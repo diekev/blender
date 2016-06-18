@@ -28,6 +28,8 @@
 #include "openvdb_primitive.h"
 #include "openvdb_util.h"
 
+#include <openvdb/io/Stream.h>
+
 #include "../guardedalloc/MEM_guardedalloc.h"
 
 struct OpenVDBFloatGrid { int unused; };
@@ -51,6 +53,45 @@ void OpenVDB_get_grid_info(const char *filename, OpenVDBGridInfoCallback cb, voi
 	file.open();
 
 	GridPtrVecPtr grids = file.getGrids();
+	int grid_num = grids->size();
+
+	for (size_t i = 0; i < grid_num; ++i) {
+		GridBase::ConstPtr grid = (*grids)[i];
+
+		Name name = grid->getName();
+		Name value_type = grid->valueType();
+		bool is_color = false;
+		if (grid->getMetadata< TypedMetadata<bool> >("is_color"))
+			is_color = grid->metaValue<bool>("is_color");
+
+		OpenVDBPrimitive *prim = new OpenVDBPrimitive;
+		prim->setGrid(grid);
+
+		cb(userdata, name.c_str(), value_type.c_str(), is_color, prim);
+	}
+}
+
+struct membuf : std::streambuf {
+    membuf(char *begin, char *end) {
+        this->setg(begin, begin, end);
+    }
+};
+
+void OpenVDB_get_packed_grids(char *data, unsigned data_size,
+                              OpenVDBGridInfoCallback cb, void *userdata)
+{
+	Timer(__func__);
+
+	using namespace openvdb;
+
+	membuf sbuf(data, data + data_size);
+	std::istream in_stream(&sbuf);
+
+	initialize();
+
+	io::Stream stream(in_stream);
+
+	GridPtrVecPtr grids = stream.getGrids();
 	int grid_num = grids->size();
 
 	for (size_t i = 0; i < grid_num; ++i) {
