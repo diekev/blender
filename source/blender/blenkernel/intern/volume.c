@@ -238,10 +238,7 @@ static void openvdb_get_grid_cb(void *userdata, const char *name,
 		data->type = VOLUME_TYPE_FLOAT;
 	}
 	else if (STREQ(value_type, "vec3s")) {
-		if (is_color)
-			data->type = VOLUME_TYPE_COLOR;
-		else
-			data->type = VOLUME_TYPE_VEC3;
+		data->type = (is_color) ? VOLUME_TYPE_COLOR : VOLUME_TYPE_VEC3;
 	}
 	else {
 		data->type = VOLUME_TYPE_UNKNOWN;
@@ -353,7 +350,7 @@ void BKE_mesh_to_volume(Scene *scene, Object *ob)
 	DerivedMesh *dm = mesh_get_derived_final(scene, ob, CD_MASK_MESH);
 
 	Volume *volume = BKE_volume_add(G.main, ob->id.name + 2);
-	bool needsFree = false;
+	bool needs_free = false;
 
 	OpenVDBDerivedMeshIterator it;
 	openvdb_dm_iter_init(&it, dm);
@@ -372,13 +369,13 @@ void BKE_mesh_to_volume(Scene *scene, Object *ob)
 		ob->data = volume;
 		ob->type = OB_VOLUME;
 
-		needsFree = true;
+		needs_free = true;
 	}
 
-	dm->needsFree = needsFree;
+	dm->needsFree = needs_free;
 	dm->release(dm);
 
-	if (needsFree) {
+	if (needs_free) {
 		ob->derivedFinal = NULL;
 
 		/* curve object could have got bounding box only in special cases */
