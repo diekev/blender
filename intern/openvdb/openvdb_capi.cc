@@ -310,6 +310,15 @@ OpenVDBPrimitive *OpenVDBPrimitive_create()
 	return new OpenVDBPrimitive();
 }
 
+OpenVDBPrimitive *OpenVDBPrimitive_copy(OpenVDBPrimitive *original)
+{
+	OpenVDBPrimitive *copy = new OpenVDBPrimitive();
+
+	copy->setGrid(original->getGridPtr()->deepCopyGrid());
+
+	return copy;
+}
+
 void OpenVDBPrimitive_free(OpenVDBPrimitive *vdb_prim)
 {
     delete vdb_prim;

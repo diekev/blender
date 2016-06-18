@@ -182,11 +182,25 @@ void BKE_volume_make_local(Volume *volume)
 	}
 }
 
+/**
+ * @brief BKE_volume_copy Perform a deep copy of a volume and its fields.
+ * @param volume The volume to copy.
+ * @return A pointer to a copy of the input volume.
+ */
 Volume *BKE_volume_copy(Volume *volume)
 {
 	Volume *copy = BKE_libblock_copy(&volume->id);
 
-	/* TODO: copy data. */
+	for (VolumeData *data = volume->fields.first; data; data = data->next) {
+		VolumeData *data_copy = MEM_callocN(sizeof(VolumeData), "VolumeData");
+		data_copy->prim = OpenVDBPrimitive_copy(data->prim);
+
+		if (data->flags & VOLUME_DATA_CURRENT) {
+			data_copy->flags |= VOLUME_DATA_CURRENT;
+		}
+
+		BLI_addtail(&copy->fields, data_copy);
+	}
 
 	if (volume->id.lib) {
 		BKE_id_lib_local_paths(G.main, volume->id.lib, &copy->id);

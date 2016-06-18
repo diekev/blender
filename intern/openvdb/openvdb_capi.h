@@ -116,6 +116,7 @@ void OpenVDBReader_get_meta_v3_int(struct OpenVDBReader *reader, const char *nam
 void OpenVDBReader_get_meta_mat4(struct OpenVDBReader *reader, const char *name, float value[4][4]);
 
 struct OpenVDBPrimitive *OpenVDBPrimitive_create(void);
+struct OpenVDBPrimitive *OpenVDBPrimitive_copy(struct OpenVDBPrimitive *original);
 void OpenVDBPrimitive_free(struct OpenVDBPrimitive *vdb_prim);
 
 void OpenVDB_get_bounds(struct OpenVDBPrimitive *prim,
