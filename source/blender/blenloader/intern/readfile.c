@@ -2280,17 +2280,24 @@ static void lib_link_volume(FileData *UNUSED(fd), Main *main)
 	for (volume = main->volumes.first; volume; volume = volume->id.next) {
 		if (volume->id.tag & LIB_TAG_NEED_LINK) {
 			volume->id.tag &= ~LIB_TAG_NEED_LINK;
-
-			BKE_volume_load(main, volume);
 		}
+
+		BKE_volume_load(main, volume);
 	}
 }
 
 static void direct_link_volume(FileData *fd, Volume *volume)
 {
-	/* palette itself has been read */
+	/* volume itself has been read */
 	link_list(fd, &volume->fields);
+
+	printf("Reading packed file\n");
+
 	volume->packedfile = direct_link_packedfile(fd, volume->packedfile);
+
+	if (volume->is_builtin) {
+		BLI_assert(volume->packedfile);
+	}
 }
 
 /* ************ READ ANIMATION STUFF ***************** */

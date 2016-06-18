@@ -265,6 +265,11 @@ void OpenVDBWriter_write(OpenVDBWriter *writer, const char *filename)
 	writer->write(filename);
 }
 
+void OpenVDBWriter_insert_prim(OpenVDBWriter *writer, OpenVDBPrimitive *prim)
+{
+	writer->insert(prim->getGridPtr());
+}
+
 OpenVDBReader *OpenVDBReader_create()
 {
 	return new OpenVDBReader();
@@ -335,4 +340,3 @@ float OpenVDB_get_voxel_size(struct OpenVDBPrimitive *prim)
 {
 	return prim->getConstGrid().transform().voxelSize()[0];
 }
-

@@ -42,12 +42,14 @@
 #include "DNA_scene_types.h"
 #include "DNA_volume_types.h"
 
+#include "BKE_appdir.h"
 #include "BKE_DerivedMesh.h"
 #include "BKE_global.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_object.h"
 #include "BKE_packedFile.h"
+#include "BKE_report.h"
 #include "BKE_volume.h"
 
 #include "GPU_draw.h"
@@ -58,6 +60,9 @@
 Volume *BKE_volume_add(Main *bmain, const char *name)
 {
 	Volume *volume = BKE_libblock_alloc(bmain, ID_VL, name);
+
+	volume->is_builtin = true;
+
 	return volume;
 }
 
@@ -183,6 +188,41 @@ void BKE_volume_make_local(Volume *volume)
 }
 
 /**
+ * Prepare the volume to be written to a file. Builtin volumes are written in an
+ * external file which is packed into the .blend file. Imported volumes are not
+ * written, only the path to the external file is stored.
+ */
+void BKE_volume_prepare_write(Volume *volume)
+{
+	if (!volume->is_builtin) {
+		return;
+	}
+
+	if (volume->packedfile) {
+		freePackedFile(volume->packedfile);
+	}
+
+	/* Create a temporary .vdb file to write the volumes to. */
+	char filename[FILE_MAX];
+	BLI_make_file_string("/", filename, BKE_tempdir_session(), volume->id.name + 2);
+	BLI_ensure_extension(filename, sizeof(filename), ".vdb");
+
+	struct OpenVDBWriter *writer = OpenVDBWriter_create();
+
+	for (VolumeData *data = volume->fields.first; data; data = data->next) {
+		OpenVDBWriter_insert_prim(writer, data->prim);
+	}
+
+	OpenVDBWriter_write(writer, filename);
+	OpenVDBWriter_free(writer);
+
+	printf("Packing file: %s\n", filename);
+
+	ReportList reports;
+	volume->packedfile = newPackedFile(&reports, filename, G.main->name);
+}
+
+/**
  * @brief BKE_volume_copy Perform a deep copy of a volume and its fields.
  * @param volume The volume to copy.
  * @return A pointer to a copy of the input volume.
@@ -292,7 +332,7 @@ void BKE_volume_load(Main *bmain, Volume *volume)
 		VolumeData *data = volume->fields.first;
 		data->flags |= VOLUME_DATA_CURRENT;
 	}
-	else {
+	else if (volume->filename[0] != '\0') {
 		if (BLI_path_is_rel(volume->filename)) {
 			BLI_path_abs(volume->filename, bmain->name);
 		}

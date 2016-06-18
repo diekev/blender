@@ -105,6 +105,7 @@ void OpenVDBWriter_add_meta_v3(struct OpenVDBWriter *writer, const char *name, c
 void OpenVDBWriter_add_meta_v3_int(struct OpenVDBWriter *writer, const char *name, const int value[3]);
 void OpenVDBWriter_add_meta_mat4(struct OpenVDBWriter *writer, const char *name, float value[4][4]);
 void OpenVDBWriter_write(struct OpenVDBWriter *writer, const char *filename);
+void OpenVDBWriter_insert_prim(struct OpenVDBWriter *writer, struct OpenVDBPrimitive *prim);
 
 struct OpenVDBReader *OpenVDBReader_create(void);
 void OpenVDBReader_free(struct OpenVDBReader *reader);

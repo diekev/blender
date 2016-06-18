@@ -162,6 +162,7 @@
 #include "BKE_fcurve.h"
 #include "BKE_pointcache.h"
 #include "BKE_mesh.h"
+#include "BKE_volume.h"
 
 #ifdef USE_NODE_COMPAT_CUSTOMNODES
 #include "NOD_socket.h"	/* for sock->default_value data */
@@ -2366,7 +2367,10 @@ static void write_volumes(WriteData *wd, ListBase *idbase)
 		writestruct(wd, ID_VL, "Volume", 1, volume);
 		write_iddata(wd, &volume->id);
 
+		BKE_volume_prepare_write(volume);
+
 		if (volume->packedfile) {
+			printf("Writing packed file\n");
 			pf = volume->packedfile;
 			writestruct(wd, DATA, "PackedFile", 1, pf);
 			writedata(wd, DATA, pf->size, pf->data);

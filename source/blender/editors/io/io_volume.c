@@ -78,6 +78,8 @@ static int wm_volume_import_exec(bContext *C, wmOperator *op)
 
 	Volume *volume = BKE_volume_from_object(ob);
 
+	volume->is_builtin = false;
+
 	if (!volume) {
 		BKE_report(op->reports, RPT_ERROR, "Cannot create volume!");
 		return OPERATOR_CANCELLED;
