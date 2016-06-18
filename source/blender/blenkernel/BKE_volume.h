@@ -43,6 +43,8 @@ struct Volume *BKE_volume_add(struct Main *bmain, const char *name);
 struct Volume *BKE_volume_from_object(struct Object *ob);
 
 void BKE_volume_update(struct Scene *scene, struct Object *ob);
+
+void BKE_volume_load(struct Main *bmain, struct Volume *volume);
 void BKE_volume_load_from_file(struct Volume *volume, const char *filename);
 
 void BKE_volume_free(struct Volume *volume);

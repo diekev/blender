@@ -46,6 +46,7 @@
 #include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_object.h"
+#include "BKE_packedFile.h"
 #include "BKE_volume.h"
 
 #include "GPU_draw.h"
@@ -92,6 +93,11 @@ void BKE_volume_free(Volume *volume)
 		}
 
 		MEM_freeN(data);
+	}
+
+	if (volume->packedfile) {
+		freePackedFile(volume->packedfile);
+		volume->packedfile = NULL;
 	}
 }
 
@@ -186,6 +192,11 @@ Volume *BKE_volume_copy(Volume *volume)
 	}
 
 	return copy;
+}
+
+void BKE_volume_load(Main *bmain, Volume *volume)
+{
+	UNUSED_VARS(bmain, volume);
 }
 
 void BKE_volume_update(Scene *scene, Object *ob)

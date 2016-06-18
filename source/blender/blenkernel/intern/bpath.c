@@ -657,7 +657,9 @@ void BKE_bpath_traverse_id(Main *bmain, ID *id, BPathVisitor visit_cb, const int
 		case ID_VL:
 		{
 			Volume *volume = (Volume *)id;
-			rewrite_path_fixed(volume->filename, visit_cb, absbase, bpath_user_data);
+			if (volume->packedfile == NULL) {
+				rewrite_path_fixed(volume->filename, visit_cb, absbase, bpath_user_data);
+			}
 			break;
 		}
 		default:

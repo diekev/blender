@@ -78,6 +78,8 @@ typedef struct VolumeData {
 typedef struct Volume {
 	ID id;
 
+	struct PackedFile *packedfile;
+
 	ListBase fields;
 	char filename[1024];  /* FILE_MAX */
 	char has_file_sequence;

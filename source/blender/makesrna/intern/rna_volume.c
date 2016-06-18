@@ -116,7 +116,11 @@ static void rna_def_volume(BlenderRNA *brna)
 	RNA_def_struct_ui_icon(srna, ICON_MOD_SMOKE);
 	RNA_def_struct_sdna(srna, "Volume");
 
-	PropertyRNA *prop = RNA_def_property(srna, "fields", PROP_COLLECTION, PROP_NONE);
+	PropertyRNA *prop = RNA_def_property(srna, "packed_file", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "packedfile");
+	RNA_def_property_ui_text(prop, "Packed File", "");
+
+	prop = RNA_def_property(srna, "fields", PROP_COLLECTION, PROP_NONE);
     RNA_def_property_collection_sdna(prop, NULL, "fields", NULL);
 	RNA_def_property_struct_type(prop, "VolumeData");
 

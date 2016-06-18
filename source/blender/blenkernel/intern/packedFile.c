@@ -47,6 +47,7 @@
 #include "DNA_packedFile_types.h"
 #include "DNA_sound_types.h"
 #include "DNA_vfont_types.h"
+#include "DNA_volume_types.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_utildefines.h"
@@ -58,6 +59,7 @@
 #include "BKE_packedFile.h"
 #include "BKE_report.h"
 #include "BKE_sound.h"
+#include "BKE_volume.h"
 
 int seekPackedFile(PackedFile *pf, int offset, int whence)
 {
@@ -124,6 +126,7 @@ int countPackedFiles(Main *bmain)
 	Image *ima;
 	VFont *vf;
 	bSound *sound;
+	Volume *volume;
 	int count = 0;
 	
 	/* let's check if there are packed files... */
@@ -138,6 +141,12 @@ int countPackedFiles(Main *bmain)
 	for (sound = bmain->sound.first; sound; sound = sound->id.next)
 		if (sound->packedfile)
 			count++;
+
+	for (volume = bmain->volumes.first; volume; volume = volume->id.next) {
+		if (volume->packedfile) {
+			++count;
+		}
+	}
 
 	return count;
 }
@@ -255,6 +264,13 @@ void packAll(Main *bmain, ReportList *reports, bool verbose)
 		if (sound->packedfile == NULL && sound->id.lib == NULL) {
 			sound->packedfile = newPackedFile(reports, sound->name, bmain->name);
 			tot++;
+		}
+	}
+
+	for (Volume *volume = bmain->sound.first; volume; volume = volume->id.next) {
+		if ((volume->packedfile == NULL) && (volume->id.lib == NULL)) {
+			volume->packedfile = newPackedFile(reports, volume->filename, bmain->name);
+			++tot;
 		}
 	}
 	
@@ -576,6 +592,33 @@ int unpackSound(Main *bmain, ReportList *reports, bSound *sound, int how)
 	return(ret_value);
 }
 
+int unpackVolume(Main *bmain, ReportList *reports, Volume *volume, int how)
+{
+	if (volume == NULL) {
+		return RET_ERROR;
+	}
+
+	char localname[FILE_MAX], absname[FILE_MAX];
+
+	unpack_generate_paths(volume->filename, (ID *)volume, absname, localname, sizeof(absname), sizeof(localname));
+
+	char *newname = unpackFile(reports, absname, localname, volume->packedfile, how);
+
+	if (newname == NULL) {
+		return RET_ERROR;
+	}
+
+	BLI_strncpy(volume->filename, newname, sizeof(volume->filename));
+	MEM_freeN(newname);
+
+	freePackedFile(volume->packedfile);
+	volume->packedfile = NULL;
+
+	BKE_volume_load(bmain, volume);
+
+	return RET_OK;
+}
+
 int unpackImage(ReportList *reports, Image *ima, int how)
 {
 	int ret_value = RET_ERROR;
@@ -686,6 +729,12 @@ void unpackAll(Main *bmain, ReportList *reports, int how)
 	for (sound = bmain->sound.first; sound; sound = sound->id.next)
 		if (sound->packedfile)
 			unpackSound(bmain, reports, sound, how);
+
+	for (Volume *volume = bmain->volumes.first; volume; volume = volume->id.next) {
+		if (volume->packedfile) {
+			unpackVolume(bmain, reports, volume, how);
+		}
+	}
 }
 
 /* ID should be not NULL, return 1 if there's a packed file */
@@ -706,6 +755,11 @@ bool BKE_pack_check(ID *id)
 		{
 			bSound *snd = (bSound *)id;
 			return snd->packedfile != NULL;
+		}
+		case ID_VL:
+		{
+			Volume *volume = (Volume *)id;
+			return volume->packedfile != NULL;
 		}
 		case ID_LI:
 		{
@@ -741,6 +795,14 @@ void BKE_unpack_id(Main *bmain, ID *id, ReportList *reports, int how)
 			bSound *snd = (bSound *)id;
 			if (snd->packedfile) {
 				unpackSound(bmain, reports, snd, how);
+			}
+			break;
+		}
+		case ID_VL:
+		{
+			Volume *volume = (Volume *)id;
+			if (volume->packedfile) {
+				unpackVolume(bmain, reports, volume, how);
 			}
 			break;
 		}

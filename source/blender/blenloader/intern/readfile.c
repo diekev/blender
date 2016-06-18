@@ -1779,6 +1779,12 @@ void blo_make_packed_pointer_map(FileData *fd, Main *oldmain)
 	for (sound = oldmain->sound.first; sound; sound = sound->id.next)
 		if (sound->packedfile)
 			insert_packedmap(fd, sound->packedfile);
+
+	for (Volume *volume = oldmain->volumes.first; volume; volume = volume->id.next) {
+		if (volume->packedfile) {
+			insert_packedmap(fd, volume->packedfile);
+		}
+	}
 	
 	for (lib = oldmain->library.first; lib; lib = lib->id.next)
 		if (lib->packedfile)
@@ -1817,6 +1823,10 @@ void blo_end_packed_pointer_map(FileData *fd, Main *oldmain)
 
 	for (sound = oldmain->sound.first; sound; sound = sound->id.next)
 		sound->packedfile = newpackedadr(fd, sound->packedfile);
+
+	for (Volume *volume = oldmain->sound.first; volume; volume = volume->id.next) {
+		volume->packedfile = newpackedadr(fd, volume->packedfile);
+	}
 		
 	for (lib = oldmain->library.first; lib; lib = lib->id.next)
 		lib->packedfile = newpackedadr(fd, lib->packedfile);
@@ -2278,6 +2288,7 @@ static void direct_link_volume(FileData *fd, Volume *volume)
 {
 	/* palette itself has been read */
 	link_list(fd, &volume->fields);
+	volume->packedfile = direct_link_packedfile(fd, volume->packedfile);
 }
 
 /* ************ READ ANIMATION STUFF ***************** */

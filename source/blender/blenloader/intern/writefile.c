@@ -2355,6 +2355,8 @@ static void write_lamps(WriteData *wd, ListBase *idbase)
 
 static void write_volumes(WriteData *wd, ListBase *idbase)
 {
+	PackedFile *pf;
+
 	for (Volume *volume = idbase->first; volume; volume = volume->id.next) {
 		if (volume->id.us < 0 && !wd->current) {
 			continue;
@@ -2363,6 +2365,12 @@ static void write_volumes(WriteData *wd, ListBase *idbase)
 		/* write LibData */
 		writestruct(wd, ID_VL, "Volume", 1, volume);
 		write_iddata(wd, &volume->id);
+
+		if (volume->packedfile) {
+			pf = volume->packedfile;
+			writestruct(wd, DATA, "PackedFile", 1, pf);
+			writedata(wd, DATA, pf->size, pf->data);
+		}
 	}
 }
 
