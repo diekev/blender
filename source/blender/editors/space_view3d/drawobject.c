@@ -1211,7 +1211,7 @@ static void drawlamp(View3D *v3d, RegionView3D *rv3d, Base *base,
 
 	if ((drawcone || drawshadowbox) && !v3d->transp) {
 		/* in this case we need to draw delayed */
-		ED_view3d_after_add(&v3d->afterdraw_transp, base, dflag);
+		ED_view3d_after_add(v3d->xray ? &v3d->afterdraw_xraytransp : &v3d->afterdraw_transp, base, dflag);
 		return;
 	}
 	
@@ -1594,12 +1594,9 @@ static void draw_bundle_sphere(void)
 
 		displist = glGenLists(1);
 		glNewList(displist, GL_COMPILE);
-
 		qobj = gluNewQuadric();
 		gluQuadricDrawStyle(qobj, GLU_FILL);
-		glShadeModel(GL_SMOOTH);
 		gluSphere(qobj, 0.05, 8, 8);
-		glShadeModel(GL_FLAT);
 		gluDeleteQuadric(qobj);
 
 		glEndList();
@@ -1781,8 +1778,6 @@ static void draw_viewport_reconstruction(
 	GPU_basic_shader_colors(NULL, NULL, 0, 1.0f);
 	GPU_basic_shader_bind(GPU_SHADER_LIGHTING | GPU_SHADER_USE_COLOR);
 
-	glShadeModel(GL_SMOOTH);
-
 	tracking_object = tracking->objects.first;
 	while (tracking_object) {
 		draw_viewport_object_reconstruction(
@@ -1793,7 +1788,6 @@ static void draw_viewport_reconstruction(
 	}
 
 	/* restore */
-	glShadeModel(GL_FLAT);
 	GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
 
 	if ((dflag & DRAW_CONSTCOLOR) == 0) {
@@ -1932,16 +1926,15 @@ static void drawcamera_stereo3d(
 
 	if (is_stereo3d_cameras) {
 		/* draw connecting lines */
-		glPushAttrib(GL_ENABLE_BIT);
-
-		glLineStipple(2, 0xAAAA);
-		glEnable(GL_LINE_STIPPLE);
+		GPU_basic_shader_bind_enable(GPU_SHADER_LINE | GPU_SHADER_STIPPLE);
+		GPU_basic_shader_line_stipple(2, 0xAAAA);
 
 		glBegin(GL_LINES);
 		glVertex3fv(origin[0]);
 		glVertex3fv(origin[1]);
 		glEnd();
-		glPopAttrib();
+
+		GPU_basic_shader_bind_disable(GPU_SHADER_LINE | GPU_SHADER_STIPPLE);
 	}
 
 	/* draw convergence plane */
@@ -2353,7 +2346,6 @@ static void drawlattice(View3D *v3d, Object *ob)
 		
 		if (ob->defbase.first && lt->dvert) {
 			actdef_wcol = ob->actdef;
-			glShadeModel(GL_SMOOTH);
 		}
 	}
 
@@ -2382,10 +2374,6 @@ static void drawlattice(View3D *v3d, Object *ob)
 		}
 	}
 	glEnd();
-	
-	/* restoration for weight colors */
-	if (actdef_wcol)
-		glShadeModel(GL_FLAT);
 
 	if (is_edit) {
 		BPoint *actbp = BKE_lattice_active_point_get(lt);
@@ -3250,17 +3238,15 @@ static void draw_em_fancy_edges(BMEditMesh *em, Scene *scene, View3D *v3d,
 			    ((ts->selectmode & SCE_SELECT_VERTEX) || (me->drawflag & ME_DRAWEIGHT)))
 			{
 				if (draw_dm_edges_weight_check(me, v3d)) {
-					glShadeModel(GL_SMOOTH);
+					// Interpolate vertex weights
 					draw_dm_edges_weight_interp(em, cageDM, ts->weightuser);
-					glShadeModel(GL_FLAT);
 				}
 				else if (ts->selectmode == SCE_SELECT_FACE) {
 					draw_dm_edges_sel(em, cageDM, wireCol, selCol, actCol, eed_act);
 				}
 				else {
-					glShadeModel(GL_SMOOTH);
+					// Interpolate vertex selection
 					draw_dm_edges_sel_interp(em, cageDM, wireCol, selCol);
-					glShadeModel(GL_FLAT);
 				}
 			}
 			else {
@@ -3760,7 +3746,7 @@ static void draw_em_fancy(Scene *scene, ARegion *ar, View3D *v3d,
 	}
 
 	if ((dt > OB_WIRE) && (v3d->flag2 & V3D_RENDER_SHADOW)) {
-	    /* pass */
+		/* pass */
 	}
 	else {
 		/* annoying but active faces is stored differently */
@@ -4266,12 +4252,15 @@ static bool draw_mesh_object(Scene *scene, ARegion *ar, View3D *v3d, RegionView3
 	if (ob == obedit || drawlinked) {
 		DerivedMesh *finalDM, *cageDM;
 		
-		if (obedit != ob)
-			finalDM = cageDM = editbmesh_get_derived_base(ob, em);
-		else
+		if (obedit != ob) {
+			finalDM = cageDM = editbmesh_get_derived_base(
+			        ob, em, scene->customdata_mask);
+		}
+		else {
 			cageDM = editbmesh_get_derived_cage_and_final(
 			        scene, ob, em, scene->customdata_mask,
 			        &finalDM);
+		}
 
 		const bool use_material = ((me->drawflag & ME_DRAWEIGHT) == 0);
 
@@ -4463,10 +4452,6 @@ static void drawDispListsolid(ListBase *lb, Object *ob, const short dflag,
 
 	glEnableClientState(GL_VERTEX_ARRAY);
 
-	if (ob->type == OB_MBALL) {  /* mball always smooth shaded */
-		glShadeModel(GL_SMOOTH);
-	}
-
 	/* track current material, -1 for none (needed for lines) */
 	short col = -1;
 	
@@ -4488,7 +4473,6 @@ static void drawDispListsolid(ListBase *lb, Object *ob, const short dflag,
 
 					// glVertexPointer(3, GL_FLOAT, 0, dl->verts);
 					// glDrawArrays(GL_LINE_STRIP, 0, dl->nr);
-
 					glBegin(GL_LINE_STRIP);
 					for (int nr = dl->nr; nr; nr--, data += 3)
 						glVertex3fv(data);
@@ -4519,15 +4503,15 @@ static void drawDispListsolid(ListBase *lb, Object *ob, const short dflag,
 						GPU_object_material_bind(dl->col + 1, use_glsl ? &gattribs : NULL);
 						col = dl->col;
 					}
-
-					if (dl->rt & CU_SMOOTH) glShadeModel(GL_SMOOTH);
-					else glShadeModel(GL_FLAT);
+					/* FLAT/SMOOTH shading for surfaces */
+					glShadeModel((dl->rt & CU_SMOOTH) ? GL_SMOOTH : GL_FLAT);
 
 					glEnableClientState(GL_NORMAL_ARRAY);
 					glVertexPointer(3, GL_FLOAT, 0, dl->verts);
 					glNormalPointer(GL_FLOAT, 0, dl->nors);
 					glDrawElements(GL_QUADS, 4 * dl->totindex, GL_UNSIGNED_INT, dl->index);
 					glDisableClientState(GL_NORMAL_ARRAY);
+					glShadeModel(GL_SMOOTH);
 				}
 				break;
 
@@ -4572,7 +4556,6 @@ static void drawDispListsolid(ListBase *lb, Object *ob, const short dflag,
 	}
 
 	glDisableClientState(GL_VERTEX_ARRAY);
-	glShadeModel(GL_FLAT);
 	glFrontFace(GL_CCW);
 
 	if (col != -1) {
@@ -5782,8 +5765,6 @@ static void draw_ptcache_edit(Scene *scene, View3D *v3d, PTCacheEdit *edit)
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_COLOR_ARRAY);
 
-	glShadeModel(GL_SMOOTH);
-
 	if (pset->brushtype == PE_BRUSH_WEIGHT)
 		glLineWidth(2.0f);
 
@@ -5898,7 +5879,6 @@ static void draw_ptcache_edit(Scene *scene, View3D *v3d, PTCacheEdit *edit)
 	glDisableClientState(GL_COLOR_ARRAY);
 	glDisableClientState(GL_NORMAL_ARRAY);
 	glDisableClientState(GL_VERTEX_ARRAY);
-	glShadeModel(GL_FLAT);
 	if (v3d->zbuf) glEnable(GL_DEPTH_TEST);
 }
 
@@ -8524,7 +8504,7 @@ static void draw_object_mesh_instance(Scene *scene, View3D *v3d, RegionView3D *r
 	DerivedMesh *dm = NULL, *edm = NULL;
 	
 	if (ob->mode & OB_MODE_EDIT) {
-		edm = editbmesh_get_derived_base(ob, me->edit_btmesh);
+		edm = editbmesh_get_derived_base(ob, me->edit_btmesh, CD_MASK_BAREMESH);
 		DM_update_materials(edm, ob);
 	}
 	else {
