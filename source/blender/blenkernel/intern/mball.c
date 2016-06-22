@@ -66,28 +66,13 @@
 
 /* Functions */
 
-void BKE_mball_unlink(MetaBall *mb)
-{
-	int a;
-	
-	for (a = 0; a < mb->totcol; a++) {
-		if (mb->mat[a])
-			id_us_min(&mb->mat[a]->id);
-		mb->mat[a] = NULL;
-	}
-}
-
-
-/* do not free mball itself */
+/** Free (or release) any data used by this mball (does not free the mball itself). */
 void BKE_mball_free(MetaBall *mb)
 {
-	BKE_mball_unlink(mb);
-	
-	if (mb->adt) {
-		BKE_animdata_free((ID *)mb);
-		mb->adt = NULL;
-	}
-	if (mb->mat) MEM_freeN(mb->mat);
+	BKE_animdata_free((ID *)mb, false);
+
+	MEM_SAFE_FREE(mb->mat);
+
 	BLI_freelistN(&mb->elems);
 	if (mb->disp.first) BKE_displist_free(&mb->disp);
 }
@@ -292,6 +277,8 @@ void BKE_mball_texspace_calc(Object *ob)
 	size[2] = (max[2] - min[2]) / 2.0f;
 #endif
 	BKE_boundbox_init_from_minmax(bb, min, max);
+
+	bb->flag &= ~BOUNDBOX_DIRTY;
 }
 
 float *BKE_mball_make_orco(Object *ob, ListBase *dispbase)

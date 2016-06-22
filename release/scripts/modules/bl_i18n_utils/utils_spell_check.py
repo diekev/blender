@@ -58,7 +58,7 @@ class SpellChecker:
         "vertices",
 
         # Merged words
-        "addon", "addons",
+        #~ "addon", "addons",
         "antialiasing",
         "arcsine", "arccosine", "arctangent",
         "autoclip",
@@ -118,6 +118,7 @@ class SpellChecker:
         "localview",
         "lookup", "lookups",
         "mathutils",
+        "micropolygon",
         "midlevel",
         "midground",
         "mixdown",
@@ -127,6 +128,7 @@ class SpellChecker:
         "multires", "multiresolution",
         "multisampling",
         "multitexture",
+        "multithreaded", 
         "multiuser",
         "multiview",
         "namespace",
@@ -242,6 +244,7 @@ class SpellChecker:
         "aero",
         "amb",
         "anim",
+        "app",
         "bool",
         "calc",
         "config", "configs",
@@ -361,6 +364,7 @@ class SpellChecker:
         "collada",
         "compositing",
         "crossfade",
+        "cuda",
         "deinterlace",
         "dropoff",
         "dv",
@@ -410,6 +414,7 @@ class SpellChecker:
         # Blender terms
         "audaspace",
         "bbone",
+        "bendy",  # bones
         "bmesh",
         "breakdowner",
         "bspline",
@@ -471,9 +476,10 @@ class SpellChecker:
         "wpaint",
         "uvwarp",
 
-        # Algorithm names
+        # Algorithm/library names
         "ashikhmin",  # Ashikhmin-Shirley
         "beckmann",
+        "blosc",
         "catmull",
         "catrom",
         "chebychev",
@@ -593,6 +599,7 @@ class SpellChecker:
         "eps",
         "exr",
         "fbx",
+        "fbxnode",
         "ffmpeg",
         "flac",
         "gzip",

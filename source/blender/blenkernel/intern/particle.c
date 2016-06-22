@@ -141,6 +141,11 @@ int count_particles_mod(ParticleSystem *psys, int totgr, int cur)
 
 #define PATH_CACHE_BUF_SIZE 1024
 
+static ParticleCacheKey *pcache_key_segment_endpoint_safe(ParticleCacheKey *key)
+{
+	return (key->segments > 0) ? (key + (key->segments - 1)) : key;
+}
+
 static ParticleCacheKey **psys_alloc_path_cache_buffers(ListBase *bufs, int tot, int totkeys)
 {
 	LinkData *buf;
@@ -371,12 +376,17 @@ static void fluid_free_settings(SPHFluidSettings *fluid)
 		MEM_freeN(fluid); 
 }
 
+/** Free (or release) any data used by this particle settings (does not free the partsett itself). */
 void BKE_particlesettings_free(ParticleSettings *part)
 {
-	MTex *mtex;
 	int a;
-	BKE_animdata_free(&part->id);
+
+	BKE_animdata_free((ID *)part, false);
 	
+	for (a = 0; a < MAX_MTEX; a++) {
+		MEM_SAFE_FREE(part->mtex[a]);
+	}
+
 	if (part->clumpcurve)
 		curvemapping_free(part->clumpcurve);
 	if (part->roughcurve)
@@ -385,21 +395,12 @@ void BKE_particlesettings_free(ParticleSettings *part)
 	free_partdeflect(part->pd);
 	free_partdeflect(part->pd2);
 
-	if (part->effector_weights)
-		MEM_freeN(part->effector_weights);
+	MEM_SAFE_FREE(part->effector_weights);
 
 	BLI_freelistN(&part->dupliweights);
 
 	boid_free_settings(part->boids);
 	fluid_free_settings(part->fluid);
-
-	for (a = 0; a < MAX_MTEX; a++) {
-		mtex = part->mtex[a];
-		if (mtex && mtex->tex)
-			id_us_min(&mtex->tex->id);
-		if (mtex)
-			MEM_freeN(mtex);
-	}
 }
 
 void free_hair(Object *UNUSED(ob), ParticleSystem *psys, int dynamics)
@@ -568,10 +569,7 @@ void psys_free(Object *ob, ParticleSystem *psys)
 		if (!nr)
 			ob->transflag &= ~OB_DUPLIPARTS;
 
-		if (psys->part) {
-			id_us_min(&psys->part->id);
-			psys->part = NULL;
-		}
+		psys->part = NULL;
 
 		BKE_ptcache_free_list(&psys->ptcaches);
 		psys->pointcache = NULL;
@@ -720,13 +718,19 @@ void psys_render_restore(Object *ob, ParticleSystem *psys)
 	disp = psys_get_current_display_percentage(psys);
 
 	if (disp != render_disp) {
-		PARTICLE_P;
+		/* Hair can and has to be recalculated if everything isn't displayed. */
+		if (psys->part->type == PART_HAIR) {
+			psys->recalc |= PSYS_RECALC_RESET;
+		}
+		else {
+			PARTICLE_P;
 
-		LOOP_PARTICLES {
-			if (psys_frand(psys, p) > disp)
-				pa->flag |= PARS_NO_DISP;
-			else
-				pa->flag &= ~PARS_NO_DISP;
+			LOOP_PARTICLES {
+				if (psys_frand(psys, p) > disp)
+					pa->flag |= PARS_NO_DISP;
+				else
+					pa->flag &= ~PARS_NO_DISP;
+			}
 		}
 	}
 }
@@ -1416,13 +1420,19 @@ int psys_particle_dm_face_lookup(
 {
 	MFace *mtessface_final;
 	OrigSpaceFace *osface_final;
-	int totface_final;
 	int pindex_orig;
 	float uv[2], (*faceuv)[2];
 
 	const int *index_mf_to_mpoly_deformed = NULL;
 	const int *index_mf_to_mpoly = NULL;
 	const int *index_mp_to_orig = NULL;
+
+	const int totface_final = dm_final->getNumTessFaces(dm_final);
+	const int totface_deformed = dm_deformed ? dm_deformed->getNumTessFaces(dm_deformed) : totface_final;
+
+	if (ELEM(0, totface_final, totface_deformed)) {
+		return DMCACHE_NOTFOUND;
+	}
 
 	index_mf_to_mpoly = dm_final->getTessFaceDataArray(dm_final, CD_ORIGINDEX);
 	index_mp_to_orig = dm_final->getPolyDataArray(dm_final, CD_ORIGINDEX);
@@ -1444,11 +1454,6 @@ int psys_particle_dm_face_lookup(
 	}
 
 	index_mf_to_mpoly_deformed = NULL;
-
-	totface_final = dm_final->getNumTessFaces(dm_final);
-	if (!totface_final) {
-		return DMCACHE_NOTFOUND;
-	}
 
 	mtessface_final = dm_final->getTessFaceArray(dm_final);
 	osface_final = dm_final->getTessFaceDataArray(dm_final, CD_ORIGSPACE);
@@ -1603,8 +1608,14 @@ void psys_particle_on_dm(DerivedMesh *dm_final, int from, int index, int index_d
 			normalize_v3(nor);
 		}
 
-		if (orco)
-			copy_v3_v3(orco, orcodata[mapindex]);
+		if (orco) {
+			if (orcodata) {
+				copy_v3_v3(orco, orcodata[mapindex]);
+			}
+			else {
+				copy_v3_v3(orco, vec);
+			}
+		}
 
 		if (ornor) {
 			dm_final->getVertNo(dm_final, mapindex, ornor);
@@ -2113,7 +2124,7 @@ static bool psys_thread_context_init_path(ParticleThreadContext *ctx, ParticleSi
 		ctx->clumpcurve = NULL;
 	}
 	if ((part->child_flag & PART_CHILD_USE_ROUGH_CURVE) && part->roughcurve) {
-		ctx->clumpcurve = curvemapping_copy(part->roughcurve);
+		ctx->roughcurve = curvemapping_copy(part->roughcurve);
 		curvemapping_changed_all(ctx->roughcurve);
 	}
 	else {
@@ -2192,20 +2203,22 @@ static void psys_thread_create_path(ParticleTask *task, struct ChildParticle *cp
 
 		/* modify weights to create parting */
 		if (p_fac > 0.f) {
+			const ParticleCacheKey *key_0_last = pcache_key_segment_endpoint_safe(key[0]);
 			for (w = 0; w < 4; w++) {
-				if (w && weight[w] > 0.f) {
+				if (w && (weight[w] > 0.f)) {
+					const ParticleCacheKey *key_w_last = pcache_key_segment_endpoint_safe(key[w]);
 					float d;
 					if (part->flag & PART_CHILD_LONG_HAIR) {
 						/* For long hair use tip distance/root distance as parting factor instead of root to tip angle. */
 						float d1 = len_v3v3(key[0]->co, key[w]->co);
-						float d2 = len_v3v3((key[0] + key[0]->segments - 1)->co, (key[w] + key[w]->segments - 1)->co);
+						float d2 = len_v3v3(key_0_last->co, key_w_last->co);
 
 						d = d1 > 0.f ? d2 / d1 - 1.f : 10000.f;
 					}
 					else {
 						float v1[3], v2[3];
-						sub_v3_v3v3(v1, (key[0] + key[0]->segments - 1)->co, key[0]->co);
-						sub_v3_v3v3(v2, (key[w] + key[w]->segments - 1)->co, key[w]->co);
+						sub_v3_v3v3(v1, key_0_last->co, key[0]->co);
+						sub_v3_v3v3(v2, key_w_last->co, key[w]->co);
 						normalize_v3(v1);
 						normalize_v3(v2);
 
@@ -3499,7 +3512,7 @@ static void get_cpa_texture(DerivedMesh *dm, ParticleSystem *psys, ParticleSetti
 					break;
 			}
 
-			externtex(mtex, texvec, &value, rgba, rgba + 1, rgba + 2, rgba + 3, 0, NULL, false);
+			externtex(mtex, texvec, &value, rgba, rgba + 1, rgba + 2, rgba + 3, 0, NULL, false, false);
 
 			if ((event & mtex->mapto) & PAMAP_ROUGH)
 				ptex->rough1 = ptex->rough2 = ptex->roughe = texture_value_blend(def, ptex->rough1, value, mtex->roughfac, blend);
@@ -3582,7 +3595,7 @@ void psys_get_texture(ParticleSimulationData *sim, ParticleData *pa, ParticleTex
 					break;
 			}
 
-			externtex(mtex, texvec, &value, rgba, rgba + 1, rgba + 2, rgba + 3, 0, NULL, false);
+			externtex(mtex, texvec, &value, rgba, rgba + 1, rgba + 2, rgba + 3, 0, NULL, false, false);
 
 			if ((event & mtex->mapto) & PAMAP_TIME) {
 				/* the first time has to set the base value for time regardless of blend mode */
@@ -4212,8 +4225,8 @@ void psys_make_billboard(ParticleBillboardData *bb, float xvec[3], float yvec[3]
 	/* can happen with bad pointcache or physics calculation
 	 * since this becomes geometry, nan's and inf's crash raytrace code.
 	 * better not allow this. */
-	if ((!finite(bb->vec[0])) || (!finite(bb->vec[1])) || (!finite(bb->vec[2])) ||
-	    (!finite(bb->vel[0])) || (!finite(bb->vel[1])) || (!finite(bb->vel[2])) )
+	if ((!isfinite(bb->vec[0])) || (!isfinite(bb->vec[1])) || (!isfinite(bb->vec[2])) ||
+	    (!isfinite(bb->vel[0])) || (!isfinite(bb->vel[1])) || (!isfinite(bb->vel[2])) )
 	{
 		zero_v3(bb->vec);
 		zero_v3(bb->vel);

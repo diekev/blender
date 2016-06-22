@@ -100,7 +100,6 @@ class NODE_HT_header(Header):
         elif snode.tree_type == 'CompositorNodeTree':
             if snode_id:
                 layout.prop(snode_id, "use_nodes")
-                layout.prop(snode_id.render, "use_free_unused_nodes", text="Free Unused")
             layout.prop(snode, "show_backdrop")
             if snode.show_backdrop:
                 row = layout.row(align=True)
@@ -193,8 +192,8 @@ class NODE_MT_view(Menu):
         layout.separator()
 
         layout.operator("screen.area_dupli")
-        layout.operator("screen.screen_full_area", text="Toggle Maximize Area")
-        layout.operator("screen.screen_full_area").use_hide_panels = True
+        layout.operator("screen.screen_full_area")
+        layout.operator("screen.screen_full_area", text="Toggle Fullscreen Area").use_hide_panels = True
 
 
 class NODE_MT_select(Menu):

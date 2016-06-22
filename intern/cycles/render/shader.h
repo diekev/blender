@@ -26,6 +26,8 @@
 #include "attribute.h"
 #include "kernel_types.h"
 
+#include "node.h"
+
 #include "util_map.h"
 #include "util_param.h"
 #include "util_string.h"
@@ -53,11 +55,15 @@ enum VolumeSampling {
 	VOLUME_SAMPLING_DISTANCE = 0,
 	VOLUME_SAMPLING_EQUIANGULAR = 1,
 	VOLUME_SAMPLING_MULTIPLE_IMPORTANCE = 2,
+
+	VOLUME_NUM_SAMPLING,
 };
 
 enum VolumeInterpolation {
 	VOLUME_INTERPOLATION_LINEAR = 0,
 	VOLUME_INTERPOLATION_CUBIC = 1,
+
+	VOLUME_NUM_INTERPOLATION,
 };
 
 /* Shader describing the appearance of a Mesh, Light or Background.
@@ -66,10 +72,10 @@ enum VolumeInterpolation {
  * volume and displacement, that the shader manager will compile and execute
  * separately. */
 
-class Shader {
+class Shader : public Node {
 public:
-	/* name */
-	string name;
+	NODE_DECLARE;
+
 	int pass_id;
 
 	/* shader graph */
@@ -108,6 +114,7 @@ public:
 	AttributeRequestSet attributes;
 
 	/* determined before compiling */
+	uint id;
 	bool used;
 
 #ifdef WITH_OSL
@@ -155,7 +162,7 @@ public:
 	uint get_attribute_id(AttributeStandard std);
 
 	/* get shader id for mesh faces */
-	int get_shader_id(uint shader, Mesh *mesh = NULL, bool smooth = false);
+	int get_shader_id(Shader *shader, Mesh *mesh = NULL, bool smooth = false);
 
 	/* add default shaders to scene, to use as default for things that don't
 	 * have any shader assigned explicitly */
@@ -164,6 +171,8 @@ public:
 	/* Selective nodes compilation. */
 	void get_requested_features(Scene *scene,
 	                            DeviceRequestedFeatures *requested_features);
+
+	static void free_memory();
 
 protected:
 	ShaderManager();

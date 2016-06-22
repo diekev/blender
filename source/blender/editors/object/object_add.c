@@ -1112,7 +1112,6 @@ void ED_base_object_free_and_unlink(Main *bmain, Scene *scene, Base *base)
 	BKE_scene_base_unlink(scene, base);
 	object_delete_check_glsl_update(base->object);
 	BKE_libblock_free_us(bmain, base->object);
-	if (scene->basact == base) scene->basact = NULL;
 	MEM_freeN(base);
 }
 
@@ -1151,7 +1150,6 @@ static int object_delete_exec(bContext *C, wmOperator *op)
 			}
 		}
 		/* end global */
-
 	}
 	CTX_DATA_END;
 
@@ -1159,7 +1157,7 @@ static int object_delete_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 
 	/* delete has to handle all open scenes */
-	BKE_main_id_flag_listbase(&bmain->scene, LIB_TAG_DOIT, 1);
+	BKE_main_id_tag_listbase(&bmain->scene, LIB_TAG_DOIT, true);
 	for (win = wm->windows.first; win; win = win->next) {
 		scene = win->screen->scene;
 		
@@ -1289,7 +1287,7 @@ static void make_object_duplilist_real(bContext *C, Scene *scene, Base *base,
 		basen->object = ob;
 
 		/* make sure apply works */
-		BKE_animdata_free(&ob->id);
+		BKE_animdata_free(&ob->id, true);
 		ob->adt = NULL;
 
 		/* Proxies are not to be copied. */
@@ -1381,7 +1379,6 @@ static void make_object_duplilist_real(bContext *C, Scene *scene, Base *base,
 		}
 	}
 
-	/* The same how BKE_object_unlink detects which object proxies to clear. */
 	if (base->object->transflag & OB_DUPLIGROUP && base->object->dup_group) {
 		for (object = bmain->object.first; object; object = object->id.next) {
 			if (object->proxy_group == base->object) {
@@ -1602,7 +1599,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 
 			if (newob->type == OB_CURVE) {
 				BKE_object_free_modifiers(newob);   /* after derivedmesh calls! */
-				ED_rigidbody_object_remove(scene, newob);
+				ED_rigidbody_object_remove(bmain, scene, newob);
 			}
 		}
 		else if (ob->type == OB_MESH && ob->modifiers.first) { /* converting a mesh with no modifiers causes a segfault */

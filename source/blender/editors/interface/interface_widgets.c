@@ -712,8 +712,7 @@ static void widgetbase_draw(uiWidgetBase *wtb, uiWidgetColors *wcol)
 			unsigned char *col_pt = col_array;
 			
 			shadecolors4(col1, col2, wcol->inner, wcol->shadetop, wcol->shadedown);
-			
-			glShadeModel(GL_SMOOTH);
+
 			for (a = 0; a < wtb->totvert; a++, col_pt += 4) {
 				round_box_shade_col4_r(col_pt, col1, col2, wtb->inner_uv[a][wtb->draw_shadedir ? 1 : 0]);
 			}
@@ -725,8 +724,6 @@ static void widgetbase_draw(uiWidgetBase *wtb, uiWidgetColors *wcol)
 			glDrawArrays(GL_POLYGON, 0, wtb->totvert);
 			glDisableClientState(GL_VERTEX_ARRAY);
 			glDisableClientState(GL_COLOR_ARRAY);
-
-			glShadeModel(GL_FLAT);
 		}
 	}
 	
@@ -859,10 +856,17 @@ static void widget_draw_icon(
 		else if (but->flag & UI_ACTIVE) {}
 		else alpha = 0.5f;
 	}
-	
-	/* extra feature allows more alpha blending */
-	if ((but->type == UI_BTYPE_LABEL) && but->a1 == 1.0f)
-		alpha *= but->a2;
+	else if ((but->type == UI_BTYPE_LABEL)) {
+		/* extra feature allows more alpha blending */
+		if (but->a1 == 1.0f) {
+			alpha *= but->a2;
+		}
+	}
+	else if (ELEM(but->type, UI_BTYPE_BUT)) {
+		if (but->flag & UI_BUT_DISABLED) {
+			alpha *= 0.5f;
+		}
+	}
 	
 	glEnable(GL_BLEND);
 	
@@ -2304,8 +2308,6 @@ static void ui_draw_but_HSVCIRCLE(uiBut *but, uiWidgetColors *wcol, const rcti *
 	
 	ui_color_picker_to_rgb(0.0f, 0.0f, hsv[2], colcent, colcent + 1, colcent + 2);
 
-	glShadeModel(GL_SMOOTH);
-
 	glBegin(GL_TRIANGLE_FAN);
 	glColor3fv(colcent);
 	glVertex2f(centx, centy);
@@ -2322,8 +2324,6 @@ static void ui_draw_but_HSVCIRCLE(uiBut *but, uiWidgetColors *wcol, const rcti *
 		glVertex2f(centx + co * radius, centy + si * radius);
 	}
 	glEnd();
-	
-	glShadeModel(GL_FLAT);
 	
 	/* fully rounded outline */
 	glPushMatrix();
@@ -2356,7 +2356,6 @@ void ui_draw_gradient(const rcti *rect, const float hsv[3], const int type, cons
 	float col1[4][3];   /* right half, rect bottom to top */
 
 	/* draw series of gouraud rects */
-	glShadeModel(GL_SMOOTH);
 	
 	switch (type) {
 		case UI_GRAD_SV:
@@ -2479,8 +2478,6 @@ void ui_draw_gradient(const rcti *rect, const float hsv[3], const int type, cons
 		}
 		glEnd();
 	}
-
-	glShadeModel(GL_FLAT);
 }
 
 bool ui_but_is_colorpicker_display_space(uiBut *but)
@@ -3042,6 +3039,15 @@ static void widget_swatch(uiBut *but, uiWidgetColors *wcol, rcti *rect, int stat
 
 	wcol->shaded = 0;
 	wcol->alpha_check = (wcol->inner[3] < 255);
+	
+	if (state & (UI_BUT_DISABLED | UI_BUT_INACTIVE)) {
+		/* Now we reduce alpha of the inner color (i.e. the color shown)
+		 * so that this setting can look greyed out, while retaining
+		 * the checkboard (for transparent values). This is needed
+		 * here as the effects of ui_widget_color_disabled() are overwritten.
+		 */
+		wcol->inner[3] /= 2;
+	}
 
 	widgetbase_draw(&wtb, wcol);
 	
@@ -3253,7 +3259,7 @@ static void widget_optionbut(uiWidgetColors *wcol, rcti *rect, int state, int UN
 	recttemp.ymax -= delta;
 	
 	/* half rounded */
-	rad = 0.2f * U.widget_unit;
+	rad = BLI_rcti_size_y(&recttemp) / 3;
 	round_box_edges(&wtb, UI_CNR_ALL, &recttemp, rad);
 	
 	/* decoration */
@@ -3499,6 +3505,10 @@ static uiWidgetType *widget_type(uiWidgetTypeEnum type)
 			
 		/* specials */
 		case UI_WTYPE_ICON:
+			wt.custom = widget_icon_has_anim;
+			break;
+
+		case UI_WTYPE_ICON_LABEL:
 			/* behave like regular labels (this is simply a label with an icon) */
 			wt.state = widget_state_label;
 			wt.custom = widget_icon_has_anim;
@@ -3628,7 +3638,14 @@ void ui_draw_but(const bContext *C, ARegion *ar, uiStyle *style, uiBut *but, rct
 	}
 	else if (but->dt == UI_EMBOSS_NONE) {
 		/* "nothing" */
-		wt = widget_type(UI_WTYPE_ICON);
+		switch (but->type) {
+			case UI_BTYPE_LABEL:
+				wt = widget_type(UI_WTYPE_ICON_LABEL);
+				break;
+			default:
+				wt = widget_type(UI_WTYPE_ICON);
+				break;
+		}
 	}
 	else if (but->dt == UI_EMBOSS_RADIAL) {
 		wt = widget_type(UI_WTYPE_MENU_ITEM_RADIAL);
@@ -4087,7 +4104,9 @@ void ui_draw_menu_item(uiFontStyle *fstyle, rcti *rect, const char *name, int ic
 		const float minwidth = (float)(UI_DPI_ICON_SIZE);
 
 		BLI_strncpy(drawstr, name, sizeof(drawstr));
-		UI_text_clip_middle_ex(fstyle, drawstr, okwidth, minwidth, max_len, '\0');
+		if (drawstr[0]) {
+			UI_text_clip_middle_ex(fstyle, drawstr, okwidth, minwidth, max_len, '\0');
+		}
 
 		glColor4ubv((unsigned char *)wt->wcol.text);
 		UI_fontstyle_draw(fstyle, rect, drawstr);

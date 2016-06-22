@@ -58,6 +58,8 @@
 #include "BIF_gl.h"
 #include "BIF_glutil.h"
 
+#include "GPU_basic_shader.h"
+
 #include "ED_screen.h"
 #include "ED_view3d.h"
 
@@ -160,11 +162,11 @@ static void paint_draw_line_cursor(bContext *C, int x, int y, void *customdata)
 	glEnable(GL_LINE_SMOOTH);
 	glEnable(GL_BLEND);
 
-	glEnable(GL_LINE_STIPPLE);
-	glLineStipple(3, 0xAAAA);
+	GPU_basic_shader_bind_enable(GPU_SHADER_LINE | GPU_SHADER_STIPPLE);
+	GPU_basic_shader_line_stipple(3, 0xAAAA);
+	GPU_basic_shader_line_width(3.0);
 
 	glColor4ub(0, 0, 0, paint->paint_cursor_col[3]);
-	glLineWidth(3.0);
 	if (stroke->constrain_line) {
 		sdrawline((int)stroke->last_mouse_position[0], (int)stroke->last_mouse_position[1],
 		        stroke->constrained_pos[0], stroke->constrained_pos[1]);
@@ -175,7 +177,7 @@ static void paint_draw_line_cursor(bContext *C, int x, int y, void *customdata)
 	}
 
 	glColor4ub(255, 255, 255, paint->paint_cursor_col[3]);
-	glLineWidth(1.0);
+	GPU_basic_shader_line_width(1.0);
 	if (stroke->constrain_line) {
 		sdrawline((int)stroke->last_mouse_position[0], (int)stroke->last_mouse_position[1],
 		        stroke->constrained_pos[0], stroke->constrained_pos[1]);
@@ -185,7 +187,7 @@ static void paint_draw_line_cursor(bContext *C, int x, int y, void *customdata)
 		        x, y);
 	}
 
-	glDisable(GL_LINE_STIPPLE);
+	GPU_basic_shader_bind_disable(GPU_SHADER_LINE | GPU_SHADER_STIPPLE);
 
 	glDisable(GL_BLEND);
 	glDisable(GL_LINE_SMOOTH);
@@ -1156,7 +1158,7 @@ int paint_stroke_modal(bContext *C, wmOperator *op, const wmEvent *event)
 		if (event->val == KM_RELEASE) {
 			copy_v2_fl2(mouse, event->mval[0], event->mval[1]);
 			paint_stroke_line_constrain(stroke, mouse);
-			paint_stroke_line_end (C, op, stroke, mouse);
+			paint_stroke_line_end(C, op, stroke, mouse);
 			stroke_done(C, op);
 			return OPERATOR_FINISHED;
 		}
@@ -1239,20 +1241,31 @@ int paint_stroke_exec(bContext *C, wmOperator *op)
 
 	/* only when executed for the first time */
 	if (stroke->stroke_started == 0) {
-		/* XXX stroke->last_mouse_position is unset, this may cause problems */
-		stroke->test_start(C, op, NULL);
-		stroke->stroke_started = 1;
+		PropertyRNA *strokeprop;
+		PointerRNA firstpoint;
+		float mouse[2];
+
+		strokeprop = RNA_struct_find_property(op->ptr, "stroke");
+
+		if (RNA_property_collection_lookup_int(op->ptr, strokeprop, 0, &firstpoint)) {
+			RNA_float_get_array(&firstpoint, "mouse", mouse);
+			stroke->stroke_started = stroke->test_start(C, op, mouse);
+		}
 	}
 
-	RNA_BEGIN (op->ptr, itemptr, "stroke")
-	{
-		stroke->update_step(C, stroke, &itemptr);
+	if (stroke->stroke_started) {
+		RNA_BEGIN (op->ptr, itemptr, "stroke")
+		{
+			stroke->update_step(C, stroke, &itemptr);
+		}
+		RNA_END;
 	}
-	RNA_END;
+
+	bool ok = (stroke->stroke_started != 0);
 
 	stroke_done(C, op);
 
-	return OPERATOR_FINISHED;
+	return ok ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
 }
 
 void paint_stroke_cancel(bContext *C, wmOperator *op)

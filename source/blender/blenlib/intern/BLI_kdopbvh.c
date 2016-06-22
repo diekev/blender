@@ -72,6 +72,12 @@
 #  define KDOPBVH_THREAD_LEAF_THRESHOLD 1024
 #endif
 
+
+/* -------------------------------------------------------------------- */
+
+/** \name Struct Definitions
+ * \{ */
+
 typedef unsigned char axis_t;
 
 typedef struct BVHNode {
@@ -165,6 +171,9 @@ typedef struct BVHNearestRayData {
 	BVHTreeNearest nearest;
 } BVHNearestRayData;
 
+/** \} */
+
+
 /**
  * Bounding Volume Hierarchy Definition
  *
@@ -178,6 +187,12 @@ const float bvhtree_kdop_axes[13][3] = {
 	{1.0, -1.0, -1.0}, {1.0, 1.0, 0}, {1.0, 0, 1.0}, {0, 1.0, 1.0}, {1.0, -1.0, 0}, {1.0, 0, -1.0},
 	{0, 1.0, -1.0}
 };
+
+
+/* -------------------------------------------------------------------- */
+
+/** \name Utility Functions
+ * \{ */
 
 MINLINE axis_t min_axis(axis_t a, axis_t b)
 {
@@ -287,6 +302,14 @@ static void node_minmax_init(const BVHTree *tree, BVHNode *node)
 		bv[axis_iter][1] = -FLT_MAX;
 	}
 }
+
+/** \} */
+
+
+/* -------------------------------------------------------------------- */
+
+/** \name Balance Utility Functions
+ * \{ */
 
 /**
  * Insertion sort algorithm
@@ -897,8 +920,13 @@ static void non_recursive_bvh_div_nodes(BVHTree *tree, BVHNode *branches_array, 
 	}
 }
 
+/** \} */
+
+
 /* -------------------------------------------------------------------- */
-/* BLI_bvhtree api */
+
+/** \name BLI_bvhtree API
+ * \{ */
 
 /**
  * \note many callers don't check for ``NULL`` return.
@@ -1086,15 +1114,27 @@ void BLI_bvhtree_update_tree(BVHTree *tree)
 	for (; index >= root; index--)
 		node_join(tree, *index);
 }
+/**
+ * Number of times #BLI_bvhtree_insert has been called.
+ * mainly useful for asserts functions to check we added the correct number.
+ */
+int BLI_bvhtree_get_size(const BVHTree *tree)
+{
+	return tree->totleaf;
+}
 
-float BLI_bvhtree_getepsilon(const BVHTree *tree)
+float BLI_bvhtree_get_epsilon(const BVHTree *tree)
 {
 	return tree->epsilon;
 }
 
+/** \} */
+
 
 /* -------------------------------------------------------------------- */
-/* BLI_bvhtree_overlap */
+
+/** \name BLI_bvhtree_overlap
+ * \{ */
 
 /**
  * overlap - is it possible for 2 bv's to collide ?
@@ -1298,6 +1338,14 @@ BVHTreeOverlap *BLI_bvhtree_overlap(
 	return overlap;
 }
 
+/** \} */
+
+
+/* -------------------------------------------------------------------- */
+
+/** \name BLI_bvhtree_find_nearest
+ * \{ */
+
 /* Determines the nearest point of the given node BV. Returns the squared distance to that point. */
 static float calc_nearest_point_squared(const float proj[3], BVHNode *node, float nearest[3])
 {
@@ -1472,8 +1520,9 @@ static void bfs_find_nearest(BVHNearestData *data, BVHNode *node)
 #endif
 
 
-int BLI_bvhtree_find_nearest(BVHTree *tree, const float co[3], BVHTreeNearest *nearest,
-                             BVHTree_NearestPointCallback callback, void *userdata)
+int BLI_bvhtree_find_nearest(
+        BVHTree *tree, const float co[3], BVHTreeNearest *nearest,
+        BVHTree_NearestPointCallback callback, void *userdata)
 {
 	axis_t axis_iter;
 
@@ -1511,16 +1560,20 @@ int BLI_bvhtree_find_nearest(BVHTree *tree, const float co[3], BVHTreeNearest *n
 	return data.nearest.index;
 }
 
+/** \} */
 
-/**
- * Raycast - BLI_bvhtree_ray_cast
+
+/* -------------------------------------------------------------------- */
+
+/** \name BLI_bvhtree_ray_cast
  *
- * raycast is done by performing a DFS on the BVHTree and saving the closest hit
- */
+ * raycast is done by performing a DFS on the BVHTree and saving the closest hit.
+ *
+ * \{ */
 
 
 /* Determines the distance that the ray must travel to hit the bounding volume of the given node */
-static float ray_nearest_hit(BVHRayCastData *data, const float bv[6])
+static float ray_nearest_hit(const BVHRayCastData *data, const float bv[6])
 {
 	int i;
 
@@ -1590,7 +1643,9 @@ static void dfs_raycast(BVHRayCastData *data, BVHNode *node)
 	 * before calling the ray-primitive functions */
 	/* XXX: temporary solution for particles until fast_ray_nearest_hit supports ray.radius */
 	float dist = (data->ray.radius == 0.0f) ? fast_ray_nearest_hit(data, node) : ray_nearest_hit(data, node->bv);
-	if (dist >= data->hit.dist) return;
+	if (dist >= data->hit.dist) {
+		return;
+	}
 
 	if (node->totnode == 0) {
 		if (data->callback) {
@@ -1617,6 +1672,9 @@ static void dfs_raycast(BVHRayCastData *data, BVHNode *node)
 	}
 }
 
+/**
+ * A version of #dfs_raycast with minor changes to reset the index & dist each ray cast.
+ */
 static void dfs_raycast_all(BVHRayCastData *data, BVHNode *node)
 {
 	int i;
@@ -1625,18 +1683,16 @@ static void dfs_raycast_all(BVHRayCastData *data, BVHNode *node)
 	 * before calling the ray-primitive functions */
 	/* XXX: temporary solution for particles until fast_ray_nearest_hit supports ray.radius */
 	float dist = (data->ray.radius == 0.0f) ? fast_ray_nearest_hit(data, node) : ray_nearest_hit(data, node->bv);
+	if (dist >= data->hit.dist) {
+		return;
+	}
 
 	if (node->totnode == 0) {
-		if (data->callback) {
-			data->hit.index = -1;
-			data->hit.dist = BVH_RAYCAST_DIST_MAX;
-			data->callback(data->userdata, node->index, &data->ray, &data->hit);
-		}
-		else {
-			data->hit.index = node->index;
-			data->hit.dist  = dist;
-			madd_v3_v3v3fl(data->hit.co, data->ray.origin, data->ray.direction, dist);
-		}
+		/* no need to check for 'data->callback' (using 'all' only makes sense with a callback). */
+		dist = data->hit.dist;
+		data->callback(data->userdata, node->index, &data->ray, &data->hit);
+		data->hit.index = -1;
+		data->hit.dist = dist;
 	}
 	else {
 		/* pick loop direction to dive into the tree (based on ray direction and split axis) */
@@ -1787,9 +1843,14 @@ float BLI_bvhtree_bb_raycast(const float bv[6], const float light_start[3], cons
 
 /**
  * Calls the callback for every ray intersection
+ *
+ * \note Using a \a callback which resets or never sets the #BVHTreeRayHit index & dist works too,
+ * however using this function means existing generic callbacks can be used from custom callbacks without
+ * having to handle resetting the hit beforehand.
+ * It also avoid redundant argument and return value which aren't meaningful when collecting multiple hits.
  */
-int BLI_bvhtree_ray_cast_all_ex(
-        BVHTree *tree, const float co[3], const float dir[3], float radius,
+void BLI_bvhtree_ray_cast_all_ex(
+        BVHTree *tree, const float co[3], const float dir[3], float radius, float hit_dist,
         BVHTree_RayCastCallback callback, void *userdata,
         int flag)
 {
@@ -1797,6 +1858,7 @@ int BLI_bvhtree_ray_cast_all_ex(
 	BVHNode *root = tree->nodes[tree->totleaf];
 
 	BLI_ASSERT_UNIT_V3(dir);
+	BLI_assert(callback != NULL);
 
 	data.tree = tree;
 
@@ -1810,21 +1872,26 @@ int BLI_bvhtree_ray_cast_all_ex(
 	bvhtree_ray_cast_data_precalc(&data, flag);
 
 	data.hit.index = -1;
-	data.hit.dist = BVH_RAYCAST_DIST_MAX;
+	data.hit.dist = hit_dist;
 
 	if (root) {
 		dfs_raycast_all(&data, root);
 	}
-
-	return data.hit.index;
 }
 
-int BLI_bvhtree_ray_cast_all(
-        BVHTree *tree, const float co[3], const float dir[3], float radius,
+void BLI_bvhtree_ray_cast_all(
+        BVHTree *tree, const float co[3], const float dir[3], float radius, float hit_dist,
         BVHTree_RayCastCallback callback, void *userdata)
 {
-	return BLI_bvhtree_ray_cast_all_ex(tree, co, dir, radius, callback, userdata, BVH_RAYCAST_DEFAULT);
+	BLI_bvhtree_ray_cast_all_ex(tree, co, dir, radius, hit_dist, callback, userdata, BVH_RAYCAST_DEFAULT);
 }
+
+
+/* -------------------------------------------------------------------- */
+
+/** \name BLI_bvhtree_find_nearest_to_ray
+ *
+ * \{ */
 
 static float calc_dist_sq_to_ray(BVHNearestRayData *data, BVHNode *node)
 {
@@ -1872,23 +1939,12 @@ static void dfs_find_nearest_to_ray_dfs(BVHNearestRayData *data, BVHNode *node)
 	}
 }
 
-static void dfs_find_nearest_to_ray_begin(BVHNearestRayData *data, BVHNode *node)
-{
-	float dist_sq = calc_dist_sq_to_ray(data, node);
-	if (dist_sq >= data->nearest.dist_sq) {
-		return;
-	}
-	dfs_find_nearest_to_ray_dfs(data, node);
-}
-
 int BLI_bvhtree_find_nearest_to_ray(
-	BVHTree *tree, const float co[3], const float dir[3], float radius, BVHTreeNearest *nearest,
-	BVHTree_NearestToRayCallback callback, void *userdata)
+        BVHTree *tree, const float co[3], const float dir[3], BVHTreeNearest *nearest,
+        BVHTree_NearestToRayCallback callback, void *userdata)
 {
 	BVHNearestRayData data;
 	BVHNode *root = tree->nodes[tree->totleaf];
-
-	BLI_ASSERT_UNIT_V3(dir);
 
 	data.tree = tree;
 
@@ -1897,7 +1953,7 @@ int BLI_bvhtree_find_nearest_to_ray(
 
 	copy_v3_v3(data.ray.origin, co);
 	copy_v3_v3(data.ray.direction, dir);
-	data.ray.radius = radius;
+	data.ray.radius = 0.0f;  /* unused here */
 
 	dist_squared_ray_to_aabb_v3_precalc(&data.nearest_precalc, co, dir);
 
@@ -1911,7 +1967,9 @@ int BLI_bvhtree_find_nearest_to_ray(
 
 	/* dfs search */
 	if (root) {
-		dfs_find_nearest_to_ray_begin(&data, root);
+		if (calc_dist_sq_to_ray(&data, root) < data.nearest.dist_sq) {
+			dfs_find_nearest_to_ray_dfs(&data, root);
+		}
 	}
 
 	/* copy back results */
@@ -1922,12 +1980,18 @@ int BLI_bvhtree_find_nearest_to_ray(
 	return data.nearest.index;
 }
 
-/**
- * Range Query - as request by broken :P
+/** \} */
+
+
+/* -------------------------------------------------------------------- */
+
+/** \name BLI_bvhtree_range_query
  *
- * Allocs and fills an array with the indexs of node that are on the given spherical range (center, radius) 
+ * Allocs and fills an array with the indexs of node that are on the given spherical range (center, radius).
  * Returns the size of the array.
- */
+ *
+ * \{ */
+
 typedef struct RangeQueryData {
 	BVHTree *tree;
 	const float *center;
@@ -1960,7 +2024,7 @@ static void dfs_range_query(RangeQueryData *data, BVHNode *node)
 				/* Its a leaf.. call the callback */
 				if (node->children[i]->totnode == 0) {
 					data->hits++;
-					data->callback(data->userdata, node->children[i]->index, dist_sq);
+					data->callback(data->userdata, node->children[i]->index, data->center, dist_sq);
 				}
 				else
 					dfs_range_query(data, node->children[i]);
@@ -1969,7 +2033,9 @@ static void dfs_range_query(RangeQueryData *data, BVHNode *node)
 	}
 }
 
-int BLI_bvhtree_range_query(BVHTree *tree, const float co[3], float radius, BVHTree_RangeQuery callback, void *userdata)
+int BLI_bvhtree_range_query(
+        BVHTree *tree, const float co[3], float radius,
+        BVHTree_RangeQuery callback, void *userdata)
 {
 	BVHNode *root = tree->nodes[tree->totleaf];
 
@@ -1989,7 +2055,7 @@ int BLI_bvhtree_range_query(BVHTree *tree, const float co[3], float radius, BVHT
 			/* Its a leaf.. call the callback */
 			if (root->totnode == 0) {
 				data.hits++;
-				data.callback(data.userdata, root->index, dist_sq);
+				data.callback(data.userdata, root->index, co, dist_sq);
 			}
 			else
 				dfs_range_query(&data, root);
@@ -1998,6 +2064,8 @@ int BLI_bvhtree_range_query(BVHTree *tree, const float co[3], float radius, BVHT
 
 	return data.hits;
 }
+
+/** \} */
 
 
 /* -------------------------------------------------------------------- */
@@ -2023,7 +2091,7 @@ static bool bvhtree_walk_dfs_recursive(
 		/* First pick the closest node to recurse into */
 		if (walk_order_cb((const BVHTreeAxisRange *)node->bv, node->main_axis, userdata)) {
 			for (int i = 0; i != node->totnode; i++) {
-				if (walk_parent_cb((const BVHTreeAxisRange *)node->bv, userdata)) {
+				if (walk_parent_cb((const BVHTreeAxisRange *)node->children[i]->bv, userdata)) {
 					if (!bvhtree_walk_dfs_recursive(
 					        walk_parent_cb, walk_leaf_cb, walk_order_cb,
 					        node->children[i], userdata))
@@ -2035,7 +2103,7 @@ static bool bvhtree_walk_dfs_recursive(
 		}
 		else {
 			for (int i = node->totnode - 1; i >= 0; i--) {
-				if (walk_parent_cb((const BVHTreeAxisRange *)node->bv, userdata)) {
+				if (walk_parent_cb((const BVHTreeAxisRange *)node->children[i]->bv, userdata)) {
 					if (!bvhtree_walk_dfs_recursive(
 					        walk_parent_cb, walk_leaf_cb, walk_order_cb,
 					        node->children[i], userdata))
@@ -2069,7 +2137,10 @@ void BLI_bvhtree_walk_dfs(
 {
 	const BVHNode *root = tree->nodes[tree->totleaf];
 	if (root != NULL) {
-		bvhtree_walk_dfs_recursive(walk_parent_cb, walk_leaf_cb, walk_order_cb, root, userdata);
+		/* first make sure the bv of root passes in the test too */
+		if (walk_parent_cb((const BVHTreeAxisRange *)root->bv, userdata)) {
+			bvhtree_walk_dfs_recursive(walk_parent_cb, walk_leaf_cb, walk_order_cb, root, userdata);
+		}
 	}
 }
 
