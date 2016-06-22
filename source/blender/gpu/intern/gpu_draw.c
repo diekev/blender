@@ -39,7 +39,6 @@
 #include <string.h>
 
 #include "GPU_glew.h"
-#include "GPU_debug.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_linklist.h"
@@ -70,10 +69,11 @@
 #include "BKE_main.h"
 #include "BKE_material.h"
 #include "BKE_node.h"
-#include "BKE_object.h"
 #include "BKE_scene.h"
-#include "BKE_subsurf.h"
 #include "BKE_DerivedMesh.h"
+#ifdef WITH_GAMEENGINE
+#  include "BKE_object.h"
+#endif
 
 #include "GPU_basic_shader.h"
 #include "GPU_buffers.h"
@@ -85,9 +85,12 @@
 
 #include "PIL_time.h"
 
-#include "smoke_API.h"
+#ifdef WITH_SMOKE
+#  include "smoke_API.h"
+#endif
 
 #ifdef WITH_OPENSUBDIV
+#  include "BKE_subsurf.h"
 #  include "BKE_editmesh.h"
 
 #  include "gpu_codegen.h"
@@ -509,7 +512,61 @@ static void gpu_verify_reflection(Image *ima)
 	}
 }
 
-int GPU_verify_image(Image *ima, ImageUser *iuser, int textarget, int tftile, bool compare, bool mipmap, bool is_data)
+typedef struct VerifyThreadData {
+	ImBuf *ibuf;
+	float *srgb_frect;
+} VerifyThreadData;
+
+static void gpu_verify_high_bit_srgb_buffer_slice(float *srgb_frect,
+                                                  ImBuf *ibuf,
+                                                  const int start_line,
+                                                  const int height)
+{
+	size_t offset = ibuf->channels * start_line * ibuf->x;
+	float *current_srgb_frect = srgb_frect + offset;
+	float *current_rect_float = ibuf->rect_float + offset;
+	IMB_buffer_float_from_float(current_srgb_frect,
+	                            current_rect_float,
+	                            ibuf->channels,
+	                            IB_PROFILE_SRGB,
+	                            IB_PROFILE_LINEAR_RGB, true,
+	                            ibuf->x, height,
+	                            ibuf->x, ibuf->x);
+	IMB_buffer_float_unpremultiply(current_srgb_frect, ibuf->x, height);
+	/* Clamp buffer colors to 1.0 to avoid artifacts due to glu for hdr images. */
+	IMB_buffer_float_clamp(current_srgb_frect, ibuf->x, height);
+}
+
+static void verify_thread_do(void *data_v,
+                             int start_scanline,
+                             int num_scanlines)
+{
+	VerifyThreadData *data = (VerifyThreadData *)data_v;
+	gpu_verify_high_bit_srgb_buffer_slice(data->srgb_frect,
+	                                      data->ibuf,
+	                                      start_scanline,
+	                                      num_scanlines);
+}
+
+static void gpu_verify_high_bit_srgb_buffer(float *srgb_frect,
+                                            ImBuf *ibuf)
+{
+	if (ibuf->y < 64) {
+		gpu_verify_high_bit_srgb_buffer_slice(srgb_frect,
+		                                      ibuf,
+		                                      0, ibuf->y);
+	}
+	else {
+		VerifyThreadData data;
+		data.ibuf = ibuf;
+		data.srgb_frect = srgb_frect;
+		IMB_processor_apply_threaded_scanlines(ibuf->y, verify_thread_do, &data);
+	}
+}
+
+int GPU_verify_image(
+        Image *ima, ImageUser *iuser,
+        int textarget, int tftile, bool compare, bool mipmap, bool is_data)
 {
 	unsigned int *bind = NULL;
 	int tpx = 0, tpy = 0;
@@ -575,17 +632,18 @@ int GPU_verify_image(Image *ima, ImageUser *iuser, int textarget, int tftile, bo
 			 * a high precision format only if it is available */
 			use_high_bit_depth = true;
 		}
+		else if (ibuf->rect == NULL) {
+			IMB_rect_from_float(ibuf);
+		}
 		/* we may skip this in high precision, but if not, we need to have a valid buffer here */
 		else if (ibuf->userflags & IB_RECT_INVALID) {
 			IMB_rect_from_float(ibuf);
 		}
 
 		/* TODO unneeded when float images are correctly treated as linear always */
-		if (!is_data)
+		if (!is_data) {
 			do_color_management = true;
-
-		if (ibuf->rect == NULL)
-			IMB_rect_from_float(ibuf);
+		}
 	}
 
 	/* currently, tpage refresh is used by ima sequences */
@@ -622,12 +680,7 @@ int GPU_verify_image(Image *ima, ImageUser *iuser, int textarget, int tftile, bo
 			if (use_high_bit_depth) {
 				if (do_color_management) {
 					srgb_frect = MEM_mallocN(ibuf->x * ibuf->y * sizeof(float) * 4, "floar_buf_col_cor");
-					IMB_buffer_float_from_float(srgb_frect, ibuf->rect_float,
-						ibuf->channels, IB_PROFILE_SRGB, IB_PROFILE_LINEAR_RGB, true,
-						ibuf->x, ibuf->y, ibuf->x, ibuf->x);
-					IMB_buffer_float_unpremultiply(srgb_frect, ibuf->x, ibuf->y);
-					/* clamp buffer colors to 1.0 to avoid artifacts due to glu for hdr images */
-					IMB_buffer_float_clamp(srgb_frect, ibuf->x, ibuf->y);
+					gpu_verify_high_bit_srgb_buffer(srgb_frect, ibuf);
 					frect = srgb_frect + texwinsy * ibuf->x + texwinsx;
 				}
 				else {
@@ -650,13 +703,7 @@ int GPU_verify_image(Image *ima, ImageUser *iuser, int textarget, int tftile, bo
 			if (use_high_bit_depth) {
 				if (do_color_management) {
 					frect = srgb_frect = MEM_mallocN(ibuf->x * ibuf->y * sizeof(*srgb_frect) * 4, "floar_buf_col_cor");
-					IMB_buffer_float_from_float(
-					        srgb_frect, ibuf->rect_float,
-					        ibuf->channels, IB_PROFILE_SRGB, IB_PROFILE_LINEAR_RGB, true,
-					        ibuf->x, ibuf->y, ibuf->x, ibuf->x);
-					IMB_buffer_float_unpremultiply(srgb_frect, ibuf->x, ibuf->y);
-					/* clamp buffer colors to 1.0 to avoid artifacts due to glu for hdr images */
-					IMB_buffer_float_clamp(srgb_frect, ibuf->x, ibuf->y);
+					gpu_verify_high_bit_srgb_buffer(srgb_frect, ibuf);
 				}
 				else
 					frect = ibuf->rect_float;
@@ -801,8 +848,9 @@ static void gpu_del_cube_map(void **cube_map)
 }
 
 /* Image *ima can be NULL */
-void GPU_create_gl_tex(unsigned int *bind, unsigned int *rect, float *frect, int rectw, int recth,
-	int textarget, bool mipmap, bool use_high_bit_depth, Image *ima)
+void GPU_create_gl_tex(
+        unsigned int *bind, unsigned int *rect, float *frect, int rectw, int recth,
+        int textarget, bool mipmap, bool use_high_bit_depth, Image *ima)
 {
 	ImBuf *ibuf = NULL;
 
@@ -1227,8 +1275,11 @@ static bool GPU_check_scaled_image(ImBuf *ibuf, Image *ima, float *frect, int x,
 void GPU_paint_update_image(Image *ima, ImageUser *iuser, int x, int y, int w, int h)
 {
 	ImBuf *ibuf = BKE_image_acquire_layer_ibuf(ima);
-	
-	if (ima->repbind || (GPU_get_mipmap() && !GTS.gpu_mipmap) || BKE_image_has_bindcode(ima) || !ibuf ||
+
+	if (ima->repbind ||
+	    (!GTS.gpu_mipmap && GPU_get_mipmap()) ||
+	    (ima->bindcode[TEXTARGET_TEXTURE_2D] == 0) ||
+	    (ibuf == NULL) ||
 	    (w == 0) || (h == 0))
 	{
 		/* these cases require full reload still */
@@ -1943,8 +1994,9 @@ int GPU_object_material_bind(int nr, void *attribs)
 		}
 		else {
 			/* or do fixed function opengl material */
-			GPU_basic_shader_colors(GMS.matbuf[nr].diff,
-				GMS.matbuf[nr].spec, GMS.matbuf[nr].hard, GMS.matbuf[nr].alpha);
+			GPU_basic_shader_colors(
+			        GMS.matbuf[nr].diff,
+			        GMS.matbuf[nr].spec, GMS.matbuf[nr].hard, GMS.matbuf[nr].alpha);
 
 			if (GMS.two_sided_lighting)
 				GPU_basic_shader_bind(GPU_SHADER_LIGHTING | GPU_SHADER_TWO_SIDED);
@@ -2237,8 +2289,6 @@ void GPU_state_init(void)
 	glDepthFunc(GL_LEQUAL);
 	/* scaling matrices */
 	glEnable(GL_NORMALIZE);
-
-	glShadeModel(GL_FLAT);
 
 	glDisable(GL_ALPHA_TEST);
 	glDisable(GL_BLEND);

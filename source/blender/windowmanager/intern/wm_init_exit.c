@@ -54,12 +54,14 @@
 #include "BLO_writefile.h"
 
 #include "BKE_blender.h"
+#include "BKE_blender_undo.h"
 #include "BKE_context.h"
 #include "BKE_screen.h"
 #include "BKE_DerivedMesh.h"
 #include "BKE_global.h"
 #include "BKE_icons.h"
 #include "BKE_library.h"
+#include "BKE_library_remap.h"
 #include "BKE_main.h"
 #include "BKE_mball_tessellate.h"
 #include "BKE_node.h"
@@ -97,9 +99,11 @@
 #include "wm_files.h"
 #include "wm_window.h"
 
+#include "ED_anim_api.h"
 #include "ED_armature.h"
 #include "ED_gpencil.h"
 #include "ED_keyframing.h"
+#include "ED_keyframes_edit.h"
 #include "ED_node.h"
 #include "ED_render.h"
 #include "ED_space_api.h"
@@ -157,9 +161,9 @@ void WM_init(bContext *C, int argc, const char **argv)
 
 	BKE_library_callback_free_window_manager_set(wm_close_and_free);   /* library.c */
 	BKE_library_callback_free_notifier_reference_set(WM_main_remove_notifier_reference);   /* library.c */
-	BKE_library_callback_free_editor_id_reference_set(WM_main_remove_editor_id_reference);   /* library.c */
+	BKE_library_callback_remap_editor_id_reference_set(WM_main_remap_editor_id_reference);   /* library.c */
 	BKE_blender_callback_test_break_set(wm_window_testbreak); /* blender.c */
-	BKE_spacedata_callback_id_unref_set(ED_spacedata_id_unref); /* screen.c */
+	BKE_spacedata_callback_id_remap_set(ED_spacedata_id_remap); /* screen.c */
 	DAG_editors_update_cb(ED_render_id_flush_update,
 	                      ED_render_scene_update,
 	                      ED_render_scene_update_pre); /* depsgraph.c */
@@ -399,13 +403,6 @@ static void free_openrecent(void)
 }
 
 
-/* bad stuff*/
-
-// XXX copy/paste buffer stuff...
-extern void free_anim_copybuf(void);
-extern void free_anim_drivers_copybuf(void);
-extern void free_fmodifiers_copybuf(void);
-
 #ifdef WIN32
 /* Read console events until there is a key event.  Also returns on any error. */
 static void wait_for_console_key(void)
@@ -497,10 +494,10 @@ void WM_exit_ext(bContext *C, const bool do_python)
 	RE_FreeAllRender();
 	RE_engines_exit();
 	
-	ED_preview_free_dbase();  /* frees a Main dbase, before free_blender! */
+	ED_preview_free_dbase();  /* frees a Main dbase, before BKE_blender_free! */
 
 	if (C && wm)
-		wm_free_reports(C);  /* before free_blender! - since the ListBases get freed there */
+		wm_free_reports(C);  /* before BKE_blender_free! - since the ListBases get freed there */
 
 	BKE_sequencer_free_clipboard(); /* sequencer.c */
 	BKE_tracking_clipboard_free();
@@ -511,11 +508,12 @@ void WM_exit_ext(bContext *C, const bool do_python)
 	COM_deinitialize();
 #endif
 	
-	free_blender();  /* blender.c, does entire library and spacetypes */
+	BKE_blender_free();  /* blender.c, does entire library and spacetypes */
 //	free_matcopybuf();
-	free_anim_copybuf();
-	free_anim_drivers_copybuf();
-	free_fmodifiers_copybuf();
+	ANIM_fcurves_copybuf_free();
+	ANIM_drivers_copybuf_free();
+	ANIM_driver_vars_copybuf_free();
+	ANIM_fmodifiers_copybuf_free();
 	ED_gpencil_anim_copybuf_free();
 	ED_gpencil_strokes_copybuf_free();
 	ED_clipboard_posebuf_free();
@@ -536,12 +534,12 @@ void WM_exit_ext(bContext *C, const bool do_python)
 
 #ifdef WITH_PYTHON
 	/* option not to close python so we can use 'atexit' */
-	if (do_python) {
+	if (do_python && ((C == NULL) || CTX_py_init_get(C))) {
 		/* XXX - old note */
-		/* before free_blender so py's gc happens while library still exists */
+		/* before BKE_blender_free so py's gc happens while library still exists */
 		/* needed at least for a rare sigsegv that can happen in pydrivers */
 
-		/* Update for blender 2.5, move after free_blender because blender now holds references to PyObject's
+		/* Update for blender 2.5, move after BKE_blender_free because blender now holds references to PyObject's
 		 * so decref'ing them after python ends causes bad problems every time
 		 * the pyDriver bug can be fixed if it happens again we can deal with it then */
 		BPY_python_end();
@@ -566,7 +564,7 @@ void WM_exit_ext(bContext *C, const bool do_python)
 	ED_file_exit(); /* for fsmenu */
 
 	UI_exit();
-	BKE_userdef_free();
+	BKE_blender_userdef_free();
 
 	RNA_exit(); /* should be after BPY_python_end so struct python slots are cleared */
 	

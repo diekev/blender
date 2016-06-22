@@ -170,7 +170,7 @@ finally:
 				l_iter = l_first = BM_FACE_FIRST_LOOP(f_new);
 				do {
 					BM_elem_attrs_copy(bm, bm, loops[i], l_iter);
-				} while (i++, (l_iter = l_iter->next) != l_first);
+				} while ((void)i++, (l_iter = l_iter->next) != l_first);
 
 				return f_new;
 			}
@@ -224,22 +224,13 @@ void bmo_weld_verts_exec(BMesh *bm, BMOperator *op)
 			if (v1 == v2) {
 				BMO_elem_flag_enable(bm, e, EDGE_COL);
 			}
-			else if (!BM_edge_exists(v1, v2)) {
-				BMEdge *e_new = BM_edge_create(bm, v1, v2, e, BM_CREATE_NOP);
-
-				/* low level selection, not essential but means we can keep
-				 * edge selection valid on auto-merge for example. */
-				if ((BM_elem_flag_test(e, BM_ELEM_SELECT)   == true) &&
-				    (BM_elem_flag_test(e_new, BM_ELEM_SELECT) == false))
-				{
-					BM_elem_flag_disable(e, BM_ELEM_SELECT);
-					BM_elem_flag_merge_into(e_new, e_new, e);
-					BM_elem_flag_enable(e_new, BM_ELEM_SELECT);
-					/* bm->totedgesel remains valid */
+			else {
+				/* always merge flags, even for edges we already created */
+				BMEdge *e_new = BM_edge_exists(v1, v2);
+				if (e_new == NULL) {
+					e_new = BM_edge_create(bm, v1, v2, e, BM_CREATE_NOP);
 				}
-				else {
-					BM_elem_flag_merge_into(e_new, e_new, e);
-				}
+				BM_elem_flag_merge(e_new, e);
 			}
 
 			BMO_elem_flag_enable(bm, e, ELE_DEL);

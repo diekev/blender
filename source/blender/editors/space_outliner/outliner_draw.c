@@ -208,11 +208,12 @@ static void restrictbutton_recursive_child(bContext *C, Scene *scene, Object *ob
 					id = ptr.id.data;
 					if (autokeyframe_cfra_can_key(scene, id)) {
 						ReportList *reports = CTX_wm_reports(C);
+						ToolSettings *ts = scene->toolsettings;
 						eInsertKeyFlags key_flag = ANIM_get_keyframing_flags(scene, 1);
 
 						fcu->flag &= ~FCURVE_SELECTED;
 						insert_keyframe(reports, id, action, ((fcu->grp) ? (fcu->grp->name) : (NULL)),
-						                fcu->rna_path, fcu->array_index, CFRA, key_flag);
+						                fcu->rna_path, fcu->array_index, CFRA, ts->keyframe_type, key_flag);
 						/* Assuming this is not necessary here, since 'ancestor' object button will do it anyway. */
 						/* WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL); */
 					}
@@ -500,6 +501,11 @@ static void namebutton_cb(bContext *C, void *tsep, char *oldname)
 				if (!BLI_exists(expanded)) {
 					BKE_reportf(CTX_wm_reports(C), RPT_ERROR,
 					            "Library path '%s' does not exist, correct this before saving", expanded);
+				}
+				else if (lib->id.tag & LIB_TAG_MISSING) {
+					BKE_reportf(CTX_wm_reports(C), RPT_INFO,
+					            "Library path '%s' is now valid, please reload the library", expanded);
+					lib->id.tag &= ~LIB_TAG_MISSING;
 				}
 			}
 		}
@@ -1578,11 +1584,19 @@ static void outliner_draw_tree_element(
 		glDisable(GL_BLEND);
 		
 		/* name */
-		if (active == OL_DRAWSEL_NORMAL) UI_ThemeColor(TH_TEXT_HI);
-		else if (ELEM(tselem->type, TSE_RNA_PROPERTY, TSE_RNA_ARRAY_ELEM)) UI_ThemeColorBlend(TH_BACK, TH_TEXT, 0.75f);
-		else UI_ThemeColor(TH_TEXT);
-		
-		UI_fontstyle_draw_simple(fstyle, startx + offsx, *starty + 5 * ufac, te->name);
+		if ((tselem->flag & TSE_TEXTBUT) == 0) {
+			if (active == OL_DRAWSEL_NORMAL) {
+				UI_ThemeColor(TH_TEXT_HI);
+			}
+			else if (ELEM(tselem->type, TSE_RNA_PROPERTY, TSE_RNA_ARRAY_ELEM)) {
+				UI_ThemeColorBlend(TH_BACK, TH_TEXT, 0.75f);
+			}
+			else {
+				UI_ThemeColor(TH_TEXT);
+			}
+
+			UI_fontstyle_draw_simple(fstyle, startx + offsx, *starty + 5 * ufac, te->name);
+		}
 		
 		offsx += (int)(UI_UNIT_X + UI_fontstyle_string_width(fstyle, te->name));
 		

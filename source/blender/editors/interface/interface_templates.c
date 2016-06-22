@@ -25,6 +25,7 @@
  */
 
 
+#include <ctype.h>
 #include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
@@ -39,6 +40,7 @@
 #include "DNA_texture_types.h"
 
 #include "BLI_utildefines.h"
+#include "BLI_alloca.h"
 #include "BLI_string.h"
 #include "BLI_ghash.h"
 #include "BLI_rect.h"
@@ -197,7 +199,9 @@ static uiBlock *id_search_menu(bContext *C, ARegion *ar, void *arg_litem)
 		
 		but = uiDefSearchBut(block, search, 0, ICON_VIEWZOOM, sizeof(search), 10, 0, w, UI_UNIT_Y,
 		                     template.prv_rows, template.prv_cols, "");
-		UI_but_func_search_set(but, id_search_cb, &template, id_search_call_cb, idptr.data);
+		UI_but_func_search_set(
+		        but, ui_searchbox_create_generic, id_search_cb,
+		        &template, id_search_call_cb, idptr.data);
 	}
 	/* list view */
 	else {
@@ -207,7 +211,9 @@ static uiBlock *id_search_menu(bContext *C, ARegion *ar, void *arg_litem)
 		/* fake button, it holds space for search items */
 		uiDefBut(block, UI_BTYPE_LABEL, 0, "", 10, 15, searchbox_width, searchbox_height, NULL, 0, 0, 0, 0, NULL);
 		but = uiDefSearchBut(block, search, 0, ICON_VIEWZOOM, sizeof(search), 10, 0, searchbox_width, UI_UNIT_Y - 1, 0, 0, "");
-		UI_but_func_search_set(but, id_search_cb, &template, id_search_call_cb, idptr.data);
+		UI_but_func_search_set(
+		        but, ui_searchbox_create_generic, id_search_cb,
+		        &template, id_search_call_cb, idptr.data);
 	}
 		
 	
@@ -2812,7 +2818,7 @@ static void uilist_prepare(
 	layoutdata->end_idx = min_ii(layoutdata->start_idx + rows * columns, len);
 }
 
-static void uilist_resize_update_cb(bContext *UNUSED(C), void *arg1, void *UNUSED(arg2))
+static void uilist_resize_update_cb(bContext *C, void *arg1, void *UNUSED(arg2))
 {
 	uiList *ui_list = arg1;
 	uiListDyn *dyn_data = ui_list->dyn_data;
@@ -2825,6 +2831,9 @@ static void uilist_resize_update_cb(bContext *UNUSED(C), void *arg1, void *UNUSE
 		dyn_data->resize_prev += diff * UI_UNIT_Y;
 		ui_list->flag |= UILST_SCROLL_TO_ACTIVE_ITEM;
 	}
+
+	/* In case uilist is in popup, we need special refreshing */
+	ED_region_tag_refresh_ui(CTX_wm_menu(C));
 }
 
 static void *uilist_item_use_dynamic_tooltip(PointerRNA *itemptr, const char *propname)
@@ -2941,7 +2950,11 @@ void uiTemplateList(
 	/* We tag the list id with the list type... */
 	BLI_snprintf(ui_list_id, sizeof(ui_list_id), "%s_%s", ui_list_type->idname, list_id ? list_id : "");
 
-	ar = CTX_wm_region(C);
+	/* Allows to work in popups. */
+	ar = CTX_wm_menu(C);
+	if (ar == NULL) {
+		ar = CTX_wm_region(C);
+	}
 	ui_list = BLI_findstring(&ar->ui_lists, ui_list_id, offsetof(uiList, list_id));
 
 	if (!ui_list) {
@@ -3017,7 +3030,7 @@ void uiTemplateList(
 						/* So that we do not map again activei! */
 						activei_mapping_pending = false;
 					}
-# if 0 /* For now, do not alter active element, even if it will be hidden... */
+#if 0 /* For now, do not alter active element, even if it will be hidden... */
 					else if (activei < i) {
 						/* We do not want an active but invisible item!
 						 * Only exception is when all items are filtered out...
@@ -3038,6 +3051,11 @@ void uiTemplateList(
 				i++;
 			}
 			RNA_PROP_END;
+
+			if (activei_mapping_pending) {
+				/* No active item found, set to 'invalid' -1 value... */
+				activei = -1;
+			}
 		}
 		if (dyn_data->items_shown >= 0) {
 			len = dyn_data->items_shown;
@@ -3266,18 +3284,47 @@ static void operator_call_cb(bContext *C, void *UNUSED(arg1), void *arg2)
 		WM_operator_name_call_ptr(C, ot, WM_OP_INVOKE_DEFAULT, NULL);
 }
 
+static bool has_word_prefix(const char *haystack, const char *needle, size_t needle_len)
+{
+	const char *match = BLI_strncasestr(haystack, needle, needle_len);
+	if (match) {
+		if ((match == haystack) || (*(match - 1) == ' ') || ispunct(*(match - 1))) {
+			return true;
+		}
+		else {
+			return has_word_prefix(match + 1, needle, needle_len);
+		}
+	}
+	else {
+		return false;
+	}
+}
+
 static void operator_search_cb(const bContext *C, void *UNUSED(arg), const char *str, uiSearchItems *items)
 {
 	GHashIterator iter;
+	const size_t str_len = strlen(str);
+	const int words_max = (str_len / 2) + 1;
+	int (*words)[2] = BLI_array_alloca(words, words_max);
+
+	const int words_len = BLI_string_find_split_words(str, str_len, ' ', words, words_max);
 
 	for (WM_operatortype_iter(&iter); !BLI_ghashIterator_done(&iter); BLI_ghashIterator_step(&iter)) {
 		wmOperatorType *ot = BLI_ghashIterator_getValue(&iter);
 		const char *ot_ui_name = CTX_IFACE_(ot->translation_context, ot->name);
+		int index;
 
 		if ((ot->flag & OPTYPE_INTERNAL) && (G.debug & G_DEBUG_WM) == 0)
 			continue;
 
-		if (BLI_strcasestr(ot_ui_name, str)) {
+		/* match name against all search words */
+		for (index = 0; index < words_len; index++) {
+			if (!has_word_prefix(ot_ui_name, str + words[index][0], words[index][1])) {
+				break;
+			}
+		}
+
+		if (index == words_len) {
 			if (WM_operator_poll((bContext *)C, ot)) {
 				char name[256];
 				int len = strlen(ot_ui_name);
@@ -3303,7 +3350,9 @@ static void operator_search_cb(const bContext *C, void *UNUSED(arg), const char 
 
 void UI_but_func_operator_search(uiBut *but)
 {
-	UI_but_func_search_set(but, operator_search_cb, NULL, operator_call_cb, NULL);
+	UI_but_func_search_set(
+	        but, ui_searchbox_create_operator, operator_search_cb,
+	        NULL, operator_call_cb, NULL);
 }
 
 void uiTemplateOperatorSearch(uiLayout *layout)
@@ -3662,6 +3711,9 @@ void uiTemplateKeymapItemProperties(uiLayout *layout, PointerRNA *ptr)
 			/* operator buttons may store props for use (file selector, [#36492]) */
 			if (but->rnaprop) {
 				UI_but_func_set(but, keymap_item_modified, ptr->data, NULL);
+
+				/* Otherwise the keymap will be re-generated which we're trying to edit, see: T47685 */
+				UI_but_flag_enable(but, UI_BUT_UPDATE_DELAY);
 			}
 		}
 	}

@@ -51,11 +51,13 @@ def dopesheet_filter(layout, context, genericFiltersOnly=False):
         row.prop(dopesheet, "show_only_matching_fcurves", text="")
         if dopesheet.show_only_matching_fcurves:
             row.prop(dopesheet, "filter_fcurve_name", text="")
+            row.prop(dopesheet, "use_multi_word_filter", text="")
     else:
         row = layout.row(align=True)
         row.prop(dopesheet, "use_filter_text", text="")
         if dopesheet.use_filter_text:
             row.prop(dopesheet, "filter_text", text="")
+            row.prop(dopesheet, "use_multi_word_filter", text="")
 
     if not genericFiltersOnly:
         row = layout.row(align=True)
@@ -151,6 +153,7 @@ class DOPESHEET_HT_header(Header):
             row.prop(st.dopesheet, "use_filter_text", text="")
             if st.dopesheet.use_filter_text:
                 row.prop(st.dopesheet, "filter_text", text="")
+                row.prop(st.dopesheet, "use_multi_word_filter", text="")
 
         row = layout.row(align=True)
         row.prop(toolsettings, "use_proportional_action",
@@ -204,6 +207,9 @@ class DOPESHEET_MT_view(Menu):
 
         st = context.space_data
 
+        layout.operator("action.properties", icon='MENU_PANEL')
+        layout.separator()
+
         layout.prop(st, "use_realtime_update")
         layout.prop(st, "show_frame_indicator")
         layout.prop(st, "show_sliders")
@@ -226,8 +232,8 @@ class DOPESHEET_MT_view(Menu):
 
         layout.separator()
         layout.operator("screen.area_dupli")
-        layout.operator("screen.screen_full_area", text="Toggle Maximize Area")
-        layout.operator("screen.screen_full_area").use_hide_panels = True
+        layout.operator("screen.screen_full_area")
+        layout.operator("screen.screen_full_area", text="Toggle Fullscreen Area").use_hide_panels = True
 
 
 class DOPESHEET_MT_select(Menu):
