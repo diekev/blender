@@ -97,6 +97,12 @@ macro(cycles_target_link_libraries target)
 		${CMAKE_DL_LIBS}
 		${PLATFORM_LINKLIBS}
 	)
+	if(WITH_ALEMBIC)
+		target_link_libraries(
+			${target}
+			${ALEMBIC_LIBRARIES}
+		)
+	endif()
 endmacro()
 
 # Application build targets
@@ -107,6 +113,19 @@ if(WITH_CYCLES_STANDALONE)
 		cycles_xml.cpp
 		cycles_xml.h
 	)
+
+	if(WITH_ALEMBIC)
+		list(APPEND SRC
+			cycles_alembic.cpp
+			cycles_alembic.h
+			)
+		add_definitions(-DWITH_ALEMBIC)
+		include_directories(
+			SYSTEM
+			${ALEMBIC_INCLUDE_DIRS}
+			)
+	endif()
+
 	add_executable(cycles ${SRC})
 	cycles_target_link_libraries(cycles)
 

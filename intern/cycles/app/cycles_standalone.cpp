@@ -40,12 +40,22 @@
 
 #include "cycles_xml.h"
 
+#ifdef WITH_ALEMBIC
+#include "cycles_alembic.h"
+#endif
+
 CCL_NAMESPACE_BEGIN
+
+enum FileType {
+	FILETYPE_XML = 0,
+	FILETYPE_ALEMBIC,
+};
 
 struct Options {
 	Session *session;
 	Scene *scene;
 	string filepath;
+	FileType filetype;
 	int width, height;
 	SceneParams scene_params;
 	SessionParams session_params;
@@ -122,8 +132,18 @@ static void scene_init()
 {
 	options.scene = new Scene(options.scene_params, options.session_params.device);
 
-	/* Read XML */
-	xml_read_file(options.scene, options.filepath.c_str());
+	/* Read file */
+	switch(options.filetype) {
+		case FILETYPE_XML:
+			xml_read_file(options.scene, options.filepath.c_str());
+			break;
+		case FILETYPE_ALEMBIC:
+			abc_read_file(options.scene, options.filepath.c_str());
+			break;
+		default:
+			return;
+	}
+
 
 	/* Camera width/height override? */
 	if(!(options.width == 0 || options.height == 0)) {
@@ -357,6 +377,15 @@ static void options_parse(int argc, const char **argv)
 	/* shading system */
 	string ssname = "svm";
 
+	/* input file type */
+	string filetypes = "auto, xml";
+
+#ifdef WITH_ALEMBIC
+	filetypes += ", alembic";
+#endif
+
+	string filetype = "auto";
+
 	/* parse options */
 	ArgParse ap;
 	bool help = false, debug = false, version = false;
@@ -372,6 +401,7 @@ static void options_parse(int argc, const char **argv)
 		"--quiet", &options.quiet, "In background mode, don't print progress messages",
 		"--samples %d", &options.session_params.samples, "Number of samples to render",
 		"--output %s", &options.session_params.output_path, "File path to write output image",
+		"--filetype %s", &filetype, ("File type: " + filetypes).c_str(),
 		"--threads %d", &options.session_params.threads, "CPU Rendering Threads",
 		"--width  %d", &options.width, "Window width in pixel",
 		"--height %d", &options.height, "Window height in pixel",
@@ -421,6 +451,23 @@ static void options_parse(int argc, const char **argv)
 		options.scene_params.shadingsystem = SHADINGSYSTEM_OSL;
 	else if(ssname == "svm")
 		options.scene_params.shadingsystem = SHADINGSYSTEM_SVM;
+
+	if(filetype == "auto") {
+		string extension = options.filepath.substr(options.filepath.find_last_of(".") + 1);
+
+		if (extension == "xml") {
+			options.filetype = FILETYPE_XML;
+		}
+		else if (extension == "abc") {
+			options.filetype = FILETYPE_ALEMBIC;
+		}
+	}
+	else if(filetype == "xml") {
+		options.filetype = FILETYPE_XML;
+	}
+	else if(filetype == "alembic") {
+		options.filetype = FILETYPE_ALEMBIC;
+	}
 
 #ifndef WITH_CYCLES_STANDALONE_GUI
 	options.session_params.background = true;
