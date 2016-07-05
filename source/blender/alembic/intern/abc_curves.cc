@@ -132,11 +132,29 @@ void AbcCurveWriter::do_write()
 			}
 		}
 
-		for (int i = 0; i < KNOTSU(nurbs); ++i) {
+		const size_t num_knots = KNOTSU(nurbs);
+
+		/* Add an extra knot at the beggining and end of the array since most apps
+		 * require/expect them. */
+		if ((nurbs->flagu & CU_NURB_CYCLIC) != 0) {
+            knots.push_back(nurbs->knotsu[0]);
+        }
+        else {
+            knots.push_back(2.0f * nurbs->knotsu[0] - nurbs->knotsu[1]);
+        }
+
+		for (int i = 0; i < num_knots; ++i) {
 			knots.push_back(nurbs->knotsu[i]);
 		}
 
-		orders.push_back(nurbs->orderu);
+		if ((nurbs->flagu & CU_NURB_CYCLIC) != 0) {
+            knots.push_back(nurbs->knotsu[num_knots - 1]);
+        }
+        else {
+            knots.push_back(2.0f * nurbs->knotsu[num_knots - 1] - nurbs->knotsu[num_knots - 2]);
+        }
+
+		orders.push_back(nurbs->orderu + 1);
 	}
 
 	Alembic::AbcGeom::OFloatGeomParam::Sample width_sample;
@@ -209,32 +227,42 @@ void AbcCurveReader::readObjectData(Main *bmain, Scene *scene, float time)
 		const int steps = (*num_vertices)[i];
 
 		Nurb *nu = static_cast<Nurb *>(MEM_callocN(sizeof(Nurb), "abc_getnurb"));
-		nu->bp = static_cast<BPoint *>(MEM_callocN(sizeof(BPoint) * steps, "abc_getnurb"));
-		nu->type = CU_NURBS;
 		nu->resolu = cu->resolu;
 		nu->resolv = cu->resolv;
 		nu->pntsu = steps;
 		nu->pntsv = 1;
 		nu->flag |= CU_SMOOTH;
 
+		nu->orderu = 1;
+
+		if (smp.getType() == Alembic::AbcGeom::kCubic) {
+            nu->orderu = 3;
+        }
+        else if (orders->size() > i) {
+            nu->orderu = static_cast<short>((*orders)[i] - 1);
+        }
+
 		if (periodicity == Alembic::AbcGeom::kNonPeriodic) {
 			nu->flagu |= CU_NURB_ENDPOINT;
 		}
 		else if (periodicity == Alembic::AbcGeom::kPeriodic) {
 			nu->flagu |= CU_NURB_CYCLIC;
+			nu->pntsu = steps - nu->orderu;
 		}
-
-		nu->orderu = (orders) ? (*orders)[i]
-		                      : (periodicity == Alembic::AbcGeom::kPeriodic) ? 4 : steps;
-
-		BPoint *bp = nu->bp;
-		float radius = 1.0f;
 		float weight = 1.0f;
 
-		for (int j = 0; j < steps; ++j, ++bp) {
+		const bool do_radius = (radiuses != NULL) && (radiuses->size() > 1);
+		float radius = (radiuses->size() == 1) ? (*radiuses)[0] : 1.0f;
+
+		nu->type = CU_NURBS;
+
+		nu->bp = static_cast<BPoint *>(MEM_callocN(sizeof(BPoint) * nu->pntsu, "abc_getnurb"));
+		BPoint *bp = nu->bp;
+
+		for (int j = 0; j < nu->pntsu; ++j, ++bp) {
 			const Imath::V3f &pos = (*positions)[idx++];
 
-			if (radiuses) {
+			if (do_radius) {
 				radius = (*radiuses)[i];
 			}
 
@@ -252,11 +280,18 @@ void AbcCurveReader::readObjectData(Main *bmain, Scene *scene, float time)
 		if (knots && knots->size() != 0) {
 			nu->knotsu = static_cast<float *>(MEM_callocN(KNOTSU(nu) * sizeof(float), "abc_setsplineknotsu"));
 
-			for (size_t i = 0; i < KNOTSU(nu); ++i) {
-				nu->knotsu[i] = (*knots)[knot_offset + i];
+			if (periodicity == Alembic::AbcGeom::kPeriodic) {
+				/* Skip first and last knots. */
+				for (size_t i = 1; i < knots->size() - 1; ++i) {
+					nu->knotsu[i - 1] = (*knots)[knot_offset + i];
+				}
+			}
+			else {
+				/* TODO: figure out how to use the knots array in this case. */
+				BKE_nurb_knot_calc_u(nu);
 			}
 
-			knot_offset += KNOTSU(nu);
+			knot_offset += knots->size();
 		}
 		else {
 			BKE_nurb_knot_calc_u(nu);
