@@ -310,7 +310,8 @@ void AbcCurveReader::readObjectData(Main *bmain, Scene *scene, float time)
 				}
 			}
 			else {
-				/* TODO: figure out how to use the knots array in this case. */
+				/* TODO: figure out how to use the knots array from other
+				 * software in this case. */
 				BKE_nurb_knot_calc_u(nu);
 			}
 
