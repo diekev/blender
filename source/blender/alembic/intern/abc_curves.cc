@@ -281,15 +281,15 @@ void AbcCurveReader::readObjectData(Main *bmain, Scene *scene, float time)
 		nu->bp = static_cast<BPoint *>(MEM_callocN(sizeof(BPoint) * nu->pntsu, "abc_getnurb"));
 		BPoint *bp = nu->bp;
 
-		for (int j = 0; j < nu->pntsu; ++j, ++bp) {
-			const Imath::V3f &pos = (*positions)[idx++];
+		for (int j = 0; j < nu->pntsu; ++j, ++bp, ++idx) {
+			const Imath::V3f &pos = (*positions)[idx];
 
 			if (do_radius) {
-				radius = (*radiuses)[i];
+				radius = (*radiuses)[idx];
 			}
 
 			if (weights) {
-				weight = (*weights)[i];
+				weight = (*weights)[idx];
 			}
 
 			copy_yup_zup(bp->vec, pos.getValue());
