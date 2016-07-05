@@ -239,6 +239,108 @@ static bool set_knots(const FloatArraySamplePtr &knots, float *&nu_knots)
 	return true;
 }
 
+//#define MAYA_INDEX
+
+static bool check_cyclic(const INuPatchSchema::Sample &smp)
+{
+	const P3fArraySamplePtr positions = smp.getPositions();
+
+#ifdef MAYA_INDEX
+	Imath::V3f *cvs = new Imath::V3f[positions->size()];
+#else
+	const Imath::V3f *cvs = positions->get();
+#endif
+
+	const int degreeU = smp.getUOrder() - 1;
+	const int degreeV = smp.getVOrder() - 1;
+	const int numCVInU = smp.getNumU();
+	const int numCVInV = smp.getNumV();
+
+#ifdef MAYA_INDEX
+	int curPos = 0;
+	for (unsigned int v = 0; v < numCVInV; ++v)
+    {
+        for (unsigned int u = 0; u < numCVInU; ++u, ++curPos)
+        {
+            unsigned int mayaIndex = u * numCVInV + (numCVInV - v - 1);
+
+			std::cerr << "Index, Maya: " << curPos << ", " << mayaIndex << '\n';
+            cvs[mayaIndex] = (*positions)[curPos];
+        }
+    }
+#endif
+
+	bool notOpen = true;
+
+	for (unsigned int v = 0; notOpen && v < numCVInV; v++) {
+        for (unsigned int u = 0; u < degreeU; u++) {
+            unsigned int firstIndex = v + u * numCVInV;
+            unsigned int lastPeriodicIndex = (numCVInU - degreeU + u) * numCVInV + (numCVInV - v - 1);
+
+            if (cvs[firstIndex] != cvs[lastPeriodicIndex]) {
+               // formU = MFnNurbsSurface::kOpen;
+				//std::cerr << "Endpoint U\n";
+                notOpen = false;
+                break;
+            }
+        }
+    }
+
+    if (!notOpen) {
+  //      formU = MFnNurbsSurface::kClosed;
+        for (unsigned int v = 0; v < numCVInV; ++v) {
+            unsigned int lastUIndex = v + numCVInV  * (numCVInU - 1);
+
+            if (cvs[v] != cvs[lastUIndex]) {
+				std::cerr << "Endpoint U\n";
+                break;
+            }
+        }
+    }
+	else {
+		std::cerr << "Cyclic U\n";
+	}
+
+    notOpen = true;
+
+    for (unsigned int u = 0; notOpen && u < numCVInU; ++u) {
+        for (unsigned int v = 0; v < degreeV; ++v) {
+#ifdef MAYA_INDEX
+			unsigned int index = u * numCVInV + (numCVInV - v - 1);
+            unsigned int cyclic_index = u * numCVInV + (degreeV - v - 1); //numV - (numV - vDegree + v) - 1;
+#else
+            unsigned int index = v + u * numCVInV;
+            unsigned int cyclic_index = index + numCVInV - degreeV;
+#endif
+
+			std::cerr << "index, cyclic_index: " << index << ", " << cyclic_index << '\n';
+
+            if (cvs[index] != cvs[cyclic_index]) {
+                notOpen = false;
+                break;
+            }
+        }
+    }
+
+    if (!notOpen) {
+        for (unsigned int u = 0; u < numCVInU; u++) {
+            if (cvs[u * numCVInV + (numCVInV - 1)] != (cvs[u * numCVInV])) {
+				std::cerr << "Endpoint V\n";
+                break;
+            }
+        }
+    }
+	else {
+		std::cerr << "Cyclic V\n";
+	}
+
+#ifdef MAYA_INDEX
+	delete [] cvs;
+#endif
+
+	return notOpen;
+}
+
 void AbcNurbsReader::readObjectData(Main *bmain, Scene *scene, float time)
 {
 	Curve *cu = static_cast<Curve *>(BKE_curve_add(bmain, "abc_curve", OB_SURF));
@@ -266,6 +368,8 @@ void AbcNurbsReader::readObjectData(Main *bmain, Scene *scene, float time)
 
 		const P3fArraySamplePtr positions = smp.getPositions();
 		const FloatArraySamplePtr weights = smp.getPositionWeights();
+
+		check_cyclic(smp);
 
 		const size_t num_points = positions->size();
 
