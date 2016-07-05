@@ -92,19 +92,11 @@ void AbcCurveWriter::do_write()
 
 	Nurb *nurbs = static_cast<Nurb *>(curve->nurb.first);
 	for (; nurbs; nurbs = nurbs->next) {
-		if ((nurbs->flagu & CU_NURB_ENDPOINT) != 0) {
-			periodicity = Alembic::AbcGeom::kNonPeriodic;
-		}
-		else if ((nurbs->flagu & CU_NURB_CYCLIC) != 0) {
-			periodicity = Alembic::AbcGeom::kPeriodic;
-		}
-
 		if (nurbs->bp) {
 			curve_basis = Alembic::AbcGeom::kNoBasis;
 			curve_type = Alembic::AbcGeom::kLinear;
 
 			const int totpoint = nurbs->pntsu * nurbs->pntsv;
-			vert_counts.push_back(totpoint);
 
 			const BPoint *point = nurbs->bp;
 
@@ -120,7 +112,6 @@ void AbcCurveWriter::do_write()
 			curve_type = Alembic::AbcGeom::kCubic;
 
 			const int totpoint = nurbs->pntsu;
-			vert_counts.push_back(totpoint);
 
 			const BezTriple *bezier = nurbs->bezt;
 
@@ -129,6 +120,21 @@ void AbcCurveWriter::do_write()
 				copy_zup_yup(temp_vert.getValue(), bezier->vec[1]);
 				verts.push_back(temp_vert);
 				widths.push_back(bezier->radius);
+			}
+		}
+
+		if ((nurbs->flagu & CU_NURB_ENDPOINT) != 0) {
+			periodicity = Alembic::AbcGeom::kNonPeriodic;
+		}
+		else if ((nurbs->flagu & CU_NURB_CYCLIC) != 0) {
+			periodicity = Alembic::AbcGeom::kPeriodic;
+
+			/* Duplicate the start points to indicate that the curve is actually
+			 * cyclic since other software need those.
+			 */
+
+			for (int i = 0; i < nurbs->orderu; ++i) {
+				verts.push_back(verts[i]);
 			}
 		}
 
@@ -155,6 +161,7 @@ void AbcCurveWriter::do_write()
         }
 
 		orders.push_back(nurbs->orderu + 1);
+		vert_counts.push_back(verts.size());
 	}
 
 	Alembic::AbcGeom::OFloatGeomParam::Sample width_sample;
@@ -248,7 +255,12 @@ void AbcCurveReader::readObjectData(Main *bmain, Scene *scene, float time)
 		else if (periodicity == Alembic::AbcGeom::kPeriodic) {
 			nu->flagu |= CU_NURB_CYCLIC;
 
-			/* Check the number of points which overlap. */
+			/* Check the number of points which overlap, we don't have
+			 * overlapping points in Blender, but other software do use them to
+			 * indicate that a curve is actually cyclic. Usually the number of
+			 * overlapping points is equal to the order/degree of the curve.
+			 */
+
 			const int start = idx;
 			const int end = idx + num_verts;
 			int overlap = 0;
@@ -264,8 +276,15 @@ void AbcCurveReader::readObjectData(Main *bmain, Scene *scene, float time)
 				++overlap;
 			}
 
+			/* TODO: Special case, need to figure out how it coincides with knots. */
 			if (overlap == 0 && num_verts > 2 && (*positions)[start] == (*positions)[end - 1]) {
 				overlap = 1;
+			}
+
+			/* There is no real cycles. */
+			if (overlap == 0) {
+				nu->flagu &= ~CU_NURB_CYCLIC;
+				nu->flagu |= CU_NURB_ENDPOINT;
 			}
 
 			nu->pntsu -= overlap;
