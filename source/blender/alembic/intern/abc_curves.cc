@@ -224,12 +224,12 @@ void AbcCurveReader::readObjectData(Main *bmain, Scene *scene, float time)
 
 	size_t idx = 0;
 	for (size_t i = 0; i < num_vertices->size(); ++i) {
-		const int steps = (*num_vertices)[i];
+		const int num_verts = (*num_vertices)[i];
 
 		Nurb *nu = static_cast<Nurb *>(MEM_callocN(sizeof(Nurb), "abc_getnurb"));
 		nu->resolu = cu->resolu;
 		nu->resolv = cu->resolv;
-		nu->pntsu = steps;
+		nu->pntsu = num_verts;
 		nu->pntsv = 1;
 		nu->flag |= CU_SMOOTH;
 
@@ -247,8 +247,30 @@ void AbcCurveReader::readObjectData(Main *bmain, Scene *scene, float time)
 		}
 		else if (periodicity == Alembic::AbcGeom::kPeriodic) {
 			nu->flagu |= CU_NURB_CYCLIC;
-			nu->pntsu = steps - nu->orderu;
+
+			/* Check the number of points which overlap. */
+			const int start = idx;
+			const int end = idx + num_verts;
+			int overlap = 0;
+
+			for (int j = start, k = end - nu->orderu; j < nu->orderu; ++j, ++k) {
+				const Imath::V3f &p1 = (*positions)[j];
+				const Imath::V3f &p2 = (*positions)[k];
+
+				if (p1 != p2) {
+					break;
+				}
+
+				++overlap;
+			}
+
+			if (overlap == 0 && num_verts > 2 && (*positions)[start] == (*positions)[end - 1]) {
+				overlap = 1;
+			}
+
+			nu->pntsu -= overlap;
 		}
+
 		float weight = 1.0f;
 
 		const bool do_radius = (radiuses != NULL) && (radiuses->size() > 1);
@@ -280,7 +302,8 @@ void AbcCurveReader::readObjectData(Main *bmain, Scene *scene, float time)
 		if (knots && knots->size() != 0) {
 			nu->knotsu = static_cast<float *>(MEM_callocN(KNOTSU(nu) * sizeof(float), "abc_setsplineknotsu"));
 
-			if (periodicity == Alembic::AbcGeom::kPeriodic) {
+			/* TODO: second check is temporary, for until the check for cycles is rock solid. */
+			if (periodicity == Alembic::AbcGeom::kPeriodic && (KNOTSU(nu) == knots->size() - 2)) {
 				/* Skip first and last knots. */
 				for (size_t i = 1; i < knots->size() - 1; ++i) {
 					nu->knotsu[i - 1] = (*knots)[knot_offset + i];
