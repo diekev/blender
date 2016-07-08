@@ -270,6 +270,18 @@ static bool check_cyclic(const INuPatchSchema::Sample &smp)
     }
 #endif
 
+#if 0
+	unsigned int index = 0;
+	for (unsigned int u = 0; u < numCVInU; u++) {
+		for (unsigned int v = 0; v < numCVInV; ++v, ++index) {
+			const Imath::V3f &cv = cvs[index];
+			std::cerr << '<' << cv[0] << ", " << cv[1] << ", " << cv[2] << "> ";
+		}
+
+		std::cerr << '\n';
+	}
+#endif
+
 	bool notOpen = true;
 
 	for (unsigned int v = 0; notOpen && v < numCVInV; v++) {
@@ -303,14 +315,15 @@ static bool check_cyclic(const INuPatchSchema::Sample &smp)
 
     notOpen = true;
 
+	int overlap = 0;
     for (unsigned int u = 0; notOpen && u < numCVInU; ++u) {
         for (unsigned int v = 0; v < degreeV; ++v) {
 #ifdef MAYA_INDEX
-			unsigned int index = u * numCVInV + (numCVInV - v - 1);
+			unsigned int index =        u * numCVInV + (numCVInV - v - 1);
             unsigned int cyclic_index = u * numCVInV + (degreeV - v - 1); //numV - (numV - vDegree + v) - 1;
 #else
-            unsigned int index = v + u * numCVInV;
-            unsigned int cyclic_index = index + numCVInV - degreeV;
+            unsigned int index =        u * numCVInV + v;
+            unsigned int cyclic_index = u * numCVInV + numCVInU;
 #endif
 
 			std::cerr << "index, cyclic_index: " << index << ", " << cyclic_index << '\n';
@@ -319,6 +332,8 @@ static bool check_cyclic(const INuPatchSchema::Sample &smp)
                 notOpen = false;
                 break;
             }
+
+			++overlap;
         }
     }
 
@@ -331,7 +346,7 @@ static bool check_cyclic(const INuPatchSchema::Sample &smp)
         }
     }
 	else {
-		std::cerr << "Cyclic V\n";
+		std::cerr << "Cyclic V, overlap: " << overlap << '\n';
 	}
 
 #ifdef MAYA_INDEX
