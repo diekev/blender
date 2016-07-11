@@ -24,7 +24,10 @@
 
 #include <cmath>
 
-#include <Alembic/AbcCoreHDF5/All.h>
+#ifdef WITH_ALEMBIC_HDF5
+#  include <Alembic/AbcCoreHDF5/All.h>
+#endif
+
 #include <Alembic/AbcCoreOgawa/All.h>
 
 #include "abc_camera.h"
@@ -68,27 +71,27 @@ using Alembic::Abc::OBox3dProperty;
 ExportSettings::ExportSettings()
     : scene(NULL)
     , selected_only(false)
-	, visible_layers_only(false)
-	, renderable_only(false)
-	, startframe(1)
+    , visible_layers_only(false)
+    , renderable_only(false)
+    , startframe(1)
     , endframe(1)
-	, xform_frame_step(1)
-	, shape_frame_step(1)
-	, shutter_open(0.0)
-	, shutter_close(1.0)
-	, global_scale(1.0f)
-	, flatten_hierarchy(false)
-	, export_normals(false)
-	, export_uvs(false)
-	, export_vcols(false)
-	, export_face_sets(false)
-	, export_vweigths(false)
-	, apply_subdiv(false)
-	, use_subdiv_schema(false)
-	, export_child_hairs(true)
-	, export_ogawa(true)
-	, pack_uv(false)
-	, do_convert_axis(false)
+    , xform_frame_step(1)
+    , shape_frame_step(1)
+    , shutter_open(0.0)
+    , shutter_close(1.0)
+    , global_scale(1.0f)
+    , flatten_hierarchy(false)
+    , export_normals(false)
+    , export_uvs(false)
+    , export_vcols(false)
+    , export_face_sets(false)
+    , export_vweigths(false)
+    , apply_subdiv(false)
+    , use_subdiv_schema(false)
+    , export_child_hairs(true)
+    , export_ogawa(true)
+    , pack_uv(false)
+    , do_convert_axis(false)
 {}
 
 static bool object_is_smoke_sim(Object *ob)
@@ -244,14 +247,23 @@ void AbcExporter::operator()(Main *bmain, float &progress, bool &was_canceled)
 
 	Alembic::Abc::Argument arg(md);
 
+#ifdef WITH_ALEMBIC_HDF5
 	if (!m_settings.export_ogawa) {
-		m_archive = Alembic::Abc::CreateArchiveWithInfo(Alembic::AbcCoreHDF5::WriteArchive(), m_filename, "Blender",
-		                                               scene_name, Alembic::Abc::ErrorHandler::kThrowPolicy, arg);
+		m_archive = Alembic::Abc::CreateArchiveWithInfo(Alembic::AbcCoreHDF5::WriteArchive(),
+		                                                m_filename,
+		                                                "Blender",
+		                                                scene_name,
+		                                                Alembic::Abc::ErrorHandler::kThrowPolicy,
+		                                                arg);
 	}
-	else {
-		m_archive = Alembic::Abc::CreateArchiveWithInfo(Alembic::AbcCoreOgawa::WriteArchive(), m_filename, "Blender",
-		                                               scene_name, Alembic::Abc::ErrorHandler::kThrowPolicy, arg);
-	}
+	else
+#endif
+		m_archive = Alembic::Abc::CreateArchiveWithInfo(Alembic::AbcCoreOgawa::WriteArchive(),
+		                                                m_filename,
+		                                                "Blender",
+		                                                scene_name,
+		                                                Alembic::Abc::ErrorHandler::kThrowPolicy,
+		                                                arg);
 
 	/* Create time samplings for transforms and shapes. */
 

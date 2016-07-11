@@ -39,6 +39,9 @@ set(INC_SYS
 	${ALEMBIC_INCLUDE_DIRS}
 	${HDF5_INCLUDE_DIRS}
 	${OPENEXR_INCLUDE_DIRS}
+if(APPLE)
+	${BOOST_INCLUDE_DIR}
+endif()
 )
 
 set(SRC
@@ -68,5 +71,9 @@ set(SRC
 	intern/abc_transform.h
 	intern/abc_util.h
 )
+
+if(WITH_ALEMBIC_HDF5)
+	add_definitions(-DWITH_ALEMBIC_HDF5)
+endif()
 
 blender_add_lib(bf_alembic "${SRC}" "${INC}" "${INC_SYS}")

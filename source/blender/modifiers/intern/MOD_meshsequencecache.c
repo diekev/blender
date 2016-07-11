@@ -35,6 +35,8 @@
 #include "BKE_library_query.h"
 #include "BKE_scene.h"
 
+#include "DEG_depsgraph_build.h"
+
 #include "MOD_modifiertypes.h"
 
 #ifdef WITH_ALEMBIC
@@ -89,15 +91,16 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 
 	Scene *scene = md->scene;
 	const float frame = BKE_scene_frame_get(scene);
-	const float time = BKE_cachefile_time_offset(mcmd->cache_file, frame / FPS);
+	const float time = BKE_cachefile_time_offset(mcmd->cache_file, frame, FPS);
 
 	DerivedMesh *result = ABC_read_mesh(mcmd->cache_file->handle,
+	                                    ob,
 	                                    dm,
 	                                    mcmd->abc_object_path,
 	                                    time);
 
 	return result ? result : dm;
-	UNUSED_VARS(ob, flag);
+	UNUSED_VARS(flag);
 #else
 	return dm;
 	UNUSED_VARS(md, ob, flag);
@@ -116,6 +119,21 @@ static void foreachIDLink(ModifierData *md, Object *ob,
 	MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *) md;
 
 	walk(userData, ob, (ID **)&mcmd->cache_file, IDWALK_USER);
+}
+
+static void updateDepsgraph(ModifierData *md,
+                            struct Main *bmain,
+                            struct Scene *scene,
+                            Object *ob,
+                            struct DepsNodeHandle *node)
+{
+	MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *) md;
+
+	if (mcmd->cache_file != NULL) {
+		DEG_add_object_cache_relation(node, mcmd->cache_file, DEG_OB_COMP_CACHE, "Mesh Cache File");
+	}
+
+	UNUSED_VARS(bmain, scene, ob);
 }
 
 ModifierTypeInfo modifierType_MeshSequenceCache = {
@@ -137,7 +155,7 @@ ModifierTypeInfo modifierType_MeshSequenceCache = {
     /* freeData */          freeData,
     /* isDisabled */        isDisabled,
     /* updateDepgraph */    NULL,
-    /* updateDepsgraph */   NULL,
+    /* updateDepsgraph */   updateDepsgraph,
     /* dependsOnTime */     dependsOnTime,
     /* dependsOnNormals */  NULL,
     /* foreachObjectLink */ NULL,

@@ -27,6 +27,7 @@
  *  \ingroup bke
  */
 
+#include "DNA_anim_types.h"
 #include "DNA_cachefile_types.h"
 #include "DNA_scene_types.h"
 
@@ -61,8 +62,8 @@ void *BKE_cachefile_add(Main *bmain, const char *name)
 
 	cache_file->handle = NULL;
 	cache_file->filepath[0] = '\0';
-	cache_file->frame_start = 0.0f;
-	cache_file->frame_scale = 1.0f;
+	cache_file->override_frame = false;
+	cache_file->frame = 0.0f;
 	cache_file->is_sequence = false;
 	cache_file->scale = 1.0f;
 
@@ -85,8 +86,8 @@ CacheFile *BKE_cachefile_copy(Main *bmain, CacheFile *cache_file)
 
 	BLI_strncpy(new_cache_file->filepath, cache_file->filepath, FILE_MAX);
 
-	new_cache_file->frame_start = cache_file->frame_start;
-	new_cache_file->frame_scale = cache_file->frame_scale;
+	new_cache_file->frame = cache_file->frame;
+	new_cache_file->override_frame = cache_file->override_frame;
 	new_cache_file->is_sequence = cache_file->is_sequence;
 	new_cache_file->scale = cache_file->scale;
 
@@ -115,17 +116,20 @@ void BKE_cachefile_load(CacheFile *cache_file, const char *relabase)
 #endif
 }
 
-void BKE_cachefile_update_frame(Main *bmain, float ctime)
+void BKE_cachefile_update_frame(Main *bmain, Scene *scene, const float ctime, const float fps)
 {
 	CacheFile *cache_file;
 	char filename[FILE_MAX];
 
 	for (cache_file = bmain->cachefiles.first; cache_file; cache_file = cache_file->id.next) {
+		/* Execute drivers only, as animation has already been done. */
+		BKE_animsys_evaluate_animdata(scene, &cache_file->id, cache_file->adt, ctime, ADT_RECALC_DRIVERS);
+
 		if (!cache_file->is_sequence) {
 			continue;
 		}
 
-		const float time = BKE_cachefile_time_offset(cache_file, ctime);
+		const float time = BKE_cachefile_time_offset(cache_file, ctime, fps);
 
 		if (BKE_cachefile_filepath_get(cache_file, time, filename)) {
 #ifdef WITH_ALEMBIC
@@ -156,7 +160,8 @@ bool BKE_cachefile_filepath_get(CacheFile *cache_file, float frame, char *r_file
 	return true;
 }
 
-float BKE_cachefile_time_offset(CacheFile *cache_file, float time)
+float BKE_cachefile_time_offset(CacheFile *cache_file, const float time, const float fps)
 {
-	return (cache_file->frame_scale * time) - cache_file->frame_start;
+	const float frame = (cache_file->override_frame ? cache_file->frame : time);
+	return cache_file->is_sequence ? frame : frame / fps;
 }

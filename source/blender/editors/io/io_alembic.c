@@ -139,11 +139,15 @@ static int wm_alembic_export_exec(bContext *C, wmOperator *op)
 static void ui_alembic_export_settings(uiLayout *layout, PointerRNA *imfptr)
 {
 	uiLayout *box = uiLayoutBox(layout);
-	uiLayout *row = uiLayoutRow(box, false);
+	uiLayout *row;
+
+#ifdef WITH_ALEMBIC_HDF5
+	row = uiLayoutRow(box, false);
 	uiItemL(row, IFACE_("Archive Options:"), ICON_NONE);
 
 	row = uiLayoutRow(box, false);
 	uiItemR(row, imfptr, "compression_type", 0, NULL, ICON_NONE);
+#endif
 
 	box = uiLayoutBox(layout);
 	row = uiLayoutRow(box, false);
@@ -244,10 +248,10 @@ void WM_OT_alembic_export(wmOperatorType *ot)
 	            "End Frame", "End Frame", INT_MIN, INT_MAX);
 
 	RNA_def_int(ot->srna, "xsamples", 1, 1, 128,
-	            "Transform Samples", "Transform samples per frame", 1, 128);
+	            "Transform Samples", "Number of times per frame transformations are sampled", 1, 128);
 
 	RNA_def_int(ot->srna, "gsamples", 1, 1, 128,
-	            "Geometry Samples", "Geometry samples per frame", 1, 128);
+	            "Geometry Samples", "Number of times per frame object datas are sampled", 1, 128);
 
 	RNA_def_float(ot->srna, "sh_open", 0.0f, -1.0f, 1.0f,
 	              "Shutter Open", "", -1.0f, 1.0f);
@@ -312,7 +316,7 @@ static int cmp_frame(const void *a, const void *b)
 	return 0;
 }
 
-static int get_seqeunce_len(char *filename, int *ofs)
+static int get_sequence_len(char *filename, int *ofs)
 {
 	int frame;
 	int numdigit;
@@ -415,7 +419,7 @@ static int wm_alembic_import_exec(bContext *C, wmOperator *op)
 	const bool set_frame_range = RNA_boolean_get(op->ptr, "set_frame_range");
 
 	int offset = 0;
-	int sequence_len = get_seqeunce_len(filename, &offset);
+	int sequence_len = get_sequence_len(filename, &offset);
 	const bool is_sequence = (sequence_len > 1);
 
 	ABC_import(C, filename, scale, is_sequence, set_frame_range, sequence_len, offset);

@@ -40,6 +40,7 @@ extern "C" {
  * such data in a way that lets other DCC know what they are for. See comments
  * in the write code for the conventions. */
 
+using Alembic::AbcGeom::kVertexScope;
 using Alembic::AbcGeom::kFacevaryingScope;
 
 using Alembic::Abc::C4fArraySample;
@@ -143,9 +144,7 @@ static void write_uv(const OCompoundProperty &prop, const CDStreamConfig &config
 
 /* Convention to write Vertex Colors:
  * - C3fGeomParam/C4fGeomParam on the arbGeomParam
- * - set scope as face varying
- *
- * TODO: check scope.
+ * - set scope as vertex varying
  */
 static void write_mcol(const OCompoundProperty &prop, const CDStreamConfig &config, void *data, const char *name)
 {
@@ -180,7 +179,7 @@ static void write_mcol(const OCompoundProperty &prop, const CDStreamConfig &conf
 
 	OC4fGeomParam::Sample sample(
 		C4fArraySample(&buffer.front(), buffer.size()),
-		kFacevaryingScope);
+		kVertexScope);
 
 	param.set(sample);
 }
@@ -363,18 +362,8 @@ void read_custom_data(const ICompoundProperty &prop, const CDStreamConfig &confi
 			continue;
 		}
 
-		/* TODO: check convention on vertex colors. */
-		if (IC3fGeomParam::matches(prop_header)) {
-			if (++num_colors > MAX_MCOL) {
-				continue;
-			}
-
-			read_custom_data_ex(prop, prop_header, config, iss, CD_MLOOPCOL);
-			continue;
-		}
-
-		/* TODO: check convention on vertex colors. */
-		if (IC4fGeomParam::matches(prop_header)) {
+		/* Read vertex colors according to convention. */
+		if (IC3fGeomParam::matches(prop_header) || IC4fGeomParam::matches(prop_header)) {
 			if (++num_colors > MAX_MCOL) {
 				continue;
 			}

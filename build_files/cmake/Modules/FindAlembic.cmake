@@ -1,16 +1,16 @@
 # - Find Alembic library
 # Find the native Alembic includes and libraries
 # This module defines
-#  ALEMBIC_INCLUDE_DIRS, where to find samplerate.h, Set when
+#  ALEMBIC_INCLUDE_DIRS, where to find Alembic headers, Set when
 #                        ALEMBIC_INCLUDE_DIR is found.
-#  ALEMBIC_LIBRARIES, libraries to link against to use Samplerate.
-#  ALEMBIC_ROOT_DIR, The base directory to search for Samplerate.
+#  ALEMBIC_LIBRARIES, libraries to link against to use Alembic.
+#  ALEMBIC_ROOT_DIR, The base directory to search for Alembic.
 #                    This can also be an environment variable.
-#  ALEMBIC_FOUND, If false, do not try to use Samplerate.
+#  ALEMBIC_FOUND, If false, do not try to use Alembic.
 #
 
 #=============================================================================
-# Copyright 2011 Blender Foundation.
+# Copyright 2016 Blender Foundation.
 #
 # Distributed under the OSI-approved BSD License (the "License");
 # see accompanying file Copyright.txt for details.
@@ -34,18 +34,6 @@ SET(_alembic_SEARCH_DIRS
   /opt/lib/alembic
 )
 
-SET(_alembic_FIND_COMPONENTS
-  AlembicAbc
-  AlembicAbcGeom
-  AlembicAbcCoreAbstract
-  AlembicUtil
-  AlembicAbcCoreHDF5
-  AlembicOgawa
-  AlembicAbcCoreOgawa
-  AlembicAbcMaterial
-  AlembicAbcCoreFactory
-)
-
 FIND_PATH(ALEMBIC_INCLUDE_DIR
   NAMES
     Alembic/Abc/All.h
@@ -55,29 +43,22 @@ FIND_PATH(ALEMBIC_INCLUDE_DIR
     include
 )
 
-SET(_alembic_LIBRARIES)
-FOREACH(COMPONENT ${_alembic_FIND_COMPONENTS})
-  STRING(TOUPPER ${COMPONENT} UPPERCOMPONENT)
-
-  FIND_LIBRARY(${UPPERCOMPONENT}_LIBRARY
-    NAMES
-      ${COMPONENT}
-    HINTS
-      ${_alembic_SEARCH_DIRS}
-    PATH_SUFFIXES
-      lib64 lib lib/static
-    )
-  MARK_AS_ADVANCED(${UPPERCOMPONENT}_LIBRARY)
-  LIST(APPEND _alembic_LIBRARIES "${${UPPERCOMPONENT}_LIBRARY}")
-ENDFOREACH()
+FIND_LIBRARY(ALEMBIC_LIBRARY
+  NAMES
+    Alembic
+  HINTS
+    ${_alembic_SEARCH_DIRS}
+  PATH_SUFFIXES
+    lib64 lib lib/static
+)
 
 # handle the QUIETLY and REQUIRED arguments and set ALEMBIC_FOUND to TRUE if 
 # all listed variables are TRUE
 INCLUDE(FindPackageHandleStandardArgs)
-FIND_PACKAGE_HANDLE_STANDARD_ARGS(ALEMBIC DEFAULT_MSG _alembic_LIBRARIES ALEMBIC_INCLUDE_DIR)
+FIND_PACKAGE_HANDLE_STANDARD_ARGS(ALEMBIC DEFAULT_MSG ALEMBIC_LIBRARY ALEMBIC_INCLUDE_DIR)
 
 IF(ALEMBIC_FOUND)
-  SET(ALEMBIC_LIBRARIES ${_alembic_LIBRARIES})
+  SET(ALEMBIC_LIBRARIES ${ALEMBIC_LIBRARY})
   SET(ALEMBIC_INCLUDE_DIRS ${ALEMBIC_INCLUDE_DIR})
 ENDIF(ALEMBIC_FOUND)
 
@@ -86,6 +67,4 @@ MARK_AS_ADVANCED(
   ALEMBIC_LIBRARY
 )
 
-UNSET(COMPONENT)
-UNSET(UPPERCOMPONENT)
-UNSET(_alembic_LIBRARIES)
+UNSET(_alembic_SEARCH_DIRS)

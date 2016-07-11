@@ -114,7 +114,6 @@
 
 #include "BKE_action.h"
 #include "BKE_armature.h"
-#include "BKE_blender_version.h"
 #include "BKE_brush.h"
 #include "BKE_cachefile.h"
 #include "BKE_cloth.h"
@@ -881,8 +880,6 @@ static void decode_blender_header(FileData *fd)
 	
 	if (readsize == sizeof(header)) {
 		if (STREQLEN(header, "BLENDER", 7)) {
-			int remove_this_endian_test = 1;
-			
 			fd->flags |= FD_FLAGS_FILE_OK;
 			
 			/* what size are pointers in the file ? */
@@ -901,7 +898,7 @@ static void decode_blender_header(FileData *fd)
 			/* is the file saved in a different endian
 			 * than we need ?
 			 */
-			if (((((char *)&remove_this_endian_test)[0] == 1) ? L_ENDIAN : B_ENDIAN) != ((header[8] == 'v') ? L_ENDIAN : B_ENDIAN)) {
+			if (((header[8] == 'v') ? L_ENDIAN : B_ENDIAN) != ENDIAN_ORDER) {
 				fd->flags |= FD_FLAGS_SWITCH_ENDIAN;
 			}
 			
@@ -921,7 +918,7 @@ static int read_file_dna(FileData *fd)
 		if (bhead->code == DNA1) {
 			const bool do_endian_swap = (fd->flags & FD_FLAGS_SWITCH_ENDIAN) != 0;
 			
-			fd->filesdna = DNA_sdna_from_data(&bhead[1], bhead->len, do_endian_swap);
+			fd->filesdna = DNA_sdna_from_data(&bhead[1], bhead->len, do_endian_swap, true);
 			if (fd->filesdna) {
 				fd->compflags = DNA_struct_get_compareflags(fd->filesdna, fd->memsdna);
 				/* used to retrieve ID names from (bhead+1) */
@@ -1081,7 +1078,7 @@ static FileData *filedata_new(void)
 	 * but it keeps us re-entrant,  remove once we have
 	 * a lib that provides a nice lock. - zr
 	 */
-	fd->memsdna = DNA_sdna_from_data(DNAstr, DNAlen, false);
+	fd->memsdna = DNA_sdna_from_data(DNAstr, DNAlen, false, false);
 	
 	fd->datamap = oldnewmap_new();
 	fd->globmap = oldnewmap_new();
@@ -6482,7 +6479,7 @@ static void *restore_pointer_by_name_main(Main *mainp, ID *id, ePointerUserMode 
  * - USER_IGNORE: no usercount change
  * - USER_REAL: ensure a real user (even if a fake one is set)
  * \param id_map: lookup table, use when performing many lookups.
- * this could be made an optional agument (falling back to a full lookup),
+ * this could be made an optional argument (falling back to a full lookup),
  * however at the moment it's always available.
  */
 static void *restore_pointer_by_name(struct IDNameLib_Map *id_map, ID *id, ePointerUserMode user)
@@ -8322,9 +8319,6 @@ static void do_versions(FileData *fd, Library *lib, Main *main)
 	blo_do_versions_250(fd, lib, main);
 	blo_do_versions_260(fd, lib, main);
 	blo_do_versions_270(fd, lib, main);
-
-	main->versionfile = BLENDER_VERSION;
-	main->subversionfile = BLENDER_SUBVERSION;
 
 	/* WATCH IT!!!: pointers from libdata have not been converted yet here! */
 	/* WATCH IT 2!: Userdef struct init see do_versions_userdef() above! */

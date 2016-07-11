@@ -2201,7 +2201,7 @@ static void actcon_get_tarmat(bConstraint *con, bConstraintOb *cob, bConstraintT
 		}
 		else if (cob->type == CONSTRAINT_OBTYPE_BONE) {
 			Object workob;
-			bPose pose = {0};
+			bPose pose = {{0}};
 			bPoseChannel *pchan, *tchan;
 
 			/* make a copy of the bone of interest in the temp pose before evaluating action, so that it can get set 
@@ -4349,14 +4349,18 @@ static void transformcache_id_looper(bConstraint *con, ConstraintIDFunc func, vo
 
 static void transformcache_evaluate(bConstraint *con, bConstraintOb *cob, ListBase *targets)
 {
+#ifdef WITH_ALEMBIC
 	bTransformCacheConstraint *data = con->data;
 	Scene *scene = cob->scene;
 
 	const float frame = BKE_scene_frame_get(scene);
-	const float time = BKE_cachefile_time_offset(data->cache_file, frame / FPS);
+	const float time = BKE_cachefile_time_offset(data->cache_file, frame, FPS);
 
 	ABC_get_transform(data->cache_file->handle, cob->ob, data->abc_object_path,
 	                  cob->matrix, time, data->cache_file->scale);
+#else
+	UNUSED_VARS(con, cob);
+#endif
 
 	UNUSED_VARS(targets);
 }
@@ -4715,7 +4719,7 @@ void BKE_constraints_id_loop(ListBase *conlist, ConstraintIDFunc func, void *use
 /* helper for BKE_constraints_copy(), to be used for making sure that ID's are valid */
 static void con_extern_cb(bConstraint *UNUSED(con), ID **idpoin, bool UNUSED(is_reference), void *UNUSED(userData))
 {
-	if (*idpoin && (*idpoin)->lib)
+	if (*idpoin && ID_IS_LINKED_DATABLOCK(*idpoin))
 		id_lib_extern(*idpoin);
 }
 
