@@ -24,7 +24,9 @@
 
 #include "cycles_alembic.h"
 
-#include </opt/lib/alembic/include/Alembic/AbcCoreHDF5/All.h>
+#ifdef WITH_ALEMBIC_HDF5
+#  include </opt/lib/alembic/include/Alembic/AbcCoreHDF5/All.h>
+#endif
 #include </opt/lib/alembic/include/Alembic/AbcCoreOgawa/All.h>
 
 #if 0
@@ -105,13 +107,17 @@
 #endif
 
 #if 0
+#include "background.h"
 #include "camera.h"
 #include "mesh.h"
+#include "nodes.h"
 #include "object.h"
 #include "scene.h"
 #else
+#include "../render/background.h"
 #include "../render/camera.h"
 #include "../render/mesh.h"
+#include "../render/nodes.h"
 #include "../render/object.h"
 #include "../render/scene.h"
 #endif
@@ -140,20 +146,26 @@ static IArchive open_archive(const std::string &filename)
 	IArchive archive;
 
 	try {
-		archive = IArchive(Alembic::AbcCoreHDF5::ReadArchive(),
+		archive = IArchive(Alembic::AbcCoreOgawa::ReadArchive(),
 		                   filename.c_str(), ErrorHandler::kThrowPolicy,
 		                   cache_ptr);
 	}
-	catch (const Exception &) {
+	catch (const Exception &e) {
+		std::cerr << e.what() << '\n';
+
+#ifdef WITH_ALEMBIC_HDF5
 		try {
-			archive = IArchive(Alembic::AbcCoreOgawa::ReadArchive(),
+			archive = IArchive(Alembic::AbcCoreHDF5::ReadArchive(),
 			                   filename.c_str(), ErrorHandler::kThrowPolicy,
 			                   cache_ptr);
 		}
-		catch (const Exception &e) {
+		catch (const Exception &) {
 			std::cerr << e.what() << '\n';
 			return IArchive();
 		}
+#else
+		return IArchive();
+#endif
 	}
 
 	return archive;
@@ -164,7 +176,7 @@ static ISampleSelector get_sample_selector(const AbcReadState &state)
 	return ISampleSelector(state.time, ISampleSelector::kFloorIndex);
 }
 
-void get_tramsform(AbcReadState &state, const IObject &object)
+static void get_transform(AbcReadState &state, const IObject &object)
 {
 	state.tfm = transform_identity();
 
@@ -238,6 +250,21 @@ static void read_mesh(const AbcReadState &state, const IPolyMesh &object)
 	const int32_t *indices = sample.getFaceIndices()->get();
 	const int32_t *nverts = sample.getFaceCounts()->get();
 
+	size_t tottris = 0;
+
+	for(int i = 0; i < totfaces; ++i) {
+		int n = nverts[i];
+
+		if (n == 3) {
+			++tottris;
+		}
+		else if (n == 4) {
+			tottris += 2;
+		}
+	}
+
+	mesh->reserve_mesh(totverts, tottris);
+
 	/* create vertices */
 	float3 *verts = mesh->verts.resize(totverts);
 	for(int i = 0; i < totverts; i++) {
@@ -281,6 +308,9 @@ static void read_camera(const AbcReadState &state, const ICamera &object)
 	/* add mesh */
 	Camera *camera = state.scene->camera;
 
+	camera->width = 800;
+	camera->height = 500;
+
 	ISampleSelector ss = get_sample_selector(state);
 	ICameraSchema schema = object.getSchema();
 
@@ -306,9 +336,14 @@ static void read_camera(const AbcReadState &state, const ICamera &object)
 
 	camera->aperturesize = (lens*1e-3f)/(2.0f*fstop);
 	camera->aperture_ratio = film_aspect;
+
+	camera->matrix = state.tfm;
+
+	camera->need_update = true;
+	camera->update();
 }
 
-static void read_object(const IObject &object, const AbcReadState &state)
+static void read_object(const IObject &object, AbcReadState &state)
 {
 	if (!object.valid()) {
 		return;
@@ -323,7 +358,7 @@ static void read_object(const IObject &object, const AbcReadState &state)
 
 		const MetaData &md = child.getMetaData();
 
-		get_tramsform(state, child);
+		get_transform(state, child);
 
 		if (IXform::matches(md)) {
 			/* Pass for now. */
@@ -363,10 +398,31 @@ static void read_object(const IObject &object, const AbcReadState &state)
 	}
 }
 
+static Shader *background_shader(Scene *scene)
+{
+	ShaderGraph *graph = new ShaderGraph();
+
+	BackgroundNode *bg = new BackgroundNode();
+	bg->color = make_float3(0.2f, 0.2f, 0.2f);
+	graph->add(bg);
+
+	graph->connect(bg->output("Background"), graph->output()->input("Surface"));
+
+	Shader *shader = new Shader();
+	shader->name = "bg";
+	shader->graph = graph;
+	scene->shaders.push_back(shader);
+
+	return shader;
+}
+
 static void read_archive(IArchive &archive, Scene *scene)
 {
 	AbcReadState state;
 	state.scene = scene;
+	state.shader = scene->default_background;
+
+	scene->background->shader = background_shader(scene);
 
 	read_object(archive.getTop(), state);
 
