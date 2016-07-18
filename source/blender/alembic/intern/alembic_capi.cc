@@ -375,7 +375,9 @@ void ABC_export(
         const bool use_subdiv_schema,
         const bool compression,
         const bool packuv,
-        const float global_scale)
+        const float global_scale,
+        const int up_axis,
+        const int forward_axis)
 {
 	ExportJobData *job = static_cast<ExportJobData *>(MEM_mallocN(sizeof(ExportJobData), "ExportJobData"));
 	job->scene = scene;
@@ -402,6 +404,11 @@ void ABC_export(
 	job->settings.export_ogawa = (compression == ABC_ARCHIVE_OGAWA);
 	job->settings.pack_uv = packuv;
 	job->settings.global_scale = global_scale;
+
+	job->settings.do_convert_axis = mat3_from_axis_conversion(1, 2,
+	                                                          forward_axis,
+	                                                          up_axis,
+	                                                          job->settings.convert_matrix);
 
 	if (job->settings.startframe > job->settings.endframe) {
 		std::swap(job->settings.startframe, job->settings.endframe);
@@ -603,6 +610,8 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
 
 	cache_file->is_sequence = data->settings.is_sequence;
 	cache_file->scale = data->settings.scale;
+	cache_file->forward_axis = data->settings.from_forward;
+	cache_file->up_axis = data->settings.from_up;
 	cache_file->handle = handle_from_archive(archive);
 	BLI_strncpy(cache_file->filepath, data->filename, 1024);
 
@@ -743,7 +752,15 @@ static void import_freejob(void *user_data)
 	delete data;
 }
 
-void ABC_import(bContext *C, const char *filepath, float scale, bool is_sequence, bool set_frame_range, int sequence_len, int offset)
+void ABC_import(bContext *C,
+                const char *filepath,
+                int up_axis,
+                int forward_axis,
+                float scale,
+                bool is_sequence,
+                bool set_frame_range,
+                int sequence_len,
+                int offset)
 {
 	/* Using new here since MEM_* funcs do not call ctor to properly initialize
 	 * data. */
@@ -751,6 +768,14 @@ void ABC_import(bContext *C, const char *filepath, float scale, bool is_sequence
 	job->bmain = CTX_data_main(C);
 	job->scene = CTX_data_scene(C);
 	BLI_strncpy(job->filename, filepath, 1024);
+
+	job->settings.from_up = up_axis;
+	job->settings.from_forward = forward_axis;
+
+	job->settings.do_axis_transform = mat3_from_axis_conversion(forward_axis,
+	                                                            up_axis,
+	                                                            1, 2,
+	                                                            job->settings.rotation_matrix);
 
 	job->settings.scale = scale;
 	job->settings.is_sequence = is_sequence;
@@ -778,7 +803,9 @@ void ABC_import(bContext *C, const char *filepath, float scale, bool is_sequence
 
 /* ******************************* */
 
-void ABC_get_transform(AbcArchiveHandle *handle, Object *ob, const char *object_path, float r_mat[4][4], float time, float scale)
+void ABC_get_transform(AbcArchiveHandle *handle, Object *ob,
+                       const char *object_path,
+                       float r_mat[4][4], float time, float scale, int up_axis, int forward_axis)
 {
 	IArchive *archive = archive_from_handle(handle);
 
@@ -805,8 +832,13 @@ void ABC_get_transform(AbcArchiveHandle *handle, Object *ob, const char *object_
 	}
 
 	ISampleSelector sample_sel(time);
+	ImportSettings settings;
+	settings.from_forward = forward_axis;
+	settings.from_up = up_axis;
 
-	create_input_transform(sample_sel, ixform, ob, r_mat, scale);
+	settings.do_axis_transform = mat3_from_axis_conversion(forward_axis, up_axis, 1, 2, settings.rotation_matrix);
+
+	create_input_transform(&settings, sample_sel, ixform, ob, r_mat, scale);
 }
 
 /* ***************************************** */
@@ -874,7 +906,7 @@ ABC_INLINE CDStreamConfig get_config(DerivedMesh *dm)
 	return config;
 }
 
-static DerivedMesh *read_mesh_sample(DerivedMesh *dm, const IObject &iobject, const float time)
+static DerivedMesh *read_mesh_sample(ImportSettings *settings, DerivedMesh *dm, const IObject &iobject, const float time)
 {
 	IPolyMesh mesh(iobject, kWrapExisting);
 	IPolyMeshSchema schema = mesh.getSchema();
@@ -899,7 +931,7 @@ static DerivedMesh *read_mesh_sample(DerivedMesh *dm, const IObject &iobject, co
 	CDStreamConfig config = get_config(new_dm ? new_dm : dm);
 
 	bool has_loop_normals = false;
-	read_mesh_sample(schema, sample_sel, config, has_loop_normals);
+	read_mesh_sample(settings, schema, sample_sel, config, has_loop_normals);
 
 	if (new_dm) {
 		/* Check if we had ME_SMOOTH flag set to restore it. */
@@ -918,7 +950,7 @@ static DerivedMesh *read_mesh_sample(DerivedMesh *dm, const IObject &iobject, co
 
 using Alembic::AbcGeom::ISubDSchema;
 
-static DerivedMesh *read_subd_sample(DerivedMesh *dm, const IObject &iobject, const float time)
+static DerivedMesh *read_subd_sample(ImportSettings *settings, DerivedMesh *dm, const IObject &iobject, const float time)
 {
 	ISubD mesh(iobject, kWrapExisting);
 	ISubDSchema schema = mesh.getSchema();
@@ -941,7 +973,7 @@ static DerivedMesh *read_subd_sample(DerivedMesh *dm, const IObject &iobject, co
 	}
 
 	CDStreamConfig config = get_config(new_dm ? new_dm : dm);
-	read_subd_sample(schema, sample_sel, config);
+	read_subd_sample(settings, schema, sample_sel, config);
 
 	if (new_dm) {
 		/* Check if we had ME_SMOOTH flag set to restore it. */
@@ -958,7 +990,7 @@ static DerivedMesh *read_subd_sample(DerivedMesh *dm, const IObject &iobject, co
 	return dm;
 }
 
-static DerivedMesh *read_points_sample(DerivedMesh *dm, const IObject &iobject, const float time)
+static DerivedMesh *read_points_sample(ImportSettings *settings, DerivedMesh *dm, const IObject &iobject, const float time)
 {
 	IPoints points(iobject, kWrapExisting);
 	IPointsSchema schema = points.getSchema();
@@ -984,7 +1016,7 @@ static DerivedMesh *read_points_sample(DerivedMesh *dm, const IObject &iobject, 
 
 	MVert *mverts = dm->getVertArray(dm);
 
-	read_mverts(mverts, positions, vnormals);
+	read_mverts(settings, mverts, positions, vnormals);
 
 	return dm;
 }
@@ -995,7 +1027,7 @@ static DerivedMesh *read_points_sample(DerivedMesh *dm, const IObject &iobject, 
  * object directly and create a new DerivedMesh from that. Also we might need to
  * create new or delete existing NURBS in the curve.
  */
-static DerivedMesh *read_curves_sample(Object *ob, const IObject &iobject, const float time)
+static DerivedMesh *read_curves_sample(ImportSettings *settings, Object *ob, const IObject &iobject, const float time)
 {
 	ICurves points(iobject, kWrapExisting);
 	ICurvesSchema schema = points.getSchema();
@@ -1013,7 +1045,7 @@ static DerivedMesh *read_curves_sample(Object *ob, const IObject &iobject, const
 
 	if (curve_count != num_vertices->size()) {
 		BKE_nurbList_free(&curve->nurb);
-		read_curve_sample(curve, schema, time);
+		read_curve_sample(settings, curve, schema, time);
 	}
 	else {
 		Nurb *nurbs = static_cast<Nurb *>(curve->nurb.first);
@@ -1025,7 +1057,7 @@ static DerivedMesh *read_curves_sample(Object *ob, const IObject &iobject, const
 
 				for (int i = 0; i < totpoint; ++i, ++point, ++vertex_idx) {
 					const Imath::V3f &pos = (*positions)[vertex_idx];
-					copy_yup_zup(point->vec, pos.getValue());
+					copy_yup_zup(settings, point->vec, pos.getValue());
 				}
 			}
 			else if (nurbs->bezt) {
@@ -1033,7 +1065,7 @@ static DerivedMesh *read_curves_sample(Object *ob, const IObject &iobject, const
 
 				for (int i = 0; i < totpoint; ++i, ++bezier, ++vertex_idx) {
 					const Imath::V3f &pos = (*positions)[vertex_idx];
-					copy_yup_zup(bezier->vec[1], pos.getValue());
+					copy_yup_zup(settings, bezier->vec[1], pos.getValue());
 				}
 			}
 		}
@@ -1046,7 +1078,7 @@ DerivedMesh *ABC_read_mesh(AbcArchiveHandle *handle,
                            Object *ob,
                            DerivedMesh *dm,
                            const char *object_path,
-                           const float time,
+                           const float time, int forward_axis, int up_axis,
                            const char **err_str)
 {
 	IArchive *archive = archive_from_handle(handle);
@@ -1066,13 +1098,19 @@ DerivedMesh *ABC_read_mesh(AbcArchiveHandle *handle,
 
 	const ObjectHeader &header = iobject.getHeader();
 
+	ImportSettings settings;
+	settings.from_forward = forward_axis;
+	settings.from_up = up_axis;
+
+	settings.do_axis_transform = mat3_from_axis_conversion(forward_axis, up_axis, 1, 2, settings.rotation_matrix);
+
 	if (IPolyMesh::matches(header)) {
 		if (ob->type != OB_MESH) {
 			*err_str = "Object type mismatch: object path points to a mesh!";
 			return NULL;
 		}
 
-		return read_mesh_sample(dm, iobject, time);
+		return read_mesh_sample(&settings, dm, iobject, time);
 	}
 	else if (ISubD::matches(header)) {
 		if (ob->type != OB_MESH) {
@@ -1080,7 +1118,7 @@ DerivedMesh *ABC_read_mesh(AbcArchiveHandle *handle,
 			return NULL;
 		}
 
-		return read_subd_sample(dm, iobject, time);
+		return read_subd_sample(&settings, dm, iobject, time);
 	}
 	else if (IPoints::matches(header)) {
 		if (ob->type != OB_MESH) {
@@ -1088,7 +1126,7 @@ DerivedMesh *ABC_read_mesh(AbcArchiveHandle *handle,
 			return NULL;
 		}
 
-		return read_points_sample(dm, iobject, time);
+		return read_points_sample(&settings, dm, iobject, time);
 	}
 	else if (ICurves::matches(header)) {
 		if (ob->type != OB_CURVE) {
@@ -1096,7 +1134,7 @@ DerivedMesh *ABC_read_mesh(AbcArchiveHandle *handle,
 			return NULL;
 		}
 
-		return read_curves_sample(ob, iobject, time);
+		return read_curves_sample(&settings, ob, iobject, time);
 	}
 
 	*err_str = "Unsupported object type: verify object path"; // or poke developer
@@ -1212,6 +1250,8 @@ void ABC_get_velocity_cache(AbcArchiveHandle *handle, const char *object_path, f
 		}
 	}
 
+	ImportSettings settings;
+
 	float fps = 1.0f / 24.0f;
 	float vel[3];
 
@@ -1227,7 +1267,7 @@ void ABC_get_velocity_cache(AbcArchiveHandle *handle, const char *object_path, f
 
 	for (size_t i = 0; i < velocities->size(); ++i) {
 		const Imath::V3f &vel_in = (*velocities)[i];
-		copy_yup_zup(vel, vel_in.getValue());
+		copy_yup_zup(&settings, vel, vel_in.getValue());
 
 #ifdef DEBUG_VELOCITY
 		if (vel[0] > maxx) {

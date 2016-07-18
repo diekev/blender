@@ -78,8 +78,8 @@ private:
 class CacheFile;
 
 struct ImportSettings {
-	bool do_convert_mat;
-	float conversion_mat[4][4];
+	bool do_axis_transform;
+	float rotation_matrix[3][3];
 
 	int from_up;
 	int from_forward;

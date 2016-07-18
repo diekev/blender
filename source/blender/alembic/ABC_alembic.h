@@ -64,10 +64,14 @@ void ABC_export(
         const bool use_subdiv_schema,
         const bool compression,
         const bool packuv,
-        const float global_scale);
+        const float global_scale,
+        const int up_axis,
+        const int forward_axis);
 
 void ABC_import(struct bContext *C,
                 const char *filepath,
+                int up_axis,
+                int forward_axis,
                 float scale,
                 bool is_sequence,
                 bool set_frame_range,
@@ -83,13 +87,13 @@ void ABC_get_transform(AbcArchiveHandle *handle,
                        const char *object_path,
                        float r_mat[4][4],
                        float time,
-                       float scale);
+                       float scale, int up_axis, int forward_axis);
 
 struct DerivedMesh *ABC_read_mesh(AbcArchiveHandle *handle,
                                   struct Object *ob,
                                   struct DerivedMesh *dm,
                                   const char *object_path,
-                                  const float time,
+                                  const float time, int forward_axis, int up_axis,
                                   const char **err_str);
 
 bool ABC_has_velocity_cache(AbcArchiveHandle *handle, const char *object_path, const float time);

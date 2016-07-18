@@ -171,7 +171,7 @@ void AbcPointsReader::readObjectData(Main *bmain, Scene *scene, float time)
 		}
 	}
 
-	read_mverts(mesh->mvert, positions, vnormals);
+	read_mverts(m_settings, mesh->mvert, positions, vnormals);
 
 	BKE_mesh_validate(mesh, false, false);
 

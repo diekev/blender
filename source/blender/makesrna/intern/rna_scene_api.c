@@ -210,7 +210,9 @@ static void rna_Scene_alembic_export(
         int subdiv_schema,
         int compression,
         int packuv,
-        float scale)
+        float scale,
+        int up_axis,
+        int forward_axis)
 {
 /* We have to enable allow_threads, because we may change scene frame number
  * during export. */
@@ -239,7 +241,9 @@ static void rna_Scene_alembic_export(
 	           subdiv_schema,
 	           compression,
 	           packuv,
-	           scale);
+	           scale,
+	           up_axis,
+	           forward_axis);
 
 #ifdef WITH_PYTHON
 	BPy_END_ALLOW_THREADS;
@@ -399,6 +403,8 @@ void RNA_api_scene(StructRNA *srna)
 	RNA_def_enum(func, "compression_type", rna_enum_abc_compression_items, 0, "Compression", "");
 	RNA_def_boolean(func, "packuv"		, 0, "Export with packed UV islands", "Export with packed UV islands");
 	RNA_def_float(func, "scale", 1.0f, 0.0001f, 1000.0f, "Scale", "Value by which to enlarge or shrink the objects with respect to the world's origin", 0.0001f, 1000.0f);
+	RNA_def_enum(func, "forward_axis", rna_enum_object_axis_items, OB_POSZ, "Forward Axis", "");
+	RNA_def_enum(func, "up_axis", rna_enum_object_axis_items, OB_NEGY, "Up Axis", "");
 
 	RNA_def_function_flag(func, FUNC_USE_CONTEXT);
 #endif

@@ -154,7 +154,7 @@ static void create_rotation_matrix(
 
 /* Recompute transform matrix of object in new coordinate system
  * (from Y-Up to Z-Up). */
-void create_transform_matrix(float r_mat[4][4])
+void create_transform_matrix(ImportSettings *settings, float r_mat[4][4])
 {
 	float rot_mat[3][3], rot[3][3], scale_mat[4][4], invmat[4][4], transform_mat[4][4];
 	float rot_x_mat[3][3], rot_y_mat[3][3], rot_z_mat[3][3];
@@ -189,7 +189,7 @@ void create_transform_matrix(float r_mat[4][4])
 	copy_m4_m3(transform_mat, rot_mat);
 
 	/* Add translation to transformation matrix. */
-	copy_yup_zup(transform_mat[3], loc);
+	copy_yup_zup(settings, transform_mat[3], loc);
 
 	/* Create scale matrix. */
 	scale_mat[0][0] = scale[0];
@@ -202,7 +202,8 @@ void create_transform_matrix(float r_mat[4][4])
 	copy_m4_m4(r_mat, transform_mat);
 }
 
-void create_input_transform(const Alembic::AbcGeom::ISampleSelector &sample_sel,
+void create_input_transform(ImportSettings *settings,
+                            const Alembic::AbcGeom::ISampleSelector &sample_sel,
                             const Alembic::AbcGeom::IXform &ixform, Object *ob,
                             float r_mat[4][4], float scale, bool has_alembic_parent)
 {
@@ -225,7 +226,7 @@ void create_input_transform(const Alembic::AbcGeom::ISampleSelector &sample_sel,
 		mul_m4_m4m4(r_mat, r_mat, cam_to_yup);
 	}
 
-	create_transform_matrix(r_mat);
+	create_transform_matrix(settings, r_mat);
 
 	if (ob->parent) {
 		mul_m4_m4m4(r_mat, ob->parent->obmat, r_mat);
@@ -241,7 +242,7 @@ void create_input_transform(const Alembic::AbcGeom::ISampleSelector &sample_sel,
 }
 
 /* Recompute transform matrix of object in new coordinate system (from Z-Up to Y-Up). */
-void create_transform_matrix(Object *obj, float transform_mat[4][4])
+void create_transform_matrix(ExportSettings *settings, Object *obj, float transform_mat[4][4])
 {
 	float rot_mat[3][3], rot[3][3], scale_mat[4][4], invmat[4][4], mat[4][4];
 	float rot_x_mat[3][3], rot_y_mat[3][3], rot_z_mat[3][3];
@@ -417,7 +418,7 @@ void create_transform_matrix(Object *obj, float transform_mat[4][4])
 	copy_m4_m3(transform_mat, rot_mat);
 
 	/* Add translation to transformation matrix. */
-	copy_zup_yup(transform_mat[3], loc);
+	copy_zup_yup(settings, transform_mat[3], loc);
 
 	/* Create scale matrix. */
 	scale_mat[0][0] = scale[0];

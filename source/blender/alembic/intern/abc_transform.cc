@@ -87,7 +87,7 @@ void AbcTransformWriter::do_write()
 	}
 
 	float mat[4][4];
-	create_transform_matrix(m_object, mat);
+	create_transform_matrix(&m_settings, m_object, mat);
 
 	/* Only apply rotation to root camera, parenting will propagate it. */
 	if (m_object->type == OB_CAMERA && !has_parent_camera(m_object)) {

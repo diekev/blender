@@ -198,7 +198,7 @@ void AbcObjectReader::readObjectMatrix(const float time)
 	Alembic::AbcGeom::XformSample xs;
 	schema.get(xs, sample_sel);
 
-	create_input_transform(sample_sel, ixform, m_object, m_object->obmat, m_settings->scale, has_alembic_parent);
+	create_input_transform(m_settings, sample_sel, ixform, m_object, m_object->obmat, m_settings->scale, has_alembic_parent);
 
 	invert_m4_m4(m_object->imat, m_object->obmat);
 

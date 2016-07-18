@@ -101,7 +101,7 @@ void AbcCurveWriter::do_write()
 			const BPoint *point = nurbs->bp;
 
 			for (int i = 0; i < totpoint; ++i, ++point) {
-				copy_zup_yup(temp_vert.getValue(), point->vec);
+				copy_zup_yup(&m_settings, temp_vert.getValue(), point->vec);
 				verts.push_back(temp_vert);
 				weights.push_back(point->vec[3]);
 				widths.push_back(point->radius);
@@ -117,7 +117,7 @@ void AbcCurveWriter::do_write()
 
 			/* TODO(kevin): store info about handles, Alembic doesn't have this. */
 			for (int i = 0; i < totpoint; ++i, ++bezier) {
-				copy_zup_yup(temp_vert.getValue(), bezier->vec[1]);
+				copy_zup_yup(&m_settings, temp_vert.getValue(), bezier->vec[1]);
 				verts.push_back(temp_vert);
 				widths.push_back(bezier->radius);
 			}
@@ -206,7 +206,7 @@ void AbcCurveReader::readObjectData(Main *bmain, Scene *scene, float time)
 	m_object = BKE_object_add(bmain, scene, OB_CURVE, m_object_name.c_str());
 	m_object->data = cu;
 
-	read_curve_sample(cu, m_curves_schema, time);
+	read_curve_sample(m_settings, cu, m_curves_schema, time);
 
 	if (has_animations(m_curves_schema, m_settings)) {
 		addCacheModifier();
@@ -215,7 +215,7 @@ void AbcCurveReader::readObjectData(Main *bmain, Scene *scene, float time)
 
 /* ************************************************************************** */
 
-void read_curve_sample(Curve *cu, const ICurvesSchema &schema, const float time)
+void read_curve_sample(ImportSettings *settings, Curve *cu, const ICurvesSchema &schema, const float time)
 {
 	const ISampleSelector sample_sel(time);
 	ICurvesSchema::Sample smp = schema.getValue(sample_sel);
@@ -318,7 +318,7 @@ void read_curve_sample(Curve *cu, const ICurvesSchema &schema, const float time)
 				weight = (*weights)[idx];
 			}
 
-			copy_yup_zup(bp->vec, pos.getValue());
+			copy_yup_zup(settings, bp->vec, pos.getValue());
 			bp->vec[3] = weight;
 			bp->f1 = SELECT;
 			bp->radius = radius;

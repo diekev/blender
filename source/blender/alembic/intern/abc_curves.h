@@ -59,4 +59,4 @@ public:
 
 /* ************************************************************************** */
 
-void read_curve_sample(Curve *cu, const Alembic::AbcGeom::ICurvesSchema &schema, const float time);
+void read_curve_sample(ImportSettings *settings, Curve *cu, const Alembic::AbcGeom::ICurvesSchema &schema, const float time);

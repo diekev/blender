@@ -25,6 +25,8 @@
 #include <Alembic/Abc/All.h>
 #include <Alembic/AbcGeom/All.h>
 
+#include "abc_object.h"
+
 #ifdef _MSC_VER
 #  define ABC_INLINE static __forceinline
 #else
@@ -46,8 +48,8 @@ bool object_selected(Object *ob);
 bool parent_selected(Object *ob);
 
 Imath::M44d convert_matrix(float mat[4][4]);
-void create_transform_matrix(float r_mat[4][4]);
-void create_transform_matrix(Object *obj, float transform_mat[4][4]);
+void create_transform_matrix(ImportSettings *settings, float r_mat[4][4]);
+void create_transform_matrix(ExportSettings *settings, Object *obj, float transform_mat[4][4]);
 
 void split(const std::string &s, const char delim, std::vector<std::string> &tokens);
 
@@ -58,7 +60,7 @@ bool begins_with(const TContainer &input, const TContainer &match)
 	        && std::equal(match.begin(), match.end(), input.begin());
 }
 
-void create_input_transform(const Alembic::AbcGeom::ISampleSelector &sample_sel,
+void create_input_transform(ImportSettings *settings, const Alembic::AbcGeom::ISampleSelector &sample_sel,
                             const Alembic::AbcGeom::IXform &ixform, Object *ob,
                             float r_mat[4][4], float scale, bool has_alembic_parent = false);
 
@@ -91,32 +93,52 @@ bool has_property(const Alembic::Abc::ICompoundProperty &prop, const std::string
 
 /* Copy from Y-up to Z-up. */
 
-ABC_INLINE void copy_yup_zup(float zup[3], const float yup[3])
+#include "BLI_math.h"
+
+ABC_INLINE void copy_yup_zup(ImportSettings *settings, float zup[3], const float yup[3])
 {
-	zup[0] = yup[0];
-	zup[1] = -yup[2];
-	zup[2] = yup[1];
+	copy_v3_v3(zup, yup);
+
+	if (settings->do_axis_transform) {
+		mul_m3_v3(settings->rotation_matrix, zup);
+	}
 }
 
-ABC_INLINE void copy_yup_zup(short zup[3], const short yup[3])
+ABC_INLINE void copy_yup_zup(ImportSettings *settings, short zup[3], const short yup[3])
 {
-	zup[0] = yup[0];
-	zup[1] = -yup[2];
-	zup[2] = yup[1];
+	copy_v3_v3_short(zup, yup);
+
+	if (settings->do_axis_transform) {
+		float tmp[3];
+		normal_short_to_float_v3(tmp, yup);
+
+		mul_m3_v3(settings->rotation_matrix, tmp);
+
+		normal_float_to_short_v3(zup, tmp);
+	}
 }
 
 /* Copy from Z-up to Y-up. */
 
-ABC_INLINE void copy_zup_yup(float yup[3], const float zup[3])
+ABC_INLINE void copy_zup_yup(ExportSettings *settings, float yup[3], const float zup[3])
 {
-	yup[0] = zup[0];
-	yup[1] = zup[2];
-	yup[2] = -zup[1];
+	copy_v3_v3(yup, zup);
+
+	if (settings->do_convert_axis) {
+		mul_m3_v3(settings->convert_matrix, yup);
+	}
 }
 
-ABC_INLINE void copy_zup_yup(short yup[3], const short zup[3])
+ABC_INLINE void copy_zup_yup(ExportSettings *settings, short yup[3], const short zup[3])
 {
-	yup[0] = zup[0];
-	yup[1] = zup[2];
-	yup[2] = -zup[1];
+	copy_v3_v3_short(yup, zup);
+
+	if (settings->do_convert_axis) {
+		float tmp[3];
+		normal_short_to_float_v3(tmp, zup);
+
+		mul_m3_v3(settings->convert_matrix, tmp);
+
+		normal_float_to_short_v3(yup, tmp);
+	}
 }

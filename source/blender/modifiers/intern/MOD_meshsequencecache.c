@@ -100,6 +100,8 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 	                                    dm,
 	                                    mcmd->abc_object_path,
 	                                    time,
+	                                    mcmd->cache_file->forward_axis,
+	                                    mcmd->cache_file->up_axis,
 	                                    &err_str);
 
 	if (err_str) {

@@ -101,7 +101,7 @@ using Alembic::AbcGeom::IN3fGeomParam;
 
 /* NOTE: Alembic's polygon winding order is clockwise, to match with Renderman. */
 
-static void get_vertices(DerivedMesh *dm, std::vector<Imath::V3f> &points)
+static void get_vertices(ExportSettings *settings, DerivedMesh *dm, std::vector<Imath::V3f> &points)
 {
 	points.clear();
 	points.resize(dm->getNumVerts(dm));
@@ -109,7 +109,7 @@ static void get_vertices(DerivedMesh *dm, std::vector<Imath::V3f> &points)
 	MVert *verts = dm->getVertArray(dm);
 
 	for (int i = 0, e = dm->getNumVerts(dm); i < e; ++i) {
-		copy_zup_yup(points[i].getValue(), verts[i].co);
+		copy_zup_yup(settings, points[i].getValue(), verts[i].co);
 	}
 }
 
@@ -182,7 +182,7 @@ static void get_creases(DerivedMesh *dm,
 	lengths.resize(sharpnesses.size(), 2);
 }
 
-static void get_vertex_normals(DerivedMesh *dm, std::vector<Imath::V3f> &normals)
+static void get_vertex_normals(ExportSettings *settings, DerivedMesh *dm, std::vector<Imath::V3f> &normals)
 {
 	normals.clear();
 	normals.resize(dm->getNumVerts(dm) * 3);
@@ -192,11 +192,11 @@ static void get_vertex_normals(DerivedMesh *dm, std::vector<Imath::V3f> &normals
 
 	for (int i = 0, e = dm->getNumVerts(dm); i < e; ++i) {
 		normal_short_to_float_v3(no, verts[i].no);
-		copy_zup_yup(normals[i].getValue(), no);
+		copy_zup_yup(settings, normals[i].getValue(), no);
 	}
 }
 
-static void get_loop_normals(DerivedMesh *dm, std::vector<Imath::V3f> &normals)
+static void get_loop_normals(ExportSettings *settings, DerivedMesh *dm, std::vector<Imath::V3f> &normals)
 {
 	MPoly *mpoly = dm->getPolyArray(dm);
 	MPoly *mp = mpoly;
@@ -223,7 +223,7 @@ static void get_loop_normals(DerivedMesh *dm, std::vector<Imath::V3f> &normals)
 
 			for (int j = 0; j < mp->totloop; --ml, ++j, ++loop_index) {
 				const int index = ml->v;
-				copy_zup_yup(normals[loop_index].getValue(), lnors[index]);
+				copy_zup_yup(settings, normals[loop_index].getValue(), lnors[index]);
 			}
 		}
 	}
@@ -238,14 +238,14 @@ static void get_loop_normals(DerivedMesh *dm, std::vector<Imath::V3f> &normals)
 				BKE_mesh_calc_poly_normal(mp, ml - (mp->totloop - 1), verts, no);
 
 				for (int j = 0; j < mp->totloop; --ml, ++j, ++loop_index) {
-					copy_zup_yup(normals[loop_index].getValue(), no);
+					copy_zup_yup(settings, normals[loop_index].getValue(), no);
 				}
 			}
 			else {
 				/* Smooth shaded, use individual vert normals. */
 				for (int j = 0; j < mp->totloop; --ml, ++j, ++loop_index) {
 					normal_short_to_float_v3(no, verts[ml->v].no);
-					copy_zup_yup(normals[loop_index].getValue(), no);
+					copy_zup_yup(settings, normals[loop_index].getValue(), no);
 				}
 			}
 		}
@@ -402,7 +402,7 @@ void AbcMeshWriter::writeMesh(DerivedMesh *dm)
 
 	bool smooth_normal = false;
 
-	get_vertices(dm, points);
+	get_vertices(&m_settings, dm, points);
 	get_topology(dm, poly_verts, loop_counts, smooth_normal);
 
 	if (m_first_frame) {
@@ -432,10 +432,10 @@ void AbcMeshWriter::writeMesh(DerivedMesh *dm)
 
 	if (m_settings.export_normals) {
 		if (smooth_normal) {
-			get_loop_normals(dm, normals);
+			get_loop_normals(&m_settings, dm, normals);
 		}
 		else {
-			get_vertex_normals(dm, normals);
+			get_vertex_normals(&m_settings, dm, normals);
 		}
 
 		ON3fGeomParam::Sample normals_sample;
@@ -470,7 +470,7 @@ void AbcMeshWriter::writeSubD(DerivedMesh *dm)
 
 	bool smooth_normal = false;
 
-	get_vertices(dm, points);
+	get_vertices(&m_settings, dm, points);
 	get_topology(dm, poly_verts, loop_counts, smooth_normal);
 	get_creases(dm, crease_indices, crease_lengths, crease_sharpness);
 
@@ -599,7 +599,7 @@ void AbcMeshWriter::getVelocities(DerivedMesh *dm, std::vector<Imath::V3f> &vels
 		float *mesh_vels = reinterpret_cast<float *>(fss->meshVelocities);
 
 		for (int i = 0; i < totverts; ++i) {
-			copy_zup_yup(vels[i].getValue(), mesh_vels);
+			copy_zup_yup(&m_settings, vels[i].getValue(), mesh_vels);
 			mesh_vels += 3;
 		}
 	}
@@ -836,22 +836,22 @@ ABC_INLINE CDStreamConfig create_config(Mesh *mesh)
 	return config;
 }
 
-static void read_mverts(CDStreamConfig &config, const AbcMeshData &mesh_data)
+static void read_mverts(ImportSettings *settings, CDStreamConfig &config, const AbcMeshData &mesh_data)
 {
 	MVert *mverts = config.mvert;
 	const P3fArraySamplePtr &positions = mesh_data.positions;
 	const N3fArraySamplePtr &normals = mesh_data.vertex_normals;
 
-	read_mverts(mverts, positions, normals);
+	read_mverts(settings, mverts, positions, normals);
 }
 
-void read_mverts(MVert *mverts, const P3fArraySamplePtr &positions, const N3fArraySamplePtr &normals)
+void read_mverts(ImportSettings *settings, MVert *mverts, const P3fArraySamplePtr &positions, const N3fArraySamplePtr &normals)
 {
 	for (int i = 0; i < positions->size(); ++i) {
 		MVert &mvert = mverts[i];
 		Imath::V3f pos_in = (*positions)[i];
 
-		copy_yup_zup(mvert.co, pos_in.getValue());
+		copy_yup_zup(settings, mvert.co, pos_in.getValue());
 
 		mvert.bweight = 0;
 
@@ -861,7 +861,7 @@ void read_mverts(MVert *mverts, const P3fArraySamplePtr &positions, const N3fArr
 			short no[3];
 			normal_float_to_short_v3(no, nor_in.getValue());
 
-			copy_yup_zup(mvert.no, no);
+			copy_yup_zup(settings, mvert.no, no);
 		}
 	}
 }
@@ -1000,7 +1000,7 @@ void AbcMeshReader::readObjectData(Main *bmain, Scene *scene, float time)
 	m_mesh_data = create_config(mesh);
 
 	bool has_smooth_normals = false;
-	read_mesh_sample(m_schema, sample_sel, m_mesh_data, has_smooth_normals);
+	read_mesh_sample(m_settings, m_schema, sample_sel, m_mesh_data, has_smooth_normals);
 
 	BKE_mesh_calc_normals(mesh);
 	BKE_mesh_validate(mesh, false, false);
@@ -1061,7 +1061,8 @@ void AbcMeshReader::readFaceSetsSample(Main *bmain, Mesh *mesh, size_t poly_star
 	utils::assign_materials(bmain, m_object, mat_map);
 }
 
-void read_mesh_sample(const IPolyMeshSchema &schema,
+void read_mesh_sample(ImportSettings *settings,
+                      const IPolyMeshSchema &schema,
                       const ISampleSelector &selector,
                       CDStreamConfig &config,
                       bool &do_normals)
@@ -1079,7 +1080,7 @@ void read_mesh_sample(const IPolyMeshSchema &schema,
 
 	read_uvs_params(config, abc_mesh_data, schema.getUVsParam(), selector);
 
-	read_mverts(config, abc_mesh_data);
+	read_mverts(settings, config, abc_mesh_data);
 	read_mpolys(config, abc_mesh_data);
 
 	read_custom_data(schema.getArbGeomParams(), config, selector);
@@ -1133,7 +1134,7 @@ void AbcSubDReader::readObjectData(Main *bmain, Scene *scene, float time)
 
 	m_mesh_data = create_config(mesh);
 
-	read_subd_sample(m_schema, sample_sel, m_mesh_data);
+	read_subd_sample(m_settings, m_schema, sample_sel, m_mesh_data);
 
 	Int32ArraySamplePtr indices = sample.getCreaseIndices();
 	Alembic::Abc::FloatArraySamplePtr sharpnesses = sample.getCreaseSharpnesses();
@@ -1160,7 +1161,8 @@ void AbcSubDReader::readObjectData(Main *bmain, Scene *scene, float time)
 	}
 }
 
-void read_subd_sample(const ISubDSchema &schema,
+void read_subd_sample(ImportSettings *settings,
+                      const ISubDSchema &schema,
                       const ISampleSelector &selector,
                       CDStreamConfig &config)
 {
@@ -1175,7 +1177,7 @@ void read_subd_sample(const ISubDSchema &schema,
 
 	read_uvs_params(config, abc_mesh_data, schema.getUVsParam(), selector);
 
-	read_mverts(config, abc_mesh_data);
+	read_mverts(settings, config, abc_mesh_data);
 	read_mpolys(config, abc_mesh_data);
 
 	read_custom_data(schema.getArbGeomParams(), config, selector);

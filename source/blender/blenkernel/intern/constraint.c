@@ -4352,12 +4352,19 @@ static void transformcache_evaluate(bConstraint *con, bConstraintOb *cob, ListBa
 #ifdef WITH_ALEMBIC
 	bTransformCacheConstraint *data = con->data;
 	Scene *scene = cob->scene;
+	CacheFile *cache_file = data->cache_file;
 
 	const float frame = BKE_scene_frame_get(scene);
-	const float time = BKE_cachefile_time_offset(data->cache_file, frame, FPS);
+	const float time = BKE_cachefile_time_offset(cache_file, frame, FPS);
 
-	ABC_get_transform(data->cache_file->handle, cob->ob, data->abc_object_path,
-	                  cob->matrix, time, data->cache_file->scale);
+	ABC_get_transform(cache_file->handle,
+	                  cob->ob,
+	                  data->abc_object_path,
+	                  cob->matrix,
+	                  time,
+	                  cache_file->scale,
+	                  cache_file->up_axis,
+	                  cache_file->forward_axis);
 #else
 	UNUSED_VARS(con, cob);
 #endif

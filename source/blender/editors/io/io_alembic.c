@@ -109,6 +109,8 @@ static int wm_alembic_export_exec(bContext *C, wmOperator *op)
 	const bool packuv = RNA_boolean_get(op->ptr, "packuv");
 	const int compression = RNA_enum_get(op->ptr, "compression_type");
 	const float scale = RNA_float_get(op->ptr, "scale");
+	const int up_axis = RNA_enum_get(op->ptr, "up_axis");
+	const int forward_axis = RNA_enum_get(op->ptr, "forward_axis");
 
 	ABC_export(CTX_data_scene(C),
 	           C,
@@ -131,7 +133,9 @@ static int wm_alembic_export_exec(bContext *C, wmOperator *op)
 	           subdiv_schem,
 	           compression,
 	           packuv,
-	           scale);
+	           scale,
+	           up_axis,
+	           forward_axis);
 
 	return OPERATOR_FINISHED;
 }
@@ -155,6 +159,12 @@ static void ui_alembic_export_settings(uiLayout *layout, PointerRNA *imfptr)
 
 	row = uiLayoutRow(box, false);
 	uiItemR(row, imfptr, "scale", 0, NULL, ICON_NONE);
+
+	row = uiLayoutRow(box, false);
+	uiItemR(row, imfptr, "forward_axis", 0, NULL, ICON_NONE);
+
+	row = uiLayoutRow(box, false);
+	uiItemR(row, imfptr, "up_axis", 0, NULL, ICON_NONE);
 
 	/* Scene Options */
 	box = uiLayoutBox(layout);
@@ -297,6 +307,12 @@ void WM_OT_alembic_export(wmOperatorType *ot)
 	RNA_def_float(ot->srna, "scale", 1.0f, 0.0001f, 1000.0f, "Scale",
 	              "Value by which to enlarge or shrink the objects with respect to the world's origin",
 	              0.0001f, 1000.0f);
+
+	RNA_def_enum(ot->srna, "forward_axis", rna_enum_object_axis_items,
+	             OB_POSZ, "Forward Axis", "");
+
+	RNA_def_enum(ot->srna, "up_axis", rna_enum_object_axis_items,
+	             OB_NEGY, "Up Axis", "");
 }
 
 /* ************************************************************************** */
@@ -389,6 +405,12 @@ static void ui_alembic_import_settings(uiLayout *layout, PointerRNA *imfptr)
 	uiItemL(row, IFACE_("Manual Transform:"), ICON_NONE);
 
 	row = uiLayoutRow(box, false);
+	uiItemR(row, imfptr, "forward_axis", 0, NULL, ICON_NONE);
+
+	row = uiLayoutRow(box, false);
+	uiItemR(row, imfptr, "up_axis", 0, NULL, ICON_NONE);
+
+	row = uiLayoutRow(box, false);
 	uiItemR(row, imfptr, "scale", 0, NULL, ICON_NONE);
 
 	box = uiLayoutBox(layout);
@@ -418,13 +440,24 @@ static int wm_alembic_import_exec(bContext *C, wmOperator *op)
 	RNA_string_get(op->ptr, "filepath", filename);
 
 	const float scale = RNA_float_get(op->ptr, "scale");
+	const int up_axis = RNA_enum_get(op->ptr, "up_axis");
+	const int forward_axis = RNA_enum_get(op->ptr, "forward_axis");
+
 	const bool set_frame_range = RNA_boolean_get(op->ptr, "set_frame_range");
 
 	int offset = 0;
 	int sequence_len = get_sequence_len(filename, &offset);
 	const bool is_sequence = (sequence_len > 1);
 
-	ABC_import(C, filename, scale, is_sequence, set_frame_range, sequence_len, offset);
+	ABC_import(C,
+	           filename,
+	           up_axis,
+	           forward_axis,
+	           scale,
+	           is_sequence,
+	           set_frame_range,
+	           sequence_len,
+	           offset);
 
 	return OPERATOR_FINISHED;
 }
@@ -446,6 +479,12 @@ void WM_OT_alembic_import(wmOperatorType *ot)
 	RNA_def_float(ot->srna, "scale", 1.0f, 0.0001f, 1000.0f, "Scale",
 	              "Value by which to enlarge or shrink the objects with respect to the world's origin",
 	              0.0001f, 1000.0f);
+
+	RNA_def_enum(ot->srna, "forward_axis", rna_enum_object_axis_items,
+	             OB_POSZ, "Forward Axis", "");
+
+	RNA_def_enum(ot->srna, "up_axis", rna_enum_object_axis_items,
+	             OB_NEGY, "Up Axis", "");
 
 	RNA_def_boolean(ot->srna, "set_frame_range", true,
 	                "Set Frame Range",
