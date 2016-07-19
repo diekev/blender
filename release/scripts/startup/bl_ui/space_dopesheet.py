@@ -101,6 +101,7 @@ def dopesheet_filter(layout, context, genericFiltersOnly=False):
             if bpy.data.grease_pencil:
                 row.prop(dopesheet, "show_gpencil", text="")
 
+            layout.prop(dopesheet, "use_datablock_sort", text="")
 
 #######################################
 # DopeSheet Editor - General/Standard UI
@@ -249,6 +250,8 @@ class DOPESHEET_MT_select(Menu):
         layout.separator()
         layout.operator("action.select_border").axis_range = False
         layout.operator("action.select_border", text="Border Axis Range").axis_range = True
+
+        layout.operator("action.select_circle")
 
         layout.separator()
         layout.operator("action.select_column", text="Columns on Selected Keys").mode = 'KEYS'
