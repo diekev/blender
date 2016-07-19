@@ -277,11 +277,11 @@ StructRNA *rna_PropertyGroup_refine(PointerRNA *ptr)
 	return ptr->type;
 }
 
-static ID *rna_ID_copy(ID *id)
+static ID *rna_ID_copy(ID *id, Main *bmain)
 {
 	ID *newid;
 
-	if (id_copy(id, &newid, false)) {
+	if (id_copy(bmain, id, &newid, false)) {
 		if (newid) id_us_min(newid);
 		return newid;
 	}
@@ -334,11 +334,6 @@ static void rna_ID_user_clear(ID *id)
 {
 	id_fake_user_clear(id);
 	id->us = 0; /* don't save */
-}
-
-static void rna_ID_delete(ID *id, Main *bmain)
-{
-	BKE_libblock_delete(bmain, id);
 }
 
 static void rna_ID_user_remap(ID *id, Main *bmain, ID *new_id)
@@ -703,7 +698,7 @@ static void rna_ImagePreview_icon_pixels_float_set(PointerRNA *ptr, const float 
 static int rna_ImagePreview_icon_id_get(PointerRNA *ptr)
 {
 	/* Using a callback here allows us to only generate icon matching that preview when icon_id is requested. */
-	return BKE_icon_preview_ensure((PreviewImage *)(ptr->data));
+	return BKE_icon_preview_ensure(ptr->id.data, (PreviewImage *)(ptr->data));
 }
 static void rna_ImagePreview_icon_reload(PreviewImage *prv)
 {
@@ -986,12 +981,9 @@ static void rna_def_ID(BlenderRNA *brna)
 	/* functions */
 	func = RNA_def_function(srna, "copy", "rna_ID_copy");
 	RNA_def_function_ui_description(func, "Create a copy of this data-block (not supported for all data-blocks)");
+	RNA_def_function_flag(func, FUNC_USE_MAIN);
 	parm = RNA_def_pointer(func, "id", "ID", "", "New copy of the ID");
 	RNA_def_function_return(func, parm);
-
-	func = RNA_def_function(srna, "destroy", "rna_ID_delete");
-	RNA_def_function_flag(func, FUNC_USE_MAIN);
-	RNA_def_function_ui_description(func, "Delete this ID from Blender (WARNING: no undo, do not use it after calling this!)");
 
 	func = RNA_def_function(srna, "user_clear", "rna_ID_user_clear");
 	RNA_def_function_ui_description(func, "Clear the user count of a data-block so its not saved, "

@@ -487,6 +487,9 @@ ccl_device void shader_merge_closures(ShaderData *sd)
 					continue;
 			}
 
+			if((sd->flag & SD_BSDF_HAS_CUSTOM) && !(sci->custom1 == scj->custom1 && sci->custom2 == scj->custom2 && sci->custom3 == scj->custom3))
+				continue;
+
 			sci->weight += scj->weight;
 			sci->sample_weight += scj->sample_weight;
 
@@ -507,7 +510,7 @@ ccl_device void shader_merge_closures(ShaderData *sd)
 
 /* BSDF */
 
-ccl_device_inline void _shader_bsdf_multi_eval(KernelGlobals *kg, const ShaderData *sd, const float3 omega_in, float *pdf,
+ccl_device_inline void _shader_bsdf_multi_eval(KernelGlobals *kg, ShaderData *sd, const float3 omega_in, float *pdf,
 	int skip_bsdf, BsdfEval *result_eval, float sum_pdf, float sum_sample_weight)
 {
 	/* this is the veach one-sample model with balance heuristic, some pdf
@@ -536,7 +539,7 @@ ccl_device_inline void _shader_bsdf_multi_eval(KernelGlobals *kg, const ShaderDa
 
 #ifdef __BRANCHED_PATH__
 ccl_device_inline void _shader_bsdf_multi_eval_branched(KernelGlobals *kg,
-                                                        const ShaderData *sd,
+                                                        ShaderData *sd,
                                                         const float3 omega_in,
                                                         BsdfEval *result_eval,
                                                         float light_pdf,
@@ -582,7 +585,7 @@ ccl_device void shader_bsdf_eval(KernelGlobals *kg,
 	}
 }
 
-ccl_device int shader_bsdf_sample(KernelGlobals *kg, const ShaderData *sd,
+ccl_device int shader_bsdf_sample(KernelGlobals *kg, ShaderData *sd,
 	float randu, float randv, BsdfEval *bsdf_eval,
 	float3 *omega_in, differential3 *domega_in, float *pdf)
 {
@@ -639,7 +642,7 @@ ccl_device int shader_bsdf_sample(KernelGlobals *kg, const ShaderData *sd,
 	return label;
 }
 
-ccl_device int shader_bsdf_sample_closure(KernelGlobals *kg, const ShaderData *sd,
+ccl_device int shader_bsdf_sample_closure(KernelGlobals *kg, ShaderData *sd,
 	const ShaderClosure *sc, float randu, float randv, BsdfEval *bsdf_eval,
 	float3 *omega_in, differential3 *domega_in, float *pdf)
 {
@@ -843,7 +846,7 @@ ccl_device float3 shader_holdout_eval(KernelGlobals *kg, ShaderData *sd)
 
 /* Surface Evaluation */
 
-ccl_device void shader_eval_surface(KernelGlobals *kg, ShaderData *sd,
+ccl_device void shader_eval_surface(KernelGlobals *kg, ShaderData *sd, ccl_addr_space RNG *rng,
 	ccl_addr_space PathState *state, float randb, int path_flag, ShaderContext ctx)
 {
 	ccl_fetch(sd, num_closure) = 0;
@@ -864,6 +867,10 @@ ccl_device void shader_eval_surface(KernelGlobals *kg, ShaderData *sd,
 		ccl_fetch_array(sd, closure, 0)->data1 = 0.0f;
 		ccl_fetch(sd, flag) |= bsdf_diffuse_setup(ccl_fetch_array(sd, closure, 0));
 #endif
+	}
+
+	if(rng && (ccl_fetch(sd, flag) & SD_BSDF_NEEDS_LCG)) {
+		ccl_fetch(sd, lcg_state) = lcg_state_init_addrspace(rng, state, 0xb4bc3953);
 	}
 }
 
