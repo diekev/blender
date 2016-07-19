@@ -1450,22 +1450,21 @@ void KX_Dome::CalculateFrustum(KX_Camera *cam)
 	gluPerspective(90.0f,1.0f,cam->GetCameraNear(),cam->GetCameraFar());
 #endif
 
-	RAS_FrameFrustum m_frustrum; //90 deg. Frustum
+	RAS_FrameFrustum m_frustum; //90 deg. Frustum
 
-	m_frustrum.camnear = cam->GetCameraNear();
-	m_frustrum.camfar = cam->GetCameraFar();
+	m_frustum.camnear = cam->GetCameraNear();
+	m_frustum.camfar = cam->GetCameraFar();
 
-//	float top = tan(90.0f*MT_PI/360.0f) * m_frustrum.camnear;
-	float top = m_frustrum.camnear; // for deg = 90deg, tan = 1
+//	float top = tan(90.0f*MT_PI/360.0f) * m_frustum.camnear;
+	float top = m_frustum.camnear; // for deg = 90deg, tan = 1
 
-	m_frustrum.x1 = -top;
-	m_frustrum.x2 = top;
-	m_frustrum.y1 = -top;
-	m_frustrum.y2 = top;
+	m_frustum.x1 = -top;
+	m_frustum.x2 = top;
+	m_frustum.y1 = -top;
+	m_frustum.y2 = top;
 	
 	m_projmat = m_rasterizer->GetFrustumMatrix(
-	m_frustrum.x1, m_frustrum.x2, m_frustrum.y1, m_frustrum.y2, m_frustrum.camnear, m_frustrum.camfar);
-
+	m_frustum.x1, m_frustum.x2, m_frustum.y1, m_frustum.y2, m_frustum.camnear, m_frustum.camfar);
 }
 
 void KX_Dome::CalculateCameraOrientation()
@@ -1601,7 +1600,7 @@ void KX_Dome::RotateCamera(KX_Camera* cam, int i)
 
 	MT_Transform camtrans(cam->GetWorldToCamera());
 	MT_Matrix4x4 viewmat(camtrans);
-	m_rasterizer->SetViewMatrix(viewmat, cam->NodeGetWorldOrientation(), cam->NodeGetWorldPosition(), cam->GetCameraData()->m_perspective);
+	m_rasterizer->SetViewMatrix(viewmat, cam->NodeGetWorldOrientation(), cam->NodeGetWorldPosition(), cam->NodeGetLocalScaling(), cam->GetCameraData()->m_perspective);
 	cam->SetModelviewMatrix(viewmat);
 
 	// restore the original orientation
@@ -2036,7 +2035,7 @@ void KX_Dome::RenderDomeFrame(KX_Scene* scene, KX_Camera* cam, int i)
 
 	MT_Transform camtrans(cam->GetWorldToCamera());
 	MT_Matrix4x4 viewmat(camtrans);
-	m_rasterizer->SetViewMatrix(viewmat, cam->NodeGetWorldOrientation(), cam->NodeGetWorldPosition(), 1.0f);
+	m_rasterizer->SetViewMatrix(viewmat, cam->NodeGetWorldOrientation(), cam->NodeGetWorldPosition(), cam->NodeGetLocalScaling(), 1.0f);
 	cam->SetModelviewMatrix(viewmat);
 
 	// restore the original orientation

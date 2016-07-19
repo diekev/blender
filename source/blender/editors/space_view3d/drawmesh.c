@@ -318,7 +318,7 @@ static bool set_draw_settings_cached(int clearcache, MTexPoly *texface, Material
 		if (textured) {
 			if (texpaint) {
 				c_badtex = false;
-				if (GPU_verify_image(ima, NULL, 0, 1, 0, false)) {
+				if (GPU_verify_image(ima, NULL, GL_TEXTURE_2D, 0, 1, 0, false)) {
 					glEnable(GL_TEXTURE_2D);
 					glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
 					glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_RGB, GL_MODULATE);
@@ -337,7 +337,7 @@ static bool set_draw_settings_cached(int clearcache, MTexPoly *texface, Material
 					glTexEnvi(GL_TEXTURE_ENV, GL_OPERAND2_RGB, GL_SRC_ALPHA);
 					glTexEnvi(GL_TEXTURE_ENV, GL_COMBINE_ALPHA, GL_REPLACE);
 					glTexEnvi(GL_TEXTURE_ENV, GL_SRC0_ALPHA, GL_PREVIOUS);
-					glBindTexture(GL_TEXTURE_2D, ima->bindcode);
+					glBindTexture(GL_TEXTURE_2D, ima->bindcode[TEXTARGET_TEXTURE_2D]);
 					glActiveTexture(GL_TEXTURE0);					
 				}
 				else {
@@ -369,27 +369,28 @@ static bool set_draw_settings_cached(int clearcache, MTexPoly *texface, Material
 	}
 
 	if (c_badtex) lit = 0;
-	if (lit != c_lit || ma != c_ma) {
+	if (lit != c_lit || ma != c_ma || textured != c_textured) {
+		int options = GPU_SHADER_USE_COLOR;
+
+		if (c_textured && !c_badtex) {
+			options |= GPU_SHADER_TEXTURE_2D;
+		}
+		if (gtexdraw.two_sided_lighting) {
+			options |= GPU_SHADER_TWO_SIDED;
+		}
+
 		if (lit) {
-			int options = GPU_SHADER_LIGHTING | GPU_SHADER_USE_COLOR;
-
-			if (gtexdraw.two_sided_lighting)
-				options |= GPU_SHADER_TWO_SIDED;
-			if (c_textured && !c_badtex)
-				options |= GPU_SHADER_TEXTURE_2D;
-
+			options |= GPU_SHADER_LIGHTING;
 			if (!ma)
 				ma = give_current_material_or_def(NULL, 0);  /* default material */
 
 			float specular[3];
 			mul_v3_v3fl(specular, &ma->specr, ma->spec);
 
-			GPU_basic_shader_colors(NULL, specular, ma->har, 0.0f);
-			GPU_basic_shader_bind(options);
+			GPU_basic_shader_colors(NULL, specular, ma->har, 1.0f);
 		}
-		else {
-			GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
-		}
+
+		GPU_basic_shader_bind(options);
 
 		c_lit = lit;
 		c_ma = ma;
@@ -465,7 +466,7 @@ static void draw_textured_begin(Scene *scene, View3D *v3d, RegionView3D *rv3d, O
 		/* load the stencil texture here */
 		if (Gtexdraw.stencil != NULL) {
 			glActiveTexture(GL_TEXTURE2);
-			if (GPU_verify_image(Gtexdraw.stencil, NULL, false, false, false, false)) {
+			if (GPU_verify_image(Gtexdraw.stencil, NULL, GL_TEXTURE_2D, false, false, false, false)) {
 				float col[4] = {imapaint->stencil_col[0], imapaint->stencil_col[1], imapaint->stencil_col[2], 1.0f};
 				glEnable(GL_TEXTURE_2D);
 				glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_COMBINE);
@@ -495,7 +496,6 @@ static void draw_textured_begin(Scene *scene, View3D *v3d, RegionView3D *rv3d, O
 
 	memcpy(Gtexdraw.obcol, obcol, sizeof(obcol));
 	set_draw_settings_cached(1, NULL, NULL, Gtexdraw);
-	glShadeModel(GL_SMOOTH);
 	glCullFace(GL_BACK);
 }
 
@@ -527,7 +527,6 @@ static void draw_textured_end(void)
 		GPU_set_tpage(NULL, 0, 0);
 	}
 
-	glShadeModel(GL_FLAT);
 	glDisable(GL_CULL_FACE);
 	GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
 
@@ -713,6 +712,8 @@ static void update_tface_color_layer(DerivedMesh *dm, bool use_mcol)
 			}
 		}
 	}
+
+	dm->dirty |= DM_DIRTY_MCOL_UPDATE_DRAW;
 }
 
 static DMDrawOption draw_tface_mapped__set_draw(void *userData, int origindex, int UNUSED(mat_nr))
@@ -942,7 +943,6 @@ static void draw_mesh_textured_old(Scene *scene, View3D *v3d, RegionView3D *rv3d
                                    Object *ob, DerivedMesh *dm, const int draw_flags)
 {
 	Mesh *me = ob->data;
-	DMDrawFlag uvflag = DM_DRAW_USE_ACTIVE_UV;
 
 	/* correct for negative scale */
 	if (ob->transflag & OB_NEG_SCALE) glFrontFace(GL_CW);
@@ -952,10 +952,6 @@ static void draw_mesh_textured_old(Scene *scene, View3D *v3d, RegionView3D *rv3d
 	draw_textured_begin(scene, v3d, rv3d, ob);
 
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-
-	if (ob->mode & OB_MODE_TEXTURE_PAINT) {
-		uvflag = DM_DRAW_USE_TEXPAINT_UV;
-	}
 
 	if (ob->mode & OB_MODE_EDIT) {
 		drawEMTFMapped_userData data;
@@ -969,34 +965,70 @@ static void draw_mesh_textured_old(Scene *scene, View3D *v3d, RegionView3D *rv3d
 
 		dm->drawMappedFacesTex(dm, draw_em_tf_mapped__set_draw, compareDrawOptionsEm, &data, 0);
 	}
-	else if (draw_flags & DRAW_FACE_SELECT) {
-		if (ob->mode & OB_MODE_WEIGHT_PAINT)
-			dm->drawMappedFaces(dm, wpaint__setSolidDrawOptions_facemask, GPU_object_material_bind, NULL, me,
-			                    DM_DRAW_USE_COLORS | DM_DRAW_ALWAYS_SMOOTH | DM_DRAW_SKIP_HIDDEN);
-		else {
-			drawTFace_userData userData;
-
-			userData.mpoly = DM_get_poly_data_layer(dm, CD_MPOLY);
-			userData.mtexpoly = DM_get_poly_data_layer(dm, CD_MTEXPOLY);
-			userData.me = me;
-			dm->drawMappedFacesTex(dm, me->mpoly ? draw_tface_mapped__set_draw : NULL, compareDrawOptions, &userData, uvflag);
-		}
-	}
-	else {		
+	else {
+		DMDrawFlag dm_draw_flag;
 		drawTFace_userData userData;
-		
-		update_tface_color_layer(dm, !(ob->mode & OB_MODE_TEXTURE_PAINT));
-		
+
+		if (ob->mode & OB_MODE_TEXTURE_PAINT) {
+			dm_draw_flag = DM_DRAW_USE_TEXPAINT_UV;
+		}
+		else {
+			dm_draw_flag = DM_DRAW_USE_ACTIVE_UV;
+		}
+
+		if (ob == OBACT) {
+			if (ob->mode & OB_MODE_WEIGHT_PAINT) {
+				dm_draw_flag |= DM_DRAW_USE_COLORS | DM_DRAW_ALWAYS_SMOOTH | DM_DRAW_SKIP_HIDDEN;
+			}
+			else if (ob->mode & OB_MODE_SCULPT) {
+				dm_draw_flag |= DM_DRAW_SKIP_HIDDEN | DM_DRAW_USE_COLORS;
+			}
+			else if ((ob->mode & OB_MODE_TEXTURE_PAINT) == 0) {
+				dm_draw_flag |= DM_DRAW_USE_COLORS;
+			}
+		}
+		else {
+			if ((ob->mode & OB_MODE_TEXTURE_PAINT) == 0) {
+				dm_draw_flag |= DM_DRAW_USE_COLORS;
+			}
+		}
+
+
 		userData.mpoly = DM_get_poly_data_layer(dm, CD_MPOLY);
 		userData.mtexpoly = DM_get_poly_data_layer(dm, CD_MTEXPOLY);
-		userData.me = NULL;
-		
-		dm->drawFacesTex(dm, draw_tface__set_draw, compareDrawOptions, &userData, uvflag);
+
+		if (draw_flags & DRAW_FACE_SELECT) {
+			userData.me = me;
+
+			dm->drawMappedFacesTex(
+			        dm, me->mpoly ? draw_tface_mapped__set_draw : NULL, compareDrawOptions,
+			        &userData, dm_draw_flag);
+		}
+		else {
+			userData.me = NULL;
+
+			if ((ob->mode & OB_MODE_ALL_PAINT) == 0) {
+
+				/* Note: this isn't efficient and runs on every redraw,
+				 * its needed so material colors are used for vertex colors.
+				 * In the future we will likely remove 'texface' so, just avoid running this where possible,
+				 * (when vertex paint or weight paint are used). */
+
+				update_tface_color_layer(dm, !(ob->mode & OB_MODE_TEXTURE_PAINT));
+			}
+
+			dm->drawFacesTex(
+			        dm, draw_tface__set_draw, compareDrawOptions,
+			        &userData, dm_draw_flag);
+		}
 	}
 
 	/* draw game engine text hack */
-	if (BKE_bproperty_object_get(ob, "Text"))
-		draw_mesh_text(scene, ob, 0);
+	if (rv3d->rflag & RV3D_IS_GAME_ENGINE) {
+		if (BKE_bproperty_object_get(ob, "Text")) {
+			draw_mesh_text(scene, ob, 0);
+		}
+	}
 
 	draw_textured_end();
 	
@@ -1046,7 +1078,7 @@ static void tex_mat_set_texture_cb(void *userData, int mat_nr, void *attribs)
 	if (ED_object_get_active_image(data->ob, mat_nr, &ima, &iuser, &node, NULL)) {
 		/* get openl texture */
 		int mipmap = 1;
-		int bindcode = (ima) ? GPU_verify_image(ima, iuser, 0, 0, mipmap, false) : 0;
+		int bindcode = (ima) ? GPU_verify_image(ima, iuser, GL_TEXTURE_2D, 0, 0, mipmap, false) : 0;
 
 		if (bindcode) {
 			NodeTexBase *texbase = node->storage;
@@ -1055,7 +1087,7 @@ static void tex_mat_set_texture_cb(void *userData, int mat_nr, void *attribs)
 			GPU_object_material_unbind();
 
 			/* bind texture */
-			glBindTexture(GL_TEXTURE_2D, ima->bindcode);
+			glBindTexture(GL_TEXTURE_2D, ima->bindcode[TEXTARGET_TEXTURE_2D]);
 
 			glMatrixMode(GL_TEXTURE);
 			glLoadMatrixf(texbase->tex_mapping.mat);
@@ -1078,7 +1110,7 @@ static void tex_mat_set_texture_cb(void *userData, int mat_nr, void *attribs)
 			if (data->two_sided_lighting)
 				options |= GPU_SHADER_TWO_SIDED;
 
-			GPU_basic_shader_colors(diffuse, NULL, 0, 0.0f);
+			GPU_basic_shader_colors(diffuse, NULL, 0, 1.0f);
 			GPU_basic_shader_bind(options);
 
 			return;
@@ -1168,7 +1200,8 @@ void draw_mesh_textured(Scene *scene, View3D *v3d, RegionView3D *rv3d,
 		set_face_cb = NULL;
 
 	/* test if we can use glsl */
-	bool glsl = (v3d->drawtype == OB_MATERIAL) && !picking;
+	const int drawtype = view3d_effective_drawtype(v3d);
+	bool glsl = (drawtype == OB_MATERIAL) && !picking;
 
 	GPU_begin_object_materials(v3d, rv3d, scene, ob, glsl, NULL);
 
@@ -1284,8 +1317,8 @@ void draw_mesh_paint_weight_edges(RegionView3D *rv3d, DerivedMesh *dm,
 	}
 
 	glColor4ub(255, 255, 255, 96);
-	glEnable(GL_LINE_STIPPLE);
-	glLineStipple(1, 0xAAAA);
+	GPU_basic_shader_bind_enable(GPU_SHADER_LINE | GPU_SHADER_STIPPLE);
+	GPU_basic_shader_line_stipple(1, 0xAAAA);
 
 	dm->drawMappedEdges(dm, (DMSetDrawOptions)edgemask_cb, user_data);
 
@@ -1297,7 +1330,7 @@ void draw_mesh_paint_weight_edges(RegionView3D *rv3d, DerivedMesh *dm,
 		glEnable(GL_DEPTH_TEST);
 	}
 
-	glDisable(GL_LINE_STIPPLE);
+	GPU_basic_shader_bind_disable(GPU_SHADER_LINE | GPU_SHADER_STIPPLE);
 
 	if (use_alpha) {
 		glDisable(GL_BLEND);

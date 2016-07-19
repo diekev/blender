@@ -46,6 +46,8 @@
 #include "MT_CmMatrix4x4.h"
 
 #include "RAS_OpenGLLight.h"
+#include "RAS_OpenGLOffScreen.h"
+#include "RAS_OpenGLSync.h"
 
 #include "RAS_StorageVA.h"
 #include "RAS_StorageVBO.h"
@@ -92,6 +94,7 @@ RAS_OpenGLRasterizer::RAS_OpenGLRasterizer(RAS_ICanvas* canvas, RAS_STORAGE_TYPE
 	m_time(0.0f),
 	m_campos(0.0f, 0.0f, 0.0f),
 	m_camortho(false),
+	m_camnegscale(false),
 	m_stereomode(RAS_STEREO_NOSTEREO),
 	m_curreye(RAS_STEREO_LEFTEYE),
 	m_eyeseparation(0.0f),
@@ -138,8 +141,6 @@ RAS_OpenGLRasterizer::RAS_OpenGLRasterizer(RAS_ICanvas* canvas, RAS_STORAGE_TYPE
 	glGetIntegerv(GL_MAX_LIGHTS, (GLint *) &m_numgllights);
 	if (m_numgllights < 8)
 		m_numgllights = 8;
-
-	PrintHardwareInfo();
 }
 
 
@@ -207,7 +208,7 @@ void RAS_OpenGLRasterizer::SetBackColor(float color[3])
 	m_redback = color[0];
 	m_greenback = color[1];
 	m_blueback = color[2];
-	m_alphaback = 1.0f;
+	m_alphaback = 0.0f;
 }
 
 void RAS_OpenGLRasterizer::SetFog(short type, float start, float dist, float intensity, float color[3])
@@ -244,7 +245,6 @@ bool RAS_OpenGLRasterizer::SetMaterial(const RAS_IPolyMaterial& mat)
 
 void RAS_OpenGLRasterizer::Exit()
 {
-
 	m_storage->Exit();
 
 	glEnable(GL_CULL_FACE);
@@ -363,7 +363,7 @@ void RAS_OpenGLRasterizer::FlushDebugShapes(SCA_IScene *scene)
 	if (light) glDisable(GL_LIGHTING);
 	if (tex) glDisable(GL_TEXTURE_2D);
 
-	//draw lines
+	// draw lines
 	glBegin(GL_LINES);
 	for (unsigned int i = 0; i < debugShapes.size(); i++) {
 		if (debugShapes[i].m_type != OglDebugShape::LINE)
@@ -376,7 +376,7 @@ void RAS_OpenGLRasterizer::FlushDebugShapes(SCA_IScene *scene)
 	}
 	glEnd();
 
-	//draw circles
+	// draw circles
 	for (unsigned int i = 0; i < debugShapes.size(); i++) {
 		if (debugShapes[i].m_type != OglDebugShape::CIRCLE)
 			continue;
@@ -601,6 +601,31 @@ float RAS_OpenGLRasterizer::GetFocalLength()
 	return m_focallength;
 }
 
+RAS_IOffScreen *RAS_OpenGLRasterizer::CreateOffScreen(int width, int height, int samples, int target)
+{
+	RAS_IOffScreen *ofs;
+
+	ofs = new RAS_OpenGLOffScreen(m_2DCanvas);
+
+	if (!ofs->Create(width, height, samples, (RAS_IOffScreen::RAS_OFS_RENDER_TARGET)target)) {
+		delete ofs;
+		return NULL;
+	}
+	return ofs;
+}
+
+RAS_ISync *RAS_OpenGLRasterizer::CreateSync(int type)
+{
+	RAS_ISync *sync;
+
+	sync = new RAS_OpenGLSync();
+
+	if (!sync->Create((RAS_ISync::RAS_SYNC_TYPE)type)) {
+		delete sync;
+		return NULL;
+	}
+	return sync;
+}
 
 void RAS_OpenGLRasterizer::SwapBuffers()
 {
@@ -785,7 +810,7 @@ static DMDrawOption CheckTexDM(MTexPoly *mtexpoly, const bool has_mcol, int matn
 
 void RAS_OpenGLRasterizer::DrawDerivedMesh(class RAS_MeshSlot &ms)
 {
-	// mesh data is in derived mesh,
+	// mesh data is in derived mesh
 	current_bucket = ms.m_bucket;
 	current_polymat = current_bucket->GetPolyMaterial();
 	current_ms = &ms;
@@ -837,10 +862,9 @@ void RAS_OpenGLRasterizer::SetProjectionMatrix(const MT_Matrix4x4 & mat)
 	float matrix[16];
 	/* Get into argument. Looks a bit dodgy, but it's ok. */
 	mat.getValue(matrix);
-	/* Internally, MT_Matrix4x4 uses doubles (MT_Scalar). */
 	glLoadMatrixf(matrix);
 
-	m_camortho= (mat[3][3] != 0.0f);
+	m_camortho = (mat[3][3] != 0.0f);
 }
 
 MT_Matrix4x4 RAS_OpenGLRasterizer::GetFrustumMatrix(
@@ -882,8 +906,8 @@ MT_Matrix4x4 RAS_OpenGLRasterizer::GetFrustumMatrix(
 			}
 			// leave bottom and top untouched
 			if (m_stereomode == RAS_STEREO_3DTVTOPBOTTOM) {
-				// restore the vertical frustrum because the 3DTV will 
-				// expande the top and bottom part to the full size of the screen
+				// restore the vertical frustum because the 3DTV will
+				// expand the top and bottom part to the full size of the screen
 				bottom *= 2.0f;
 				top *= 2.0f;
 			}
@@ -910,7 +934,7 @@ MT_Matrix4x4 RAS_OpenGLRasterizer::GetOrthoMatrix(
 	MT_Matrix4x4 result;
 	float mat[16];
 
-	// stereo is meaning less for orthographic, disable it
+	// stereo is meaningless for orthographic, disable it
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
 	glOrtho(left, right, bottom, top, frustnear, frustfar);
@@ -926,6 +950,7 @@ MT_Matrix4x4 RAS_OpenGLRasterizer::GetOrthoMatrix(
 void RAS_OpenGLRasterizer::SetViewMatrix(const MT_Matrix4x4 &mat, 
 										 const MT_Matrix3x3 & camOrientMat3x3,
 										 const MT_Point3 & pos,
+										 const MT_Vector3 &scale,
 										 bool perspective)
 {
 	m_viewmatrix = mat;
@@ -968,6 +993,12 @@ void RAS_OpenGLRasterizer::SetViewMatrix(const MT_Matrix4x4 &mat,
 		}
 	}
 
+	bool negX = (scale[0] < 0.0f);
+	bool negY = (scale[0] < 0.0f);
+	bool negZ = (scale[0] < 0.0f);
+	if (negX || negY || negZ) {
+		m_viewmatrix.tscale((negX)?-1.0f:1.0f, (negY)?-1.0f:1.0f, (negZ)?-1.0f:1.0f, 1.0);
+	}
 	m_viewinvmatrix = m_viewmatrix;
 	m_viewinvmatrix.invert();
 
@@ -978,6 +1009,7 @@ void RAS_OpenGLRasterizer::SetViewMatrix(const MT_Matrix4x4 &mat,
 	glMatrixMode(GL_MODELVIEW);
 	glLoadMatrixf(glviewmat);
 	m_campos = pos;
+	m_camnegscale = negX ^ negY ^ negZ;
 }
 
 
@@ -1110,6 +1142,9 @@ void RAS_OpenGLRasterizer::SetAlphaBlend(int alphablend)
 
 void RAS_OpenGLRasterizer::SetFrontFace(bool ccw)
 {
+	if (m_camnegscale)
+		ccw = !ccw;
+
 	if (m_last_frontface == ccw)
 		return;
 
@@ -1305,8 +1340,8 @@ bool RAS_OpenGLRasterizer::RayHit(struct KX_ClientObjectInfo *client, KX_RayCast
 
 		float maat[16] = {left[0],         left[1],         left[2],         0,
 			               dir[0],          dir[1],          dir[2],          0,
-				           resultnormal[0], resultnormal[1], resultnormal[2], 0,
-					       0,               0,               0,               1};
+		                  resultnormal[0], resultnormal[1], resultnormal[2], 0,
+		                  0,               0,               0,               1};
 
 		glTranslatef(oglmatrix[12],oglmatrix[13],oglmatrix[14]);
 		//glMultMatrixd(oglmatrix);
@@ -1480,7 +1515,7 @@ void RAS_OpenGLRasterizer::RenderBox2D(int xco,
 	yco = height - yco;
 	int barsize = 50;
 
-	/* draw in black first*/
+	/* draw in black first */
 	glColor3ub(0, 0, 0);
 	glBegin(GL_QUADS);
 	glVertex2f(xco + 1 + 1 + barsize * percentage, yco - 1 + 10);
@@ -1518,9 +1553,9 @@ void RAS_OpenGLRasterizer::RenderText3D(
 	BLF_enable(fontid, BLF_MATRIX|BLF_ASPECT);
 	BLF_matrix(fontid, mat);
 
-	/* aspect is the inverse scale that allows you to increase */
-	/* your resolution without sizing the final text size      */
-	/* the bigger the size, the smaller the aspect	           */
+	/* aspect is the inverse scale that allows you to increase
+	 * your resolution without sizing the final text size
+	 * the bigger the size, the smaller the aspect */
 	BLF_aspect(fontid, aspect, aspect, aspect);
 
 	BLF_size(fontid, size, dpi);
@@ -1553,7 +1588,7 @@ void RAS_OpenGLRasterizer::RenderText2D(
 	glLoadIdentity();
 
 	if (mode == RAS_TEXT_PADDED) {
-		/* draw in black first*/
+		/* draw in black first */
 		glColor3ub(0, 0, 0);
 		BLF_size(blf_mono_font, 11, 72);
 		BLF_position(blf_mono_font, (float)xco+1, (float)(height-yco-1), 0.0f);
@@ -1592,7 +1627,7 @@ void RAS_OpenGLRasterizer::MotionBlur()
 		motionblurvalue = GetMotionBlurValue();
 		if (state==1)
 		{
-			//bugfix:load color buffer into accum buffer for the first time(state=1)
+			// bugfix:load color buffer into accum buffer for the first time(state=1)
 			glAccum(GL_LOAD, 1.0f);
 			SetMotionBlurState(2);
 		}

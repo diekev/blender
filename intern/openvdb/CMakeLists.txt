@@ -42,6 +42,7 @@ if(WITH_OPENVDB)
 
 	list(APPEND INC_SYS
 		${BOOST_INCLUDE_DIR}
+		${TBB_INCLUDE_DIRS}
 		${OPENEXR_INCLUDE_DIRS}
 		${OPENVDB_INCLUDE_DIRS}
 	)
@@ -53,7 +54,18 @@ if(WITH_OPENVDB)
 		intern/openvdb_writer.cc
 		openvdb_capi.cc
 		openvdb_util.cc
+
+		intern/openvdb_dense_convert.h
+		intern/openvdb_reader.h
+		intern/openvdb_writer.h
+		openvdb_util.h
 	)
+
+	if(WITH_OPENVDB_BLOSC)
+		add_definitions(
+			-DWITH_OPENVDB_BLOSC
+		)
+	endif()
 endif()
 
 blender_add_lib(bf_intern_openvdb "${SRC}" "${INC}" "${INC_SYS}")

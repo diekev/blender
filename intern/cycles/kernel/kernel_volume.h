@@ -276,15 +276,14 @@ ccl_device void kernel_volume_shadow_heterogeneous(KernelGlobals *kg, PathState 
 
 /* get the volume attenuation over line segment defined by ray, with the
  * assumption that there are no surfaces blocking light between the endpoints */
-ccl_device_noinline void kernel_volume_shadow(KernelGlobals *kg, PathState *state, Ray *ray, float3 *throughput)
+ccl_device_noinline void kernel_volume_shadow(KernelGlobals *kg, ShaderData *shadow_sd, PathState *state, Ray *ray, float3 *throughput)
 {
-	ShaderData sd;
-	shader_setup_from_volume(kg, &sd, ray);
+	shader_setup_from_volume(kg, shadow_sd, ray);
 
 	if(volume_stack_is_heterogeneous(kg, state->volume_stack))
-		kernel_volume_shadow_heterogeneous(kg, state, ray, &sd, throughput);
+		kernel_volume_shadow_heterogeneous(kg, state, ray, shadow_sd, throughput);
 	else
-		kernel_volume_shadow_homogeneous(kg, state, ray, &sd, throughput);
+		kernel_volume_shadow_homogeneous(kg, state, ray, shadow_sd, throughput);
 }
 
 /* Equi-angular sampling as in:
@@ -334,7 +333,7 @@ ccl_device float kernel_volume_distance_sample(float max_t, float3 sigma_t, int 
 	float sample_t = min(max_t, -logf(1.0f - xi*(1.0f - sample_transmittance))/sample_sigma_t);
 
 	*transmittance = volume_color_transmittance(sigma_t, sample_t);
-	*pdf = (sigma_t * *transmittance)/(make_float3(1.0f, 1.0f, 1.0f) - full_transmittance);
+	*pdf = safe_divide_color(sigma_t * *transmittance, make_float3(1.0f, 1.0f, 1.0f) - full_transmittance);
 
 	/* todo: optimization: when taken together with hit/miss decision,
 	 * the full_transmittance cancels out drops out and xi does not
@@ -348,7 +347,7 @@ ccl_device float3 kernel_volume_distance_pdf(float max_t, float3 sigma_t, float 
 	float3 full_transmittance = volume_color_transmittance(sigma_t, max_t);
 	float3 transmittance = volume_color_transmittance(sigma_t, sample_t);
 
-	return (sigma_t * transmittance)/(make_float3(1.0f, 1.0f, 1.0f) - full_transmittance);
+	return safe_divide_color(sigma_t * transmittance, make_float3(1.0f, 1.0f, 1.0f) - full_transmittance);
 }
 
 /* Emission */
@@ -497,7 +496,7 @@ ccl_device_inline VolumeIntegrateResult kernel_volume_integrate_ray(
 	if(volume_shader_sample(kg, sd, state, new_P, &coeff)) {
 		int closure_flag = sd->flag;
 		float3 new_tp;
-		float3 transmittance;
+		float3 transmittance = make_float3(1.0f, 1.0f, 1.0f);
 		bool scatter = false;
 
 		/* distance sampling */
@@ -742,12 +741,36 @@ ccl_device void kernel_volume_decoupled_record(KernelGlobals *kg, PathState *sta
 		const int global_max_steps = kernel_data.integrator.volume_max_steps;
 		step_size = kernel_data.integrator.volume_step_size;
 		/* compute exact steps in advance for malloc */
-		max_steps = max((int)ceilf(ray->t/step_size), 1);
-		if(max_steps > global_max_steps) {
+		if(ray->t > global_max_steps*step_size) {
 			max_steps = global_max_steps;
 			step_size = ray->t / (float)max_steps;
 		}
+		else {
+			max_steps = max((int)ceilf(ray->t/step_size), 1);
+		}
+#ifdef __KERNEL_CPU__
+		/* NOTE: For the branched path tracing it's possible to have direct
+		 * and indirect light integration both having volume segments allocated.
+		 * We detect this using index in the pre-allocated memory. Currently we
+		 * only support two segments allocated at a time, if more needed some
+		 * modifications to the KernelGlobals will be needed.
+		 *
+		 * This gives us restrictions that decoupled record should only happen
+		 * in the stack manner, meaning if there's subsequent call of decoupled
+		 * record it'll need to free memory before it's caller frees memory.
+		 */
+		const int index = kg->decoupled_volume_steps_index;
+		assert(index < sizeof(kg->decoupled_volume_steps) /
+		               sizeof(*kg->decoupled_volume_steps));
+		if(kg->decoupled_volume_steps[index] == NULL) {
+			kg->decoupled_volume_steps[index] =
+			        (VolumeStep*)malloc(sizeof(VolumeStep)*global_max_steps);
+		}
+		segment->steps = kg->decoupled_volume_steps[index];
+		++kg->decoupled_volume_steps_index;
+#else
 		segment->steps = (VolumeStep*)malloc(sizeof(VolumeStep)*max_steps);
+#endif
 		random_jitter_offset = lcg_step_float(&state->rng_congruential) * step_size;
 	}
 	else {
@@ -768,78 +791,174 @@ ccl_device void kernel_volume_decoupled_record(KernelGlobals *kg, PathState *sta
 	bool is_last_step_empty = false;
 
 	VolumeStep *step = segment->steps;
+#ifdef __OPENVDB__
+	int vdb_index = kernel_data.tables.density_index;
+	bool has_vdb_volume = kernel_data.tables.num_volumes > 0;
+	float t1 = 0.0f;
 
-	for(int i = 0; i < max_steps; i++, step++) {
-		/* advance to new position */
-		float new_t = min(ray->t, (i+1) * step_size);
-		float dt = new_t - t;
-
-		/* use random position inside this segment to sample shader */
-		if(heterogeneous && new_t == ray->t)
-			random_jitter_offset = lcg_step_float(&state->rng_congruential) * dt;
-
-		float3 new_P = ray->P + ray->D * (t + random_jitter_offset);
-		VolumeShaderCoefficients coeff;
-
-		/* compute segment */
-		if(volume_shader_sample(kg, sd, state, new_P, &coeff)) {
-			int closure_flag = sd->flag;
-			float3 sigma_t = coeff.sigma_a + coeff.sigma_s;
-
-			/* compute accumulated transmittance */
-			float3 transmittance = volume_color_transmittance(sigma_t, dt);
-
-			/* compute emission attenuated by absorption */
-			if(closure_flag & SD_EMISSION) {
-				float3 emission = kernel_volume_emission_integrate(&coeff, closure_flag, transmittance, dt);
-				accum_emission += accum_transmittance * emission;
-			}
-
-			accum_transmittance *= transmittance;
-
-			/* compute pdf for distance sampling */
-			float3 pdf_distance = dt * accum_transmittance * coeff.sigma_s;
-			cdf_distance = cdf_distance + pdf_distance;
-
-			/* write step data */
-			step->sigma_t = sigma_t;
-			step->sigma_s = coeff.sigma_s;
-			step->closure_flag = closure_flag;
-
-			segment->closure_flag |= closure_flag;
-
-			is_last_step_empty = false;
-			segment->numsteps++;
+	if(has_vdb_volume && kg->float_volumes[vdb_index]->has_uniform_voxels()) {
+		/* TODO(kevin): this call should be moved out of here, all it does is
+		 * checking if we have an intersection with the boundbox of the volumue
+		 * which in most cases corresponds to the boundbox of the object that has
+		 * this volume. Also it initializes the rays for the ray marching. */
+		if(!kg->float_volumes[vdb_index]->intersect(ray, NULL)) {
+			return;
 		}
-		else {
-			if(is_last_step_empty) {
-				/* consecutive empty step, merge */
-				step--;
+
+		/* t and t1 represent the entry and exit points for each leaf node or tile
+		 * containing active voxels. If we don't have any active node in the current
+		 * ray path (i.e. empty space) the ray march loop is not executed,
+		 * otherwise we loop through all leaves until the end of the volume. */
+		while(kg->float_volumes[vdb_index]->march(&t, &t1)) {
+
+			/* Perform small steps through the current leaf or tile. */
+			for(float new_t = step_size * ceilf(t / step_size); new_t <= t1; new_t += step_size, step++) {
+				float dt = new_t - t;
+
+				/* use random position inside this segment to sample shader */
+				if(heterogeneous && new_t == ray->t)
+					random_jitter_offset = lcg_step_float(&state->rng_congruential) * dt;
+
+				float3 new_P = ray->P + ray->D * (t + random_jitter_offset);
+				VolumeShaderCoefficients coeff;
+
+				/* compute segment */
+				if(volume_shader_sample(kg, sd, state, new_P, &coeff)) {
+					int closure_flag = sd->flag;
+					float3 sigma_t = coeff.sigma_a + coeff.sigma_s;
+
+					/* compute accumulated transmittance */
+					float3 transmittance = volume_color_transmittance(sigma_t, dt);
+
+					/* compute emission attenuated by absorption */
+					if(closure_flag & SD_EMISSION) {
+						float3 emission = kernel_volume_emission_integrate(&coeff, closure_flag, transmittance, dt);
+						accum_emission += accum_transmittance * emission;
+					}
+
+					accum_transmittance *= transmittance;
+
+					/* compute pdf for distance sampling */
+					float3 pdf_distance = dt * accum_transmittance * coeff.sigma_s;
+					cdf_distance = cdf_distance + pdf_distance;
+
+					/* write step data */
+					step->sigma_t = sigma_t;
+					step->sigma_s = coeff.sigma_s;
+					step->closure_flag = closure_flag;
+
+					segment->closure_flag |= closure_flag;
+
+					is_last_step_empty = false;
+					segment->numsteps++;
+				}
+				else {
+					if(is_last_step_empty) {
+						/* consecutive empty step, merge */
+						step--;
+					}
+					else {
+						/* store empty step */
+						step->sigma_t = make_float3(0.0f, 0.0f, 0.0f);
+						step->sigma_s = make_float3(0.0f, 0.0f, 0.0f);
+						step->closure_flag = 0;
+
+						segment->numsteps++;
+						is_last_step_empty = true;
+					}
+				}
+
+				step->accum_transmittance = accum_transmittance;
+				step->cdf_distance = cdf_distance;
+				step->t = new_t;
+				step->shade_t = t + random_jitter_offset;
+
+				/* stop if at the end of the volume */
+				t = new_t;
+				if(t == ray->t)
+					break;
+
+				/* stop if nearly all light blocked */
+				if(accum_transmittance.x < tp_eps && accum_transmittance.y < tp_eps && accum_transmittance.z < tp_eps)
+					break;
+			}
+		}
+	}
+	else
+#endif
+	{
+		for(int i = 0; i < max_steps; i++, step++) {
+			/* advance to new position */
+			float new_t = min(ray->t, (i+1) * step_size);
+			float dt = new_t - t;
+
+			/* use random position inside this segment to sample shader */
+			if(heterogeneous && new_t == ray->t)
+				random_jitter_offset = lcg_step_float(&state->rng_congruential) * dt;
+
+			float3 new_P = ray->P + ray->D * (t + random_jitter_offset);
+			VolumeShaderCoefficients coeff;
+
+			/* compute segment */
+			if(volume_shader_sample(kg, sd, state, new_P, &coeff)) {
+				int closure_flag = sd->flag;
+				float3 sigma_t = coeff.sigma_a + coeff.sigma_s;
+
+				/* compute accumulated transmittance */
+				float3 transmittance = volume_color_transmittance(sigma_t, dt);
+
+				/* compute emission attenuated by absorption */
+				if(closure_flag & SD_EMISSION) {
+					float3 emission = kernel_volume_emission_integrate(&coeff, closure_flag, transmittance, dt);
+					accum_emission += accum_transmittance * emission;
+				}
+
+				accum_transmittance *= transmittance;
+
+				/* compute pdf for distance sampling */
+				float3 pdf_distance = dt * accum_transmittance * coeff.sigma_s;
+				cdf_distance = cdf_distance + pdf_distance;
+
+				/* write step data */
+				step->sigma_t = sigma_t;
+				step->sigma_s = coeff.sigma_s;
+				step->closure_flag = closure_flag;
+
+				segment->closure_flag |= closure_flag;
+
+				is_last_step_empty = false;
+				segment->numsteps++;
 			}
 			else {
-				/* store empty step */
-				step->sigma_t = make_float3(0.0f, 0.0f, 0.0f);
-				step->sigma_s = make_float3(0.0f, 0.0f, 0.0f);
-				step->closure_flag = 0;
+				if(is_last_step_empty) {
+					/* consecutive empty step, merge */
+					step--;
+				}
+				else {
+					/* store empty step */
+					step->sigma_t = make_float3(0.0f, 0.0f, 0.0f);
+					step->sigma_s = make_float3(0.0f, 0.0f, 0.0f);
+					step->closure_flag = 0;
 
-				segment->numsteps++;
-				is_last_step_empty = true;
+					segment->numsteps++;
+					is_last_step_empty = true;
+				}
 			}
+
+			step->accum_transmittance = accum_transmittance;
+			step->cdf_distance = cdf_distance;
+			step->t = new_t;
+			step->shade_t = t + random_jitter_offset;
+
+			/* stop if at the end of the volume */
+			t = new_t;
+			if(t == ray->t)
+				break;
+
+			/* stop if nearly all light blocked */
+			if(accum_transmittance.x < tp_eps && accum_transmittance.y < tp_eps && accum_transmittance.z < tp_eps)
+				break;
 		}
-
-		step->accum_transmittance = accum_transmittance;
-		step->cdf_distance = cdf_distance;
-		step->t = new_t;
-		step->shade_t = t + random_jitter_offset;
-
-		/* stop if at the end of the volume */
-		t = new_t;
-		if(t == ray->t)
-			break;
-
-		/* stop if nearly all light blocked */
-		if(accum_transmittance.x < tp_eps && accum_transmittance.y < tp_eps && accum_transmittance.z < tp_eps)
-			break;
 	}
 
 	/* store total emission and transmittance */
@@ -847,26 +966,40 @@ ccl_device void kernel_volume_decoupled_record(KernelGlobals *kg, PathState *sta
 	segment->accum_transmittance = accum_transmittance;
 
 	/* normalize cumulative density function for distance sampling */
-	VolumeStep *last_step = segment->steps + segment->numsteps - 1;
+	int numsteps = segment->numsteps - 1;
 
-	if(!is_zero(last_step->cdf_distance)) {
-		VolumeStep *step = &segment->steps[0];
-		int numsteps = segment->numsteps;
-		float3 inv_cdf_distance_sum = safe_invert_color(last_step->cdf_distance);
+	if(numsteps >= 0) {
+		VolumeStep *last_step = segment->steps + segment->numsteps - 1;
 
-		for(int i = 0; i < numsteps; i++, step++)
-			step->cdf_distance *= inv_cdf_distance_sum;
+		if(!is_zero(last_step->cdf_distance)) {
+			VolumeStep *step = &segment->steps[0];
+			int numsteps = segment->numsteps;
+			float3 inv_cdf_distance_sum = safe_invert_color(last_step->cdf_distance);
+
+			for(int i = 0; i < numsteps; i++, step++)
+				step->cdf_distance *= inv_cdf_distance_sum;
+		}
 	}
 }
 
 ccl_device void kernel_volume_decoupled_free(KernelGlobals *kg, VolumeSegment *segment)
 {
-	if(segment->steps != &segment->stack_step)
+	if(segment->steps != &segment->stack_step) {
+#ifdef __KERNEL_CPU__
+		/* NOTE: We only allow free last allocated segment.
+		 * No random order of alloc/free is supported.
+		 */
+		assert(kg->decoupled_volume_steps_index > 0);
+		assert(segment->steps == kg->decoupled_volume_steps[kg->decoupled_volume_steps_index - 1]);
+		--kg->decoupled_volume_steps_index;
+#else
 		free(segment->steps);
+#endif
+	}
 }
 
 /* scattering for homogeneous and heterogeneous volumes, using decoupled ray
- * marching. this function does not do emission or modify throughput. 
+ * marching.
  *
  * function is expected to return VOLUME_PATH_SCATTERED when probalistic_scatter is false */
 ccl_device VolumeIntegrateResult kernel_volume_decoupled_scatter(
@@ -1084,6 +1217,7 @@ ccl_device bool kernel_volume_use_decoupled(KernelGlobals *kg, bool heterogeneou
  * is inside of. */
 
 ccl_device void kernel_volume_stack_init(KernelGlobals *kg,
+                                         ShaderData *stack_sd,
                                          Ray *ray,
                                          VolumeStack *stack)
 {
@@ -1115,7 +1249,8 @@ ccl_device void kernel_volume_stack_init(KernelGlobals *kg,
 	uint num_hits = scene_intersect_volume_all(kg,
 	                                           &volume_ray,
 	                                           hits,
-	                                           2*VOLUME_STACK_SIZE);
+	                                           2*VOLUME_STACK_SIZE,
+	                                           PATH_RAY_ALL_VISIBILITY);
 	if(num_hits > 0) {
 		int enclosed_volumes[VOLUME_STACK_SIZE];
 		Intersection *isect = hits;
@@ -1123,22 +1258,27 @@ ccl_device void kernel_volume_stack_init(KernelGlobals *kg,
 		qsort(hits, num_hits, sizeof(Intersection), intersections_compare);
 
 		for(uint hit = 0; hit < num_hits; ++hit, ++isect) {
-			ShaderData sd;
-			shader_setup_from_ray(kg, &sd, isect, &volume_ray);
-			if(sd.flag & SD_BACKFACING) {
-				/* If ray exited the volume and never entered to that volume
-				 * it means that camera is inside such a volume.
-				 */
-				bool is_enclosed = false;
-				for(int i = 0; i < enclosed_index; ++i) {
-					if(enclosed_volumes[i] == sd.object) {
-						is_enclosed = true;
+			shader_setup_from_ray(kg, stack_sd, isect, &volume_ray);
+			if(stack_sd->flag & SD_BACKFACING) {
+				bool need_add = true;
+				for(int i = 0; i < enclosed_index && need_add; ++i) {
+					/* If ray exited the volume and never entered to that volume
+					 * it means that camera is inside such a volume.
+					 */
+					if(enclosed_volumes[i] == stack_sd->object) {
+						need_add = false;
+					}
+				}
+				for(int i = 0; i < stack_index && need_add; ++i) {
+					/* Don't add intersections twice. */
+					if(stack[i].object == stack_sd->object) {
+						need_add = false;
 						break;
 					}
 				}
-				if(is_enclosed == false) {
-					stack[stack_index].object = sd.object;
-					stack[stack_index].shader = sd.shader;
+				if(need_add) {
+					stack[stack_index].object = stack_sd->object;
+					stack[stack_index].shader = stack_sd->shader;
 					++stack_index;
 				}
 			}
@@ -1146,7 +1286,7 @@ ccl_device void kernel_volume_stack_init(KernelGlobals *kg,
 				/* If ray from camera enters the volume, this volume shouldn't
 				 * be added to the stack on exit.
 				 */
-				enclosed_volumes[enclosed_index++] = sd.object;
+				enclosed_volumes[enclosed_index++] = stack_sd->object;
 			}
 		}
 	}
@@ -1159,26 +1299,34 @@ ccl_device void kernel_volume_stack_init(KernelGlobals *kg,
 	      step < 2 * VOLUME_STACK_SIZE)
 	{
 		Intersection isect;
-		if(!scene_intersect_volume(kg, &volume_ray, &isect)) {
+		if(!scene_intersect_volume(kg, &volume_ray, &isect, PATH_RAY_ALL_VISIBILITY)) {
 			break;
 		}
 
-		ShaderData sd;
-		shader_setup_from_ray(kg, &sd, &isect, &volume_ray);
-		if(sd.flag & SD_BACKFACING) {
+		shader_setup_from_ray(kg, stack_sd, &isect, &volume_ray);
+		if(stack_sd->flag & SD_BACKFACING) {
 			/* If ray exited the volume and never entered to that volume
 			 * it means that camera is inside such a volume.
 			 */
-			bool is_enclosed = false;
-			for(int i = 0; i < enclosed_index; ++i) {
-				if(enclosed_volumes[i] == sd.object) {
-					is_enclosed = true;
+			bool need_add = true;
+			for(int i = 0; i < enclosed_index && need_add; ++i) {
+				/* If ray exited the volume and never entered to that volume
+				 * it means that camera is inside such a volume.
+				 */
+				if(enclosed_volumes[i] == stack_sd->object) {
+					need_add = false;
+				}
+			}
+			for(int i = 0; i < stack_index && need_add; ++i) {
+				/* Don't add intersections twice. */
+				if(stack[i].object == stack_sd->object) {
+					need_add = false;
 					break;
 				}
 			}
-			if(is_enclosed == false) {
-				stack[stack_index].object = sd.object;
-				stack[stack_index].shader = sd.shader;
+			if(need_add) {
+				stack[stack_index].object = stack_sd->object;
+				stack[stack_index].shader = stack_sd->shader;
 				++stack_index;
 			}
 		}
@@ -1186,11 +1334,11 @@ ccl_device void kernel_volume_stack_init(KernelGlobals *kg,
 			/* If ray from camera enters the volume, this volume shouldn't
 			 * be added to the stack on exit.
 			 */
-			enclosed_volumes[enclosed_index++] = sd.object;
+			enclosed_volumes[enclosed_index++] = stack_sd->object;
 		}
 
 		/* Move ray forward. */
-		volume_ray.P = ray_offset(sd.P, -sd.Ng);
+		volume_ray.P = ray_offset(stack_sd->P, -stack_sd->Ng);
 		++step;
 	}
 #endif
@@ -1258,6 +1406,7 @@ ccl_device void kernel_volume_stack_enter_exit(KernelGlobals *kg, ShaderData *sd
 
 #ifdef __SUBSURFACE__
 ccl_device void kernel_volume_stack_update_for_subsurface(KernelGlobals *kg,
+                                                          ShaderData *stack_sd,
                                                           Ray *ray,
                                                           VolumeStack *stack)
 {
@@ -1265,39 +1414,44 @@ ccl_device void kernel_volume_stack_update_for_subsurface(KernelGlobals *kg,
 
 	Ray volume_ray = *ray;
 
-#ifdef __VOLUME_RECORD_ALL__
+#  ifdef __VOLUME_RECORD_ALL__
 	Intersection hits[2*VOLUME_STACK_SIZE];
 	uint num_hits = scene_intersect_volume_all(kg,
 	                                           &volume_ray,
 	                                           hits,
-	                                           2*VOLUME_STACK_SIZE);
+	                                           2*VOLUME_STACK_SIZE,
+	                                           PATH_RAY_ALL_VISIBILITY);
 	if(num_hits > 0) {
 		Intersection *isect = hits;
 
 		qsort(hits, num_hits, sizeof(Intersection), intersections_compare);
 
 		for(uint hit = 0; hit < num_hits; ++hit, ++isect) {
-			ShaderData sd;
-			shader_setup_from_ray(kg, &sd, isect, &volume_ray);
-			kernel_volume_stack_enter_exit(kg, &sd, stack);
+			shader_setup_from_ray(kg, stack_sd, isect, &volume_ray);
+			kernel_volume_stack_enter_exit(kg, stack_sd, stack);
 		}
 	}
-#else
+#  else
 	Intersection isect;
 	int step = 0;
+	float3 Pend = ray->P + ray->D*ray->t;
 	while(step < 2 * VOLUME_STACK_SIZE &&
-	      scene_intersect_volume(kg, &volume_ray, &isect))
+	      scene_intersect_volume(kg,
+	                             &volume_ray,
+	                             &isect,
+	                             PATH_RAY_ALL_VISIBILITY))
 	{
-		ShaderData sd;
-		shader_setup_from_ray(kg, &sd, &isect, &volume_ray);
-		kernel_volume_stack_enter_exit(kg, &sd, stack);
+		shader_setup_from_ray(kg, stack_sd, &isect, &volume_ray);
+		kernel_volume_stack_enter_exit(kg, stack_sd, stack);
 
 		/* Move ray forward. */
-		volume_ray.P = ray_offset(sd.P, -sd.Ng);
-		volume_ray.t -= sd.ray_length;
+		volume_ray.P = ray_offset(stack_sd->P, -stack_sd->Ng);
+		if(volume_ray.t != FLT_MAX) {
+			volume_ray.D = normalize_len(Pend - volume_ray.P, &volume_ray.t);
+		}
 		++step;
 	}
-#endif
+#  endif
 }
 #endif
 

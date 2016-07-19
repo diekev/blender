@@ -355,7 +355,10 @@ typedef struct ImageFormatData {
 	char  jp2_flag;
 	char jp2_codec;
 
-	char pad[5];
+	/* TIFF */
+	char tiff_codec;
+
+	char pad[4];
 
 	/* Multiview */
 	char views_format;
@@ -442,6 +445,14 @@ typedef struct ImageFormatData {
 /* ImageFormatData.cineon_flag */
 #define R_IMF_CINEON_FLAG_LOG (1<<0)  /* was R_CINEON_LOG */
 
+/* ImageFormatData.tiff_codec */
+enum {
+	R_IMF_TIFF_CODEC_DEFLATE   = 0,
+	R_IMF_TIFF_CODEC_LZW       = 1,
+	R_IMF_TIFF_CODEC_PACKBITS  = 2,
+	R_IMF_TIFF_CODEC_NONE      = 3,
+};
+
 typedef struct BakeData {
 	struct ImageFormatData im_format;
 
@@ -451,7 +462,7 @@ typedef struct BakeData {
 	short margin, flag;
 
 	float cage_extrusion;
-	float pad2;
+	int pass_filter;
 
 	char normal_swizzle[3];
 	char normal_space;
@@ -477,6 +488,22 @@ typedef enum BakeSaveMode {
 	R_BAKE_SAVE_INTERNAL = 0,
 	R_BAKE_SAVE_EXTERNAL = 1,
 } BakeSaveMode;
+
+/* bake->pass_filter */
+typedef enum BakePassFilter {
+	R_BAKE_PASS_FILTER_NONE           = 0,
+	R_BAKE_PASS_FILTER_AO             = (1 << 0),
+	R_BAKE_PASS_FILTER_EMIT           = (1 << 1),
+	R_BAKE_PASS_FILTER_DIFFUSE        = (1 << 2),
+	R_BAKE_PASS_FILTER_GLOSSY         = (1 << 3),
+	R_BAKE_PASS_FILTER_TRANSM         = (1 << 4),
+	R_BAKE_PASS_FILTER_SUBSURFACE     = (1 << 5),
+	R_BAKE_PASS_FILTER_DIRECT         = (1 << 6),
+	R_BAKE_PASS_FILTER_INDIRECT       = (1 << 7),
+	R_BAKE_PASS_FILTER_COLOR          = (1 << 8),
+} BakePassFilter;
+
+#define R_BAKE_PASS_FILTER_ALL (~0)
 
 /* *************************************************************** */
 /* Render Data */
@@ -768,12 +795,18 @@ typedef struct RecastData {
 	int vertsperpoly;
 	float detailsampledist;
 	float detailsamplemaxerror;
-	short pad1, pad2;
+	char partitioning;
+	char pad1;
+	short pad2;
 } RecastData;
+
+#define RC_PARTITION_WATERSHED 0
+#define RC_PARTITION_MONOTONE 1
+#define RC_PARTITION_LAYERS 2
 
 typedef struct GameData {
 
-	/*  standalone player */
+	/* standalone player */
 	struct GameFraming framing;
 	short playerflag, xplay, yplay, freqplay;
 	short depth, attrib, rt1, rt2;
@@ -796,7 +829,7 @@ typedef struct GameData {
 
 	/*
 	 * bit 3: (gameengine): Activity culling is enabled.
-	 * bit 5: (gameengine) : enable Bullet DBVT tree for view frustrum culling
+	 * bit 5: (gameengine) : enable Bullet DBVT tree for view frustum culling
 	 */
 	int flag;
 	short mode, matmode;
@@ -869,6 +902,7 @@ typedef struct GameData {
 #define GAME_GLSL_NO_COLOR_MANAGEMENT		(1 << 15)
 #define GAME_SHOW_OBSTACLE_SIMULATION		(1 << 16)
 #define GAME_NO_MATERIAL_CACHING			(1 << 17)
+#define GAME_GLSL_NO_ENV_LIGHTING			(1 << 18)
 /* Note: GameData.flag is now an int (max 32 flags). A short could only take 16 flags */
 
 /* GameData.playerflag */
@@ -1233,6 +1267,41 @@ typedef enum {
 	UNIFIED_PAINT_BRUSH_ALPHA_PRESSURE  = (1 << 4)
 } UnifiedPaintSettingsFlags;
 
+
+typedef struct CurvePaintSettings {
+	char curve_type;
+	char flag;
+	char depth_mode;
+	char surface_plane;
+	int error_threshold;
+	float radius_min, radius_max;
+	float radius_taper_start, radius_taper_end;
+	float surface_offset;
+	float corner_angle;
+} CurvePaintSettings;
+
+/* CurvePaintSettings.flag */
+enum {
+	CURVE_PAINT_FLAG_CORNERS_DETECT             = (1 << 0),
+	CURVE_PAINT_FLAG_PRESSURE_RADIUS            = (1 << 1),
+	CURVE_PAINT_FLAG_DEPTH_STROKE_ENDPOINTS     = (1 << 2),
+	CURVE_PAINT_FLAG_DEPTH_STROKE_OFFSET_ABS    = (1 << 3),
+};
+
+/* CurvePaintSettings.depth_mode */
+enum {
+	CURVE_PAINT_PROJECT_CURSOR              = 0,
+	CURVE_PAINT_PROJECT_SURFACE             = 1,
+};
+
+/* CurvePaintSettings.surface_plane */
+enum {
+	CURVE_PAINT_SURFACE_PLANE_NORMAL_VIEW           = 0,
+	CURVE_PAINT_SURFACE_PLANE_NORMAL_SURFACE        = 1,
+	CURVE_PAINT_SURFACE_PLANE_VIEW                  = 2,
+};
+
+
 /* *************************************************************** */
 /* Stats */
 
@@ -1315,10 +1384,10 @@ typedef struct ToolSettings {
 
 	/* Auto-Keying Mode */
 	short autokey_mode, autokey_flag;	/* defines in DNA_userdef_types.h */
+	char keyframe_type;                 /* keyframe type (see DNA_curve_types.h) */
 
 	/* Multires */
 	char multires_subdiv_type;
-	char pad3[1];
 
 	/* Skeleton generation */
 	short skgen_resolution;
@@ -1383,6 +1452,8 @@ typedef struct ToolSettings {
 
 	/* Unified Paint Settings */
 	struct UnifiedPaintSettings unified_paint_settings;
+
+	struct CurvePaintSettings curve_paint_settings;
 
 	struct MeshStatVis statvis;
 } ToolSettings;
@@ -1569,6 +1640,7 @@ typedef struct Scene {
 #define R_SIMPLIFY			0x1000000
 #define R_EDGE_FRS			0x2000000 /* R_EDGE reserved for Freestyle */
 #define R_PERSISTENT_DATA	0x4000000 /* keep data around for re-render */
+#define R_USE_WS_SHADING	0x8000000 /* use world space interpretation of lighting data */
 
 /* seq_flag */
 #define R_SEQ_GL_PREV 1
@@ -1618,7 +1690,7 @@ typedef struct Scene {
 #define R_FREE_IMAGE		0x0100
 #define R_SINGLE_LAYER		0x0200
 #define R_EXR_TILE_FILE		0x0400
-#define R_COMP_FREE			0x0800
+/* #define R_COMP_FREE			0x0800 */
 #define R_NO_IMAGE_LOAD		0x1000
 #define R_NO_TEX			0x2000
 #define R_NO_FRAME_UPDATE	0x4000
@@ -1644,9 +1716,10 @@ typedef struct Scene {
 #define R_STAMP_RENDERTIME	0x0400
 #define R_STAMP_CAMERALENS	0x0800
 #define R_STAMP_STRIPMETA	0x1000
+#define R_STAMP_MEMORY		0x2000
 #define R_STAMP_ALL (R_STAMP_TIME|R_STAMP_FRAME|R_STAMP_DATE|R_STAMP_CAMERA|R_STAMP_SCENE| \
                      R_STAMP_NOTE|R_STAMP_MARKER|R_STAMP_FILENAME|R_STAMP_SEQSTRIP|        \
-                     R_STAMP_RENDERTIME|R_STAMP_CAMERALENS)
+                     R_STAMP_RENDERTIME|R_STAMP_CAMERALENS|R_STAMP_MEMORY)
 
 /* alphamode */
 #define R_ADDSKY		0
@@ -1712,16 +1785,17 @@ extern const char *RE_engine_id_CYCLES;
 
 /* **************** SCENE ********************* */
 
+/* note that much higher maxframes give imprecise sub-frames, see: T46859 */
 /* for general use */
-#define MAXFRAME	300000
-#define MAXFRAMEF	300000.0f
+#define MAXFRAME	500000
+#define MAXFRAMEF	500000.0f
 
 #define MINFRAME	0
 #define MINFRAMEF	0.0f
 
 /* (minimum frame number for current-frame) */
-#define MINAFRAME	-300000
-#define MINAFRAMEF	-300000.0f
+#define MINAFRAME	-500000
+#define MINAFRAMEF	-500000.0f
 
 /* depricate this! */
 #define TESTBASE(v3d, base)  (                                                \

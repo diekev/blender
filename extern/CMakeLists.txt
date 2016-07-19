@@ -23,8 +23,19 @@
 #
 # ***** END GPL LICENSE BLOCK *****
 
+# Libs that adhere to strict flags
+add_subdirectory(curve_fit_nd)
+
 # Otherwise we get warnings here that we cant fix in external projects
 remove_strict_flags()
+
+# Not a strict flag, but noisy for code we don't maintain
+if(CMAKE_COMPILER_IS_GNUCC)
+	remove_cc_flag(
+		"-Wmisleading-indentation"
+	)
+endif()
+
 
 add_subdirectory(rangetree)
 add_subdirectory(wcwidth)
@@ -60,10 +71,6 @@ if(WITH_IMAGE_OPENJPEG AND (NOT WITH_SYSTEM_OPENJPEG))
 	add_subdirectory(libopenjpeg)
 endif()
 
-if(WITH_IMAGE_REDCODE)
-	add_subdirectory(libredcode)
-endif()
-
 if(WITH_LZO AND NOT WITH_SYSTEM_LZO)
 	add_subdirectory(lzo)
 endif()
@@ -74,7 +81,9 @@ endif()
 
 if(WITH_CYCLES OR WITH_COMPOSITOR OR WITH_OPENSUBDIV)
 	add_subdirectory(clew)
-	add_subdirectory(cuew)
+	if(WITH_CUDA_DYNLOAD)
+		add_subdirectory(cuew)
+	endif()
 endif()
 
 if(WITH_MOD_BOOLEAN)

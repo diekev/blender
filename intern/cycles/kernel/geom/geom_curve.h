@@ -450,8 +450,8 @@ ccl_device_inline bool bvh_cardinal_curve_intersect(KernelGlobals *kg, Intersect
 		else if(level == 1) {
 
 			/* the maximum recursion depth is reached.
-			* check if dP0.(Q-P0)>=0 and dPn.(Pn-Q)>=0.
-			* dP* is reversed if necessary.*/
+			 * check if dP0.(Q-P0)>=0 and dPn.(Pn-Q)>=0.
+			 * dP* is reversed if necessary.*/
 			float t = isect->t;
 			float u = 0.0f;
 			float gd = 0.0f;
@@ -626,9 +626,9 @@ ccl_device_inline bool bvh_curve_intersect(KernelGlobals *kg, Intersection *isec
 {
 	/* define few macros to minimize code duplication for SSE */
 #ifndef __KERNEL_SSE2__
-#define len3_squared(x) len_squared(x)
-#define len3(x) len(x)
-#define dot3(x, y) dot(x, y)
+#  define len3_squared(x) len_squared(x)
+#  define len3(x) len(x)
+#  define dot3(x, y) dot(x, y)
 #endif
 
 	int segment = PRIMITIVE_UNPACK_SEGMENT(type);
@@ -850,10 +850,10 @@ ccl_device_inline bool bvh_curve_intersect(KernelGlobals *kg, Intersection *isec
 	return false;
 
 #ifndef __KERNEL_SSE2__
-#undef len3_squared
-#undef len3
-#undef dot3
-#endif
+#  undef len3_squared
+#  undef len3
+#  undef dot3
+#  endif
 }
 
 ccl_device_inline float3 curvetangent(float t, float3 p0, float3 p1, float3 p2, float3 p3)

@@ -227,6 +227,10 @@ static const char *rna_safe_id(const char *id)
 		return "operator_value";
 	else if (STREQ(id, "new"))
 		return "create";
+	else if (STREQ(id, "co_return")) {
+		/* MSVC2015, C++ uses for coroutines */
+		return "coord_return";
+	}
 
 	return id;
 }
@@ -466,7 +470,7 @@ static const char *rna_parameter_type_name(PropertyRNA *parm)
 		}
 		case PROP_COLLECTION:
 		{
-			return "ListBase";
+			return "CollectionListBase";
 		}
 		default:
 			return "<error, no type specified>";
@@ -3692,6 +3696,7 @@ static const char *cpp_classes = ""
 "return *this; }\n"
 "\n"
 "	operator T*() { return data; }\n"
+"	operator const T*() const { return data; }\n"
 "};\n"
 "\n"
 "template<typename T>\n"

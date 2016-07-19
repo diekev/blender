@@ -37,6 +37,7 @@
 #define ccl_device_noinline static
 #define ccl_global
 #define ccl_constant
+#define ccl_restrict __restrict
 #define __KERNEL_WITH_SSE_ALIGN__
 
 #if defined(_WIN32) && !defined(FREE_WINDOWS)
@@ -468,6 +469,8 @@ enum InterpolationType {
 	INTERPOLATION_CLOSEST = 1,
 	INTERPOLATION_CUBIC = 2,
 	INTERPOLATION_SMART = 3,
+
+	INTERPOLATION_NUM_TYPES,
 };
 
 /* Extension types for textures.
@@ -481,6 +484,8 @@ enum ExtensionType {
 	EXTENSION_EXTEND = 1,
 	/* Clip to image size and set exterior pixels as transparent. */
 	EXTENSION_CLIP = 2,
+
+	EXTENSION_NUM_TYPES,
 };
 
 /* macros */

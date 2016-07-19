@@ -1545,7 +1545,8 @@ BLI_INLINE bool spring_length(Implicit_Data *data, int i, int j, float r_extent[
 		/*
 		if (length>L) {
 			if ((clmd->sim_parms->flags & CSIMSETT_FLAG_TEARING_ENABLED) &&
-			    ( ((length-L)*100.0f/L) > clmd->sim_parms->maxspringlen )) {
+			    ( ((length-L)*100.0f/L) > clmd->sim_parms->maxspringlen ))
+			{
 				// cut spring!
 				s->flags |= CSPRING_FLAG_DEACTIVATE;
 				return false;
@@ -1585,8 +1586,11 @@ bool BPH_mass_spring_force_spring_linear(Implicit_Data *data, int i, int j, floa
 	
 	// calculate elonglation
 	spring_length(data, i, j, extent, dir, &length, vel);
-	
-	if (length > restlen || no_compress) {
+
+	/* This code computes not only the force, but also its derivative.
+	   Zero derivative effectively disables the spring for the implicit solver.
+	   Thus length > restlen makes cloth unconstrained at the start of simulation. */
+	if ((length >= restlen && length > 0) || no_compress) {
 		float stretch_force, f[3], dfdx[3][3], dfdv[3][3];
 		
 		stretch_force = stiffness * (length - restlen);

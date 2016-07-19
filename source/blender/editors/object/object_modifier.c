@@ -42,10 +42,8 @@
 #include "DNA_meshdata_types.h"
 #include "DNA_object_force.h"
 #include "DNA_scene_types.h"
-#include "DNA_smoke_types.h"
 
 #include "BLI_bitmap.h"
-#include "BLI_fileops.h"
 #include "BLI_math.h"
 #include "BLI_listbase.h"
 #include "BLI_string.h"
@@ -74,8 +72,6 @@
 #include "BKE_ocean.h"
 #include "BKE_paint.h"
 #include "BKE_particle.h"
-#include "BKE_screen.h"
-#include "BKE_smoke.h"
 #include "BKE_softbody.h"
 #include "BKE_editmesh.h"
 
@@ -92,10 +88,6 @@
 #include "WM_types.h"
 
 #include "object_intern.h"
-
-#ifdef WITH_OPENVDB
-#  include "openvdb_capi.h"
-#endif
 
 static void modifier_skin_customdata_delete(struct Object *ob);
 
@@ -825,9 +817,9 @@ int edit_modifier_poll_generic(bContext *C, StructRNA *rna_type, int obtype_flag
 	PointerRNA ptr = CTX_data_pointer_get_type(C, "modifier", rna_type);
 	Object *ob = (ptr.id.data) ? ptr.id.data : ED_object_active_context(C);
 	
-	if (!ob || ob->id.lib) return 0;
+	if (!ob || ID_IS_LINKED_DATABLOCK(ob)) return 0;
 	if (obtype_flag && ((1 << ob->type) & obtype_flag) == 0) return 0;
-	if (ptr.id.data && ((ID *)ptr.id.data)->lib) return 0;
+	if (ptr.id.data && ID_IS_LINKED_DATABLOCK(ptr.id.data)) return 0;
 	
 	return 1;
 }
@@ -1366,8 +1358,9 @@ void OBJECT_OT_multires_external_save(wmOperatorType *ot)
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
 
-	WM_operator_properties_filesel(ot, FILE_TYPE_FOLDER | FILE_TYPE_BTX, FILE_SPECIAL, FILE_SAVE,
-	                               WM_FILESEL_FILEPATH | WM_FILESEL_RELPATH, FILE_DEFAULTDISPLAY, FILE_SORT_ALPHA);
+	WM_operator_properties_filesel(
+	        ot, FILE_TYPE_FOLDER | FILE_TYPE_BTX, FILE_SPECIAL, FILE_SAVE,
+	        WM_FILESEL_FILEPATH | WM_FILESEL_RELPATH, FILE_DEFAULTDISPLAY, FILE_SORT_ALPHA);
 	edit_modifier_properties(ot);
 }
 
@@ -1467,7 +1460,7 @@ static int skin_edit_poll(bContext *C)
 	        edit_modifier_poll_generic(C, &RNA_SkinModifier, (1 << OB_MESH)));
 }
 
-static void skin_root_clear(BMesh *bm, BMVert *bm_vert, GSet *visited)
+static void skin_root_clear(BMVert *bm_vert, GSet *visited, const int cd_vert_skin_offset)
 {
 	BMEdge *bm_edge;
 	BMIter bm_iter;
@@ -1475,16 +1468,13 @@ static void skin_root_clear(BMesh *bm, BMVert *bm_vert, GSet *visited)
 	BM_ITER_ELEM (bm_edge, &bm_iter, bm_vert, BM_EDGES_OF_VERT) {
 		BMVert *v2 = BM_edge_other_vert(bm_edge, bm_vert);
 
-		if (!BLI_gset_haskey(visited, v2)) {
-			MVertSkin *vs = CustomData_bmesh_get(&bm->vdata,
-			                                     v2->head.data,
-			                                     CD_MVERT_SKIN);
+		if (BLI_gset_add(visited, v2)) {
+			MVertSkin *vs = BM_ELEM_CD_GET_VOID_P(v2, cd_vert_skin_offset);
 
 			/* clear vertex root flag and add to visited set */
 			vs->flag &= ~MVERT_SKIN_ROOT;
-			BLI_gset_insert(visited, v2);
 
-			skin_root_clear(bm, v2, visited);
+			skin_root_clear(v2, visited, cd_vert_skin_offset);
 		}
 	}
 }
@@ -1494,6 +1484,7 @@ static int skin_root_mark_exec(bContext *C, wmOperator *UNUSED(op))
 	Object *ob = CTX_data_edit_object(C);
 	BMEditMesh *em = BKE_editmesh_from_object(ob);
 	BMesh *bm = em->bm;
+	const int cd_vert_skin_offset = CustomData_get_offset(&bm->vdata, CD_MVERT_SKIN);
 	BMVert *bm_vert;
 	BMIter bm_iter;
 	GSet *visited;
@@ -1503,19 +1494,16 @@ static int skin_root_mark_exec(bContext *C, wmOperator *UNUSED(op))
 	BKE_mesh_ensure_skin_customdata(ob->data);
 
 	BM_ITER_MESH (bm_vert, &bm_iter, bm, BM_VERTS_OF_MESH) {
-		if (!BLI_gset_haskey(visited, bm_vert) &&
-		    BM_elem_flag_test(bm_vert, BM_ELEM_SELECT))
+		if (BM_elem_flag_test(bm_vert, BM_ELEM_SELECT) &&
+		    BLI_gset_add(visited, bm_vert))
 		{
-			MVertSkin *vs = CustomData_bmesh_get(&bm->vdata,
-			                                     bm_vert->head.data,
-			                                     CD_MVERT_SKIN);
+			MVertSkin *vs = BM_ELEM_CD_GET_VOID_P(bm_vert, cd_vert_skin_offset);
 
 			/* mark vertex as root and add to visited set */
 			vs->flag |= MVERT_SKIN_ROOT;
-			BLI_gset_insert(visited, bm_vert);
 
 			/* clear root flag from all connected vertices (recursively) */
-			skin_root_clear(bm, bm_vert, visited);
+			skin_root_clear(bm_vert, visited, cd_vert_skin_offset);
 		}
 	}
 
@@ -2305,388 +2293,6 @@ void OBJECT_OT_laplaciandeform_bind(wmOperatorType *ot)
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
 	edit_modifier_properties(ot);
-}
-
-/* ************************* OpenVDB cache operators ************************* */
-
-static int openvdb_cache_poll(bContext *C)
-{
-	Object *ob = CTX_data_active_object(C);
-	SmokeModifierData *smd = NULL;
-
-	if (!ob) {
-		return false;
-	}
-
-	smd = (SmokeModifierData *)modifiers_findByType(ob, eModifierType_Smoke);
-
-	if (!smd) {
-		return false;
-	}
-
-	return true;
-}
-
-typedef struct OpenVDBCacheJob {
-	/* from wmJob */
-	void *owner;
-	short *stop, *do_update;
-	float *progress;
-	struct SmokeModifierData *smd;
-	struct Scene *scene;
-	struct Object *ob;
-	struct DerivedMesh *dm;
-} OpenVDBCacheJob;
-
-static void openvdb_cache_bake_free(void *customdata)
-{
-	OpenVDBCacheJob *ocj = customdata;
-	MEM_freeN(ocj);
-}
-
-/* called by smoke export, only to check job 'stop' value */
-static int openvdb_cache_bake_breakjob(void *customdata)
-{
-	UNUSED_VARS(customdata);
-	return G.is_break;
-}
-
-/* called by smokeModifier_OpenVDB_export, wmJob sends notifier */
-static void openvdb_cache_bake_update(void *customdata, float progress, int *cancel)
-{
-	OpenVDBCacheJob *ocj = customdata;
-
-	if (openvdb_cache_bake_breakjob(ocj)) {
-		*cancel = 1;
-	}
-
-	*(ocj->do_update) = true;
-	*(ocj->progress) = progress;
-}
-
-static void openvdb_cache_bake_startjob(void *customdata, short *stop, short *do_update, float *progress)
-{
-	OpenVDBCacheJob *ocj = customdata;
-
-	ocj->stop = stop;
-	ocj->do_update = do_update;
-	ocj->progress = progress;
-
-	G.is_break = false;
-
-	/* XXX annoying hack: needed to prevent data corruption when changing
-	 * scene frame in separate threads
-	 */
-	G.is_rendering = true;
-	BKE_spacedata_draw_locks(true);
-
-	smokeModifier_OpenVDB_export(ocj->smd, ocj->scene, ocj->ob, ocj->dm,
-	                             openvdb_cache_bake_update, (void *)ocj);
-
-	*do_update = true;
-	*stop = 0;
-}
-
-static void openvdb_cache_bake_endjob(void *customdata)
-{
-	OpenVDBCacheJob *ocj = customdata;
-	Object *ob = ocj->ob;
-
-	G.is_rendering = false;
-	BKE_spacedata_draw_locks(false);
-
-	DAG_id_tag_update(&ob->id, OB_RECALC_DATA);
-	WM_main_add_notifier(NC_OBJECT | ND_MODIFIER, ob);
-}
-
-static int openvdb_cache_bake_exec(bContext *C, wmOperator *op)
-{
-	Object *ob = CTX_data_active_object(C);
-	SmokeModifierData *smd = (SmokeModifierData *)modifiers_findByType(ob, eModifierType_Smoke);
-	Scene *scene = CTX_data_scene(C);
-	wmJob *wm_job;
-	OpenVDBCacheJob *ocj;
-
-	if (!smd) {
-		return OPERATOR_CANCELLED;
-	}
-
-	/* setup job */
-	wm_job = WM_jobs_get(CTX_wm_manager(C), CTX_wm_window(C), scene, "OpenVDB Cache",
-	                     WM_JOB_PROGRESS, WM_JOB_TYPE_OPENVDB_CACHE);
-
-	ocj = MEM_callocN(sizeof(OpenVDBCacheJob), "openvdb cache job");
-	ocj->smd = smd;
-	ocj->scene = scene;
-	ocj->ob = ob;
-	ocj->dm = ob->derivedDeform;
-
-	WM_jobs_customdata_set(wm_job, ocj, openvdb_cache_bake_free);
-	WM_jobs_timer(wm_job, 0.1, NC_OBJECT | ND_MODIFIER, NC_OBJECT | ND_MODIFIER);
-	WM_jobs_callbacks(wm_job, openvdb_cache_bake_startjob, NULL, NULL, openvdb_cache_bake_endjob);
-
-	WM_jobs_start(CTX_wm_manager(C), wm_job);
-
-	return OPERATOR_FINISHED;
-
-	UNUSED_VARS(op);
-}
-
-static int openvdb_cache_bake_invoke(bContext *C, wmOperator *op, const wmEvent *event)
-{
-	Object *ob = CTX_data_active_object(C);
-	SmokeModifierData *smd = (SmokeModifierData *)modifiers_findByType(ob, eModifierType_Smoke);
-	OpenVDBCache *cache = BKE_openvdb_cache_current(smd->domain);
-	const char *relbase = modifier_path_relbase(ob);
-	char filename[FILE_MAX];
-
-	if (!cache)
-		return OPERATOR_CANCELLED;
-
-	BKE_openvdb_cache_filename(filename, cache->path, cache->name, relbase, cache->startframe);
-
-	if (!BLI_exists(filename)) {
-		return openvdb_cache_bake_exec(C, op);
-	}
-
-	if (!BLI_is_file(filename)) {
-		BKE_reportf(op->reports, RPT_ERROR, "Invalid cache target: %200s", filename);
-		return OPERATOR_CANCELLED;
-	}
-
-	if (BLI_file_is_writable(filename)) {
-		return WM_operator_confirm_message(C, op, "Cache target already exists! Overwrite?");
-	}
-
-	BKE_reportf(op->reports, RPT_ERROR, "Cannot create cache target: %200s", filename);
-	return OPERATOR_CANCELLED;
-
-	UNUSED_VARS(event);
-}
-
-void OBJECT_OT_openvdb_cache_bake(wmOperatorType *ot)
-{
-	ot->name = "Bake Cache";
-	ot->description = "Cache the smoke simulation";
-	ot->idname = "OBJECT_OT_openvdb_cache_bake";
-
-	ot->invoke = openvdb_cache_bake_invoke;
-	ot->poll = openvdb_cache_poll;
-	ot->exec = openvdb_cache_bake_exec;
-
-	/* flags */
-	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
-}
-
-static OpenVDBCache *openvdb_cache_new(void)
-{
-	OpenVDBCache *cache = NULL;
-
-	cache = MEM_callocN(sizeof(OpenVDBCache), "OpenVDBCache");
-	cache->reader = NULL;
-	cache->writer = NULL;
-	cache->startframe = 1;
-	cache->endframe = 250;
-	cache->compression = VDB_COMPRESSION_ZIP;
-	cache->shutter_speed = 1.0f;
-	cache->num_steps = 10;
-	cache->time_scale = 1.0f;
-	cache->cached_frames = MEM_callocN(cache->endframe - cache->startframe + 1,
-	                                   "OpenVDBCache_cache_frames");
-
-	BLI_strncpy(cache->path, "//\0", 3);
-	BLI_strncpy(cache->name, "openvdb_cache", sizeof(cache->name));
-
-	return cache;
-}
-
-static int openvdb_cache_add_exec(bContext *C, wmOperator *op)
-{
-	Object *ob = CTX_data_active_object(C);
-	SmokeModifierData *smd = (SmokeModifierData *)modifiers_findByType(ob, eModifierType_Smoke);
-
-	if (!smd) {
-		return OPERATOR_CANCELLED;
-	}
-
-	SmokeDomainSettings *sds = smd->domain;
-	OpenVDBCache *cache = BKE_openvdb_cache_current(sds), *cache_new;
-
-	if (cache) {
-		cache->flags &= ~OPENVDB_CACHE_CURRENT;
-	}
-
-	cache_new = openvdb_cache_new();
-	cache_new->flags |= OPENVDB_CACHE_CURRENT;
-
-	BLI_addtail(&sds->vdb_caches, cache_new);
-
-	WM_event_add_notifier(C, NC_OBJECT | ND_POINTCACHE, ob);
-
-	return OPERATOR_FINISHED;
-
-	UNUSED_VARS(op);
-}
-
-void OBJECT_OT_openvdb_cache_add(wmOperatorType *ot)
-{
-	/* identifiers */
-	ot->name = "Add an OpenVDB cache";
-	ot->description = "Add an OpenVDB cache";
-	ot->idname = "OBJECT_OT_openvdb_cache_add";
-
-	/* api callbacks */
-	ot->poll = openvdb_cache_poll;
-	ot->exec = openvdb_cache_add_exec;
-
-	/* flags */
-	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
-}
-
-static int openvdb_cache_remove_exec(bContext *C, wmOperator *op)
-{
-	Object *ob = CTX_data_active_object(C);
-	SmokeModifierData *smd = (SmokeModifierData *)modifiers_findByType(ob, eModifierType_Smoke);
-
-	if (!smd) {
-		return OPERATOR_CANCELLED;
-	}
-
-	SmokeDomainSettings *sds = smd->domain;
-	OpenVDBCache *cache = BKE_openvdb_cache_current(sds);
-	OpenVDBCache *cache_prev = NULL, *cache_next = NULL;
-
-	if (cache) {
-		cache_prev = cache->prev;
-		cache_next = cache->next;
-		BLI_remlink(&sds->vdb_caches, cache);
-		MEM_freeN(cache->cached_frames);
-		MEM_freeN(cache);
-	}
-
-	if (cache_next) {
-		cache_next->flags |= OPENVDB_CACHE_CURRENT;
-	}
-	else if (cache_prev) {
-		cache_prev->flags |= OPENVDB_CACHE_CURRENT;
-	}
-
-	WM_event_add_notifier(C, NC_OBJECT | ND_POINTCACHE, ob);
-
-	return OPERATOR_FINISHED;
-
-	UNUSED_VARS(op);
-}
-
-void OBJECT_OT_openvdb_cache_remove(wmOperatorType *ot)
-{
-	/* identifiers */
-	ot->name = "Remove Cache";
-	ot->description = "Remove the currently selected cache";
-	ot->idname = "OBJECT_OT_openvdb_cache_remove";
-
-	/* api callbacks */
-	ot->poll = openvdb_cache_poll;
-	ot->exec = openvdb_cache_remove_exec;
-
-	/* flags */
-	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
-}
-
-enum {
-	VDB_CACHE_MOVE_UP = 0,
-	VDB_CACHE_MOVE_DOWN,
-};
-
-static int openvdb_cache_move_exec(bContext *C, wmOperator *op)
-{
-	Object *ob = CTX_data_active_object(C);
-	SmokeModifierData *smd = (SmokeModifierData *)modifiers_findByType(ob, eModifierType_Smoke);
-
-	if (!smd) {
-		return OPERATOR_CANCELLED;
-	}
-
-	SmokeDomainSettings *sds = smd->domain;
-	OpenVDBCache *cache = BKE_openvdb_cache_current(sds);
-	int direction = RNA_enum_get(op->ptr, "direction");
-
-	if (direction == VDB_CACHE_MOVE_UP) {
-		if (cache->prev) {
-			BLI_remlink(&sds->vdb_caches, cache);
-			BLI_insertlinkbefore(&sds->vdb_caches, cache->prev, cache);
-		}
-	}
-	else if (direction == VDB_CACHE_MOVE_DOWN) {
-		if (cache->next) {
-			BLI_remlink(&sds->vdb_caches, cache);
-			BLI_insertlinkafter(&sds->vdb_caches, cache->next, cache);
-		}
-	}
-
-	WM_event_add_notifier(C, NC_OBJECT | ND_POINTCACHE, ob);
-
-	return OPERATOR_FINISHED;
-}
-
-void OBJECT_OT_openvdb_cache_move(wmOperatorType *ot)
-{
-	static EnumPropertyItem cache_move[] = {
-	    {VDB_CACHE_MOVE_UP, "UP", 0, "Up", ""},
-	    {VDB_CACHE_MOVE_DOWN, "DOWN", 0, "Down", ""},
-	    { 0, NULL, 0, NULL, NULL }
-	};
-
-	ot->name = "Move Cache";
-	ot->description = "Move cache up or down the list";
-	ot->idname = "OBJECT_OT_openvdb_cache_move";
-
-	ot->poll = openvdb_cache_poll;
-	ot->exec = openvdb_cache_move_exec;
-
-	/* flags */
-	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
-	ot->prop = RNA_def_enum(ot->srna, "direction", cache_move, VDB_CACHE_MOVE_UP, "Direction", "");
-}
-
-static int openvdb_cache_free_exec(bContext *C, wmOperator *op)
-{
-	Object *ob = CTX_data_active_object(C);
-	SmokeModifierData *smd = (SmokeModifierData *)modifiers_findByType(ob, eModifierType_Smoke);
-
-	if (!smd) {
-		return OPERATOR_CANCELLED;
-	}
-
-	OpenVDBCache *cache = BKE_openvdb_cache_current(smd->domain);
-
-	if ((cache->flags & OPENVDB_CACHE_BAKED) == 0) {
-		return OPERATOR_CANCELLED;
-	}
-
-	const char *relbase = modifier_path_relbase(ob);
-	BKE_openvdb_cache_remove_files(cache, relbase);
-
-	cache->flags &= ~OPENVDB_CACHE_BAKED;
-
-	WM_event_add_notifier(C, NC_OBJECT | ND_POINTCACHE, ob);
-
-	return OPERATOR_FINISHED;
-
-	UNUSED_VARS(op);
-}
-
-void OBJECT_OT_openvdb_cache_free(wmOperatorType *ot)
-{
-	ot->name = "Free Cache";
-	ot->description = "Mark cache as not baked and delete cached files to further edit the smoke simulation";
-	ot->idname = "OBJECT_OT_openvdb_cache_free";
-
-	ot->poll = openvdb_cache_poll;
-	ot->exec = openvdb_cache_free_exec;
-
-	/* flags */
-	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
 
 /* ************************* fluid retimer operator ************************* */

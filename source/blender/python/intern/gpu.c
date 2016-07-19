@@ -97,6 +97,8 @@ static PyObject *PyInit_gpu(void)
 	PY_MODULE_ADD_CONSTANT(m, GPU_DYNAMIC_OBJECT_MAT);
 	PY_MODULE_ADD_CONSTANT(m, GPU_DYNAMIC_OBJECT_VIEWIMAT);
 	PY_MODULE_ADD_CONSTANT(m, GPU_DYNAMIC_OBJECT_IMAT);
+	PY_MODULE_ADD_CONSTANT(m, GPU_DYNAMIC_OBJECT_LOCTOVIEWMAT);
+	PY_MODULE_ADD_CONSTANT(m, GPU_DYNAMIC_OBJECT_LOCTOVIEWIMAT);
 	PY_MODULE_ADD_CONSTANT(m, GPU_DYNAMIC_OBJECT_COLOR);
 	PY_MODULE_ADD_CONSTANT(m, GPU_DYNAMIC_OBJECT_AUTOBUMPSCALE);
 	/* GPU_DYNAMIC_GROUP_LAMP */
@@ -126,6 +128,7 @@ static PyObject *PyInit_gpu(void)
 	/* GPU_DYNAMIC_GROUP_WORLD */
 	PY_MODULE_ADD_CONSTANT(m, GPU_DYNAMIC_HORIZON_COLOR);
 	PY_MODULE_ADD_CONSTANT(m, GPU_DYNAMIC_AMBIENT_COLOR);
+	PY_MODULE_ADD_CONSTANT(m, GPU_DYNAMIC_ZENITH_COLOR);
 	/* GPU_DYNAMIC_GROUP_MAT */
 	PY_MODULE_ADD_CONSTANT(m, GPU_DYNAMIC_MAT_DIFFRGB);
 	PY_MODULE_ADD_CONSTANT(m, GPU_DYNAMIC_MAT_REF);
@@ -258,6 +261,9 @@ static PyObject *GPU_export_shader(PyObject *UNUSED(self), PyObject *args, PyObj
 		if (uniform->lamp) {
 			PY_DICT_ADD_ID(dict, uniform, lamp);
 		}
+		if (uniform->material) {
+			PY_DICT_ADD_ID(dict, uniform, material);
+		}
 		if (uniform->image) {
 			PY_DICT_ADD_ID(dict, uniform, image);
 		}
@@ -324,10 +330,10 @@ PyObject *GPU_initPython(void)
 
 	/* gpu.offscreen */
 	PyModule_AddObject(module, "offscreen", (submodule = BPyInit_gpu_offscreen()));
-	PyDict_SetItemString(sys_modules, PyModule_GetName(submodule), submodule);
+	PyDict_SetItem(sys_modules, PyModule_GetNameObject(submodule), submodule);
 	Py_INCREF(submodule);
 
-	PyDict_SetItemString(PyImport_GetModuleDict(), "gpu", module);
+	PyDict_SetItem(PyImport_GetModuleDict(), PyModule_GetNameObject(module), module);
 	return module;
 }
 

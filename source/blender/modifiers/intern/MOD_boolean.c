@@ -43,6 +43,7 @@
 #include "DNA_object_types.h"
 
 #include "BLI_utildefines.h"
+#include "BLI_math_matrix.h"
 
 #include "BKE_cdderivedmesh.h"
 #include "BKE_library_query.h"
@@ -52,6 +53,7 @@
 
 #include "MOD_boolean_util.h"
 #include "MOD_util.h"
+
 
 #ifdef USE_BMESH
 #include "BLI_alloca.h"
@@ -68,6 +70,14 @@
 #include "PIL_time.h"
 #include "PIL_time_utildefines.h"
 #endif
+
+static void initData(ModifierData *md)
+{
+	BooleanModifierData *bmd = (BooleanModifierData *)md;
+
+	bmd->solver = eBooleanModifierSolver_BMesh;
+	bmd->double_threshold = 1e-6f;
+}
 
 static void copyData(ModifierData *md, ModifierData *target)
 {
@@ -220,7 +230,9 @@ static DerivedMesh *applyModifier_bmesh(
 #ifdef DEBUG_TIME
 			TIMEIT_START(boolean_bmesh);
 #endif
-			bm = BM_mesh_create(&allocsize);
+			bm = BM_mesh_create(
+			         &allocsize,
+			         &((struct BMeshCreateParams){.use_toolflags = false,}));
 
 			DM_to_bmesh_ex(dm_other, bm, true);
 			DM_to_bmesh_ex(dm, bm, true);
@@ -234,7 +246,7 @@ static DerivedMesh *applyModifier_bmesh(
 
 				looptris = MEM_mallocN(sizeof(*looptris) * looptris_tot, __func__);
 
-				BM_bmesh_calc_tessellation(bm, looptris, &tottri);
+				BM_mesh_calc_tessellation(bm, looptris, &tottri);
 
 				/* postpone this until after tessellating
 				 * so we can use the original normals before the vertex are moved */
@@ -294,16 +306,21 @@ static DerivedMesh *applyModifier_bmesh(
 				 * currently this is ok for 'BM_mesh_intersect' */
 				// BM_mesh_normals_update(bm);
 
+				/* change for testing */
+				bool use_separate = false;
+				bool use_dissolve = true;
+				bool use_island_connect = true;
+
 				BM_mesh_intersect(
 				        bm,
 				        looptris, tottri,
 				        bm_face_isect_pair, NULL,
 				        false,
-				        (bmd->bm_flag & eBooleanModifierBMeshFlag_BMesh_Separate) != 0,
-				        (bmd->bm_flag & eBooleanModifierBMeshFlag_BMesh_NoDissolve) == 0,
-				        (bmd->bm_flag & eBooleanModifierBMeshFlag_BMesh_NoConnectRegions) == 0,
+				        use_separate,
+				        use_dissolve,
+				        use_island_connect,
 				        bmd->operation,
-				        bmd->threshold);
+				        bmd->double_threshold);
 
 				MEM_freeN(looptris);
 			}
@@ -407,15 +424,14 @@ static DerivedMesh *applyModifier(
         ModifierApplyFlag flag)
 {
 	BooleanModifierData *bmd = (BooleanModifierData *)md;
-	const int method = (bmd->bm_flag & eBooleanModifierBMeshFlag_Enabled) ? 1 : 0;
 
-	switch (method) {
+	switch (bmd->solver) {
 #ifdef USE_CARVE
-		case 0:
+		case eBooleanModifierSolver_Carve:
 			return applyModifier_carve(md, ob, derivedData, flag);
 #endif
 #ifdef USE_BMESH
-		case 1:
+		case eBooleanModifierSolver_BMesh:
 			return applyModifier_bmesh(md, ob, derivedData, flag);
 #endif
 		default:
@@ -439,7 +455,7 @@ ModifierTypeInfo modifierType_Boolean = {
 	/* deformMatricesEM */  NULL,
 	/* applyModifier */     applyModifier,
 	/* applyModifierEM */   NULL,
-	/* initData */          NULL,
+	/* initData */          initData,
 	/* requiredDataMask */  requiredDataMask,
 	/* freeData */          NULL,
 	/* isDisabled */        isDisabled,

@@ -33,6 +33,7 @@
 
 #include "BLI_math.h"
 #include "BLI_blenlib.h"
+#include "BLI_kdopbvh.h"
 #include "BLI_utildefines.h"
 
 #include "BKE_context.h"
@@ -49,6 +50,7 @@
 #include "ED_screen.h"
 #include "ED_space_api.h"
 #include "ED_transform.h"
+#include "ED_transform_snap_object_context.h"
 
 #include "PIL_time.h" /* smoothview */
 
@@ -305,6 +307,8 @@ typedef struct WalkInfo {
 	float jump_height; /* maximum jump height */
 	float speed_factor; /* to use for fast/slow speeds */
 
+	struct SnapObjectContext *snap_context;
+
 	struct View3DCameraControl *v3d_camera_control;
 
 } WalkInfo;
@@ -401,28 +405,31 @@ static void walk_navigation_mode_set(bContext *C, wmOperator *op, WalkInfo *walk
 /**
  * \param r_distance  Distance to the hit point
  */
-static bool walk_floor_distance_get(bContext *C, RegionView3D *rv3d, WalkInfo *walk, const float dvec[3], float *r_distance)
+static bool walk_floor_distance_get(
+        RegionView3D *rv3d, WalkInfo *walk, const float dvec[3],
+        float *r_distance)
 {
 	float ray_normal[3] = {0, 0, -1}; /* down */
 	float ray_start[3];
 	float r_location[3];
-	float r_normal[3];
+	float r_normal_dummy[3];
 	float dvec_tmp[3];
 	bool ret;
 
-	*r_distance = TRANSFORM_DIST_MAX_RAY;
+	*r_distance = BVH_RAYCAST_DIST_MAX;
 
 	copy_v3_v3(ray_start, rv3d->viewinv[3]);
 
 	mul_v3_v3fl(dvec_tmp, dvec, walk->grid);
 	add_v3_v3(ray_start, dvec_tmp);
 
-	ret = snapObjectsRayEx(
-	        CTX_data_scene(C), NULL, NULL, NULL, NULL,
-	        NULL, SNAP_ALL, SCE_SNAP_MODE_FACE,
+	ret = ED_transform_snap_object_project_ray(
+	        walk->snap_context,
+	        &(const struct SnapObjectParams){
+	            .snap_select = SNAP_ALL,
+	        },
 	        ray_start, ray_normal, r_distance,
-	        r_location, r_normal, NULL, NULL,
-	        NULL, NULL);
+	        r_location, r_normal_dummy);
 
 	/* artifically scale the distance to the scene size */
 	*r_distance /= walk->grid;
@@ -434,34 +441,33 @@ static bool walk_floor_distance_get(bContext *C, RegionView3D *rv3d, WalkInfo *w
  * \param r_location  Location of the hit point
  * \param r_normal  Normal of the hit surface, transformed to always face the camera
  */
-static bool walk_ray_cast(bContext *C, RegionView3D *rv3d, WalkInfo *walk, float r_location[3], float r_normal[3], float *ray_distance)
+static bool walk_ray_cast(
+        RegionView3D *rv3d, WalkInfo *walk,
+        float r_location[3], float r_normal[3], float *ray_distance)
 {
-	float ray_normal[3] = {0, 0, 1}; /* forward */
+	float ray_normal[3] = {0, 0, -1}; /* forward */
 	float ray_start[3];
-	float mat[3][3]; /* 3x3 copy of the view matrix so we can move along the view axis */
 	bool ret;
 
-	*ray_distance = TRANSFORM_DIST_MAX_RAY;
+	*ray_distance = BVH_RAYCAST_DIST_MAX;
 
 	copy_v3_v3(ray_start, rv3d->viewinv[3]);
-	copy_m3_m4(mat, rv3d->viewinv);
 
-	mul_m3_v3(mat, ray_normal);
+	mul_mat3_m4_v3(rv3d->viewinv, ray_normal);
 
-	mul_v3_fl(ray_normal, -1);
 	normalize_v3(ray_normal);
 
-	ret = snapObjectsRayEx(
-	        CTX_data_scene(C), NULL, NULL, NULL, NULL,
-	        NULL, SNAP_ALL, SCE_SNAP_MODE_FACE,
-	        ray_start, ray_normal, ray_distance,
-	        r_location, r_normal, NULL, NULL,
-	        NULL, NULL);
-
+	ret = ED_transform_snap_object_project_ray(
+	        walk->snap_context,
+	        &(const struct SnapObjectParams){
+	            .snap_select = SNAP_ALL,
+	        },
+	        ray_start, ray_normal, NULL,
+	        r_location, r_normal);
 
 	/* dot is positive if both rays are facing the same direction */
 	if (dot_v3v3(ray_normal, r_normal) > 0) {
-		copy_v3_fl3(r_normal, -r_normal[0], -r_normal[1], -r_normal[2]);
+		negate_v3(r_normal);
 	}
 
 	/* artifically scale the distance to the scene size */
@@ -499,7 +505,7 @@ static bool initWalkInfo(bContext *C, WalkInfo *walk, wmOperator *op)
 		walk->rv3d->persp = RV3D_PERSP;
 	}
 
-	if (walk->rv3d->persp == RV3D_CAMOB && walk->v3d->camera->id.lib) {
+	if (walk->rv3d->persp == RV3D_CAMOB && ID_IS_LINKED_DATABLOCK(walk->v3d->camera)) {
 		BKE_report(op->reports, RPT_ERROR, "Cannot navigate a camera from an external library");
 		return false;
 	}
@@ -574,6 +580,9 @@ static bool initWalkInfo(bContext *C, WalkInfo *walk, wmOperator *op)
 
 	walk->rv3d->rflag |= RV3D_NAVIGATING;
 
+	walk->snap_context = ED_transform_snap_object_context_create_view3d(
+	        CTX_data_main(C), walk->scene, SNAP_OBJECT_USE_CACHE,
+	        walk->ar, walk->v3d);
 
 	walk->v3d_camera_control = ED_view3d_cameracontrol_acquire(
 	        walk->scene, walk->v3d, walk->rv3d,
@@ -623,6 +632,8 @@ static int walkEnd(bContext *C, WalkInfo *walk)
 	WM_event_remove_timer(CTX_wm_manager(C), win, walk->timer);
 
 	ED_region_draw_cb_exit(walk->ar->type, walk->draw_handle_pixel);
+
+	ED_transform_snap_object_context_destroy(walk->snap_context);
 
 	ED_view3d_cameracontrol_release(walk->v3d_camera_control, walk->state == WALK_CANCEL);
 
@@ -896,7 +907,7 @@ static void walkEvent(bContext *C, wmOperator *op, WalkInfo *walk, const wmEvent
 			{
 				float loc[3], nor[3];
 				float distance;
-				bool ret = walk_ray_cast(C, walk->rv3d, walk, loc, nor, &distance);
+				bool ret = walk_ray_cast(walk->rv3d, walk, loc, nor, &distance);
 
 				/* in case we are teleporting middle way from a jump */
 				walk->speed_jump = 0.0f;
@@ -913,8 +924,7 @@ static void walkEvent(bContext *C, wmOperator *op, WalkInfo *walk, const wmEvent
 					copy_v3_v3(teleport->origin, walk->rv3d->viewinv[3]);
 
 					/* stop the camera from a distance (camera height) */
-					normalize_v3(nor);
-					mul_v3_fl(nor, walk->view_height);
+					normalize_v3_length(nor, walk->view_height);
 					add_v3_v3(loc, nor);
 
 					sub_v3_v3v3(teleport->direction, loc, teleport->origin);
@@ -1177,7 +1187,7 @@ static int walkApply(bContext *C, wmOperator *op, WalkInfo *walk)
 				float difference = -100.0f;
 				float fall_distance;
 
-				ret = walk_floor_distance_get(C, rv3d, walk, dvec, &ray_distance);
+				ret = walk_floor_distance_get(rv3d, walk, dvec, &ray_distance);
 
 				if (ret) {
 					difference = walk->view_height - ray_distance;
@@ -1230,7 +1240,7 @@ static int walkApply(bContext *C, wmOperator *op, WalkInfo *walk)
 				if (t > walk->teleport.duration) {
 
 					/* check to see if we are landing */
-					ret = walk_floor_distance_get(C, rv3d, walk, dvec, &ray_distance);
+					ret = walk_floor_distance_get(rv3d, walk, dvec, &ray_distance);
 
 					if (ret) {
 						difference = walk->view_height - ray_distance;
@@ -1420,7 +1430,7 @@ void VIEW3D_OT_walk(wmOperatorType *ot)
 	ot->invoke = walk_invoke;
 	ot->cancel = walk_cancel;
 	ot->modal = walk_modal;
-	ot->poll = ED_operator_view3d_active;
+	ot->poll = ED_operator_region_view3d_active;
 
 	/* flags */
 	ot->flag = OPTYPE_BLOCKING;

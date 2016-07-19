@@ -126,7 +126,7 @@ KX_BlenderSceneConverter::KX_BlenderSceneConverter(
 							m_useglslmat(false),
 							m_use_mat_cache(true)
 {
-	BKE_main_id_tag_all(maggie, false);  /* avoid re-tagging later on */
+	BKE_main_id_tag_all(maggie, LIB_TAG_DOIT, false);  /* avoid re-tagging later on */
 	m_newfilename = "";
 	m_threadinfo = new ThreadInfo();
 	m_threadinfo->m_pool = BLI_task_pool_create(engine->GetTaskScheduler(), NULL);
@@ -630,8 +630,8 @@ void KX_BlenderSceneConverter::WritePhysicsObjectToAnimationIpo(int frameNumber)
 
 					mat3_to_compatible_eul(blenderObject->rot, blenderObject->rot, tmat);
 
-					insert_keyframe(NULL, &blenderObject->id, NULL, NULL, "location", -1, (float)frameNumber, INSERTKEY_FAST);
-					insert_keyframe(NULL, &blenderObject->id, NULL, NULL, "rotation_euler", -1, (float)frameNumber, INSERTKEY_FAST);
+					insert_keyframe(NULL, &blenderObject->id, NULL, NULL, "location", -1, (float)frameNumber, BEZT_KEYTYPE_JITTER, INSERTKEY_FAST);
+					insert_keyframe(NULL, &blenderObject->id, NULL, NULL, "rotation_euler", -1, (float)frameNumber, BEZT_KEYTYPE_JITTER, INSERTKEY_FAST);
 
 #if 0
 					const MT_Point3& position = gameObj->NodeGetWorldPosition();
@@ -1045,7 +1045,7 @@ bool KX_BlenderSceneConverter::FreeBlendFile(Main *maggie)
 	for (vector<Main *>::iterator it = m_DynamicMaggie.begin(); !(it == m_DynamicMaggie.end()); it++) {
 		Main *main = *it;
 		if (main != maggie) {
-			BKE_main_id_tag_all(main, false);
+			BKE_main_id_tag_all(main, LIB_TAG_DOIT, false);
 		}
 		else {
 			maggie_index = i;
@@ -1058,7 +1058,7 @@ bool KX_BlenderSceneConverter::FreeBlendFile(Main *maggie)
 		return false;
 
 	m_DynamicMaggie.erase(m_DynamicMaggie.begin() + maggie_index);
-	BKE_main_id_tag_all(maggie, true);
+	BKE_main_id_tag_all(maggie, LIB_TAG_DOIT, true);
 
 	/* free all tagged objects */
 	KX_SceneList *scenes = m_ketsjiEngine->CurrentScenes();
@@ -1425,7 +1425,7 @@ RAS_MeshObject *KX_BlenderSceneConverter::ConvertMeshSpecial(KX_Scene *kx_scene,
 #ifdef DEBUG
 		printf("Mesh has a user \"%s\"\n", name);
 #endif
-		me = (ID*)BKE_mesh_copy_ex(from_maggie, (Mesh*)me);
+		me = (ID*)BKE_mesh_copy(from_maggie, (Mesh*)me);
 		id_us_min(me);
 	}
 	BLI_remlink(&from_maggie->mesh, me); /* even if we made the copy it needs to be removed */
@@ -1447,12 +1447,12 @@ RAS_MeshObject *KX_BlenderSceneConverter::ConvertMeshSpecial(KX_Scene *kx_scene,
 			/* if its tagged its a replaced material */
 			if (mat_old && (mat_old->id.tag & LIB_TAG_DOIT) == 0) {
 				Material *mat_old = mesh->mat[i];
-				Material *mat_new = BKE_material_copy(mat_old);
+				Material *mat_new = BKE_material_copy(from_maggie, mat_old);
 
 				mat_new->id.tag |= LIB_TAG_DOIT;
 				id_us_min(&mat_old->id);
 
-				BLI_remlink(&G.main->mat, mat_new); // BKE_material_copy uses G.main, and there is no BKE_material_copy_ex
+				BLI_remlink(&from_maggie->mat, mat_new); // BKE_material_copy uses G.main, and there is no BKE_material_copy_ex
 				BLI_addtail(&maggie->mat, mat_new);
 
 				mesh->mat[i] = mat_new;

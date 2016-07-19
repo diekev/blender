@@ -85,6 +85,7 @@ static void draw_fcurve_modifier_controls_envelope(FModifier *fcm, View2D *v2d)
 	
 	/* draw two black lines showing the standard reference levels */
 	glColor3f(0.0f, 0.0f, 0.0f);
+	glLineWidth(1);
 	setlinestyle(5);
 	
 	glBegin(GL_LINES);
@@ -93,7 +94,7 @@ static void draw_fcurve_modifier_controls_envelope(FModifier *fcm, View2D *v2d)
 		
 	glVertex2f(v2d->cur.xmin, env->midval + env->max);
 	glVertex2f(v2d->cur.xmax, env->midval + env->max);
-	glEnd();  /* GL_LINES */
+	glEnd();
 	setlinestyle(0);
 	
 	/* set size of vertices (non-adjustable for now) */
@@ -112,9 +113,7 @@ static void draw_fcurve_modifier_controls_envelope(FModifier *fcm, View2D *v2d)
 			glVertex2f(fed->time, fed->max);
 		}
 	}
-	glEnd();  /* GL_POINTS */
-	
-	glPointSize(1.0f);
+	glEnd();
 }
 
 /* *************************** */
@@ -152,7 +151,7 @@ static void draw_fcurve_vertices_keyframes(FCurve *fcu, SpaceIpo *UNUSED(sipo), 
 		}
 	}
 	
-	glEnd();  /* GL_POINTS */
+	glEnd();
 }
 
 
@@ -288,8 +287,6 @@ static void draw_fcurve_vertices(SpaceIpo *sipo, ARegion *ar, FCurve *fcu, short
 	
 	set_fcurve_vertex_color(fcu, 1);
 	draw_fcurve_vertices_keyframes(fcu, sipo, v2d, !(fcu->flag & FCURVE_PROTECTED), 1);
-	
-	glPointSize(1.0f);
 }
 
 /* Handles ---------------- */
@@ -829,7 +826,7 @@ static void graph_draw_driver_debug(bAnimContext *ac, ID *id, FCurve *fcu)
 	//if ((driver->flag & DRIVER_FLAG_SHOWDEBUG) == 0)
 	//	return;
 	
-	/* No curve to modify/visualise the result? 
+	/* No curve to modify/visualize the result?
 	 * => We still want to show the 1-1 default... 
 	 */
 	if ((fcu->totvert == 0) && BLI_listbase_is_empty(&fcu->modifiers)) {
@@ -856,7 +853,6 @@ static void graph_draw_driver_debug(bAnimContext *ac, ID *id, FCurve *fcu)
 		
 		/* cleanup line drawing */
 		setlinestyle(0);
-		glLineWidth(1.0f);
 	}
 	
 	/* draw driver only if actually functional */
@@ -915,8 +911,6 @@ static void graph_draw_driver_debug(bAnimContext *ac, ID *id, FCurve *fcu)
 			glBegin(GL_POINTS);
 			glVertex2f(x, y);
 			glEnd();
-			
-			glPointSize(1.0f);
 		}
 	}
 }
@@ -952,7 +946,6 @@ void graph_draw_ghost_curves(bAnimContext *ac, SpaceIpo *sipo, ARegion *ar)
 	
 	/* restore settings */
 	setlinestyle(0);
-	glLineWidth(1.0f);
 	
 	if ((sipo->flag & SIPO_BEAUTYDRAW_OFF) == 0) glDisable(GL_LINE_SMOOTH);
 	glDisable(GL_BLEND);
@@ -1015,6 +1008,9 @@ void graph_draw_curves(bAnimContext *ac, SpaceIpo *sipo, ARegion *ar, View2DGrid
 			if (fcu->flag & FCURVE_ACTIVE) {
 				glLineWidth(2.0);
 			}
+			else {
+				glLineWidth(1.0);
+			}
 			
 			/* anti-aliased lines for less jagged appearance */
 			if ((sipo->flag & SIPO_BEAUTYDRAW_OFF) == 0) glEnable(GL_LINE_SMOOTH);
@@ -1042,7 +1038,6 @@ void graph_draw_curves(bAnimContext *ac, SpaceIpo *sipo, ARegion *ar, View2DGrid
 			
 			/* restore settings */
 			setlinestyle(0);
-			glLineWidth(1.0);
 			
 			if ((sipo->flag & SIPO_BEAUTYDRAW_OFF) == 0) glDisable(GL_LINE_SMOOTH);
 			glDisable(GL_BLEND);
@@ -1066,11 +1061,15 @@ void graph_draw_curves(bAnimContext *ac, SpaceIpo *sipo, ARegion *ar, View2DGrid
 				short mapping_flag = ANIM_get_normalization_flags(ac);
 				float offset;
 				float unit_scale = ANIM_unit_mapping_get_factor(ac->scene, ale->id, fcu, mapping_flag, &offset);
-
+				
+				/* apply unit-scaling to all values via OpenGL */
 				glPushMatrix();
 				glScalef(1.0f, unit_scale, 1.0f);
 				glTranslatef(0.0f, offset, 0.0f);
-
+				
+				/* set this once and for all - all handles and handle-verts should use the same thickness */
+				glLineWidth(1.0);
+				
 				if (fcu->bezt) {
 					bool do_handles = draw_fcurve_handles_check(sipo, fcu);
 					
@@ -1087,7 +1086,7 @@ void graph_draw_curves(bAnimContext *ac, SpaceIpo *sipo, ARegion *ar, View2DGrid
 					/* samples: only draw two indicators at either end as indicators */
 					draw_fcurve_samples(sipo, ar, fcu);
 				}
-
+				
 				glPopMatrix();
 			}
 		}
@@ -1131,18 +1130,18 @@ void graph_draw_channel_names(bContext *C, bAnimContext *ac, ARegion *ar)
 	 *	- offset of ACHANNEL_HEIGHT*2 is added to the height of the channels, as first is for 
 	 *	  start of list offset, and the second is as a correction for the scrollers.
 	 */
-	height = (float)((items * ACHANNEL_STEP) + (ACHANNEL_HEIGHT * 2));
+	height = (float)((items * ACHANNEL_STEP(ac)) + (ACHANNEL_HEIGHT(ac) * 2));
 	UI_view2d_totRect_set(v2d, ar->winx, height);
 	
 	/* loop through channels, and set up drawing depending on their type  */
 	{   /* first pass: just the standard GL-drawing for backdrop + text */
 		size_t channel_index = 0;
 		
-		y = (float)ACHANNEL_FIRST;
+		y = (float)ACHANNEL_FIRST(ac);
 		
 		for (ale = anim_data.first, i = 0; ale; ale = ale->next, i++) {
-			const float yminc = (float)(y - ACHANNEL_HEIGHT_HALF);
-			const float ymaxc = (float)(y + ACHANNEL_HEIGHT_HALF);
+			const float yminc = (float)(y - ACHANNEL_HEIGHT_HALF(ac));
+			const float ymaxc = (float)(y + ACHANNEL_HEIGHT_HALF(ac));
 			
 			/* check if visible */
 			if (IN_RANGE(yminc, v2d->cur.ymin, v2d->cur.ymax) ||
@@ -1153,7 +1152,7 @@ void graph_draw_channel_names(bContext *C, bAnimContext *ac, ARegion *ar)
 			}
 			
 			/* adjust y-position for next one */
-			y -= ACHANNEL_STEP;
+			y -= ACHANNEL_STEP(ac);
 			channel_index++;
 		}
 	}
@@ -1161,15 +1160,15 @@ void graph_draw_channel_names(bContext *C, bAnimContext *ac, ARegion *ar)
 		uiBlock *block = UI_block_begin(C, ar, __func__, UI_EMBOSS);
 		size_t channel_index = 0;
 		
-		y = (float)ACHANNEL_FIRST;
+		y = (float)ACHANNEL_FIRST(ac);
 		
 		/* set blending again, as may not be set in previous step */
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glEnable(GL_BLEND);
 		
 		for (ale = anim_data.first, i = 0; ale; ale = ale->next, i++) {
-			const float yminc = (float)(y - ACHANNEL_HEIGHT_HALF);
-			const float ymaxc = (float)(y + ACHANNEL_HEIGHT_HALF);
+			const float yminc = (float)(y - ACHANNEL_HEIGHT_HALF(ac));
+			const float ymaxc = (float)(y + ACHANNEL_HEIGHT_HALF(ac));
 			
 			/* check if visible */
 			if (IN_RANGE(yminc, v2d->cur.ymin, v2d->cur.ymax) ||
@@ -1180,7 +1179,7 @@ void graph_draw_channel_names(bContext *C, bAnimContext *ac, ARegion *ar)
 			}
 			
 			/* adjust y-position for next one */
-			y -= ACHANNEL_STEP;
+			y -= ACHANNEL_STEP(ac);
 			channel_index++;
 		}
 		

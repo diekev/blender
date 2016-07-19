@@ -279,8 +279,6 @@ static void draw_uvs_stretch(SpaceImage *sima, Scene *scene, BMEditMesh *em, MTe
 
 			col[3] = 0.5f; /* hard coded alpha, not that nice */
 			
-			glShadeModel(GL_SMOOTH);
-			
 			BM_ITER_MESH (efa, &iter, bm, BM_FACES_OF_MESH) {
 				tf = BM_ELEM_CD_GET_VOID_P(efa, cd_poly_tex_offset);
 				
@@ -343,8 +341,6 @@ static void draw_uvs_stretch(SpaceImage *sima, Scene *scene, BMEditMesh *em, MTe
 			BLI_buffer_free(&ang_buf);
 			BLI_buffer_free(&av_buf);
 			BLI_buffer_free(&auv_buf);
-
-			glShadeModel(GL_FLAT);
 
 			break;
 		}
@@ -738,7 +734,9 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	}
-	
+
+	glLineWidth(1);
+
 	switch (sima->dt_uv) {
 		case SI_UVDT_DASH:
 			BM_ITER_MESH (efa, &iter, bm, BM_FACES_OF_MESH) {
@@ -792,8 +790,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 				UI_GetThemeColor4ubv(TH_EDGE_SELECT, col1);
 
 				if (interpedges) {
-					glShadeModel(GL_SMOOTH);
-
+					GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
 					BM_ITER_MESH (efa, &iter, bm, BM_FACES_OF_MESH) {
 						if (!BM_elem_flag_test(efa, BM_ELEM_TAG))
 							continue;
@@ -808,8 +805,6 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 						}
 						glEnd();
 					}
-
-					glShadeModel(GL_FLAT);
 				}
 				else {
 					BM_ITER_MESH (efa, &iter, bm, BM_FACES_OF_MESH) {
@@ -856,12 +851,13 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 		float cent[2];
 		
 		pointsize = UI_GetThemeValuef(TH_FACEDOT_SIZE);
-		glPointSize(pointsize); // TODO - drawobject.c changes this value after - Investigate!
+		glPointSize(pointsize);
 		
+		glBegin(GL_POINTS);
+
 		/* unselected faces */
 		UI_ThemeColor(TH_WIRE);
 
-		glBegin(GL_POINTS);
 		BM_ITER_MESH (efa, &iter, bm, BM_FACES_OF_MESH) {
 			if (!BM_elem_flag_test(efa, BM_ELEM_TAG))
 				continue;
@@ -871,12 +867,10 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 				glVertex2fv(cent);
 			}
 		}
-		glEnd();
 
 		/* selected faces */
 		UI_ThemeColor(TH_FACE_DOT);
 
-		glBegin(GL_POINTS);
 		BM_ITER_MESH (efa, &iter, bm, BM_FACES_OF_MESH) {
 			if (!BM_elem_flag_test(efa, BM_ELEM_TAG))
 				continue;
@@ -886,6 +880,7 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 				glVertex2fv(cent);
 			}
 		}
+
 		glEnd();
 	}
 
@@ -947,8 +942,6 @@ static void draw_uvs(SpaceImage *sima, Scene *scene, Object *obedit)
 		}
 		glEnd();
 	}
-
-	glPointSize(1.0);
 }
 
 

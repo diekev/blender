@@ -103,6 +103,7 @@ void VIEW3D_OT_enable_manipulator(struct wmOperatorType *ot);
 void VIEW3D_OT_render_border(struct wmOperatorType *ot);
 void VIEW3D_OT_clear_render_border(struct wmOperatorType *ot);
 void VIEW3D_OT_zoom_border(struct wmOperatorType *ot);
+void VIEW3D_OT_toggle_render(struct wmOperatorType *ot);
 
 void view3d_boxview_copy(ScrArea *sa, ARegion *ar);
 
@@ -140,7 +141,7 @@ void draw_object(Scene *scene, struct ARegion *ar, View3D *v3d, Base *base, cons
 bool draw_glsl_material(Scene *scene, struct Object *ob, View3D *v3d, const char dt);
 void draw_object_instance(Scene *scene, View3D *v3d, RegionView3D *rv3d, struct Object *ob, const char dt, int outline);
 void draw_object_backbufsel(Scene *scene, View3D *v3d, RegionView3D *rv3d, struct Object *ob);
-void drawaxes(float size, char drawtype);
+void drawaxes(const float viewmat_local[4][4], float size, char drawtype);
 
 void view3d_cached_text_draw_begin(void);
 void view3d_cached_text_draw_add(const float co[3],
@@ -157,6 +158,8 @@ enum {
 	V3D_CACHE_TEXT_GLOBALSPACE  = (1 << 3),
 	V3D_CACHE_TEXT_LOCALCLIP    = (1 << 4)
 };
+
+int view3d_effective_drawtype(const struct View3D *v3d);
 
 /* drawarmature.c */
 bool draw_armature(Scene *scene, View3D *v3d, ARegion *ar, Base *base,
@@ -229,6 +232,10 @@ void ED_view3d_smooth_view(
         struct View3D *v3d, struct ARegion *ar, const int smooth_viewtx,
         const V3D_SmoothParams *sview);
 
+void ED_view3d_smooth_view_force_finish(
+        struct bContext *C,
+        struct View3D *v3d, struct ARegion *ar);
+
 void view3d_winmatrix_set(ARegion *ar, const View3D *v3d, const rctf *rect);
 void view3d_viewmatrix_set(Scene *scene, const View3D *v3d, RegionView3D *rv3d);
 
@@ -267,6 +274,7 @@ bool ED_view3d_minmax_verts(struct Object *obedit, float min[3], float max[3]);
 
 void VIEW3D_OT_snap_selected_to_grid(struct wmOperatorType *ot);
 void VIEW3D_OT_snap_selected_to_cursor(struct wmOperatorType *ot);
+void VIEW3D_OT_snap_selected_to_active(struct wmOperatorType *ot);
 void VIEW3D_OT_snap_cursor_to_grid(struct wmOperatorType *ot);
 void VIEW3D_OT_snap_cursor_to_center(struct wmOperatorType *ot);
 void VIEW3D_OT_snap_cursor_to_selected(struct wmOperatorType *ot);

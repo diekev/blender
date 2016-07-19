@@ -262,7 +262,7 @@ static void ui_block_bounds_calc_text(uiBlock *block, float offset)
 		}
 
 		if (bt->next && bt->rect.xmin < bt->next->rect.xmin) {
-			/* End of this column, and it’s not the last one. */
+			/* End of this column, and it's not the last one. */
 			for (col_bt = init_col_bt; col_bt->prev != bt; col_bt = col_bt->next) {
 				col_bt->rect.xmin = x1addval;
 				col_bt->rect.xmax = x1addval + i + block->bounds;
@@ -735,8 +735,15 @@ static bool ui_but_update_from_old_block(const bContext *C, uiBlock *block, uiBu
 
 		/* copy hardmin for list rows to prevent 'sticking' highlight to mouse position
 		 * when scrolling without moving mouse (see [#28432]) */
-		if (ELEM(oldbut->type, UI_BTYPE_ROW, UI_BTYPE_LISTROW))
+		if (ELEM(oldbut->type, UI_BTYPE_ROW, UI_BTYPE_LISTROW)) {
 			oldbut->hardmax = but->hardmax;
+		}
+
+		/* Selectively copy a1, a2 since their use differs across all button types
+		 * (and we'll probably split these out later) */
+		if (ELEM(oldbut->type, UI_BTYPE_PROGRESS_BAR)) {
+			oldbut->a1 = but->a1;
+		}
 
 		ui_but_update_linklines(block, oldbut, but);
 
@@ -1131,7 +1138,7 @@ static bool ui_but_event_property_operator_string(const bContext *C, uiBut *but,
  * as new items are added to the menu later on. It also optimises efficiency -
  * a radial menu is best kept symmetrical, with as large an angle between
  * items as possible, so that the gestural mouse movements can be fast and inexact.
-
+ *
  * It starts off with two opposite sides for the first two items
  * then joined by the one below for the third (this way, even with three items,
  * the menu seems to still be 'in order' reading left to right). Then the fourth is
@@ -1200,6 +1207,11 @@ void UI_block_update_from_old(const bContext *C, uiBlock *block)
 	for (but = block->buttons.first; but; but = but->next) {
 		if (ui_but_update_from_old_block(C, block, &but, &but_old)) {
 			ui_but_update(but);
+
+			/* redraw dynamic tooltip if we have one open */
+			if (but->tip_func) {
+				UI_but_tooltip_refresh((bContext *)C, but);
+			}
 		}
 	}
 
@@ -1371,7 +1383,7 @@ void UI_block_draw(const bContext *C, uiBlock *block)
 	glPushMatrix();
 	glLoadIdentity();
 
-	wmOrtho2_region_ui(ar);
+	wmOrtho2_region_pixelspace(ar);
 	
 	/* back */
 	if (block->flag & UI_BLOCK_RADIAL)
@@ -2417,7 +2429,7 @@ bool ui_but_string_set(bContext *C, uiBut *but, const char *str)
 		double value;
 
 		if (ui_but_string_set_eval_num(C, but, str, &value) == false) {
-			WM_report_banner_show(C);
+			WM_report_banner_show();
 			return false;
 		}
 
@@ -2564,9 +2576,11 @@ static void ui_set_but_soft_range(uiBut *but)
 	}
 	else if (but->poin && (but->pointype & UI_BUT_POIN_TYPES)) {
 		float value = ui_but_value_get(but);
-		CLAMP(value, but->hardmin, but->hardmax);
-		but->softmin = min_ff(but->softmin, value);
-		but->softmax = max_ff(but->softmax, value);
+		if (isfinite(value)) {
+			CLAMP(value, but->hardmin, but->hardmax);
+			but->softmin = min_ff(but->softmin, value);
+			but->softmax = max_ff(but->softmax, value);
+		}
 	}
 	else {
 		BLI_assert(0);
@@ -2775,7 +2789,12 @@ void UI_block_emboss_set(uiBlock *block, char dt)
 	block->dt = dt;
 }
 
-void ui_but_update(uiBut *but)
+/**
+ * \param but: Button to update.
+ * \param validate: When set, this function may change the button value.
+ * Otherwise treat the button value as read-only.
+ */
+void ui_but_update_ex(uiBut *but, const bool validate)
 {
 	/* if something changed in the button */
 	double value = UI_BUT_VALUE_UNSET;
@@ -2797,13 +2816,19 @@ void ui_but_update(uiBut *but)
 		case UI_BTYPE_NUM:
 		case UI_BTYPE_SCROLL:
 		case UI_BTYPE_NUM_SLIDER:
-			UI_GET_BUT_VALUE_INIT(but, value);
-			if      (value < (double)but->hardmin) ui_but_value_set(but, but->hardmin);
-			else if (value > (double)but->hardmax) ui_but_value_set(but, but->hardmax);
+			if (validate) {
+				UI_GET_BUT_VALUE_INIT(but, value);
+				if      (value < (double)but->hardmin) {
+					ui_but_value_set(but, but->hardmin);
+				}
+				else if (value > (double)but->hardmax) {
+					ui_but_value_set(but, but->hardmax);
+				}
 
-			/* max must never be smaller than min! Both being equal is allowed though */
-			BLI_assert(but->softmin <= but->softmax &&
-			           but->hardmin <= but->hardmax);
+				/* max must never be smaller than min! Both being equal is allowed though */
+				BLI_assert(but->softmin <= but->softmax &&
+				           but->hardmin <= but->hardmax);
+			}
 			break;
 			
 		case UI_BTYPE_ICON_TOGGLE:
@@ -2832,14 +2857,16 @@ void ui_but_update(uiBut *but)
 				if (but->block->flag & UI_BLOCK_LOOP) {
 					if (but->rnaprop && (RNA_property_type(but->rnaprop) == PROP_ENUM)) {
 						int value_enum = RNA_property_enum_get(&but->rnapoin, but->rnaprop);
-						const char *buf;
-						if (RNA_property_enum_name_gettexted(
+
+						EnumPropertyItem item;
+						if (RNA_property_enum_item_from_value_gettexted(
 						        but->block->evil_C,
-						        &but->rnapoin, but->rnaprop, value_enum, &buf))
+						        &but->rnapoin, but->rnaprop, value_enum, &item))
 						{
-							size_t slen = strlen(buf);
+							size_t slen = strlen(item.name);
 							ui_but_string_free_internal(but);
-							ui_but_string_set_internal(but, buf, slen);
+							ui_but_string_set_internal(but, item.name, slen);
+							but->icon = item.icon;
 						}
 					}
 				}
@@ -2977,6 +3004,15 @@ void ui_but_update(uiBut *but)
 	/* text clipping moved to widget drawing code itself */
 }
 
+void ui_but_update(uiBut *but)
+{
+	ui_but_update_ex(but, false);
+}
+
+void ui_but_update_edited(uiBut *but)
+{
+	ui_but_update_ex(but, true);
+}
 
 void UI_block_align_begin(uiBlock *block)
 {
@@ -3545,11 +3581,11 @@ static int findBitIndex(unsigned int x)
 	else {
 		int idx = 0;
 
-		if (x & 0xFFFF0000) idx += 16, x >>= 16;
-		if (x & 0xFF00) idx += 8, x >>= 8;
-		if (x & 0xF0) idx += 4, x >>= 4;
-		if (x & 0xC) idx += 2, x >>= 2;
-		if (x & 0x2) idx += 1;
+		if (x & 0xFFFF0000) { idx += 16; x >>= 16; }
+		if (x & 0xFF00)     { idx +=  8; x >>=  8; }
+		if (x & 0xF0)       { idx +=  4; x >>=  4; }
+		if (x & 0xC)        { idx +=  2; x >>=  2; }
+		if (x & 0x2)        { idx +=  1; }
 
 		return idx;
 	}
@@ -3950,6 +3986,11 @@ void UI_but_flag_disable(uiBut *but, int flag)
 	but->flag &= ~flag;
 }
 
+bool UI_but_flag_is_set(uiBut *but, int flag)
+{
+	return (but->flag & flag) != 0;
+}
+
 void UI_but_drawflag_enable(uiBut *but, int flag)
 {
 	but->drawflag |= flag;
@@ -4284,16 +4325,34 @@ uiBut *uiDefSearchBut(uiBlock *block, void *arg, int retval, int icon, int maxle
 
 
 /**
- * \param sfunc, bfunc: both get it as \a arg.
+ * \param search_func, bfunc: both get it as \a arg.
  * \param arg: user value,
  * \param  active: when set, button opens with this item visible and selected.
  */
-void UI_but_func_search_set(uiBut *but, uiButSearchFunc sfunc, void *arg, uiButHandleFunc bfunc, void *active)
+void UI_but_func_search_set(
+        uiBut *but,
+        uiButSearchCreateFunc search_create_func,
+        uiButSearchFunc search_func, void *arg,
+        uiButHandleFunc bfunc, void *active)
 {
-	but->search_func = sfunc;
+	/* needed since callers don't have access to internal functions (as an alternative we could expose it) */
+	if (search_create_func == NULL) {
+		search_create_func = ui_searchbox_create_generic;
+	}
+
+	but->search_create_func = search_create_func;
+	but->search_func = search_func;
 	but->search_arg = arg;
 	
-	UI_but_func_set(but, bfunc, arg, active);
+	if (bfunc) {
+#ifdef DEBUG
+		if (but->func) {
+			/* watch this, can be cause of much confusion, see: T47691 */
+			printf("%s: warning, overwriting button callback with search function callback!\n", __func__);
+		}
+#endif
+		UI_but_func_set(but, bfunc, arg, active);
+	}
 	
 	/* search buttons show red-alert if item doesn't exist, not for menus */
 	if (0 == (but->block->flag & UI_BLOCK_LOOP)) {
@@ -4322,7 +4381,7 @@ static void operator_enum_search_cb(const struct bContext *C, void *but, const c
 		EnumPropertyItem *item, *item_array;
 		bool do_free;
 
-		RNA_property_enum_items((bContext *)C, ptr, prop, &item_array, NULL, &do_free);
+		RNA_property_enum_items_gettexted((bContext *)C, ptr, prop, &item_array, NULL, &do_free);
 
 		for (item = item_array; item->identifier; item++) {
 			/* note: need to give the index rather than the identifier because the enum can be freed */
@@ -4368,7 +4427,9 @@ uiBut *uiDefSearchButO_ptr(
 	uiBut *but;
 
 	but = uiDefSearchBut(block, arg, retval, icon, maxlen, x, y, width, height, a1, a2, tip);
-	UI_but_func_search_set(but, operator_enum_search_cb, but, operator_enum_call_cb, NULL);
+	UI_but_func_search_set(
+	        but, ui_searchbox_create_generic, operator_enum_search_cb,
+	        but, operator_enum_call_cb, NULL);
 
 	but->optype = ot;
 	but->opcontext = WM_OP_EXEC_DEFAULT;

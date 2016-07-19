@@ -96,7 +96,7 @@ const unsigned char *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colo
 	static char setting = 0;
 	const char *cp = error;
 	
-	/* ensure we're not getting a color after running BKE_userdef_free */
+	/* ensure we're not getting a color after running BKE_blender_userdef_free */
 	BLI_assert(BLI_findindex(&U.themes, theme_active) != -1);
 	BLI_assert(colorid != TH_UNDEFINED);
 
@@ -786,9 +786,14 @@ static void ui_theme_init_new_do(ThemeSpace *ts)
 	rgba_char_args_set(ts->panel_text_hi,  255, 255, 255, 255);
 #endif
 
+	ts->panelcolors.show_back = false;
+	ts->panelcolors.show_header = false;
+	rgba_char_args_set(ts->panelcolors.back,   114, 114, 114, 128);
+	rgba_char_args_set(ts->panelcolors.header, 0, 0, 0, 25);
+
 	rgba_char_args_set(ts->button,         145, 145, 145, 245);
 	rgba_char_args_set(ts->button_title,   0, 0, 0, 255);
-	rgba_char_args_set(ts->button_text,        0, 0, 0, 255);
+	rgba_char_args_set(ts->button_text,    0, 0, 0, 255);
 	rgba_char_args_set(ts->button_text_hi, 255, 255, 255, 255);
 
 	rgba_char_args_set(ts->list,           165, 165, 165, 255);
@@ -848,14 +853,9 @@ void ui_theme_init_default(void)
 
 	/* UI buttons */
 	ui_widget_color_init(&btheme->tui);
-	
+
 	btheme->tui.iconfile[0] = 0;
-	btheme->tui.panel.show_back = false;
-	btheme->tui.panel.show_header = false;
-	rgba_char_args_set(btheme->tui.panel.header, 0, 0, 0, 25);
-	
 	rgba_char_args_set(btheme->tui.wcol_tooltip.text, 255, 255, 255, 255);
-	
 	rgba_char_args_set_fl(btheme->tui.widget_emboss, 1.0f, 1.0f, 1.0f, 0.02f);
 
 	rgba_char_args_set(btheme->tui.xaxis, 220,   0,   0, 255);
@@ -872,10 +872,6 @@ void ui_theme_init_default(void)
 	ui_theme_init_new(btheme);
 	
 	/* space view3d */
-	btheme->tv3d.panelcolors.show_back = false;
-	btheme->tv3d.panelcolors.show_header = false;
-	rgba_char_args_set_fl(btheme->tv3d.panelcolors.back, 0.45, 0.45, 0.45, 0.5);
-	rgba_char_args_set_fl(btheme->tv3d.panelcolors.header, 0, 0, 0, 0.01);
 	rgba_char_args_set_fl(btheme->tv3d.back,       0.225, 0.225, 0.225, 1.0);
 	rgba_char_args_set(btheme->tv3d.text,       0, 0, 0, 255);
 	rgba_char_args_set(btheme->tv3d.text_hi, 255, 255, 255, 255);
@@ -1014,6 +1010,8 @@ void ui_theme_init_default(void)
 	
 	rgba_char_args_set(btheme->tact.keyborder,               0,   0,   0, 255);
 	rgba_char_args_set(btheme->tact.keyborder_select,        0,   0,   0, 255);
+	
+	btheme->tact.keyframe_scale_fac = 1.0f;
 	
 	/* space nla */
 	btheme->tnla = btheme->tact;
@@ -1473,6 +1471,30 @@ void UI_GetThemeColor3ubv(int colorid, unsigned char col[3])
 	col[0] = cp[0];
 	col[1] = cp[1];
 	col[2] = cp[2];
+}
+
+/* get the color, range 0.0-1.0, complete with shading offset */
+void UI_GetThemeColorShade4fv(int colorid, int offset, float col[4])
+{
+	int r, g, b, a;
+	const unsigned char *cp;
+	
+	cp = UI_ThemeGetColorPtr(theme_active, theme_spacetype, colorid);
+	
+	r = offset + (int) cp[0];
+	CLAMP(r, 0, 255);
+	g = offset + (int) cp[1];
+	CLAMP(g, 0, 255);
+	b = offset + (int) cp[2];
+	CLAMP(b, 0, 255);
+	
+	a = (int) cp[3]; /* no shading offset... */
+	CLAMP(a, 0, 255);
+	
+	col[0] = ((float)r) / 255.0f;
+	col[1] = ((float)g) / 255.0f;
+	col[2] = ((float)b) / 255.0f;
+	col[3] = ((float)a) / 255.0f;
 }
 
 /* get the color, in char pointer */
@@ -2024,7 +2046,7 @@ void init_userdef_do_versions(void)
 			{0, 0, 0, 255},
 			{190, 190, 190, 255},
 			{100, 100, 100, 180},
-			{68, 68, 68, 255},
+			{128, 128, 128, 255},
 			
 			{0, 0, 0, 255},
 			{255, 255, 255, 255},
@@ -2676,6 +2698,48 @@ void init_userdef_do_versions(void)
 		for (btheme = U.themes.first; btheme; btheme = btheme->next) {
 			rgba_char_args_set(btheme->tseq.text_strip, 162, 151, 0, 255);
 		}
+	}
+
+	if (!USER_VERSION_ATLEAST(276, 8)) {
+		bTheme *btheme;
+		for (btheme = U.themes.first; btheme; btheme = btheme->next) {
+			rgba_char_args_set(btheme->tui.wcol_progress.item, 128, 128, 128, 255);
+		}
+	}
+
+	if (!USER_VERSION_ATLEAST(276, 10)) {
+		bTheme *btheme;
+		for (btheme = U.themes.first; btheme; btheme = btheme->next) {
+			/* 3dView Keyframe Indicators */
+			rgba_char_args_set(btheme->tv3d.time_keyframe, 0xDD, 0xD7, 0x00, 1.0);
+			rgba_char_args_set(btheme->tv3d.time_gp_keyframe, 0xB5, 0xE6, 0x1D, 1.0);
+		}
+	}
+
+	if (!USER_VERSION_ATLEAST(277, 0)) {
+		bTheme *btheme;
+		for (btheme = U.themes.first; btheme; btheme = btheme->next) {
+			if (memcmp(btheme->tui.wcol_list_item.item, btheme->tui.wcol_list_item.text_sel, sizeof(char) * 3) == 0) {
+				copy_v4_v4_char(btheme->tui.wcol_list_item.item, btheme->tui.wcol_text.item);
+				copy_v4_v4_char(btheme->tui.wcol_list_item.text_sel, btheme->tui.wcol_text.text_sel);
+			}
+		}
+	}
+	
+	if (!USER_VERSION_ATLEAST(277, 2)) {
+		bTheme *btheme;
+		for (btheme = U.themes.first; btheme; btheme = btheme->next) {
+			if (btheme->tact.keyframe_scale_fac < 0.1f)
+				btheme->tact.keyframe_scale_fac = 1.0f;
+		}
+	}
+
+	/**
+	 * Include next version bump.
+	 *
+	 * (keep this block even if it becomes empty).
+	 */
+	{
 	}
 
 	if (U.pixelsize == 0.0f)

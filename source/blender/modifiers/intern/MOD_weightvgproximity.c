@@ -89,7 +89,7 @@ typedef struct Vert2GeomDataChunk {
 /**
  * Callback used by BLI_task 'for loop' helper.
  */
-static void vert2geom_task_cb(void *userdata, void *userdata_chunk, int iter)
+static void vert2geom_task_cb_ex(void *userdata, void *userdata_chunk, const int iter, const int UNUSED(thread_id))
 {
 	Vert2GeomData *data = userdata;
 	Vert2GeomDataChunk *data_chunk = userdata_chunk;
@@ -177,7 +177,8 @@ static void get_vert2geom_distance(int numVerts, float (*v_cos)[3],
 	data.dist[2] = dist_f;
 
 	BLI_task_parallel_range_ex(
-	            0, numVerts, &data, &data_chunk, sizeof(data_chunk), vert2geom_task_cb, numVerts > 10000, false);
+	            0, numVerts, &data, &data_chunk, sizeof(data_chunk), vert2geom_task_cb_ex,
+	            numVerts > 10000, false);
 
 	if (dist_v)
 		free_bvhtree_from_mesh(&treeData_v);
@@ -377,12 +378,15 @@ static void updateDepsgraph(ModifierData *md,
 	WeightVGProximityModifierData *wmd = (WeightVGProximityModifierData *)md;
 	if (wmd->proximity_ob_target != NULL) {
 		DEG_add_object_relation(node, wmd->proximity_ob_target, DEG_OB_COMP_TRANSFORM, "WeightVGProximity Modifier");
+		DEG_add_object_relation(node, wmd->proximity_ob_target, DEG_OB_COMP_GEOMETRY, "WeightVGProximity Modifier");
 	}
 	if (wmd->mask_tex_map_obj != NULL && wmd->mask_tex_mapping == MOD_DISP_MAP_OBJECT) {
 		DEG_add_object_relation(node, wmd->mask_tex_map_obj, DEG_OB_COMP_TRANSFORM, "WeightVGProximity Modifier");
+		DEG_add_object_relation(node, wmd->mask_tex_map_obj, DEG_OB_COMP_GEOMETRY, "WeightVGProximity Modifier");
 	}
 	if (wmd->mask_tex_mapping == MOD_DISP_MAP_GLOBAL) {
 		DEG_add_object_relation(node, ob, DEG_OB_COMP_TRANSFORM, "WeightVGProximity Modifier");
+		DEG_add_object_relation(node, ob, DEG_OB_COMP_GEOMETRY, "WeightVGProximity Modifier");
 	}
 }
 
@@ -505,9 +509,9 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob, DerivedMesh *der
 			new_w[i] = dist;
 	}
 	else if (wmd->proximity_mode == MOD_WVG_PROXIMITY_GEOMETRY) {
-		const short use_trgt_verts = (wmd->proximity_flags & MOD_WVG_PROXIMITY_GEOM_VERTS);
-		const short use_trgt_edges = (wmd->proximity_flags & MOD_WVG_PROXIMITY_GEOM_EDGES);
-		const short use_trgt_faces = (wmd->proximity_flags & MOD_WVG_PROXIMITY_GEOM_FACES);
+		const bool use_trgt_verts = (wmd->proximity_flags & MOD_WVG_PROXIMITY_GEOM_VERTS) != 0;
+		const bool use_trgt_edges = (wmd->proximity_flags & MOD_WVG_PROXIMITY_GEOM_EDGES) != 0;
+		const bool use_trgt_faces = (wmd->proximity_flags & MOD_WVG_PROXIMITY_GEOM_FACES) != 0;
 
 		if (use_trgt_verts || use_trgt_edges || use_trgt_faces) {
 			DerivedMesh *target_dm = obr->derivedFinal;

@@ -49,9 +49,6 @@ set(INC
 	../../../intern/smoke/extern
 	../../../intern/atomic
 	../../../intern/libmv
-
-	# XXX - BAD LEVEL CALL WM_api.h
-	../windowmanager
 )
 
 set(INC_SYS
@@ -75,6 +72,9 @@ set(SRC
 	intern/armature_update.c
 	intern/autoexec.c
 	intern/blender.c
+	intern/blender_copybuffer.c
+	intern/blender_undo.c
+	intern/blendfile.c
 	intern/bmfont.c
 	intern/boids.c
 	intern/bpath.c
@@ -118,7 +118,9 @@ set(SRC
 	intern/lamp.c
 	intern/lattice.c
 	intern/library.c
+	intern/library_idmap.c
 	intern/library_query.c
+	intern/library_remap.c
 	intern/linestyle.c
 	intern/mask.c
 	intern/mask_evaluate.c
@@ -194,6 +196,10 @@ set(SRC
 	BKE_armature.h
 	BKE_autoexec.h
 	BKE_blender.h
+	BKE_blender_copybuffer.h
+	BKE_blender_undo.h
+	BKE_blender_version.h
+	BKE_blendfile.h
 	BKE_bmfont.h
 	BKE_bmfont_types.h
 	BKE_boids.h
@@ -237,7 +243,9 @@ set(SRC
 	BKE_lamp.h
 	BKE_lattice.h
 	BKE_library.h
+	BKE_library_idmap.h
 	BKE_library_query.h
+	BKE_library_remap.h
 	BKE_linestyle.h
 	BKE_main.h
 	BKE_mask.h
@@ -412,6 +420,13 @@ if(WITH_PYTHON)
 	if(WITH_PYTHON_SECURITY)
 		add_definitions(-DWITH_PYTHON_SECURITY)
 	endif()
+
+
+	if(PYTHON_EXECUTABLE)
+		get_filename_component(_python_exe_name ${PYTHON_EXECUTABLE} NAME)
+		add_definitions(-DPYTHON_EXECUTABLE_NAME=${_python_exe_name})
+		unset(_python_exe_name)
+	endif()
 endif()
 
 if(WITH_MOD_FLUID)
@@ -470,20 +485,6 @@ if(WITH_LIBMV)
 	add_definitions(-DWITH_LIBMV)
 endif()
 
-if(WITH_LIBMV_WERROR)
-	if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
-		set_source_files_properties(intern/tracking.c
-		                            intern/tracking_auto.c
-		                            intern/tracking_detect.c
-		                            intern/tracking_plane_tracker.c
-		                            intern/tracking_region_tracker.c
-		                            intern/tracking_solver.c
-		                            intern/tracking_stabilize.c
-		                            intern/tracking_util.c
-		                            PROPERTIES COMPILE_FLAGS -Werror)
-	endif()
-endif()
-
 if(WITH_FFTW3)
 	list(APPEND INC_SYS
 		${FFTW3_INCLUDE_DIRS}
@@ -505,16 +506,6 @@ if(WITH_OPENSUBDIV)
 		../../../intern/opensubdiv
 		${OPENSUBDIV_INCLUDE_DIRS}
 	)
-	if(WITH_SUBSURF_WERROR)
-		if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_C_COMPILER_ID MATCHES "Clang")
-			set_source_files_properties(intern/CCGSubSurf.c
-			                            intern/CCGSubSurf_legacy.c
-			                            intern/CCGSubSurf_opensubdiv.c
-			                            intern/CCGSubSurf_opensubdiv_converter.c
-			                            intern/CCGSubSurf_util.c
-			                            PROPERTIES COMPILE_FLAGS -Werror)
-		endif()
-	endif()
 endif()
 
 if(WITH_OPENVDB)
@@ -522,6 +513,12 @@ if(WITH_OPENVDB)
 	list(APPEND INC
 		 ../../../intern/openvdb
 	)
+
+	if(WITH_OPENVDB_BLOSC)
+		add_definitions(
+			-DWITH_OPENVDB_BLOSC
+		)
+	endif()
 endif()
 
 ## Warnings as errors, this is too strict!

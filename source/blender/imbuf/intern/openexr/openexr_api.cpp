@@ -38,45 +38,6 @@
 #include <set>
 #include <errno.h>
 #include <algorithm>
-
-#include "DNA_scene_types.h" /* For OpenEXR compression constants */
-
-#include <openexr_api.h>
-
-#if defined (WIN32) && !defined(FREE_WINDOWS)
-#include "utfconv.h"
-#endif
-
-extern "C"
-{
-
-// The following prevents a linking error in debug mode for MSVC using the libs in CVS
-#if defined(WITH_OPENEXR) && defined(_WIN32) && defined(DEBUG) && !defined(__MINGW32__)
-_CRTIMP void __cdecl _invalid_parameter_noinfo(void)
-{
-}
-#endif
-
-#include "MEM_guardedalloc.h"
-
-#include "BLI_blenlib.h"
-#include "BLI_math_color.h"
-#include "BLI_threads.h"
-
-#include "BKE_idprop.h"
-#include "BKE_image.h"
-
-#include "IMB_imbuf_types.h"
-#include "IMB_imbuf.h"
-#include "IMB_allocimbuf.h"
-#include "IMB_metadata.h"
-
-#include "IMB_colormanagement.h"
-#include "IMB_colormanagement_intern.h"
-
-#include "openexr_multi.h"
-}
-
 #include <iostream>
 
 #include <half.h>
@@ -104,6 +65,46 @@ _CRTIMP void __cdecl _invalid_parameter_noinfo(void)
 #include <ImfPartType.h>
 #include <ImfPartHelper.h>
 
+#include "DNA_scene_types.h" /* For OpenEXR compression constants */
+
+#include <openexr_api.h>
+
+#if defined (WIN32) && !defined(FREE_WINDOWS)
+#include "utfconv.h"
+#endif
+
+extern "C"
+{
+
+// The following prevents a linking error in debug mode for MSVC using the libs in CVS
+#if defined(WITH_OPENEXR) && defined(_WIN32) && defined(DEBUG) && !defined(__MINGW32__) && _MSC_VER < 1900
+_CRTIMP void __cdecl _invalid_parameter_noinfo(void)
+{
+}
+#endif
+
+#include "MEM_guardedalloc.h"
+
+#include "BLI_blenlib.h"
+#include "BLI_math_color.h"
+#include "BLI_threads.h"
+
+#include "BKE_idprop.h"
+#include "BKE_image.h"
+
+#include "IMB_imbuf_types.h"
+#include "IMB_imbuf.h"
+#include "IMB_allocimbuf.h"
+#include "IMB_metadata.h"
+
+#include "openexr_multi.h"
+}
+
+extern "C" {
+#include "IMB_colormanagement.h"
+#include "IMB_colormanagement_intern.h"
+}
+
 using namespace Imf;
 using namespace Imath;
 
@@ -126,7 +127,7 @@ class Mem_IStream : public Imf::IStream
 {
 public:
 
-	Mem_IStream (unsigned char *exrbuf, size_t exrsize) :
+	Mem_IStream(unsigned char *exrbuf, size_t exrsize) :
 		IStream("dummy"), _exrpos(0), _exrsize(exrsize)
 	{
 		_exrbuf = exrbuf;
@@ -420,14 +421,14 @@ static bool imb_save_openexr_half(
 		OutputFile file(file_stream, header);
 
 		/* we store first everything in half array */
-		RGBAZ *pixels = new RGBAZ[height * width * totviews];
+		std::vector<RGBAZ> pixels(height * width * totviews);
 		int xstride = sizeof(RGBAZ);
 		int ystride = xstride * width;
 
 		for (view_id = 0; view_id < totviews; view_id ++) {
 			ImBuf *view_ibuf = is_multiview ? getbuffer(ibuf->userdata, view_id) : ibuf;
 			const size_t offset = view_id * width * height;
-			RGBAZ *to = pixels + offset;
+			RGBAZ *to = &pixels[offset];
 
 			/* TODO (dfelinto)
 			 * In some cases we get NULL ibufs, it needs investigation, meanwhile prevent crash
@@ -485,8 +486,6 @@ static bool imb_save_openexr_half(
 
 		file.setFrameBuffer(frameBuffer);
 		file.writePixels(height);
-
-		delete[] pixels;
 	}
 	catch (const std::exception& exc)
 	{

@@ -81,7 +81,20 @@ class VIEW3D_HT_header(Header):
                     row.prop(toolsettings, "proportional_edit_falloff", icon_only=True)
 
         # Snap
-        if not obj or mode not in {'SCULPT', 'VERTEX_PAINT', 'WEIGHT_PAINT', 'TEXTURE_PAINT'}:
+        show_snap = False
+        if obj is None:
+            show_snap = True
+        else:
+            if mode not in {'SCULPT', 'VERTEX_PAINT', 'WEIGHT_PAINT', 'TEXTURE_PAINT'}:
+                show_snap = True
+            else:
+                paint_settings = UnifiedPaintPanel.paint_settings(context)
+                if paint_settings:
+                    brush = paint_settings.brush
+                    if brush and brush.stroke_method == 'CURVE':
+                        show_snap = True
+
+        if show_snap:
             snap_element = toolsettings.snap_element
             row = layout.row(align=True)
             row.prop(toolsettings, "use_snap", text="")
@@ -125,6 +138,10 @@ class VIEW3D_HT_header(Header):
             row.operator("gpencil.paste", text="", icon='PASTEDOWN')
 
             layout.prop(context.gpencil_data, "use_onion_skinning", text="Onion Skins", icon='PARTICLE_PATH') # XXX: icon
+
+            layout.prop(context.tool_settings.gpencil_sculpt, "use_select_mask")
+
+
 
 
 class VIEW3D_MT_editor_menus(Menu):
@@ -279,10 +296,6 @@ class VIEW3D_MT_transform_object(VIEW3D_MT_transform_base):
         layout.operator("object.randomize_transform")
         layout.operator("object.align")
 
-        layout.separator()
-
-        layout.operator("object.anim_transforms_to_deltas")
-
 
 # Armature EditMode extensions to Transform menu
 class VIEW3D_MT_transform_armature(VIEW3D_MT_transform_base):
@@ -354,6 +367,7 @@ class VIEW3D_MT_snap(Menu):
         layout.operator("view3d.snap_selected_to_grid", text="Selection to Grid")
         layout.operator("view3d.snap_selected_to_cursor", text="Selection to Cursor").use_offset = False
         layout.operator("view3d.snap_selected_to_cursor", text="Selection to Cursor (Offset)").use_offset = True
+        layout.operator("view3d.snap_selected_to_active", text="Selection to Active")
 
         layout.separator()
 
@@ -434,6 +448,7 @@ class VIEW3D_MT_view(Menu):
         layout.operator("view3d.clip_border", text="Clipping Border...")
         layout.operator("view3d.zoom_border", text="Zoom Border...")
         layout.operator("view3d.render_border", text="Render Border...").camera_only = False
+        layout.operator("view3d.clear_render_border")
 
         layout.separator()
 
@@ -453,8 +468,8 @@ class VIEW3D_MT_view(Menu):
 
         layout.operator("screen.area_dupli")
         layout.operator("screen.region_quadview")
-        layout.operator("screen.screen_full_area", text="Toggle Maximize Area")
-        layout.operator("screen.screen_full_area").use_hide_panels = True
+        layout.operator("screen.screen_full_area")
+        layout.operator("screen.screen_full_area", text="Toggle Fullscreen Area").use_hide_panels = True
 
 
 class VIEW3D_MT_view_navigation(Menu):
@@ -471,8 +486,8 @@ class VIEW3D_MT_view_navigation(Menu):
 
         layout.separator()
 
-        layout.operator("view3d.view_roll", text="Roll Left").angle = pi / -12.0
-        layout.operator("view3d.view_roll", text="Roll Right").angle = pi / 12.0
+        layout.operator("view3d.view_roll", text="Roll Left").type = 'LEFT'
+        layout.operator("view3d.view_roll", text="Roll Right").type = 'RIGHT'
 
         layout.separator()
 
@@ -552,7 +567,39 @@ class VIEW3D_MT_view_cameras(Menu):
         layout.operator("view3d.object_as_camera")
         layout.operator("view3d.viewnumpad", text="Active Camera").type = 'CAMERA'
 
+
 # ********** Select menus, suffix from context.mode **********
+
+class VIEW3D_MT_select_object_more_less(Menu):
+    bl_label = "Select More/Less"
+
+    def draw(self, context):
+        layout = self.layout
+
+        layout = self.layout
+
+        layout.operator("object.select_more", text="More")
+        layout.operator("object.select_less", text="Less")
+
+        layout.separator()
+
+        props = layout.operator("object.select_hierarchy", text="Parent")
+        props.extend = False
+        props.direction = 'PARENT'
+
+        props = layout.operator("object.select_hierarchy", text="Child")
+        props.extend = False
+        props.direction = 'CHILD'
+
+        layout.separator()
+
+        props = layout.operator("object.select_hierarchy", text="Extend Parent")
+        props.extend = True
+        props.direction = 'PARENT'
+
+        props = layout.operator("object.select_hierarchy", text="Extend Child")
+        props.extend = True
+        props.direction = 'CHILD'
 
 
 class VIEW3D_MT_select_object(Menu):
@@ -576,9 +623,40 @@ class VIEW3D_MT_select_object(Menu):
 
         layout.separator()
 
+        layout.menu("VIEW3D_MT_select_object_more_less")
+
+        layout.separator()
+
         layout.operator_menu_enum("object.select_grouped", "type", text="Grouped")
         layout.operator_menu_enum("object.select_linked", "type", text="Linked")
         layout.operator("object.select_pattern", text="Select Pattern...")
+
+
+class VIEW3D_MT_select_pose_more_less(Menu):
+    bl_label = "Select More/Less"
+
+    def draw(self, context):
+        layout = self.layout
+
+        layout = self.layout
+
+        props = layout.operator("pose.select_hierarchy", text="Parent")
+        props.extend = False
+        props.direction = 'PARENT'
+
+        props = layout.operator("pose.select_hierarchy", text="Child")
+        props.extend = False
+        props.direction = 'CHILD'
+
+        layout.separator()
+
+        props = layout.operator("pose.select_hierarchy", text="Extend Parent")
+        props.extend = True
+        props.direction = 'PARENT'
+
+        props = layout.operator("pose.select_hierarchy", text="Extend Child")
+        props.extend = True
+        props.direction = 'CHILD'
 
 
 class VIEW3D_MT_select_pose(Menu):
@@ -600,23 +678,7 @@ class VIEW3D_MT_select_pose(Menu):
 
         layout.separator()
 
-        props = layout.operator("pose.select_hierarchy", text="Parent")
-        props.extend = False
-        props.direction = 'PARENT'
-
-        props = layout.operator("pose.select_hierarchy", text="Child")
-        props.extend = False
-        props.direction = 'CHILD'
-
-        layout.separator()
-
-        props = layout.operator("pose.select_hierarchy", text="Extend Parent")
-        props.extend = True
-        props.direction = 'PARENT'
-
-        props = layout.operator("pose.select_hierarchy", text="Extend Child")
-        props.extend = True
-        props.direction = 'CHILD'
+        layout.menu("VIEW3D_MT_select_pose_more_less")
 
         layout.separator()
 
@@ -827,7 +889,6 @@ class VIEW3D_MT_select_edit_text(Menu):
         layout.separator()
 
         layout.operator("font.text_paste_from_file")
-        layout.operator("font.text_paste_from_clipboard")
 
         layout.separator()
 
@@ -924,7 +985,7 @@ class VIEW3D_MT_select_edit_armature(Menu):
 
 class VIEW3D_MT_select_gpencil(Menu):
     bl_label = "Select"
-    
+
     def draw(self, context):
         layout = self.layout
 
@@ -936,6 +997,13 @@ class VIEW3D_MT_select_gpencil(Menu):
         layout.operator("gpencil.select_all", text="(De)select All").action = 'TOGGLE'
         layout.operator("gpencil.select_all", text="Inverse").action = 'INVERT'
         layout.operator("gpencil.select_linked", text="Linked")
+        #layout.operator_menu_enum("gpencil.select_grouped", "type", text="Grouped")
+        layout.operator("gpencil.select_grouped", text="Grouped")
+
+        layout.separator()
+
+        layout.operator("gpencil.select_first")
+        layout.operator("gpencil.select_last")
 
         layout.separator()
 
@@ -1174,6 +1242,8 @@ class VIEW3D_MT_object(Menu):
 
     def draw(self, context):
         layout = self.layout
+        view = context.space_data
+        is_local_view = (view.local_view is not None)
 
         layout.operator("ed.undo")
         layout.operator("ed.redo")
@@ -1225,7 +1295,13 @@ class VIEW3D_MT_object(Menu):
 
         layout.separator()
 
-        layout.operator("object.move_to_layer", text="Move to Layer...")
+        if is_local_view:
+            layout.operator_context = 'EXEC_REGION_WIN'
+            layout.operator("object.move_to_layer", text="Move out of Local View")
+            layout.operator_context = 'INVOKE_REGION_WIN'
+        else:
+            layout.operator("object.move_to_layer", text="Move to Layer...")
+
         layout.menu("VIEW3D_MT_object_showhide")
 
         layout.operator_menu_enum("object.convert", "target")
@@ -1428,6 +1504,15 @@ class VIEW3D_MT_object_apply(Menu):
         props = layout.operator("object.transform_apply", text="Rotation & Scale", text_ctxt=i18n_contexts.default)
         props.location, props.rotation, props.scale = False, True, True
 
+        layout.separator()
+        
+        layout.operator("object.transforms_to_deltas", text="Location to Deltas", text_ctxt=i18n_contexts.default).mode = 'LOC'
+        layout.operator("object.transforms_to_deltas", text="Rotation to Deltas", text_ctxt=i18n_contexts.default).mode = 'ROT'
+        layout.operator("object.transforms_to_deltas", text="Scale to Deltas", text_ctxt=i18n_contexts.default).mode = 'SCALE'
+        
+        layout.operator("object.transforms_to_deltas", text="All Transforms to Deltas", text_ctxt=i18n_contexts.default).mode = 'ALL'
+        layout.operator("object.anim_transforms_to_deltas")
+        
         layout.separator()
 
         layout.operator("object.visual_transform_apply", text="Visual Transform", text_ctxt=i18n_contexts.default)
@@ -1660,6 +1745,13 @@ class VIEW3D_MT_paint_vertex(Menu):
         layout.operator("paint.vertex_color_smooth")
         layout.operator("paint.vertex_color_dirt")
 
+        layout.separator()
+
+        layout.operator("paint.vertex_color_invert", text="Invert")
+        layout.operator("paint.vertex_color_levels", text="Levels")
+        layout.operator("paint.vertex_color_hsv", text="Hue Saturation Value")
+        layout.operator("paint.vertex_color_brightness_contrast", text="Bright/Contrast")
+
 
 class VIEW3D_MT_hook(Menu):
     bl_label = "Hooks"
@@ -1841,6 +1933,7 @@ class VIEW3D_MT_particle(Menu):
         if particle_edit.select_mode == 'POINT':
             layout.operator("particle.subdivide")
 
+        layout.operator("particle.unify_length")
         layout.operator("particle.rekey")
         layout.operator("particle.weight_set")
 
@@ -1860,6 +1953,7 @@ class VIEW3D_MT_particle_specials(Menu):
         layout.operator("particle.rekey")
         layout.operator("particle.delete")
         layout.operator("particle.remove_doubles")
+        layout.operator("particle.unify_length")
 
         if particle_edit.select_mode == 'POINT':
             layout.operator("particle.subdivide")
@@ -2499,6 +2593,7 @@ class VIEW3D_MT_edit_mesh_clean(Menu):
 
         layout.separator()
 
+        layout.operator("mesh.decimate")
         layout.operator("mesh.dissolve_degenerate")
         layout.operator("mesh.dissolve_limited")
         layout.operator("mesh.face_make_planar")
@@ -2547,6 +2642,10 @@ class VIEW3D_MT_edit_gpencil_delete(Menu):
 
         layout.operator("gpencil.dissolve")
 
+        layout.separator()
+
+        layout.operator("gpencil.active_frames_delete_all")
+
 
 # Edit Curve
 # draw_curve is used by VIEW3D_MT_edit_curve and VIEW3D_MT_edit_surface
@@ -2570,7 +2669,7 @@ def draw_curve(self, context):
     layout.operator("curve.separate")
     layout.operator("curve.make_segment")
     layout.operator("curve.cyclic_toggle")
-    layout.operator("curve.delete", text="Delete...")
+    layout.menu("VIEW3D_MT_edit_curve_delete")
 
     layout.separator()
 
@@ -2639,6 +2738,19 @@ class VIEW3D_MT_edit_curve_specials(Menu):
         layout.operator("curve.smooth_weight")
         layout.operator("curve.smooth_radius")
         layout.operator("curve.smooth_tilt")
+
+
+class VIEW3D_MT_edit_curve_delete(Menu):
+    bl_label = "Delete"
+
+    def draw(self, context):
+        layout = self.layout
+
+        layout.operator_enum("curve.delete", "type")
+
+        layout.separator()
+
+        layout.operator("curve.dissolve_verts")
 
 
 class VIEW3D_MT_edit_curve_showhide(ShowHideMenu, Menu):
@@ -2867,6 +2979,7 @@ class VIEW3D_MT_edit_armature_roll(Menu):
         layout.separator()
 
         layout.operator("transform.transform", text="Set Roll").mode = 'BONE_ROLL'
+        layout.operator("armature.roll_clear")
 
 
 class VIEW3D_MT_edit_armature_delete(Menu):
@@ -2887,7 +3000,7 @@ class VIEW3D_MT_edit_armature_delete(Menu):
 
 class VIEW3D_MT_edit_gpencil(Menu):
     bl_label = "GPencil"
-    
+
     def draw(self, context):
         toolsettings = context.tool_settings
 

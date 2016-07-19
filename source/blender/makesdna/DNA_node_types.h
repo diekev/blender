@@ -503,7 +503,8 @@ enum {
 };
 
 enum {
-	CMP_NODEFLAG_BLUR_VARIABLE_SIZE = (1 << 0)
+	CMP_NODEFLAG_BLUR_VARIABLE_SIZE = (1 << 0),
+	CMP_NODEFLAG_BLUR_EXTEND_BOUNDS = (1 << 1),
 };
 
 typedef struct NodeFrame {
@@ -688,6 +689,8 @@ typedef struct NodeColorBalance {
 	float slope[3];
 	float offset[3];
 	float power[3];
+	float offset_basis;
+	char _pad[4];
 	
 	/* LGG parameters */
 	float lift[3];
@@ -806,7 +809,8 @@ typedef struct NodeShaderTexPointDensity {
 	short space;
 	short interpolation;
 	short color_source;
-	short pad2;
+	short ob_color_source;
+	char vertex_attribute_name[64]; /* vertex attribute layer for color source, MAX_CUSTOMDATA_LAYER_NAME */
 	PointDensity pd;
 } NodeShaderTexPointDensity;
 
@@ -946,7 +950,8 @@ typedef struct NodeSunBeams {
 #define SHD_GLOSSY_BECKMANN				0
 #define SHD_GLOSSY_SHARP				1
 #define SHD_GLOSSY_GGX					2
-#define SHD_GLOSSY_ASHIKHMIN_SHIRLEY	3
+#define SHD_GLOSSY_ASHIKHMIN_SHIRLEY			3
+#define SHD_GLOSSY_MULTI_GGX				4
 
 /* vector transform */
 #define SHD_VECT_TRANSFORM_TYPE_VECTOR	0
@@ -1094,6 +1099,7 @@ enum {
 #endif
 	SHD_SUBSURFACE_CUBIC			= 1,
 	SHD_SUBSURFACE_GAUSSIAN			= 2,
+	SHD_SUBSURFACE_BURLEY			= 3,
 };
 
 /* blur node */
@@ -1176,6 +1182,12 @@ enum {
 	SHD_POINTDENSITY_COLOR_PARTAGE   = 1,
 	SHD_POINTDENSITY_COLOR_PARTSPEED = 2,
 	SHD_POINTDENSITY_COLOR_PARTVEL   = 3,
+};
+
+enum {
+	SHD_POINTDENSITY_COLOR_VERTCOL      = 0,
+	SHD_POINTDENSITY_COLOR_VERTWEIGHT   = 1,
+	SHD_POINTDENSITY_COLOR_VERTNOR      = 2,
 };
 
 #endif

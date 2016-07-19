@@ -657,11 +657,12 @@ static bool rna_NodeTree_check(bNodeTree *ntree, ReportList *reports)
 static void rna_NodeTree_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	bNodeTree *ntree = (bNodeTree *)ptr->id.data;
+	bNode *node = (bNode *)ptr->data;
 
 	WM_main_add_notifier(NC_NODE | NA_EDITED, NULL);
 	WM_main_add_notifier(NC_SCENE | ND_NODES, &ntree->id);
 
-	ED_node_tag_update_nodetree(bmain, ntree);
+	ED_node_tag_update_nodetree(bmain, ntree, node);
 }
 
 static bNode *rna_NodeTree_node_new(bNodeTree *ntree, bContext *C, ReportList *reports, const char *type)
@@ -802,6 +803,7 @@ static bNodeLink *rna_NodeTree_link_new(bNodeTree *ntree, ReportList *reports,
 
 		ntreeUpdateTree(G.main, ntree);
 
+		ED_node_tag_update_nodetree(G.main, ntree, ret->tonode);
 		WM_main_add_notifier(NC_NODE | NA_EDITED, ntree);
 	}
 	return ret;
@@ -1048,7 +1050,7 @@ static void rna_NodeTree_interface_update(bNodeTree *ntree, bContext *C)
 	ntree->update |= NTREE_UPDATE_GROUP;
 	ntreeUpdateTree(G.main, ntree);
 	
-	ED_node_tag_update_nodetree(CTX_data_main(C), ntree);
+	ED_node_tag_update_nodetree(CTX_data_main(C), ntree, NULL);
 }
 
 
@@ -1545,12 +1547,13 @@ static int rna_Node_parent_poll(PointerRNA *ptr, PointerRNA value)
 static void rna_Node_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	bNodeTree *ntree = (bNodeTree *)ptr->id.data;
-	ED_node_tag_update_nodetree(bmain, ntree);
+	bNode *node = (bNode *)ptr->data;
+	ED_node_tag_update_nodetree(bmain, ntree, node);
 }
 
-static void rna_Node_socket_value_update(ID *id, bNode *UNUSED(node), bContext *C)
+static void rna_Node_socket_value_update(ID *id, bNode *node, bContext *C)
 {
-	ED_node_tag_update_nodetree(CTX_data_main(C), (bNodeTree *)id);
+	ED_node_tag_update_nodetree(CTX_data_main(C), (bNodeTree *)id, node);
 }
 
 static void rna_Node_select_set(PointerRNA *ptr, int value)
@@ -1916,7 +1919,11 @@ static PointerRNA rna_NodeSocket_node_get(PointerRNA *ptr)
 static void rna_NodeSocket_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	bNodeTree *ntree = (bNodeTree *)ptr->id.data;
-	ED_node_tag_update_nodetree(bmain, ntree);
+	bNodeSocket *sock = (bNodeSocket *)ptr->data;
+	bNode *node;
+	if (nodeFindNode(ntree, sock, &node, NULL)) {
+		ED_node_tag_update_nodetree(bmain, ntree, node);
+	}
 }
 
 static int rna_NodeSocket_is_output_get(PointerRNA *ptr)
@@ -2182,7 +2189,7 @@ static void rna_NodeSocketInterface_update(Main *bmain, Scene *UNUSED(scene), Po
 	ntree->update |= NTREE_UPDATE_GROUP;
 	ntreeUpdateTree(G.main, ntree);
 	
-	ED_node_tag_update_nodetree(bmain, ntree);
+	ED_node_tag_update_nodetree(bmain, ntree, NULL);
 }
 
 
@@ -2438,8 +2445,9 @@ static void rna_CompositorNode_tag_need_exec(bNode *node)
 static void rna_Node_tex_image_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	bNodeTree *ntree = (bNodeTree *)ptr->id.data;
+	bNode *node = (bNode *)ptr->data;
 
-	ED_node_tag_update_nodetree(bmain, ntree);
+	ED_node_tag_update_nodetree(bmain, ntree, node);
 	WM_main_add_notifier(NC_IMAGE, NULL);
 }
 
@@ -2451,7 +2459,7 @@ static void rna_Node_material_update(Main *bmain, Scene *UNUSED(scene), PointerR
 	if (node->id)
 		nodeSetActive(ntree, node);
 
-	ED_node_tag_update_nodetree(bmain, ntree);
+	ED_node_tag_update_nodetree(bmain, ntree, node);
 }
 
 static void rna_NodeGroup_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
@@ -2462,7 +2470,7 @@ static void rna_NodeGroup_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *
 	if (node->id)
 		ntreeUpdateTree(bmain, (bNodeTree *)node->id);
 	
-	ED_node_tag_update_nodetree(bmain, ntree);
+	ED_node_tag_update_nodetree(bmain, ntree, node);
 }
 
 static void rna_NodeGroup_node_tree_set(PointerRNA *ptr, const PointerRNA value)
@@ -2972,7 +2980,7 @@ static void rna_ShaderNodeScript_update(Main *bmain, Scene *scene, PointerRNA *p
 		RE_engine_free(engine);
 	}
 
-	ED_node_tag_update_nodetree(bmain, ntree);
+	ED_node_tag_update_nodetree(bmain, ntree, node);
 }
 
 static void rna_ShaderNodeSubsurface_update(Main *bmain, Scene *scene, PointerRNA *ptr)
@@ -3023,12 +3031,30 @@ static void rna_ShaderNodePointDensity_psys_set(PointerRNA *ptr, PointerRNA valu
 	}
 }
 
-static int point_density_color_source_from_shader(NodeShaderTexPointDensity *shader_point_density)
+static int point_density_particle_color_source_from_shader(NodeShaderTexPointDensity *shader_point_density)
 {
 	switch (shader_point_density->color_source) {
-		case SHD_POINTDENSITY_COLOR_PARTAGE: return TEX_PD_COLOR_PARTAGE;
-		case SHD_POINTDENSITY_COLOR_PARTSPEED: return TEX_PD_COLOR_PARTSPEED;
-		case SHD_POINTDENSITY_COLOR_PARTVEL: return TEX_PD_COLOR_PARTVEL;
+		case SHD_POINTDENSITY_COLOR_PARTAGE:
+			return TEX_PD_COLOR_PARTAGE;
+		case SHD_POINTDENSITY_COLOR_PARTSPEED:
+			return TEX_PD_COLOR_PARTSPEED;
+		case SHD_POINTDENSITY_COLOR_PARTVEL:
+			return TEX_PD_COLOR_PARTVEL;
+		default:
+			BLI_assert(!"Unknown color source");
+			return TEX_PD_COLOR_CONSTANT;
+	}
+}
+
+static int point_density_vertex_color_source_from_shader(NodeShaderTexPointDensity *shader_point_density)
+{
+	switch (shader_point_density->ob_color_source) {
+		case SHD_POINTDENSITY_COLOR_VERTCOL:
+			return TEX_PD_COLOR_VERTCOL;
+		case SHD_POINTDENSITY_COLOR_VERTWEIGHT:
+			return TEX_PD_COLOR_VERTWEIGHT;
+		case SHD_POINTDENSITY_COLOR_VERTNOR:
+			return TEX_PD_COLOR_VERTNOR;
 		default:
 			BLI_assert(!"Unknown color source");
 			return TEX_PD_COLOR_CONSTANT;
@@ -3045,8 +3071,11 @@ void rna_ShaderNodePointDensity_density_cache(bNode *self,
 		return;
 	}
 
+	/* Make sure there's no cached data. */
+	BKE_texture_pointdensity_free_data(pd);
+	RE_point_density_free(pd);
+
 	/* Create PointDensity structure from node for sampling. */
-	memset(pd, 0, sizeof(*pd));
 	BKE_texture_pointdensity_init_data(pd);
 	pd->object = (Object *)self->id;
 	pd->radius = shader_point_density->radius;
@@ -3054,16 +3083,20 @@ void rna_ShaderNodePointDensity_density_cache(bNode *self,
 		pd->source = TEX_PD_PSYS;
 		pd->psys = shader_point_density->particle_system;
 		pd->psys_cache_space = TEX_PD_OBJECTSPACE;
+		pd->color_source = point_density_particle_color_source_from_shader(shader_point_density);
 	}
 	else {
 		BLI_assert(shader_point_density->point_source == SHD_POINTDENSITY_SOURCE_OBJECT);
 		pd->source = TEX_PD_OBJECT;
 		pd->ob_cache_space = TEX_PD_OBJECTSPACE;
+		pd->ob_color_source = point_density_vertex_color_source_from_shader(shader_point_density);
+		BLI_strncpy(pd->vertex_attribute_name,
+		            shader_point_density->vertex_attribute_name,
+		            sizeof(pd->vertex_attribute_name));
 	}
-	pd->color_source = point_density_color_source_from_shader(shader_point_density);
 
 	/* Single-threaded sampling of the voxel domain. */
-	RE_cache_point_density(scene,
+	RE_point_density_cache(scene,
 	                       pd,
 	                       settings == 1);
 }
@@ -3091,13 +3124,30 @@ void rna_ShaderNodePointDensity_density_calc(bNode *self,
 	}
 
 	/* Single-threaded sampling of the voxel domain. */
-	RE_sample_point_density(scene, pd,
+	RE_point_density_sample(scene, pd,
 	                        shader_point_density->resolution,
 	                        settings == 1,
 	                        *values);
 
 	/* We're done, time to clean up. */
 	BKE_texture_pointdensity_free_data(pd);
+	memset(pd, 0, sizeof(*pd));
+}
+
+void rna_ShaderNodePointDensity_density_minmax(bNode *self,
+                                               Scene *scene,
+                                               int settings,
+                                               float r_min[3],
+                                               float r_max[3])
+{
+	NodeShaderTexPointDensity *shader_point_density = self->storage;
+	PointDensity *pd = &shader_point_density->pd;
+	if (scene == NULL) {
+		zero_v3(r_min);
+		zero_v3(r_max);
+		return;
+	}
+	RE_point_density_minmax(scene, pd, settings == 1, r_min, r_max);
 }
 
 static void rna_ShaderNodeOpenVDB_update(Main *bmain, Scene *scene, PointerRNA *ptr)
@@ -3155,17 +3205,27 @@ static EnumPropertyItem node_glossy_items[] = {
 	{SHD_GLOSSY_BECKMANN,          "BECKMANN",          0, "Beckmann", ""},
 	{SHD_GLOSSY_GGX,               "GGX",               0, "GGX",      ""},
 	{SHD_GLOSSY_ASHIKHMIN_SHIRLEY, "ASHIKHMIN_SHIRLEY", 0, "Ashikhmin-Shirley", ""},
+	{SHD_GLOSSY_MULTI_GGX,         "MULTI_GGX",         0, "Multiscatter GGX", ""},
 	{0, NULL, 0, NULL, NULL}
 };
 
 static EnumPropertyItem node_anisotropic_items[] = {
 	{SHD_GLOSSY_BECKMANN,          "BECKMANN",          0, "Beckmann", ""},
 	{SHD_GLOSSY_GGX,               "GGX",               0, "GGX",      ""},
+	{SHD_GLOSSY_MULTI_GGX,         "MULTI_GGX",         0, "Multiscatter GGX", ""},
 	{SHD_GLOSSY_ASHIKHMIN_SHIRLEY, "ASHIKHMIN_SHIRLEY", 0, "Ashikhmin-Shirley", ""},
 	{0, NULL, 0, NULL, NULL}
 };
 
 static EnumPropertyItem node_glass_items[] = {
+	{SHD_GLOSSY_SHARP,             "SHARP",             0, "Sharp",    ""},
+	{SHD_GLOSSY_BECKMANN,          "BECKMANN",          0, "Beckmann", ""},
+	{SHD_GLOSSY_GGX,               "GGX",               0, "GGX",      ""},
+	{SHD_GLOSSY_MULTI_GGX,         "MULTI_GGX",         0, "Multiscatter GGX", ""},
+	{0, NULL, 0, NULL, NULL}
+};
+
+static EnumPropertyItem node_refraction_items[] = {
 	{SHD_GLOSSY_SHARP,             "SHARP",             0, "Sharp",    ""},
 	{SHD_GLOSSY_BECKMANN,          "BECKMANN",          0, "Beckmann", ""},
 	{SHD_GLOSSY_GGX,               "GGX",               0, "GGX",      ""},
@@ -3987,13 +4047,21 @@ static void def_sh_tex_pointdensity(StructRNA *srna)
 		{0, NULL, 0, NULL, NULL}
 	};
 
-	static EnumPropertyItem color_source_items[] = {
+	static EnumPropertyItem particle_color_source_items[] = {
 		{SHD_POINTDENSITY_COLOR_PARTAGE, "PARTICLE_AGE", 0, "Particle Age",
 		                                 "Lifetime mapped as 0.0 - 1.0 intensity"},
 		{SHD_POINTDENSITY_COLOR_PARTSPEED, "PARTICLE_SPEED", 0, "Particle Speed",
 		                                   "Particle speed (absolute magnitude of velocity) mapped as 0.0-1.0 intensity"},
 		{SHD_POINTDENSITY_COLOR_PARTVEL, "PARTICLE_VELOCITY", 0, "Particle Velocity",
 		                                 "XYZ velocity mapped to RGB colors"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	static EnumPropertyItem vertex_color_source_items[] = {
+	    {SHD_POINTDENSITY_COLOR_VERTCOL, "VERTEX_COLOR", 0, "Vertex Color", "Vertex color layer"},
+	    {SHD_POINTDENSITY_COLOR_VERTWEIGHT, "VERTEX_WEIGHT", 0, "Vertex Weight", "Vertex group weight"},
+	    {SHD_POINTDENSITY_COLOR_VERTNOR, "VERTEX_NORMAL", 0, "Vertex Normal",
+	                                     "XYZ normal vector mapped to RGB colors"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -4047,11 +4115,21 @@ static void def_sh_tex_pointdensity(StructRNA *srna)
 	RNA_def_property_ui_text(prop, "Interpolation", "Texture interpolation");
 	RNA_def_property_update(prop, 0, "rna_Node_update");
 
-	prop = RNA_def_property(srna, "color_source", PROP_ENUM, PROP_NONE);
+	prop = RNA_def_property(srna, "particle_color_source", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "color_source");
-	RNA_def_property_enum_items(prop, color_source_items);
+	RNA_def_property_enum_items(prop, particle_color_source_items);
 	RNA_def_property_ui_text(prop, "Color Source", "Data to derive color results from");
 	RNA_def_property_update(prop, 0, "rna_Node_update");
+
+	prop = RNA_def_property(srna, "vertex_color_source", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "ob_color_source");
+	RNA_def_property_enum_items(prop, vertex_color_source_items);
+	RNA_def_property_ui_text(prop, "Color Source", "Data to derive color results from");
+	RNA_def_property_update(prop, 0, "rna_Node_update");
+
+	prop = RNA_def_property(srna, "vertex_attribute_name", PROP_STRING, PROP_NONE);
+	RNA_def_property_ui_text(prop, "Vertex Attribute Name", "Vertex attribute to use for color");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
 	func = RNA_def_function(srna, "cache_point_density", "rna_ShaderNodePointDensity_density_cache");
 	RNA_def_function_ui_description(func, "Cache point density data for later calculation");
@@ -4065,6 +4143,19 @@ static void def_sh_tex_pointdensity(StructRNA *srna)
 	/* TODO, See how array size of 0 works, this shouldnt be used. */
 	prop = RNA_def_float_array(func, "rgba_values", 1, NULL, 0, 0, "", "RGBA Values", 0, 0);
 	RNA_def_property_flag(prop, PROP_DYNAMIC);
+	RNA_def_function_output(func, prop);
+
+	func = RNA_def_function(srna, "calc_point_density_minmax", "rna_ShaderNodePointDensity_density_minmax");
+	RNA_def_function_ui_description(func, "Calculate point density");
+	RNA_def_pointer(func, "scene", "Scene", "", "");
+	RNA_def_enum(func, "settings", calc_mode_items, 1, "", "Calculate density for rendering");
+	prop = RNA_def_property(func, "min", PROP_FLOAT, PROP_COORDS);
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_flag(prop, PROP_THICK_WRAP);
+	RNA_def_function_output(func, prop);
+	prop = RNA_def_property(func, "max", PROP_FLOAT, PROP_COORDS);
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_flag(prop, PROP_THICK_WRAP);
 	RNA_def_function_output(func, prop);
 }
 
@@ -4086,6 +4177,17 @@ static void def_glass(StructRNA *srna)
 	prop = RNA_def_property(srna, "distribution", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "custom1");
 	RNA_def_property_enum_items(prop, node_glass_items);
+	RNA_def_property_ui_text(prop, "Distribution", "");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+}
+
+static void def_refraction(StructRNA *srna)
+{
+	PropertyRNA *prop;
+	
+	prop = RNA_def_property(srna, "distribution", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "custom1");
+	RNA_def_property_enum_items(prop, node_refraction_items);
 	RNA_def_property_ui_text(prop, "Distribution", "");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 }
@@ -4267,6 +4369,7 @@ static void def_sh_subsurface(StructRNA *srna)
 	static EnumPropertyItem prop_subsurface_falloff_items[] = {
 		{SHD_SUBSURFACE_CUBIC, "CUBIC", 0, "Cubic", "Simple cubic falloff function"},
 		{SHD_SUBSURFACE_GAUSSIAN, "GAUSSIAN", 0, "Gaussian", "Normal distribution, multiple can be combined to fit more complex profiles"},
+		{SHD_SUBSURFACE_BURLEY, "BURLEY", 0, "Christensen-Burley", "Approximation to physically based volume scattering"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -4423,6 +4526,11 @@ static void def_cmp_blur(StructRNA *srna)
 	prop = RNA_def_property(srna, "use_variable_size", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "custom1", CMP_NODEFLAG_BLUR_VARIABLE_SIZE);
 	RNA_def_property_ui_text(prop, "Variable Size", "Support variable blur per-pixel when using an image for size input");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+	prop = RNA_def_property(srna, "use_extended_bounds", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "custom1", CMP_NODEFLAG_BLUR_EXTEND_BOUNDS);
+	RNA_def_property_ui_text(prop, "Extend Bounds", "Extend bounds of the input image to fully fit blurred image");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
 	RNA_def_struct_sdna_from(srna, "NodeBlurData", "storage");
@@ -5855,6 +5963,12 @@ static void def_cmp_colorbalance(StructRNA *srna)
 	RNA_def_property_ui_range(prop, 0, 2, 0.1, 3);
 	RNA_def_property_ui_text(prop, "Slope", "Correction for Highlights");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeColorBalance_update_cdl");
+
+	prop = RNA_def_property(srna, "offset_basis", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop,  -FLT_MAX, FLT_MAX);
+	RNA_def_property_ui_range(prop, -1.0, 1.0, 1.0, 2);
+	RNA_def_property_ui_text(prop, "Basis", "Support negative color by using this as the RGB basis");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_NodeColorBalance_update_cdl");
 }
 
 static void def_cmp_huecorrect(StructRNA *srna)
@@ -6145,6 +6259,11 @@ static void def_cmp_bokehblur(StructRNA *srna)
 	RNA_def_property_boolean_sdna(prop, NULL, "custom1", CMP_NODEFLAG_BLUR_VARIABLE_SIZE);
 	RNA_def_property_ui_text(prop, "Variable Size",
 	                         "Support variable blur per-pixel when using an image for size input");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+	prop = RNA_def_property(srna, "use_extended_bounds", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "custom1", CMP_NODEFLAG_BLUR_EXTEND_BOUNDS);
+	RNA_def_property_ui_text(prop, "Extend Bounds", "Extend bounds of the input image to fully fit blurred image");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
 #if 0
@@ -6616,7 +6735,8 @@ static void def_cmp_translate(StructRNA *srna)
 
 	prop = RNA_def_property(srna, "use_relative", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "relative", 1);
-	RNA_def_property_ui_text(prop, "Relative", "Use relative (percent) values to define blur radius");
+	RNA_def_property_ui_text(prop, "Relative",
+	                         "Use relative (fraction of input image size) values to define translation");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
 	prop = RNA_def_property(srna, "wrap_axis", PROP_ENUM, PROP_NONE);

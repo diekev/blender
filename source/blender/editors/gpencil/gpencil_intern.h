@@ -126,6 +126,23 @@ extern ListBase gp_strokes_copypastebuf;
 
 void gp_stroke_delete_tagged_points(bGPDframe *gpf, bGPDstroke *gps, bGPDstroke *next_stroke, int tag_flags);
 
+
+/**
+ * Apply smooth to stroke point 
+ * \param gps              Stroke to smooth
+ * \param i                Point index
+ * \param inf              Amount of smoothing to apply
+ * \param affect_pressure  Apply smoothing to pressure values too?
+ */
+bool gp_smooth_stroke(bGPDstroke *gps, int i, float inf, bool affect_pressure);
+
+/**
+ * Subdivide a stroke once, by adding points at the midpoint between each pair of points
+ * \param gps           Stroke data
+ * \param new_totpoints Total number of points (after subdividing)
+ */
+void gp_subdivide_stroke(bGPDstroke *gps, const int new_totpoints);
+
 /* Layers Enums -------------------------------------- */
 
 struct EnumPropertyItem *ED_gpencil_layers_enum_itemf(struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop, bool *r_free);
@@ -157,8 +174,11 @@ void GPENCIL_OT_select_border(struct wmOperatorType *ot);
 void GPENCIL_OT_select_lasso(struct wmOperatorType *ot);
 
 void GPENCIL_OT_select_linked(struct wmOperatorType *ot);
+void GPENCIL_OT_select_grouped(struct wmOperatorType *ot);
 void GPENCIL_OT_select_more(struct wmOperatorType *ot);
 void GPENCIL_OT_select_less(struct wmOperatorType *ot);
+void GPENCIL_OT_select_first(struct wmOperatorType *ot);
+void GPENCIL_OT_select_last(struct wmOperatorType *ot);
 
 void GPENCIL_OT_duplicate(struct wmOperatorType *ot);
 void GPENCIL_OT_delete(struct wmOperatorType *ot);
@@ -198,6 +218,7 @@ void GPENCIL_OT_unlock_all(struct wmOperatorType *ot);
 void GPENCIL_OT_layer_isolate(struct wmOperatorType *ot);
 
 void GPENCIL_OT_active_frame_delete(struct wmOperatorType *ot);
+void GPENCIL_OT_active_frames_delete_all(struct wmOperatorType *ot);
 
 void GPENCIL_OT_convert(struct wmOperatorType *ot);
 

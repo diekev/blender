@@ -27,6 +27,7 @@
 
 #include "buffers.h"
 
+#include "util_debug.h"
 #include "util_foreach.h"
 #include "util_logging.h"
 #include "util_map.h"
@@ -84,29 +85,28 @@ namespace {
 
 cl_device_type opencl_device_type()
 {
-	char *device = getenv("CYCLES_OPENCL_TEST");
-
-	if(device) {
-		if(strcmp(device, "NONE") == 0)
+	switch(DebugFlags().opencl.device_type)
+	{
+		case DebugFlags::OpenCL::DEVICE_NONE:
 			return 0;
-		if(strcmp(device, "ALL") == 0)
+		case DebugFlags::OpenCL::DEVICE_ALL:
 			return CL_DEVICE_TYPE_ALL;
-		else if(strcmp(device, "DEFAULT") == 0)
+		case DebugFlags::OpenCL::DEVICE_DEFAULT:
 			return CL_DEVICE_TYPE_DEFAULT;
-		else if(strcmp(device, "CPU") == 0)
+		case DebugFlags::OpenCL::DEVICE_CPU:
 			return CL_DEVICE_TYPE_CPU;
-		else if(strcmp(device, "GPU") == 0)
+		case DebugFlags::OpenCL::DEVICE_GPU:
 			return CL_DEVICE_TYPE_GPU;
-		else if(strcmp(device, "ACCELERATOR") == 0)
+		case DebugFlags::OpenCL::DEVICE_ACCELERATOR:
 			return CL_DEVICE_TYPE_ACCELERATOR;
+		default:
+			return CL_DEVICE_TYPE_ALL;
 	}
-
-	return CL_DEVICE_TYPE_ALL;
 }
 
-bool opencl_kernel_use_debug()
+inline bool opencl_kernel_use_debug()
 {
-	return (getenv("CYCLES_OPENCL_DEBUG") != NULL);
+	return DebugFlags().opencl.debug;
 }
 
 bool opencl_kernel_use_advanced_shading(const string& platform)
@@ -129,11 +129,11 @@ bool opencl_kernel_use_advanced_shading(const string& platform)
 bool opencl_kernel_use_split(const string& platform_name,
                              const cl_device_type device_type)
 {
-	if(getenv("CYCLES_OPENCL_SPLIT_KERNEL_TEST") != NULL) {
+	if(DebugFlags().opencl.kernel_type == DebugFlags::OpenCL::KERNEL_SPLIT) {
 		VLOG(1) << "Forcing split kernel to use.";
 		return true;
 	}
-	if(getenv("CYCLES_OPENCL_MEGA_KERNEL_TEST") != NULL) {
+	if(DebugFlags().opencl.kernel_type == DebugFlags::OpenCL::KERNEL_MEGA) {
 		VLOG(1) << "Forcing mega kernel to use.";
 		return false;
 	}
@@ -229,8 +229,7 @@ bool opencl_device_version_check(cl_device_id device,
 void opencl_get_usable_devices(vector<OpenCLPlatformDevice> *usable_devices)
 {
 	const bool force_all_platforms =
-	        (getenv("CYCLES_OPENCL_MEGA_KERNEL_TEST") != NULL) ||
-	        (getenv("CYCLES_OPENCL_SPLIT_KERNEL_TEST") != NULL);
+		(DebugFlags().opencl.kernel_type != DebugFlags::OpenCL::KERNEL_DEFAULT);
 	const cl_device_type device_type = opencl_device_type();
 	static bool first_time = true;
 #define FIRST_VLOG(severity) if(first_time) VLOG(severity)
@@ -796,7 +795,7 @@ public:
 
 	bool load_binary(const string& /*kernel_path*/,
 	                 const string& clbin,
-	                 string custom_kernel_build_options,
+	                 const string& custom_kernel_build_options,
 	                 cl_program *program,
 	                 const string *debug_src = NULL)
 	{
@@ -849,7 +848,7 @@ public:
 	}
 
 	bool build_kernel(cl_program *kernel_program,
-	                  string custom_kernel_build_options,
+	                  const string& custom_kernel_build_options,
 	                  const string *debug_src = NULL)
 	{
 		string build_options;
@@ -882,30 +881,39 @@ public:
 		return true;
 	}
 
-	bool compile_kernel(const string& kernel_path,
-	                    string source,
-	                    string custom_kernel_build_options,
+	bool compile_kernel(const string& kernel_name,
+	                    const string& kernel_path,
+	                    const string& source,
+	                    const string& custom_kernel_build_options,
 	                    cl_program *kernel_program,
 	                    const string *debug_src = NULL)
 	{
-		/* we compile kernels consisting of many files. unfortunately opencl
+		/* We compile kernels consisting of many files. unfortunately OpenCL
 		 * kernel caches do not seem to recognize changes in included files.
-		 * so we force recompile on changes by adding the md5 hash of all files */
-		source = path_source_replace_includes(source, kernel_path);
+		 * so we force recompile on changes by adding the md5 hash of all files.
+		 */
+		string inlined_source = path_source_replace_includes(source,
+		                                                     kernel_path);
 
-		if(debug_src)
-			path_write_text(*debug_src, source);
+		if(debug_src) {
+			path_write_text(*debug_src, inlined_source);
+		}
 
-		size_t source_len = source.size();
-		const char *source_str = source.c_str();
+		size_t source_len = inlined_source.size();
+		const char *source_str = inlined_source.c_str();
 
-		*kernel_program = clCreateProgramWithSource(cxContext, 1, &source_str, &source_len, &ciErr);
+		*kernel_program = clCreateProgramWithSource(cxContext,
+		                                            1,
+		                                            &source_str,
+		                                            &source_len,
+		                                            &ciErr);
 
-		if(opencl_error(ciErr))
+		if(opencl_error(ciErr)) {
 			return false;
+		}
 
 		double starttime = time_dt();
-		printf("Compiling OpenCL kernel ...\n");
+		printf("Compiling %s OpenCL kernel ...\n", kernel_name.c_str());
 		/* TODO(sergey): Report which kernel is being compiled
 		 * as well (megakernel or which of split kernels etc..).
 		 */
@@ -995,7 +1003,8 @@ public:
 			if(path_exists(clbin) && load_binary(kernel_path,
 			                                     clbin,
 			                                     build_flags,
-			                                     &cpProgram)) {
+			                                     &cpProgram))
+			{
 				/* Kernel loaded from binary, nothing to do. */
 				VLOG(2) << "Loaded kernel from " << clbin << ".";
 			}
@@ -1004,7 +1013,8 @@ public:
 				string init_kernel_source = "#include \"kernels/opencl/kernel.cl\" // " + kernel_md5 + "\n";
 
 				/* If does not exist or loading binary failed, compile kernel. */
-				if(!compile_kernel(kernel_path,
+				if(!compile_kernel("base_kernel",
+				                   kernel_path,
 				                   init_kernel_source,
 				                   build_flags,
 				                   &cpProgram,
@@ -1187,7 +1197,9 @@ public:
 	               InterpolationType /*interpolation*/,
 	               ExtensionType /*extension*/)
 	{
-		VLOG(1) << "Texture allocate: " << name << ", " << mem.memory_size() << " bytes.";
+		VLOG(1) << "Texture allocate: " << name << ", "
+		        << string_human_readable_number(mem.memory_size()) << " bytes. ("
+		        << string_human_readable_size(mem.memory_size()) << ")";
 		mem_alloc(mem, MEM_READ_ONLY);
 		mem_copy_to(mem);
 		assert(mem_map.find(name) == mem_map.end());
@@ -1222,18 +1234,28 @@ public:
 			CL_KERNEL_WORK_GROUP_SIZE, sizeof(size_t), &workgroup_size, NULL);
 		clGetDeviceInfo(cdDevice,
 			CL_DEVICE_MAX_WORK_ITEM_SIZES, sizeof(size_t)*3, max_work_items, NULL);
-	
-		/* try to divide evenly over 2 dimensions */
+
+		/* Try to divide evenly over 2 dimensions. */
 		size_t sqrt_workgroup_size = max((size_t)sqrt((double)workgroup_size), 1);
 		size_t local_size[2] = {sqrt_workgroup_size, sqrt_workgroup_size};
 
-		/* some implementations have max size 1 on 2nd dimension */
+		/* Some implementations have max size 1 on 2nd dimension. */
 		if(local_size[1] > max_work_items[1]) {
 			local_size[0] = workgroup_size/max_work_items[1];
 			local_size[1] = max_work_items[1];
 		}
 
-		size_t global_size[2] = {global_size_round_up(local_size[0], w), global_size_round_up(local_size[1], h)};
+		size_t global_size[2] = {global_size_round_up(local_size[0], w),
+		                         global_size_round_up(local_size[1], h)};
+
+		/* Vertical size of 1 is coming from bake/shade kernels where we should
+		 * not round anything up because otherwise we'll either be doing too
+		 * much work per pixel (if we don't check global ID on Y axis) or will
+		 * be checking for global ID to always have Y of 0.
+		 */
+		if (h == 1) {
+			global_size[h] = 1;
+		}
 
 		/* run kernel */
 		opencl_assert(clEnqueueNDRangeKernel(cqCommandQueue, kernel, 2, NULL, global_size, NULL, 0, NULL, NULL));
@@ -1306,6 +1328,7 @@ public:
 		cl_mem d_output = CL_MEM_PTR(task.shader_output);
 		cl_mem d_output_luma = CL_MEM_PTR(task.shader_output_luma);
 		cl_int d_shader_eval_type = task.shader_eval_type;
+		cl_int d_shader_filter = task.shader_filter;
 		cl_int d_shader_x = task.shader_x;
 		cl_int d_shader_w = task.shader_w;
 		cl_int d_offset = task.offset;
@@ -1317,19 +1340,12 @@ public:
 		else
 			kernel = ckShaderKernel;
 
-		for(int sample = 0; sample < task.num_samples; sample++) {
-
-			if(task.get_cancel())
-				break;
-
-			cl_int d_sample = sample;
-
-			cl_uint start_arg_index =
-				kernel_set_args(kernel,
-				                0,
-				                d_data,
-				                d_input,
-				                d_output);
+		cl_uint start_arg_index =
+			kernel_set_args(kernel,
+			                0,
+			                d_data,
+			                d_input,
+			                d_output);
 
 		if(task.shader_eval_type < SHADER_EVAL_BAKE) {
 			start_arg_index += kernel_set_args(kernel,
@@ -1342,15 +1358,30 @@ public:
 #include "kernel_textures.h"
 #undef KERNEL_TEX
 
+		start_arg_index += kernel_set_args(kernel,
+		                                   start_arg_index,
+		                                   d_shader_eval_type);
+		if(task.shader_eval_type >= SHADER_EVAL_BAKE) {
 			start_arg_index += kernel_set_args(kernel,
 			                                   start_arg_index,
-			                                   d_shader_eval_type,
-			                                   d_shader_x,
-			                                   d_shader_w,
-			                                   d_offset,
-			                                   d_sample);
+			                                   d_shader_filter);
+		}
+		start_arg_index += kernel_set_args(kernel,
+		                                   start_arg_index,
+		                                   d_shader_x,
+		                                   d_shader_w,
+		                                   d_offset);
+
+		for(int sample = 0; sample < task.num_samples; sample++) {
+
+			if(task.get_cancel())
+				break;
+
+			kernel_set_args(kernel, start_arg_index, sample);
 
 			enqueue_kernel(kernel, task.shader_w, 1);
+
+			clFinish(cqCommandQueue);
 
 			task.update_progress(NULL);
 		}
@@ -1442,7 +1473,15 @@ protected:
 		template <typename T>
 		ArgumentWrapper(T& argument) : size(sizeof(argument)),
 		                               pointer(&argument) { }
+		ArgumentWrapper(int argument) : size(sizeof(int)),
+		                                int_value(argument),
+		                                pointer(&int_value) { }
+		ArgumentWrapper(float argument) : size(sizeof(float)),
+		                                  float_value(argument),
+		                                  pointer(&float_value) { }
 		size_t size;
+		int int_value;
+		float float_value;
 		void *pointer;
 	};
 
@@ -1657,14 +1696,16 @@ public:
 			                                     clbin,
 			                                     custom_kernel_build_options,
 			                                     &path_trace_program,
-			                                     debug_src)) {
+			                                     debug_src))
+			{
 				/* Kernel loaded from binary, nothing to do. */
 			}
 			else {
 				string init_kernel_source = "#include \"kernels/opencl/kernel.cl\" // " +
 				                            kernel_md5 + "\n";
 				/* If does not exist or loading binary failed, compile kernel. */
-				if(!compile_kernel(kernel_path,
+				if(!compile_kernel("mega_kernel",
+				                   kernel_path,
 				                   init_kernel_source,
 				                   custom_kernel_build_options,
 				                   &path_trace_program,
@@ -1893,59 +1934,6 @@ public:
 	                        * shadow_blocked kernel.
 	                        */
 
-	/* Global buffers of each member of ShaderData. */
-	cl_mem P_sd;
-	cl_mem P_sd_DL_shadow;
-	cl_mem N_sd;
-	cl_mem N_sd_DL_shadow;
-	cl_mem Ng_sd;
-	cl_mem Ng_sd_DL_shadow;
-	cl_mem I_sd;
-	cl_mem I_sd_DL_shadow;
-	cl_mem shader_sd;
-	cl_mem shader_sd_DL_shadow;
-	cl_mem flag_sd;
-	cl_mem flag_sd_DL_shadow;
-	cl_mem prim_sd;
-	cl_mem prim_sd_DL_shadow;
-	cl_mem type_sd;
-	cl_mem type_sd_DL_shadow;
-	cl_mem u_sd;
-	cl_mem u_sd_DL_shadow;
-	cl_mem v_sd;
-	cl_mem v_sd_DL_shadow;
-	cl_mem object_sd;
-	cl_mem object_sd_DL_shadow;
-	cl_mem time_sd;
-	cl_mem time_sd_DL_shadow;
-	cl_mem ray_length_sd;
-	cl_mem ray_length_sd_DL_shadow;
-
-	/* Ray differentials. */
-	cl_mem dP_sd, dI_sd;
-	cl_mem dP_sd_DL_shadow, dI_sd_DL_shadow;
-	cl_mem du_sd, dv_sd;
-	cl_mem du_sd_DL_shadow, dv_sd_DL_shadow;
-
-	/* Dp/Du */
-	cl_mem dPdu_sd, dPdv_sd;
-	cl_mem dPdu_sd_DL_shadow, dPdv_sd_DL_shadow;
-
-	/* Object motion. */
-	cl_mem ob_tfm_sd, ob_itfm_sd;
-	cl_mem ob_tfm_sd_DL_shadow, ob_itfm_sd_DL_shadow;
-
-	cl_mem closure_sd;
-	cl_mem closure_sd_DL_shadow;
-	cl_mem num_closure_sd;
-	cl_mem num_closure_sd_DL_shadow;
-	cl_mem randb_closure_sd;
-	cl_mem randb_closure_sd_DL_shadow;
-	cl_mem ray_P_sd;
-	cl_mem ray_P_sd_DL_shadow;
-	cl_mem ray_dP_sd;
-	cl_mem ray_dP_sd_DL_shadow;
-
 	/* Global memory required for shadow blocked and accum_radiance. */
 	cl_mem BSDFEval_coop;
 	cl_mem ISLamp_coop;
@@ -1953,8 +1941,7 @@ public:
 	cl_mem AOAlpha_coop;
 	cl_mem AOBSDF_coop;
 	cl_mem AOLightRay_coop;
-	cl_mem Intersection_coop_AO;
-	cl_mem Intersection_coop_DL;
+	cl_mem Intersection_coop_shadow;
 
 #ifdef WITH_CYCLES_DEBUG
 	/* DebugData memory */
@@ -2043,66 +2030,6 @@ public:
 		sd = NULL;
 		sd_DL_shadow = NULL;
 
-		P_sd = NULL;
-		P_sd_DL_shadow = NULL;
-		N_sd = NULL;
-		N_sd_DL_shadow = NULL;
-		Ng_sd = NULL;
-		Ng_sd_DL_shadow = NULL;
-		I_sd = NULL;
-		I_sd_DL_shadow = NULL;
-		shader_sd = NULL;
-		shader_sd_DL_shadow = NULL;
-		flag_sd = NULL;
-		flag_sd_DL_shadow = NULL;
-		prim_sd = NULL;
-		prim_sd_DL_shadow = NULL;
-		type_sd = NULL;
-		type_sd_DL_shadow = NULL;
-		u_sd = NULL;
-		u_sd_DL_shadow = NULL;
-		v_sd = NULL;
-		v_sd_DL_shadow = NULL;
-		object_sd = NULL;
-		object_sd_DL_shadow = NULL;
-		time_sd = NULL;
-		time_sd_DL_shadow = NULL;
-		ray_length_sd = NULL;
-		ray_length_sd_DL_shadow = NULL;
-
-		/* Ray differentials. */
-		dP_sd = NULL;
-		dI_sd = NULL;
-		dP_sd_DL_shadow = NULL;
-		dI_sd_DL_shadow = NULL;
-		du_sd = NULL;
-		dv_sd = NULL;
-		du_sd_DL_shadow = NULL;
-		dv_sd_DL_shadow = NULL;
-
-		/* Dp/Du */
-		dPdu_sd = NULL;
-		dPdv_sd = NULL;
-		dPdu_sd_DL_shadow = NULL;
-		dPdv_sd_DL_shadow = NULL;
-
-		/* Object motion. */
-		ob_tfm_sd = NULL;
-		ob_itfm_sd = NULL;
-		ob_tfm_sd_DL_shadow = NULL;
-		ob_itfm_sd_DL_shadow = NULL;
-
-		closure_sd = NULL;
-		closure_sd_DL_shadow = NULL;
-		num_closure_sd = NULL;
-		num_closure_sd_DL_shadow = NULL;
-		randb_closure_sd = NULL;
-		randb_closure_sd_DL_shadow = NULL;
-		ray_P_sd = NULL;
-		ray_P_sd_DL_shadow = NULL;
-		ray_dP_sd = NULL;
-		ray_dP_sd_DL_shadow = NULL;
-
 		rng_coop = NULL;
 		throughput_coop = NULL;
 		L_transparent_coop = NULL;
@@ -2118,8 +2045,7 @@ public:
 		BSDFEval_coop = NULL;
 		ISLamp_coop = NULL;
 		LightRay_coop = NULL;
-		Intersection_coop_AO = NULL;
-		Intersection_coop_DL = NULL;
+		Intersection_coop_shadow = NULL;
 
 #ifdef WITH_CYCLES_DEBUG
 		debugdata_coop = NULL;
@@ -2163,29 +2089,33 @@ public:
 	/* TODO(sergey): Seems really close to load_kernel(),
 	 * could it be de-duplicated?
 	 */
-	bool load_split_kernel(string kernel_path,
-	                       string kernel_init_source,
-	                       string clbin,
-	                       string custom_kernel_build_options,
+	bool load_split_kernel(const string& kernel_name,
+	                       const string& kernel_path,
+	                       const string& kernel_init_source,
+	                       const string& clbin,
+	                       const string& custom_kernel_build_options,
 	                       cl_program *program,
 	                       const string *debug_src = NULL)
 	{
-		if(!opencl_version_check())
+		if(!opencl_version_check()) {
 			return false;
+		}
 
-		clbin = path_user_get(path_join("cache", clbin));
+		string cache_clbin = path_user_get(path_join("cache", clbin));
 
 		/* If exists already, try use it. */
-		if(path_exists(clbin) && load_binary(kernel_path,
-		                                     clbin,
-		                                     custom_kernel_build_options,
-		                                     program,
-		                                     debug_src)) {
+		if(path_exists(cache_clbin) && load_binary(kernel_path,
+		                                           cache_clbin,
+		                                           custom_kernel_build_options,
+		                                           program,
+		                                           debug_src))
+		{
 			/* Kernel loaded from binary. */
 		}
 		else {
 			/* If does not exist or loading binary failed, compile kernel. */
-			if(!compile_kernel(kernel_path,
+			if(!compile_kernel(kernel_name,
+			                   kernel_path,
 			                   kernel_init_source,
 			                   custom_kernel_build_options,
 			                   program,
@@ -2194,7 +2124,7 @@ public:
 				return false;
 			}
 			/* Save binary for reuse. */
-			if(!save_binary(program, clbin)) {
+			if(!save_binary(program, cache_clbin)) {
 				return false;
 			}
 		}
@@ -2219,17 +2149,10 @@ public:
 		return ret_size;
 	}
 
-	size_t get_shader_closure_size(int max_closure)
+	size_t get_shader_data_size(size_t max_closure)
 	{
-		return (sizeof(ShaderClosure) * max_closure);
-	}
-
-	size_t get_shader_data_size(size_t shader_closure_size)
-	{
-		/* ShaderData size without accounting for ShaderClosure array. */
-		size_t shader_data_size =
-			sizeof(ShaderData) - (sizeof(ShaderClosure) * MAX_CLOSURE);
-		return (shader_data_size + shader_closure_size);
+		/* ShaderData size with variable size ShaderClosure array */
+		return sizeof(ShaderData) - (sizeof(ShaderClosure) * (MAX_CLOSURE - max_closure));
 	}
 
 	/* Returns size of KernelGlobals structure associated with OpenCL. */
@@ -2244,23 +2167,11 @@ public:
 	ccl_global type *name;
 #include "kernel_textures.h"
 #undef KERNEL_TEX
+			void *sd_input;
+			void *isect_shadow;
 		} KernelGlobals;
 
 		return sizeof(KernelGlobals);
-	}
-
-	/* Returns size of Structure of arrays implementation of. */
-	size_t get_shaderdata_soa_size()
-	{
-		size_t shader_soa_size = 0;
-
-#define SD_VAR(type, what) shader_soa_size += sizeof(void *);
-#define SD_CLOSURE_VAR(type, what, max_closure) shader_soa_size += sizeof(void *);
-		#include "kernel_shaderdata_vars.h"
-#undef SD_VAR
-#undef SD_CLOSURE_VAR
-
-		return shader_soa_size;
 	}
 
 	bool load_kernels(const DeviceRequestedFeatures& requested_features)
@@ -2311,7 +2222,10 @@ public:
 			clsrc = path_user_get(path_join("cache", clsrc)); \
 			debug_src = &clsrc; \
 		} \
-		if(!load_split_kernel(kernel_path, kernel_init_source, clbin, \
+		if(!load_split_kernel(#name, \
+		                      kernel_path, \
+		                      kernel_init_source, \
+		                      clbin, \
 		                      build_options, \
 		                      &GLUE(name, _program), \
 		                      debug_src)) \
@@ -2383,66 +2297,6 @@ public:
 		release_kernel_safe(ckPathTraceKernel_sum_all_radiance);
 
 		/* Release global memory */
-		release_mem_object_safe(P_sd);
-		release_mem_object_safe(P_sd_DL_shadow);
-		release_mem_object_safe(N_sd);
-		release_mem_object_safe(N_sd_DL_shadow);
-		release_mem_object_safe(Ng_sd);
-		release_mem_object_safe(Ng_sd_DL_shadow);
-		release_mem_object_safe(I_sd);
-		release_mem_object_safe(I_sd_DL_shadow);
-		release_mem_object_safe(shader_sd);
-		release_mem_object_safe(shader_sd_DL_shadow);
-		release_mem_object_safe(flag_sd);
-		release_mem_object_safe(flag_sd_DL_shadow);
-		release_mem_object_safe(prim_sd);
-		release_mem_object_safe(prim_sd_DL_shadow);
-		release_mem_object_safe(type_sd);
-		release_mem_object_safe(type_sd_DL_shadow);
-		release_mem_object_safe(u_sd);
-		release_mem_object_safe(u_sd_DL_shadow);
-		release_mem_object_safe(v_sd);
-		release_mem_object_safe(v_sd_DL_shadow);
-		release_mem_object_safe(object_sd);
-		release_mem_object_safe(object_sd_DL_shadow);
-		release_mem_object_safe(time_sd);
-		release_mem_object_safe(time_sd_DL_shadow);
-		release_mem_object_safe(ray_length_sd);
-		release_mem_object_safe(ray_length_sd_DL_shadow);
-
-		/* Ray differentials. */
-		release_mem_object_safe(dP_sd);
-		release_mem_object_safe(dP_sd_DL_shadow);
-		release_mem_object_safe(dI_sd);
-		release_mem_object_safe(dI_sd_DL_shadow);
-		release_mem_object_safe(du_sd);
-		release_mem_object_safe(du_sd_DL_shadow);
-		release_mem_object_safe(dv_sd);
-		release_mem_object_safe(dv_sd_DL_shadow);
-
-		/* Dp/Du */
-		release_mem_object_safe(dPdu_sd);
-		release_mem_object_safe(dPdu_sd_DL_shadow);
-		release_mem_object_safe(dPdv_sd);
-		release_mem_object_safe(dPdv_sd_DL_shadow);
-
-		/* Object motion. */
-		release_mem_object_safe(ob_tfm_sd);
-		release_mem_object_safe(ob_itfm_sd);
-
-		release_mem_object_safe(ob_tfm_sd_DL_shadow);
-		release_mem_object_safe(ob_itfm_sd_DL_shadow);
-
-		release_mem_object_safe(closure_sd);
-		release_mem_object_safe(closure_sd_DL_shadow);
-		release_mem_object_safe(num_closure_sd);
-		release_mem_object_safe(num_closure_sd_DL_shadow);
-		release_mem_object_safe(randb_closure_sd);
-		release_mem_object_safe(randb_closure_sd_DL_shadow);
-		release_mem_object_safe(ray_P_sd);
-		release_mem_object_safe(ray_P_sd_DL_shadow);
-		release_mem_object_safe(ray_dP_sd);
-		release_mem_object_safe(ray_dP_sd_DL_shadow);
 		release_mem_object_safe(rng_coop);
 		release_mem_object_safe(throughput_coop);
 		release_mem_object_safe(L_transparent_coop);
@@ -2460,8 +2314,7 @@ public:
 		release_mem_object_safe(BSDFEval_coop);
 		release_mem_object_safe(ISLamp_coop);
 		release_mem_object_safe(LightRay_coop);
-		release_mem_object_safe(Intersection_coop_AO);
-		release_mem_object_safe(Intersection_coop_DL);
+		release_mem_object_safe(Intersection_coop_shadow);
 #ifdef WITH_CYCLES_DEBUG
 		release_mem_object_safe(debugdata_coop);
 #endif
@@ -2558,7 +2411,7 @@ public:
 			/* TODO(sergey): This will actually over-allocate if
 			 * particular kernel does not support multiclosure.
 			 */
-			size_t ShaderClosure_size = get_shader_closure_size(current_max_closure);
+			size_t shaderdata_size = get_shader_data_size(current_max_closure);
 
 #ifdef __WORK_STEALING__
 			/* Calculate max groups */
@@ -2579,67 +2432,8 @@ public:
 			kgbuffer = mem_alloc(get_KernelGlobals_size());
 
 			/* Create global buffers for ShaderData. */
-			sd = mem_alloc(get_shaderdata_soa_size());
-			sd_DL_shadow = mem_alloc(get_shaderdata_soa_size());
-			P_sd = mem_alloc(num_global_elements * sizeof(float3));
-			P_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(float3));
-			N_sd = mem_alloc(num_global_elements * sizeof(float3));
-			N_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(float3));
-			Ng_sd = mem_alloc(num_global_elements * sizeof(float3));
-			Ng_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(float3));
-			I_sd = mem_alloc(num_global_elements * sizeof(float3));
-			I_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(float3));
-			shader_sd = mem_alloc(num_global_elements * sizeof(int));
-			shader_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(int));
-			flag_sd = mem_alloc(num_global_elements * sizeof(int));
-			flag_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(int));
-			prim_sd = mem_alloc(num_global_elements * sizeof(int));
-			prim_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(int));
-			type_sd = mem_alloc(num_global_elements * sizeof(int));
-			type_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(int));
-			u_sd = mem_alloc(num_global_elements * sizeof(float));
-			u_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(float));
-			v_sd = mem_alloc(num_global_elements * sizeof(float));
-			v_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(float));
-			object_sd = mem_alloc(num_global_elements * sizeof(int));
-			object_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(int));
-			time_sd = mem_alloc(num_global_elements * sizeof(float));
-			time_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(float));
-			ray_length_sd = mem_alloc(num_global_elements * sizeof(float));
-			ray_length_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(float));
-
-			/* Ray differentials. */
-			dP_sd = mem_alloc(num_global_elements * sizeof(differential3));
-			dP_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(differential3));
-			dI_sd = mem_alloc(num_global_elements * sizeof(differential3));
-			dI_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(differential3));
-			du_sd = mem_alloc(num_global_elements * sizeof(differential));
-			du_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(differential));
-			dv_sd = mem_alloc(num_global_elements * sizeof(differential));
-			dv_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(differential));
-
-			/* Dp/Du */
-			dPdu_sd = mem_alloc(num_global_elements * sizeof(float3));
-			dPdu_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(float3));
-			dPdv_sd = mem_alloc(num_global_elements * sizeof(float3));
-			dPdv_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(float3));
-
-			/* Object motion. */
-			ob_tfm_sd = mem_alloc(num_global_elements * sizeof(Transform));
-			ob_tfm_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(Transform));
-			ob_itfm_sd = mem_alloc(num_global_elements * sizeof(Transform));
-			ob_itfm_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(Transform));
-
-			closure_sd = mem_alloc(num_global_elements * ShaderClosure_size);
-			closure_sd_DL_shadow = mem_alloc(num_global_elements * 2 * ShaderClosure_size);
-			num_closure_sd = mem_alloc(num_global_elements * sizeof(int));
-			num_closure_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(int));
-			randb_closure_sd = mem_alloc(num_global_elements * sizeof(float));
-			randb_closure_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(float));
-			ray_P_sd = mem_alloc(num_global_elements * sizeof(float3));
-			ray_P_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(float3));
-			ray_dP_sd = mem_alloc(num_global_elements * sizeof(differential3));
-			ray_dP_sd_DL_shadow = mem_alloc(num_global_elements * 2 * sizeof(differential3));
+			sd = mem_alloc(num_global_elements * shaderdata_size);
+			sd_DL_shadow = mem_alloc(num_global_elements * 2 * shaderdata_size);
 
 			/* Creation of global memory buffers which are shared among
 			 * the kernels.
@@ -2657,8 +2451,7 @@ public:
 			BSDFEval_coop = mem_alloc(num_global_elements * sizeof(BsdfEval));
 			ISLamp_coop = mem_alloc(num_global_elements * sizeof(int));
 			LightRay_coop = mem_alloc(num_global_elements * sizeof(Ray));
-			Intersection_coop_AO = mem_alloc(num_global_elements * sizeof(Intersection));
-			Intersection_coop_DL = mem_alloc(num_global_elements * sizeof(Intersection));
+			Intersection_coop_shadow = mem_alloc(2 * num_global_elements * sizeof(Intersection));
 
 #ifdef WITH_CYCLES_DEBUG
 			debugdata_coop = mem_alloc(num_global_elements * sizeof(DebugData));
@@ -2676,85 +2469,12 @@ public:
 		}
 
 		cl_int dQueue_size = global_size[0] * global_size[1];
-		cl_int total_num_rays = global_size[0] * global_size[1];
 
 		cl_uint start_arg_index =
 			kernel_set_args(ckPathTraceKernel_data_init,
 			                0,
 			                kgbuffer,
-			                sd,
 			                sd_DL_shadow,
-			                P_sd,
-			                P_sd_DL_shadow,
-			                N_sd,
-			                N_sd_DL_shadow,
-			                Ng_sd,
-			                Ng_sd_DL_shadow,
-			                I_sd,
-			                I_sd_DL_shadow,
-			                shader_sd,
-			                shader_sd_DL_shadow,
-			                flag_sd,
-			                flag_sd_DL_shadow,
-			                prim_sd,
-			                prim_sd_DL_shadow,
-			                type_sd,
-			                type_sd_DL_shadow,
-			                u_sd,
-			                u_sd_DL_shadow,
-			                v_sd,
-			                v_sd_DL_shadow,
-			                object_sd,
-			                object_sd_DL_shadow,
-			                time_sd,
-			                time_sd_DL_shadow,
-			                ray_length_sd,
-			                ray_length_sd_DL_shadow);
-
-		/* Ray differentials. */
-		start_arg_index +=
-			kernel_set_args(ckPathTraceKernel_data_init,
-			                start_arg_index,
-			                dP_sd,
-			                dP_sd_DL_shadow,
-			                dI_sd,
-			                dI_sd_DL_shadow,
-			                du_sd,
-			                du_sd_DL_shadow,
-			                dv_sd,
-			                dv_sd_DL_shadow);
-
-		/* Dp/Du */
-		start_arg_index +=
-			kernel_set_args(ckPathTraceKernel_data_init,
-			                start_arg_index,
-			                dPdu_sd,
-			                dPdu_sd_DL_shadow,
-			                dPdv_sd,
-			                dPdv_sd_DL_shadow);
-
-		/* Object motion. */
-		start_arg_index +=
-			kernel_set_args(ckPathTraceKernel_data_init,
-			                start_arg_index,
-			                ob_tfm_sd,
-			                ob_tfm_sd_DL_shadow,
-			                ob_itfm_sd,
-			                ob_itfm_sd_DL_shadow);
-
-		start_arg_index +=
-			kernel_set_args(ckPathTraceKernel_data_init,
-			                start_arg_index,
-			                closure_sd,
-			                closure_sd_DL_shadow,
-			                num_closure_sd,
-			                num_closure_sd_DL_shadow,
-			                randb_closure_sd,
-			                randb_closure_sd_DL_shadow,
-			                ray_P_sd,
-			                ray_P_sd_DL_shadow,
-			                ray_dP_sd,
-			                ray_dP_sd_DL_shadow,
 			                d_data,
 			                per_sample_output_buffers,
 			                d_rng_state,
@@ -2764,6 +2484,7 @@ public:
 			                PathRadiance_coop,
 			                Ray_coop,
 			                PathState_coop,
+			                Intersection_coop_shadow,
 			                ray_state);
 
 /* TODO(sergey): Avoid map lookup here. */
@@ -2823,7 +2544,6 @@ public:
 		                0,
 		                kgbuffer,
 		                d_data,
-		                sd,
 		                throughput_coop,
 		                PathRadiance_coop,
 		                Ray_coop,
@@ -2849,7 +2569,6 @@ public:
 		                 0,
 		                 kgbuffer,
 		                 d_data,
-		                 sd,
 		                 per_sample_output_buffers,
 		                 d_rng_state,
 		                 rng_coop,
@@ -2931,7 +2650,6 @@ public:
 		                kgbuffer,
 		                d_data,
 		                sd,
-		                sd_DL_shadow,
 		                rng_coop,
 		                PathState_coop,
 		                ISLamp_coop,
@@ -2946,17 +2664,13 @@ public:
 		                0,
 		                kgbuffer,
 		                d_data,
-		                sd_DL_shadow,
 		                PathState_coop,
 		                LightRay_coop,
 		                AOLightRay_coop,
-		                Intersection_coop_AO,
-		                Intersection_coop_DL,
 		                ray_state,
 		                Queue_data,
 		                Queue_index,
-		                dQueue_size,
-		                total_num_rays);
+		                dQueue_size);
 
 		kernel_set_args(ckPathTraceKernel_next_iteration_setup,
 		                0,
@@ -3126,16 +2840,12 @@ public:
 	{
 		size_t total_invariable_mem_allocated = 0;
 		size_t KernelGlobals_size = 0;
-		size_t ShaderData_SOA_size = 0;
 
 		KernelGlobals_size = get_KernelGlobals_size();
-		ShaderData_SOA_size = get_shaderdata_soa_size();
 
 		total_invariable_mem_allocated += KernelGlobals_size; /* KernelGlobals size */
 		total_invariable_mem_allocated += NUM_QUEUES * sizeof(unsigned int); /* Queue index size */
 		total_invariable_mem_allocated += sizeof(char); /* use_queues_flag size */
-		total_invariable_mem_allocated += ShaderData_SOA_size; /* sd size */
-		total_invariable_mem_allocated += ShaderData_SOA_size; /* sd_DL_shadow size */
 
 		return total_invariable_mem_allocated;
 	}
@@ -3202,13 +2912,11 @@ public:
 	/* Calculate the memory required for one thread in split kernel. */
 	size_t get_per_thread_memory()
 	{
-		size_t shader_closure_size = 0;
-		size_t shaderdata_volume = 0;
-		shader_closure_size = get_shader_closure_size(current_max_closure);
+		size_t shaderdata_size = 0;
 		/* TODO(sergey): This will actually over-allocate if
 		 * particular kernel does not support multiclosure.
 		 */
-		shaderdata_volume = get_shader_data_size(shader_closure_size);
+		shaderdata_size = get_shader_data_size(current_max_closure);
 		size_t retval = sizeof(RNG)
 			+ sizeof(float3)          /* Throughput size */
 			+ sizeof(float)           /* L transparent size */
@@ -3219,8 +2927,8 @@ public:
 			+ sizeof(Intersection)    /* Overall isect */
 			+ sizeof(Intersection)    /* Instersection_coop_AO */
 			+ sizeof(Intersection)    /* Intersection coop DL */
-			+ shaderdata_volume       /* Overall ShaderData */
-			+ (shaderdata_volume * 2) /* ShaderData : DL and shadow */
+			+ shaderdata_size         /* Overall ShaderData */
+			+ (shaderdata_size * 2)   /* ShaderData : DL and shadow */
 			+ sizeof(Ray) + sizeof(BsdfEval)
 			+ sizeof(float3)          /* AOAlpha size */
 			+ sizeof(float3)          /* AOBSDF size */

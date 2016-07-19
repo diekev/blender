@@ -100,6 +100,8 @@ void ED_operatortypes_object(void)
 	WM_operatortype_append(OBJECT_OT_select_linked);
 	WM_operatortype_append(OBJECT_OT_select_grouped);
 	WM_operatortype_append(OBJECT_OT_select_mirror);
+	WM_operatortype_append(OBJECT_OT_select_more);
+	WM_operatortype_append(OBJECT_OT_select_less);
 
 	WM_operatortype_append(GROUP_OT_create);
 	WM_operatortype_append(GROUP_OT_objects_remove_all);
@@ -143,11 +145,6 @@ void ED_operatortypes_object(void)
 	WM_operatortype_append(OBJECT_OT_skin_loose_mark_clear);
 	WM_operatortype_append(OBJECT_OT_skin_radii_equalize);
 	WM_operatortype_append(OBJECT_OT_skin_armature_create);
-	WM_operatortype_append(OBJECT_OT_openvdb_cache_add);
-	WM_operatortype_append(OBJECT_OT_openvdb_cache_bake);
-	WM_operatortype_append(OBJECT_OT_openvdb_cache_free);
-	WM_operatortype_append(OBJECT_OT_openvdb_cache_move);
-	WM_operatortype_append(OBJECT_OT_openvdb_cache_remove);
 	WM_operatortype_append(OBJECT_OT_cache_retime);
 
 	WM_operatortype_append(OBJECT_OT_correctivesmooth_bind);
@@ -337,6 +334,9 @@ void ED_keymap_object(wmKeyConfig *keyconf)
 	kmi = WM_keymap_add_item(keymap, "OBJECT_OT_select_all", IKEY, KM_PRESS, KM_CTRL, 0);
 	RNA_enum_set(kmi->ptr, "action", SEL_INVERT);
 
+	WM_keymap_add_item(keymap, "OBJECT_OT_select_more", PADPLUSKEY, KM_PRESS, KM_CTRL, 0);
+	WM_keymap_add_item(keymap, "OBJECT_OT_select_less", PADMINUS, KM_PRESS, KM_CTRL, 0);
+
 	WM_keymap_add_item(keymap, "OBJECT_OT_select_linked", LKEY, KM_PRESS, KM_SHIFT, 0);
 	WM_keymap_add_item(keymap, "OBJECT_OT_select_grouped", GKEY, KM_PRESS, KM_SHIFT, 0);
 	WM_keymap_add_item(keymap, "OBJECT_OT_select_mirror", MKEY, KM_PRESS, KM_CTRL | KM_SHIFT, 0);
@@ -366,9 +366,21 @@ void ED_keymap_object(wmKeyConfig *keyconf)
 	WM_keymap_verify_item(keymap, "OBJECT_OT_constraint_add_with_targets", CKEY, KM_PRESS, KM_CTRL | KM_SHIFT, 0);
 	WM_keymap_verify_item(keymap, "OBJECT_OT_constraints_clear", CKEY, KM_PRESS, KM_CTRL | KM_ALT, 0);
 	
-	WM_keymap_verify_item(keymap, "OBJECT_OT_location_clear", GKEY, KM_PRESS, KM_ALT, 0);
-	WM_keymap_verify_item(keymap, "OBJECT_OT_rotation_clear", RKEY, KM_PRESS, KM_ALT, 0);
-	WM_keymap_verify_item(keymap, "OBJECT_OT_scale_clear", SKEY, KM_PRESS, KM_ALT, 0);
+	
+	kmi = WM_keymap_add_item(keymap, "OBJECT_OT_location_clear", GKEY, KM_PRESS, KM_ALT, 0);
+	RNA_boolean_set(kmi->ptr, "clear_delta", false);
+	kmi = WM_keymap_add_item(keymap, "OBJECT_OT_rotation_clear", RKEY, KM_PRESS, KM_ALT, 0);
+	RNA_boolean_set(kmi->ptr, "clear_delta", false);
+	kmi = WM_keymap_add_item(keymap, "OBJECT_OT_scale_clear", SKEY, KM_PRESS, KM_ALT, 0);
+	RNA_boolean_set(kmi->ptr, "clear_delta", false);
+	
+	kmi = WM_keymap_add_item(keymap, "OBJECT_OT_location_clear", GKEY, KM_PRESS, KM_ALT | KM_SHIFT, 0);
+	RNA_boolean_set(kmi->ptr, "clear_delta", true);
+	kmi = WM_keymap_add_item(keymap, "OBJECT_OT_rotation_clear", RKEY, KM_PRESS, KM_ALT | KM_SHIFT, 0);
+	RNA_boolean_set(kmi->ptr, "clear_delta", true);
+	kmi = WM_keymap_add_item(keymap, "OBJECT_OT_scale_clear", SKEY, KM_PRESS, KM_ALT | KM_SHIFT, 0);
+	RNA_boolean_set(kmi->ptr, "clear_delta", true);
+	
 	WM_keymap_verify_item(keymap, "OBJECT_OT_origin_clear", OKEY, KM_PRESS, KM_ALT, 0);
 	
 	WM_keymap_add_item(keymap, "OBJECT_OT_hide_view_clear", HKEY, KM_PRESS, KM_ALT, 0);

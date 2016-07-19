@@ -49,7 +49,8 @@
 #include "DNA_view3d_types.h"
 #include "DNA_userdef_types.h"
 
-#include "BKE_blender.h"
+#include "BKE_blender_undo.h"
+#include "BKE_blender_version.h"
 #include "BKE_camera.h"
 #include "BKE_context.h"
 #include "BKE_colortools.h"
@@ -1188,6 +1189,7 @@ static void render_view3d_startjob(void *customdata, short *stop, short *do_upda
 	char name[32];
 	int update_flag;
 	bool use_border;
+	int ob_inst_update_flag = 0;
 
 	update_flag = rp->engine->job_update_flag;
 	rp->engine->job_update_flag = 0;
@@ -1299,6 +1301,13 @@ static void render_view3d_startjob(void *customdata, short *stop, short *do_upda
 	/* OK, can we enter render code? */
 	if (rstats->convertdone) {
 		bool first_time = true;
+
+		if (update_flag & PR_UPDATE_VIEW) {
+			ob_inst_update_flag |= RE_OBJECT_INSTANCES_UPDATE_VIEW;
+		}
+
+		RE_updateRenderInstances(re, ob_inst_update_flag);
+
 		for (;;) {
 			if (first_time == false) {
 				if (restore)
@@ -1473,7 +1482,7 @@ static void render_view3d_do(RenderEngine *engine, const bContext *C)
 void render_view3d_update(RenderEngine *engine, const bContext *C)
 {	
 	/* this shouldn't be needed and causes too many database rebuilds, but we
-	 * aren't actually tracking updates for all relevent datablocks so this is
+	 * aren't actually tracking updates for all relevant datablocks so this is
 	 * a catch-all for updates */
 	engine->update_flag |= RE_ENGINE_UPDATE_DATABASE;
 

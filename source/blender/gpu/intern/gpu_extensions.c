@@ -32,9 +32,6 @@
  * with checks for drivers and GPU support.
  */
 
-#include "MEM_guardedalloc.h"
-
-#include "BLI_blenlib.h"
 #include "BLI_utildefines.h"
 #include "BLI_math_base.h"
 #include "BLI_math_vector.h"
@@ -42,7 +39,6 @@
 #include "BKE_global.h"
 
 #include "GPU_basic_shader.h"
-#include "GPU_draw.h"
 #include "GPU_extensions.h"
 #include "GPU_glew.h"
 #include "GPU_texture.h"
@@ -60,7 +56,6 @@
 /* Extensions support */
 
 /* -- extension: version of GL that absorbs it
- * ARB_fragment_program: 2.0
  * ARB_framebuffer object: 3.0
  * EXT_framebuffer_object: 3.0
  * EXT_framebuffer_blit: 3.0
@@ -74,6 +69,7 @@
 
 static struct GPUGlobal {
 	GLint maxtexsize;
+	GLint maxcubemapsize;
 	GLint maxtextures;
 	bool extdisabled;
 	int colordepth;
@@ -81,9 +77,10 @@ static struct GPUGlobal {
 	GPUDeviceType device;
 	GPUOSType os;
 	GPUDriverType driver;
-	float dfdyfactors[2]; /* workaround for different calculation of dfdy factors on GPUs. Some GPUs/drivers
-	                         calculate dfdy in shader differently when drawing to an offscreen buffer. First
-	                         number is factor on screen and second is off-screen */
+	/* workaround for different calculation of dfdy factors on GPUs. Some GPUs/drivers
+	 * calculate dfdy in shader differently when drawing to an offscreen buffer. First
+	 * number is factor on screen and second is off-screen */
+	float dfdyfactors[2];
 	float max_anisotropy;
 } GG = {1, 0};
 
@@ -121,6 +118,11 @@ int GPU_max_color_texture_samples(void)
 	return GG.samples_color_texture_max;
 }
 
+int GPU_max_cube_map_size(void)
+{
+	return GG.maxcubemapsize;
+}
+
 void GPU_get_dfdy_factors(float fac[2])
 {
 	copy_v2_v2(fac, GG.dfdyfactors);
@@ -134,6 +136,7 @@ void gpu_extensions_init(void)
 	glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &GG.maxtextures);
 
 	glGetIntegerv(GL_MAX_TEXTURE_SIZE, &GG.maxtexsize);
+	glGetIntegerv(GL_MAX_CUBE_MAP_TEXTURE_SIZE, &GG.maxcubemapsize);
 
 	if (GLEW_EXT_texture_filter_anisotropic)
 		glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &GG.max_anisotropy);
@@ -252,9 +255,9 @@ bool GPU_legacy_support(void)
 			glGetIntegerv(GL_CONTEXT_PROFILE_MASK, &profile);
 
 			if (G.debug & G_DEBUG_GPU) {
-				printf("GL_CONTEXT_PROFILE_MASK = %#x (%s profile)\n", profile,
-				       profile & GL_CONTEXT_COMPATIBILITY_PROFILE_BIT ? "compatibility" :
-				       profile & GL_CONTEXT_CORE_PROFILE_BIT ? "core" : "unknown");
+				printf("GL_CONTEXT_PROFILE_MASK = %#x (%s profile)\n", (unsigned int)profile,
+				       (profile & GL_CONTEXT_COMPATIBILITY_PROFILE_BIT) ? "compatibility" :
+				       (profile & GL_CONTEXT_CORE_PROFILE_BIT) ? "core" : "unknown");
 			}
 
 			if (profile == 0) {

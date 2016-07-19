@@ -36,6 +36,7 @@ struct bGPdata;
 struct bGPDlayer;
 struct bGPDframe;
 struct bGPDstroke;
+struct Main;
 
 /* ------------ Grease-Pencil API ------------------ */
 
@@ -48,15 +49,20 @@ void gpencil_stroke_sync_selection(struct bGPDstroke *gps);
 
 struct bGPDframe *gpencil_frame_addnew(struct bGPDlayer *gpl, int cframe);
 struct bGPDframe *gpencil_frame_addcopy(struct bGPDlayer *gpl, int cframe);
-struct bGPDlayer *gpencil_layer_addnew(struct bGPdata *gpd, const char *name, int setactive);
+struct bGPDlayer *gpencil_layer_addnew(struct bGPdata *gpd, const char *name, bool setactive);
 struct bGPdata *gpencil_data_addnew(const char name[]);
 
 struct bGPDframe *gpencil_frame_duplicate(struct bGPDframe *src);
 struct bGPDlayer *gpencil_layer_duplicate(struct bGPDlayer *src);
-struct bGPdata *gpencil_data_duplicate(struct bGPdata *gpd, bool internal_copy);
+struct bGPdata *gpencil_data_duplicate(struct Main *bmain, struct bGPdata *gpd, bool internal_copy);
 
 void gpencil_frame_delete_laststroke(struct bGPDlayer *gpl, struct bGPDframe *gpf);
 
+
+/* Stroke and Fill - Alpha Visibility Threshold */
+#define GPENCIL_ALPHA_OPACITY_THRESH 0.001f
+
+bool gpencil_layer_is_editable(const struct bGPDlayer *gpl);
 
 /* How gpencil_layer_getframe() should behave when there
  * is no existing GP-Frame on the frame requested.

@@ -440,7 +440,6 @@ extern StructRNA RNA_ObstacleFluidSettings;
 extern StructRNA RNA_OceanModifier;
 extern StructRNA RNA_OceanTexData;
 extern StructRNA RNA_OceanTexture;
-extern StructRNA RNA_OpenVDBCache;
 extern StructRNA RNA_Operator;
 extern StructRNA RNA_OperatorFileListElement;
 extern StructRNA RNA_OperatorMousePath;
@@ -819,6 +818,9 @@ bool RNA_enum_description(EnumPropertyItem *item, const int value, const char **
 int  RNA_enum_from_value(EnumPropertyItem *item, const int value);
 int  RNA_enum_from_identifier(EnumPropertyItem *item, const char *identifier);
 
+void RNA_property_enum_items_ex(
+        struct bContext *C, PointerRNA *ptr, PropertyRNA *prop, const bool use_static,
+        EnumPropertyItem **item, int *r_totitem, bool *r_free);
 void RNA_property_enum_items(struct bContext *C, PointerRNA *ptr, PropertyRNA *prop,
                              EnumPropertyItem **item, int *r_totitem, bool *r_free);
 void RNA_property_enum_items_gettexted(struct bContext *C, PointerRNA *ptr, PropertyRNA *prop,
@@ -829,6 +831,14 @@ bool RNA_property_enum_value(struct bContext *C, PointerRNA *ptr, PropertyRNA *p
 bool RNA_property_enum_identifier(struct bContext *C, PointerRNA *ptr, PropertyRNA *prop, const int value, const char **identifier);
 bool RNA_property_enum_name(struct bContext *C, PointerRNA *ptr, PropertyRNA *prop, const int value, const char **name);
 bool RNA_property_enum_name_gettexted(struct bContext *C, PointerRNA *ptr, PropertyRNA *prop, const int value, const char **name);
+
+bool RNA_property_enum_item_from_value(
+        struct bContext *C, PointerRNA *ptr, PropertyRNA *prop, const int value,
+        EnumPropertyItem *r_item);
+bool RNA_property_enum_item_from_value_gettexted(
+        struct bContext *C, PointerRNA *ptr, PropertyRNA *prop, const int value,
+        EnumPropertyItem *r_item);
+
 int RNA_property_enum_bitflag_identifiers(struct bContext *C, PointerRNA *ptr, PropertyRNA *prop, const int value, const char **identifier);
 
 StructRNA *RNA_property_pointer_type(PointerRNA *ptr, PropertyRNA *prop);
@@ -969,6 +979,7 @@ bool RNA_path_resolve_elements(PointerRNA *ptr, const char *path, struct ListBas
 
 char *RNA_path_from_ID_to_struct(PointerRNA *ptr);
 char *RNA_path_from_ID_to_property(PointerRNA *ptr, PropertyRNA *prop);
+char *RNA_path_from_ID_to_property_index(PointerRNA *ptr, PropertyRNA *prop, int array_dim, int index);
 
 char *RNA_path_resolve_from_type_to_property(
         struct PointerRNA *ptr, struct PropertyRNA *prop,

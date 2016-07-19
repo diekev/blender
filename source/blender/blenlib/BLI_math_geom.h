@@ -115,6 +115,13 @@ float dist_signed_squared_to_corner_v3v3v3(
         const float p[3],
         const float v1[3], const float v2[3], const float v3[3],
         const float axis_ref[3]);
+float dist_squared_to_ray_v3(
+        const float ray_origin[3], const float ray_direction[3],
+        const float co[3], float *r_depth);
+float dist_squared_ray_to_seg_v3(
+        const float ray_origin[3], const float ray_direction[3],
+        const float v0[3], const float v1[3],
+        float r_point[3], float *r_depth);
 float closest_to_line_v2(float r_close[2], const float p[2], const float l1[2], const float l2[2]);
 float closest_to_line_v3(float r_close[3], const float p[3], const float l1[3], const float l2[3]);
 void closest_to_line_segment_v2(float r_close[2], const float p[2], const float l1[2], const float l2[2]);
@@ -126,6 +133,12 @@ void closest_to_plane3_v3(float r_close[3], const float plane[3], const float pt
 
 /* Set 'r' to the point in triangle (t1, t2, t3) closest to point 'p' */
 void closest_on_tri_to_point_v3(float r[3], const float p[3], const float t1[3], const float t2[3], const float t3[3]);
+
+float ray_point_factor_v3_ex(
+        const float p[3], const float ray_origin[3], const float ray_direction[3],
+        const float epsilon, const float fallback);
+float ray_point_factor_v3(
+        const float p[3], const float ray_origin[3], const float ray_direction[3]);
 
 float line_point_factor_v3_ex(
         const float p[3], const float l1[3], const float l2[3],
@@ -271,21 +284,46 @@ bool isect_point_tri_v3(
 /* axis-aligned bounding box */
 bool isect_aabb_aabb_v3(const float min1[3], const float max1[3], const float min2[3], const float max2[3]);
 
-typedef struct {
+struct IsectRayAABB_Precalc {
 	float ray_origin[3];
 	float ray_inv_dir[3];
 	int sign[3];
-} IsectRayAABBData;
+};
 
-void isect_ray_aabb_initialize(IsectRayAABBData *data, const float ray_origin[3], const float ray_direction[3]);
-bool isect_ray_aabb(const IsectRayAABBData *data, const float bb_min[3], const float bb_max[3], float *tmin);
+void isect_ray_aabb_v3_precalc(
+        struct IsectRayAABB_Precalc *data,
+        const float ray_origin[3], const float ray_direction[3]);
+bool isect_ray_aabb_v3(
+        const struct IsectRayAABB_Precalc *data,
+        const float bb_min[3], const float bb_max[3], float *tmin);
+
+struct NearestRayToAABB_Precalc {
+	float ray_origin[3];
+	float ray_direction[3];
+	float ray_inv_dir[3];
+	float cdot_axis[3];
+	float idiag_sq[3];
+	bool sign[3];
+};
+
+void dist_squared_ray_to_aabb_v3_precalc(
+        struct NearestRayToAABB_Precalc *data,
+        const float ray_origin[3], const float ray_direction[3]);
+float dist_squared_ray_to_aabb_v3(
+        const struct NearestRayToAABB_Precalc *data,
+        const float bb_min[3], const float bb_max[3],
+        bool r_axis_closest[3]);
 
 /* other */
 bool isect_sweeping_sphere_tri_v3(const float p1[3], const float p2[3], const float radius,
                                   const float v0[3], const float v1[3], const float v2[3], float *r_lambda, float ipoint[3]);
 
-bool clip_segment_v3_plane(float p1[3], float p2[3], const float plane[4]);
-bool clip_segment_v3_plane_n(float p1[3], float p2[3], float plane_array[][4], const int plane_tot);
+bool clip_segment_v3_plane(
+        const float p1[3], const float p2[3], const float plane[4],
+        float r_p1[3], float r_p2[3]);
+bool clip_segment_v3_plane_n(
+        const float p1[3], const float p2[3], const float plane_array[][4], const int plane_tot,
+        float r_p1[3], float r_p2[3]);
 
 void plot_line_v2v2i(const int p1[2], const int p2[2], bool (*callback)(int, int, void *), void *userData);
 void fill_poly_v2i_n(
@@ -438,6 +476,10 @@ MINLINE float shell_v3v3_normalized_to_dist(const float a[3], const float b[3]);
 MINLINE float shell_v2v2_normalized_to_dist(const float a[2], const float b[2]);
 MINLINE float shell_v3v3_mid_normalized_to_dist(const float a[3], const float b[3]);
 MINLINE float shell_v2v2_mid_normalized_to_dist(const float a[2], const float b[2]);
+
+/********************************* Cubic (Bezier) *******************************/
+
+float cubic_tangent_factor_circle_v3(const float tan_l[3], const float tan_r[3]);
 
 /**************************** Inline Definitions ******************************/
 

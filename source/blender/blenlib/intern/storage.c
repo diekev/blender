@@ -232,7 +232,6 @@ int BLI_exists(const char *name)
 	if (res == -1) return(0);
 #else
 	struct stat st;
-	BLI_assert(name);
 	BLI_assert(!BLI_path_is_rel(name));
 	if (stat(name, &st)) return(0);
 #endif
@@ -390,7 +389,7 @@ LinkNode *BLI_file_read_as_lines(const char *name)
 		/*
 		 * size = because on win32 reading
 		 * all the bytes in the file will return
-		 * less bytes because of crnl changes.
+		 * less bytes because of `CRNL` changes.
 		 */
 		size = fread(buf, 1, size, fp);
 		for (i = 0; i <= size; i++) {

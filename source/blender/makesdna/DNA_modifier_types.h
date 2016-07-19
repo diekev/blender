@@ -641,8 +641,9 @@ typedef struct BooleanModifierData {
 
 	struct Object *object;
 	char operation;
-	char bm_flag, pad[2];
-	float threshold;
+	char solver;
+	char pad[2];
+	float double_threshold;
 } BooleanModifierData;
 
 typedef enum {
@@ -651,13 +652,10 @@ typedef enum {
 	eBooleanModifierOp_Difference = 2,
 } BooleanModifierOp;
 
-/* temp bm_flag (debugging only) */
-enum {
-	eBooleanModifierBMeshFlag_Enabled                   = (1 << 0),
-	eBooleanModifierBMeshFlag_BMesh_Separate            = (1 << 1),
-	eBooleanModifierBMeshFlag_BMesh_NoDissolve          = (1 << 2),
-	eBooleanModifierBMeshFlag_BMesh_NoConnectRegions    = (1 << 3),
-};
+typedef enum {
+	eBooleanModifierSolver_Carve    = 0,
+	eBooleanModifierSolver_BMesh = 1,
+} BooleanSolver;
 
 typedef struct MDefInfluence {
 	int vertex;
@@ -825,6 +823,8 @@ enum {
 	MOD_SHRINKWRAP_CULL_TARGET_BACKFACE  = (1 << 4),
 
 	MOD_SHRINKWRAP_KEEP_ABOVE_SURFACE    = (1 << 5),  /* distance is measure to the front face of the target */
+
+	MOD_SHRINKWRAP_INVERT_VGROUP         = (1 << 6),
 };
 
 /* Shrinkwrap->projAxis */
@@ -846,9 +846,16 @@ typedef struct SimpleDeformModifierData {
 
 	char mode;              /* deform function */
 	char axis;              /* lock axis (for taper and strech) */
-	char pad[2];
+	char flag;
+	char pad;
 
 } SimpleDeformModifierData;
+
+/* SimpleDeform->flag */
+enum {
+	MOD_SIMPLEDEFORM_FLAG_INVERT_VGROUP = (1 << 0),
+};
+
 
 enum {
 	MOD_SIMPLEDEFORM_MODE_TWIST   = 1,
@@ -1509,7 +1516,9 @@ typedef struct NormalEditModifierData {
 	short mix_mode;
 	char pad[2];
 	float mix_factor;
+	float mix_limit;
 	float offset[3];
+	float pad_f1;
 } NormalEditModifierData;
 
 /* NormalEditModifierData.mode */

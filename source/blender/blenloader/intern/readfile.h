@@ -74,8 +74,8 @@ typedef struct FileData {
 	
 	// general reading variables
 	struct SDNA *filesdna;
-	struct SDNA *memsdna;
-	char *compflags;
+	const struct SDNA *memsdna;
+	char *compflags;        /* array of eSDNA_StructCompare */
 	
 	int fileversion;
 	int id_name_offs;       /* used to retrieve ID names from (bhead+1) */
@@ -110,13 +110,15 @@ typedef struct BHeadN {
 	struct BHead bhead;
 } BHeadN;
 
-
-#define FD_FLAGS_SWITCH_ENDIAN             (1 << 0)
-#define FD_FLAGS_FILE_POINTSIZE_IS_4       (1 << 1)
-#define FD_FLAGS_POINTSIZE_DIFFERS         (1 << 2)
-#define FD_FLAGS_FILE_OK                   (1 << 3)
-#define FD_FLAGS_NOT_MY_BUFFER             (1 << 4)
-#define FD_FLAGS_NOT_MY_LIBMAP             (1 << 5)
+/* FileData->flags */
+enum {
+	FD_FLAGS_SWITCH_ENDIAN         = 1 << 0,
+	FD_FLAGS_FILE_POINTSIZE_IS_4   = 1 << 1,
+	FD_FLAGS_POINTSIZE_DIFFERS     = 1 << 2,
+	FD_FLAGS_FILE_OK               = 1 << 3,
+	FD_FLAGS_NOT_MY_BUFFER         = 1 << 4,
+	FD_FLAGS_NOT_MY_LIBMAP         = 1 << 5,  /* XXX Unused in practice (checked once but never set). */
+};
 
 #define SIZEOFBLENDERHEADER 12
 
@@ -154,9 +156,9 @@ const char *bhead_id_name(const FileData *fd, const BHead *bhead);
 
 void blo_reportf_wrap(struct ReportList *reports, ReportType type, const char *format, ...) ATTR_PRINTF_FORMAT(3, 4);
 
-void blo_do_versions_oldnewmap_insert(struct OldNewMap *onm, void *oldaddr, void *newaddr, int nr);
-void *blo_do_versions_newlibadr(struct FileData *fd, void *lib, void *adr);
-void *blo_do_versions_newlibadr_us(struct FileData *fd, void *lib, void *adr);
+void blo_do_versions_oldnewmap_insert(struct OldNewMap *onm, const void *oldaddr, void *newaddr, int nr);
+void *blo_do_versions_newlibadr(struct FileData *fd, const void *lib, const void *adr);
+void *blo_do_versions_newlibadr_us(struct FileData *fd, const void *lib, const void *adr);
 
 struct PartEff *blo_do_version_give_parteff_245(struct Object *ob);
 void blo_do_version_old_trackto_to_constraints(struct Object *ob);

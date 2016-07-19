@@ -10,7 +10,7 @@ set(INC_SYS
 
 set(SRC
 	util_aligned_malloc.cpp
-	util_cache.cpp
+	util_debug.cpp
 	util_logging.cpp
 	util_math_cdf.cpp
 	util_md5.cpp
@@ -19,8 +19,10 @@ set(SRC
 	util_simd.cpp
 	util_system.cpp
 	util_task.cpp
+	util_thread.cpp
 	util_time.cpp
 	util_transform.cpp
+	util_windows.cpp
 )
 
 if(NOT CYCLES_STANDALONE_REPOSITORY)
@@ -39,10 +41,11 @@ set(SRC_HEADERS
 	util_args.h
 	util_atomic.h
 	util_boundbox.h
-	util_cache.h
 	util_debug.h
+	util_guarded_allocator.cpp
 	util_foreach.h
 	util_function.h
+	util_guarded_allocator.h
 	util_half.h
 	util_hash.h
 	util_image.h
@@ -61,35 +64,36 @@ set(SRC_HEADERS
 	util_queue.h
 	util_set.h
 	util_simd.h
+	util_sky_model.cpp
+	util_sky_model.h
+	util_sky_model_data.h
 	util_sseb.h
 	util_ssef.h
 	util_ssei.h
+	util_stack_allocator.h
 	util_stats.h
 	util_string.h
 	util_system.h
 	util_task.h
+	util_texture.h
 	util_thread.h
 	util_time.h
 	util_transform.h
 	util_types.h
 	util_vector.h
+	util_version.h
 	util_view.h
 	util_volume.h
+	util_windows.h
 	util_xml.h
 )
-
-if(WITH_CYCLES_DEBUG)
-	list(APPEND SRC
-		util_guarded_allocator.cpp
-	)
-	list(APPEND SRC_HEADERS
-		util_guarded_allocator.h
-	)
-endif()
 
 if(WITH_OPENVDB)
     add_definitions(
         -DWITH_OPENVDB
+    )
+    list(APPEND SRC
+		util_volume.cpp
     )
 endif()
 

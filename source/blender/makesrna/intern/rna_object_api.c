@@ -35,6 +35,7 @@
 #include <time.h>
 
 #include "BLI_utildefines.h"
+#include "BLI_kdopbvh.h"
 
 #include "RNA_define.h"
 
@@ -613,7 +614,8 @@ void RNA_api_object(StructRNA *srna)
 	RNA_def_property_flag(parm, PROP_REQUIRED);
 	parm = RNA_def_float_vector(func, "direction", 3, NULL, -FLT_MAX, FLT_MAX, "", "", -1e4, 1e4);
 	RNA_def_property_flag(parm, PROP_REQUIRED);
-	RNA_def_float(func, "distance", FLT_MAX, 0.0, FLT_MAX, "", "Maximum distance", 0.0, FLT_MAX);
+	RNA_def_float(func, "distance", BVH_RAYCAST_DIST_MAX, 0.0, BVH_RAYCAST_DIST_MAX,
+	              "", "Maximum distance", 0.0, BVH_RAYCAST_DIST_MAX);
 
 	/* return location and normal */
 	parm = RNA_def_boolean(func, "result", 0, "", "");
@@ -696,7 +698,7 @@ void RNA_api_object(StructRNA *srna)
 #endif /* NDEBUG */
 
 	func = RNA_def_function(srna, "update_from_editmode", "rna_Object_update_from_editmode");
-	RNA_def_function_ui_description(func, "Load the objects edit-mode data intp the object data");
+	RNA_def_function_ui_description(func, "Load the objects edit-mode data into the object data");
 	parm = RNA_def_boolean(func, "result", 0, "", "Success");
 	RNA_def_function_return(func, parm);
 
