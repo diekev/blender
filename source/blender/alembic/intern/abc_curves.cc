@@ -150,12 +150,12 @@ void AbcCurveWriter::do_write()
 
 		if ((nurbs->flagu & CU_NURB_CYCLIC) != 0) {
 			knots[0] = nurbs->knotsu[0];
-            knots[num_knots - 1] = nurbs->knotsu[num_knots - 1];
-        }
-        else {
+			knots[num_knots - 1] = nurbs->knotsu[num_knots - 1];
+		}
+		else {
 			knots[0] = (2.0f * nurbs->knotsu[0] - nurbs->knotsu[1]);
-            knots[num_knots - 1] = (2.0f * nurbs->knotsu[num_knots - 1] - nurbs->knotsu[num_knots - 2]);
-        }
+			knots[num_knots - 1] = (2.0f * nurbs->knotsu[num_knots - 1] - nurbs->knotsu[num_knots - 2]);
+		}
 
 		orders.push_back(nurbs->orderu + 1);
 		vert_counts.push_back(verts.size());
@@ -196,20 +196,20 @@ bool AbcCurveReader::valid() const
 	return m_curves_schema.valid();
 }
 
-void AbcCurveReader::readObjectData(Main *bmain, Scene *scene, float time)
+void AbcCurveReader::readObjectData(Main *bmain, float time)
 {
 	Curve *cu = BKE_curve_add(bmain, m_data_name.c_str(), OB_CURVE);
 
 	cu->flag |= CU_DEFORM_FILL | CU_3D;
 	cu->actvert = CU_ACT_NONE;
 
-	m_object = BKE_object_add(bmain, scene, OB_CURVE, m_object_name.c_str());
+	m_object = BKE_object_add_only_object(bmain, OB_CURVE, m_object_name.c_str());
 	m_object->data = cu;
 
 	read_curve_sample(cu, m_curves_schema, time);
 
-	if (m_settings->is_sequence || !m_curves_schema.isConstant()) {
-		addDefaultModifier(bmain);
+	if (has_animations(m_curves_schema, m_settings)) {
+		addCacheModifier();
 	}
 }
 
@@ -250,11 +250,11 @@ void read_curve_sample(Curve *cu, const ICurvesSchema &schema, const float time)
 		nu->orderu = num_verts;
 
 		if (smp.getType() == Alembic::AbcGeom::kCubic) {
-            nu->orderu = 3;
-        }
-        else if (orders && orders->size() > i) {
-            nu->orderu = static_cast<short>((*orders)[i] - 1);
-        }
+			nu->orderu = 3;
+		}
+		else if (orders && orders->size() > i) {
+			nu->orderu = static_cast<short>((*orders)[i] - 1);
+		}
 
 		if (periodicity == Alembic::AbcGeom::kNonPeriodic) {
 			nu->flagu |= CU_NURB_ENDPOINT;

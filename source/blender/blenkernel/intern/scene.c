@@ -151,7 +151,7 @@ static void remove_sequencer_fcurves(Scene *sce)
 	}
 }
 
-Scene *BKE_scene_copy(Scene *sce, int type)
+Scene *BKE_scene_copy(Main *bmain, Scene *sce, int type)
 {
 	Scene *scen;
 	SceneRenderLayer *srl, *new_srl;
@@ -162,7 +162,7 @@ Scene *BKE_scene_copy(Scene *sce, int type)
 	if (type == SCE_COPY_EMPTY) {
 		ListBase rl, rv;
 		/* XXX. main should become an arg */
-		scen = BKE_scene_add(G.main, sce->id.name + 2);
+		scen = BKE_scene_add(bmain, sce->id.name + 2);
 		
 		rl = scen->r.layers;
 		rv = scen->r.views;
@@ -183,10 +183,10 @@ Scene *BKE_scene_copy(Scene *sce, int type)
 		BKE_sound_destroy_scene(scen);
 	}
 	else {
-		scen = BKE_libblock_copy(&sce->id);
+		scen = BKE_libblock_copy(bmain, &sce->id);
 		BLI_duplicatelist(&(scen->base), &(sce->base));
 		
-		BKE_main_id_clear_newpoins(G.main);
+		BKE_main_id_clear_newpoins(bmain);
 		
 		id_us_plus((ID *)scen->world);
 		id_us_plus((ID *)scen->set);
@@ -210,7 +210,7 @@ Scene *BKE_scene_copy(Scene *sce, int type)
 
 		if (sce->nodetree) {
 			/* ID's are managed on both copy and switch */
-			scen->nodetree = ntreeCopyTree(sce->nodetree);
+			scen->nodetree = ntreeCopyTree(bmain, sce->nodetree);
 			ntreeSwitchID(scen->nodetree, &sce->id, &scen->id);
 		}
 
@@ -238,7 +238,7 @@ Scene *BKE_scene_copy(Scene *sce, int type)
 				for (lineset = new_srl->freestyleConfig.linesets.first; lineset; lineset = lineset->next) {
 					if (lineset->linestyle) {
 						id_us_plus((ID *)lineset->linestyle);
-						lineset->linestyle = BKE_linestyle_copy(G.main, lineset->linestyle);
+						lineset->linestyle = BKE_linestyle_copy(bmain, lineset->linestyle);
 					}
 				}
 			}
@@ -321,7 +321,7 @@ Scene *BKE_scene_copy(Scene *sce, int type)
 	if (type == SCE_COPY_FULL) {
 		if (scen->world) {
 			id_us_plus((ID *)scen->world);
-			scen->world = BKE_world_copy(scen->world);
+			scen->world = BKE_world_copy(bmain, scen->world);
 			BKE_animdata_copy_id_action((ID *)scen->world);
 		}
 
@@ -335,7 +335,7 @@ Scene *BKE_scene_copy(Scene *sce, int type)
 	/* grease pencil */
 	if (scen->gpd) {
 		if (type == SCE_COPY_FULL) {
-			scen->gpd = gpencil_data_duplicate(scen->gpd, false);
+			scen->gpd = gpencil_data_duplicate(bmain, scen->gpd, false);
 		}
 		else if (type == SCE_COPY_EMPTY) {
 			scen->gpd = NULL;
@@ -345,9 +345,7 @@ Scene *BKE_scene_copy(Scene *sce, int type)
 		}
 	}
 
-	if (sce->preview) {
-		scen->preview = BKE_previewimg_copy(sce->preview);
-	}
+	scen->preview = BKE_previewimg_copy(sce->preview);
 
 	return scen;
 }
@@ -1126,7 +1124,7 @@ char *BKE_scene_find_last_marker_name(Scene *scene, int frame)
 
 Base *BKE_scene_base_add(Scene *sce, Object *ob)
 {
-	Base *b = MEM_callocN(sizeof(*b), "BKE_scene_base_add");
+	Base *b = MEM_callocN(sizeof(*b), __func__);
 	BLI_addhead(&sce->base, b);
 
 	b->object = ob;

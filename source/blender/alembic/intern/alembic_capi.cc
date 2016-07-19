@@ -50,6 +50,7 @@ extern "C" {
 #include "BKE_cachefile.h"
 #include "BKE_cdderivedmesh.h"
 #include "BKE_context.h"
+#include "BKE_curve.h"
 #include "BKE_depsgraph.h"
 #include "BKE_global.h"
 #include "BKE_library.h"
@@ -153,9 +154,106 @@ static IArchive *open_archive(const std::string &filename)
 	return archive;
 }
 
-AbcArchiveHandle *ABC_create_handle(const char *filename)
+/* NOTE: this function is similar to visit_objects below, need to keep them in
+ * sync. */
+static void gather_objects_paths(const IObject &object, ListBase *object_paths)
 {
-	return handle_from_archive(open_archive(filename));
+	if (!object.valid()) {
+		return;
+	}
+
+	for (int i = 0; i < object.getNumChildren(); ++i) {
+		IObject child = object.getChild(i);
+
+		if (!child.valid()) {
+			continue;
+		}
+
+		bool get_path = false;
+
+		const MetaData &md = child.getMetaData();
+
+		if (IXform::matches(md)) {
+			/* Check whether or not this object is a Maya locator, which is
+			 * similar to empties used as parent object in Blender. */
+			if (has_property(child.getProperties(), "locator")) {
+				get_path = true;
+			}
+			else {
+				/* Avoid creating an empty object if the child of this transform
+				 * is not a transform (that is an empty). */
+				if (child.getNumChildren() == 1) {
+					if (IXform::matches(child.getChild(0).getMetaData())) {
+						get_path = true;
+					}
+#if 0
+					else {
+						std::cerr << "Skipping " << child.getFullName() << '\n';
+					}
+#endif
+				}
+				else {
+					get_path = true;
+				}
+			}
+		}
+		else if (IPolyMesh::matches(md)) {
+			get_path = true;
+		}
+		else if (ISubD::matches(md)) {
+			get_path = true;
+		}
+		else if (INuPatch::matches(md)) {
+			get_path = true;
+		}
+		else if (ICamera::matches(md)) {
+			get_path = true;
+		}
+		else if (IPoints::matches(md)) {
+			get_path = true;
+		}
+		else if (IMaterial::matches(md)) {
+			/* Pass for now. */
+		}
+		else if (ILight::matches(md)) {
+			/* Pass for now. */
+		}
+		else if (IFaceSet::matches(md)) {
+			/* Pass, those are handled in the mesh reader. */
+		}
+		else if (ICurves::matches(md)) {
+			get_path = true;
+		}
+		else {
+			assert(false);
+		}
+
+		if (get_path) {
+			AlembicObjectPath *abc_path = static_cast<AlembicObjectPath *>(
+			                                  MEM_callocN(sizeof(AlembicObjectPath), "AlembicObjectPath"));
+
+			BLI_strncpy(abc_path->path, child.getFullName().c_str(), PATH_MAX);
+
+			BLI_addtail(object_paths, abc_path);
+		}
+
+		gather_objects_paths(child, object_paths);
+	}
+}
+
+AbcArchiveHandle *ABC_create_handle(const char *filename, ListBase *object_paths)
+{
+	IArchive *archive = open_archive(filename);
+
+	if (!archive) {
+		return NULL;
+	}
+
+	if (object_paths) {
+		gather_objects_paths(archive->getTop(), object_paths);
+	}
+
+	return handle_from_archive(archive);
 }
 
 void ABC_free_handle(AbcArchiveHandle *handle)
@@ -410,6 +508,13 @@ static void visit_object(const IObject &object,
 		if (reader) {
 			readers.push_back(reader);
 
+			AlembicObjectPath *abc_path = static_cast<AlembicObjectPath *>(
+			                                  MEM_callocN(sizeof(AlembicObjectPath), "AlembicObjectPath"));
+
+			BLI_strncpy(abc_path->path, child.getFullName().c_str(), PATH_MAX);
+
+			BLI_addtail(&settings.cache_file->object_paths, abc_path);
+
 			/* Cast to `void *` explicitly to avoid compiler errors because it
 			 * is a `const char *` which the compiler cast to `const void *`
 			 * instead of the expected `void *`. */
@@ -440,7 +545,40 @@ struct ImportJobData {
 	float *progress;
 
 	char error_code;
+	bool was_cancelled;
 };
+
+ABC_INLINE bool is_mesh_and_strands(const IObject &object)
+{
+	if (object.getNumChildren() != 2) {
+		return false;
+	}
+
+	bool has_mesh = false;
+	bool has_curve = false;
+
+	for (int i = 0; i < object.getNumChildren(); ++i) {
+		const IObject &child = object.getChild(i);
+
+		if (!child.valid()) {
+			continue;
+		}
+
+		const MetaData &md = child.getMetaData();
+
+		if (IPolyMesh::matches(md)) {
+			has_mesh = true;
+		}
+		else if (ISubD::matches(md)) {
+			has_mesh = true;
+		}
+		else if (ICurves::matches(md)) {
+			has_curve = true;
+		}
+	}
+
+	return has_mesh && has_curve;
+}
 
 static void import_startjob(void *user_data, short *stop, short *do_update, float *progress)
 {
@@ -481,6 +619,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
 	visit_object(archive->getTop(), data->readers, data->parent_map, data->settings);
 
 	if (G.is_break) {
+		data->was_cancelled = true;
 		return;
 	}
 
@@ -492,8 +631,6 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
 	const float size = static_cast<float>(data->readers.size());
 	size_t i = 0;
 
-	Scene *scene = data->scene;
-
 	chrono_t min_time = std::numeric_limits<chrono_t>::max();
 	chrono_t max_time = std::numeric_limits<chrono_t>::min();
 
@@ -502,7 +639,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
 		AbcObjectReader *reader = *iter;
 
 		if (reader->valid()) {
-			reader->readObjectData(data->bmain, scene, 0.0f);
+			reader->readObjectData(data->bmain, 0.0f);
 			reader->readObjectMatrix(0.0f);
 
 			min_time = std::min(min_time, reader->minTime());
@@ -510,13 +647,17 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
 		}
 
 		*data->progress = 0.1f + 0.6f * (++i / size);
+		*data->do_update = true;
 
 		if (G.is_break) {
+			data->was_cancelled = true;
 			return;
 		}
 	}
 
 	if (data->settings.set_frame_range) {
+		Scene *scene = data->scene;
+
 		if (data->settings.is_sequence) {
 			SFRA = data->settings.offset;
 			EFRA = SFRA + (data->settings.sequence_len - 1);
@@ -537,18 +678,22 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
 		const AbcObjectReader *parent_reader = NULL;
 		const IObject &iobject = reader->iobject();
 
-		if (IXform::matches(iobject.getHeader())) {
-			parent_reader = reinterpret_cast<AbcObjectReader *>(
-			                    BLI_ghash_lookup(data->parent_map,
-			                                     iobject.getParent().getFullName().c_str()));
-		}
-		else {
+		IObject parent = iobject.getParent();
+
+		if (!IXform::matches(iobject.getHeader())) {
 			/* In the case of an non XForm node, the parent is the transform
-			 * matrix of the data itself, so skip it. */
-			parent_reader = reinterpret_cast<AbcObjectReader *>(
-			                    BLI_ghash_lookup(data->parent_map,
-			                                     iobject.getParent().getParent().getFullName().c_str()));
+			 * matrix of the data itself, so we get the its grand parent.
+			 */
+
+			/* Special case with object only containing a mesh and some strands,
+			 * we want both objects to be parented to the same object. */
+			if (!is_mesh_and_strands(parent)) {
+				parent = parent.getParent();
+			}
 		}
+
+		parent_reader = reinterpret_cast<AbcObjectReader *>(
+		                    BLI_ghash_lookup(data->parent_map, parent.getFullName().c_str()));
 
 		if (parent_reader) {
 			Object *parent = parent_reader->object();
@@ -556,16 +701,14 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
 			if (parent != NULL && reader->object() != parent) {
 				Object *ob = reader->object();
 				ob->parent = parent;
-
-				DAG_id_tag_update(&ob->id, OB_RECALC_OB);
-				DAG_relations_tag_update(data->bmain);
-				WM_main_add_notifier(NC_OBJECT | ND_PARENT, ob);
 			}
 		}
 
 		*data->progress = 0.7f + 0.3f * (++i / size);
+		*data->do_update = true;
 
 		if (G.is_break) {
+			data->was_cancelled = true;
 			return;
 		}
 	}
@@ -575,9 +718,37 @@ static void import_endjob(void *user_data)
 {
 	ImportJobData *data = static_cast<ImportJobData *>(user_data);
 
-	/* TODO(kevin): remove objects from the scene on cancelation. */
-
 	std::vector<AbcObjectReader *>::iterator iter;
+
+	/* Delete objects on cancelation. */
+	if (data->was_cancelled) {
+		for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
+			Object *ob = (*iter)->object();
+
+			if (ob->data) {
+				BKE_libblock_free_us(data->bmain, ob->data);
+				ob->data = NULL;
+			}
+
+			BKE_libblock_free_us(data->bmain, ob);
+		}
+	}
+	else {
+		/* Add object to scene. */
+		BKE_scene_base_deselect_all(data->scene);
+
+		for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
+			Object *ob = (*iter)->object();
+			ob->lay = data->scene->lay;
+
+			BKE_scene_base_add(data->scene, ob);
+
+			DAG_id_tag_update_ex(data->bmain, &ob->id, OB_RECALC_OB | OB_RECALC_DATA | OB_RECALC_TIME);
+		}
+
+		DAG_relations_tag_update(data->bmain);
+	}
+
 	for (iter = data->readers.begin(); iter != data->readers.end(); ++iter) {
 		delete *iter;
 	}
@@ -619,8 +790,10 @@ void ABC_import(bContext *C, const char *filepath, float scale, bool is_sequence
 	job->settings.sequence_len = sequence_len;
 	job->settings.offset = offset;
 	job->parent_map = NULL;
-	G.is_break = false;
 	job->error_code = ABC_NO_ERROR;
+	job->was_cancelled = false;
+
+	G.is_break = false;
 
 	wmJob *wm_job = WM_jobs_get(CTX_wm_manager(C),
 	                            CTX_wm_window(C),
@@ -672,6 +845,31 @@ void ABC_get_transform(AbcArchiveHandle *handle, Object *ob, const char *object_
 
 /* ***************************************** */
 
+static bool check_smooth_poly_flag(DerivedMesh *dm)
+{
+	MPoly *mpolys = dm->getPolyArray(dm);
+
+	for (int i = 0, e = dm->getNumPolys(dm); i < e; ++i) {
+		MPoly &poly = mpolys[i];
+
+		if ((poly.flag & ME_SMOOTH) != 0) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static void set_smooth_poly_flag(DerivedMesh *dm)
+{
+	MPoly *mpolys = dm->getPolyArray(dm);
+
+	for (int i = 0, e = dm->getNumPolys(dm); i < e; ++i) {
+		MPoly &poly = mpolys[i];
+		poly.flag |= ME_SMOOTH;
+	}
+}
+
 static void *add_customdata_cb(void *user_data, const char *name, int data_type)
 {
 	DerivedMesh *dm = static_cast<DerivedMesh *>(user_data);
@@ -694,6 +892,22 @@ static void *add_customdata_cb(void *user_data, const char *name, int data_type)
 	return cd_ptr;
 }
 
+ABC_INLINE CDStreamConfig get_config(DerivedMesh *dm)
+{
+	CDStreamConfig config;
+
+	config.user_data = dm;
+	config.mvert = dm->getVertArray(dm);
+	config.mloop = dm->getLoopArray(dm);
+	config.mpoly = dm->getPolyArray(dm);
+	config.totloop = dm->getNumLoops(dm);
+	config.totpoly = dm->getNumPolys(dm);
+	config.loopdata = dm->getLoopDataLayout(dm);
+	config.add_customdata_cb = add_customdata_cb;
+
+	return config;
+}
+
 static DerivedMesh *read_mesh_sample(DerivedMesh *dm, const IObject &iobject, const float time)
 {
 	IPolyMesh mesh(iobject, kWrapExisting);
@@ -705,89 +919,74 @@ static DerivedMesh *read_mesh_sample(DerivedMesh *dm, const IObject &iobject, co
 	const Alembic::Abc::Int32ArraySamplePtr &face_indices = sample.getFaceIndices();
 	const Alembic::Abc::Int32ArraySamplePtr &face_counts = sample.getFaceCounts();
 
-	bool new_dm = false;
+	DerivedMesh *new_dm = NULL;
+
 	if (dm->getNumVerts(dm) != positions->size()) {
-		DerivedMesh *tmp = CDDM_from_template(dm,
-		                                      positions->size(),
-		                                      0,
-		                                      0,
-		                                      face_indices->size(),
-		                                      face_counts->size());
-		dm = tmp;
-		new_dm = true;
+		new_dm = CDDM_from_template(dm,
+		                            positions->size(),
+		                            0,
+		                            0,
+		                            face_indices->size(),
+		                            face_counts->size());
 	}
 
-	MVert *mverts = dm->getVertArray(dm);
-	MPoly *mpolys = dm->getPolyArray(dm);
-	MLoop *mloops = dm->getLoopArray(dm);
-	MLoopUV *mloopuvs = NULL;
-	CustomData *ldata = dm->getLoopDataLayout(dm);
+	CDStreamConfig config = get_config(new_dm ? new_dm : dm);
 
-	const IV2fGeomParam uv = schema.getUVsParam();
-	Alembic::Abc::V2fArraySamplePtr uvs;
-	Alembic::Abc::UInt32ArraySamplePtr uvs_indices;
-
-	if (uv.valid()) {
-		IV2fGeomParam::Sample uvsamp;
-		uv.getIndexed(uvsamp, sample_sel);
-		uvs = uvsamp.getVals();
-		uvs_indices = uvsamp.getIndices();
-
-		if (uvs_indices->size() != dm->getNumLoops(dm)) {
-			uvs = Alembic::Abc::V2fArraySamplePtr();
-			uvs_indices = Alembic::Abc::UInt32ArraySamplePtr();
-		}
-		else {
-			std::string name = Alembic::Abc::GetSourceName(uv.getMetaData());
-
-			/* According to the convention, primary UVs should have had their name
-			 * set using Alembic::Abc::SetSourceName, but you can't expect everyone
-			 * to follow it! :) */
-			if (name.empty()) {
-				name = uv.getName();
-			}
-
-			void *ptr = add_customdata_cb(dm, name.c_str(), CD_MLOOPUV);
-			mloopuvs = static_cast<MLoopUV *>(ptr);
-
-			dm->dirty = static_cast<DMDirtyFlag>(static_cast<int>(dm->dirty) | static_cast<int>(DM_DIRTY_TESS_CDLAYERS));
-		}
-	}
-
-	N3fArraySamplePtr vertex_normals, poly_normals;
-	const IN3fGeomParam normals = schema.getNormalsParam();
-
-	if (normals.valid()) {
-		IN3fGeomParam::Sample normsamp = normals.getExpandedValue(sample_sel);
-
-		if (normals.getScope() == Alembic::AbcGeom::kFacevaryingScope) {
-			poly_normals = normsamp.getVals();
-		}
-		else if ((normals.getScope() == Alembic::AbcGeom::kVertexScope) ||
-		         (normals.getScope() == Alembic::AbcGeom::kVaryingScope))
-		{
-			vertex_normals = normsamp.getVals();
-		}
-		else {
-			dm->dirty = static_cast<DMDirtyFlag>(static_cast<int>(dm->dirty) | static_cast<int>(DM_DIRTY_NORMALS));
-		}
-	}
-
-	read_mverts(mverts, positions, vertex_normals);
-	read_mpolys(mpolys, mloops, mloopuvs, ldata, face_indices, face_counts, uvs, uvs_indices, poly_normals);
-
-	CDStreamConfig config;
-	config.user_data = dm;
-	config.mloop = dm->getLoopArray(dm);
-	config.mpoly = dm->getPolyArray(dm);
-	config.totloop = dm->getNumLoops(dm);
-	config.totpoly = dm->getNumPolys(dm);
-	config.add_customdata_cb = add_customdata_cb;
-
-	read_custom_data(schema.getArbGeomParams(), config, sample_sel);
+	bool has_loop_normals = false;
+	read_mesh_sample(schema, sample_sel, config, has_loop_normals);
 
 	if (new_dm) {
-		CDDM_calc_edges(dm);
+		/* Check if we had ME_SMOOTH flag set to restore it. */
+		if (!has_loop_normals && check_smooth_poly_flag(dm)) {
+			set_smooth_poly_flag(new_dm);
+		}
+
+		CDDM_calc_normals(new_dm);
+		CDDM_calc_edges(new_dm);
+
+		return new_dm;
+	}
+
+	return dm;
+}
+
+using Alembic::AbcGeom::ISubDSchema;
+
+static DerivedMesh *read_subd_sample(DerivedMesh *dm, const IObject &iobject, const float time)
+{
+	ISubD mesh(iobject, kWrapExisting);
+	ISubDSchema schema = mesh.getSchema();
+	ISampleSelector sample_sel(time);
+	const ISubDSchema::Sample sample = schema.getValue(sample_sel);
+
+	const P3fArraySamplePtr &positions = sample.getPositions();
+	const Alembic::Abc::Int32ArraySamplePtr &face_indices = sample.getFaceIndices();
+	const Alembic::Abc::Int32ArraySamplePtr &face_counts = sample.getFaceCounts();
+
+	DerivedMesh *new_dm = NULL;
+
+	if (dm->getNumVerts(dm) != positions->size()) {
+		new_dm = CDDM_from_template(dm,
+		                            positions->size(),
+		                            0,
+		                            0,
+		                            face_indices->size(),
+		                            face_counts->size());
+	}
+
+	CDStreamConfig config = get_config(new_dm ? new_dm : dm);
+	read_subd_sample(schema, sample_sel, config);
+
+	if (new_dm) {
+		/* Check if we had ME_SMOOTH flag set to restore it. */
+		if (check_smooth_poly_flag(dm)) {
+			set_smooth_poly_flag(new_dm);
+		}
+
+		CDDM_calc_normals(new_dm);
+		CDDM_calc_edges(new_dm);
+
+		return new_dm;
 	}
 
 	return dm;
@@ -847,7 +1046,7 @@ static DerivedMesh *read_curves_sample(Object *ob, const IObject &iobject, const
 	const int curve_count = BLI_listbase_count(&curve->nurb);
 
 	if (curve_count != num_vertices->size()) {
-		BLI_freelistN(&curve->nurb);
+		BKE_nurbList_free(&curve->nurb);
 		read_curve_sample(curve, schema, time);
 	}
 	else {
@@ -877,33 +1076,64 @@ static DerivedMesh *read_curves_sample(Object *ob, const IObject &iobject, const
 	return CDDM_from_curve(ob);
 }
 
-DerivedMesh *ABC_read_mesh(AbcArchiveHandle *handle, Object *ob, DerivedMesh *dm, const char *object_path, const float time)
+DerivedMesh *ABC_read_mesh(AbcArchiveHandle *handle,
+                           Object *ob,
+                           DerivedMesh *dm,
+                           const char *object_path,
+                           const float time,
+                           const char **err_str)
 {
 	IArchive *archive = archive_from_handle(handle);
 
 	if (!archive || !archive->valid()) {
-		return dm;
+		*err_str = "Invalid archive!";
+		return NULL;
 	}
 
 	IObject iobject;
 	find_iobject(archive->getTop(), iobject, object_path);
 
 	if (!iobject.valid()) {
+		*err_str = "Invalid object: verify object path";
 		return NULL;
 	}
 
 	const ObjectHeader &header = iobject.getHeader();
 
 	if (IPolyMesh::matches(header)) {
+		if (ob->type != OB_MESH) {
+			*err_str = "Object type mismatch: object path points to a mesh!";
+			return NULL;
+		}
+
 		return read_mesh_sample(dm, iobject, time);
 	}
+	else if (ISubD::matches(header)) {
+		if (ob->type != OB_MESH) {
+			*err_str = "Object type mismatch: object path points to a subdivision mesh!";
+			return NULL;
+		}
+
+		return read_subd_sample(dm, iobject, time);
+	}
 	else if (IPoints::matches(header)) {
+		if (ob->type != OB_MESH) {
+			*err_str = "Object type mismatch: object path points to a point cloud (requires a mesh object)!";
+			return NULL;
+		}
+
 		return read_points_sample(dm, iobject, time);
 	}
 	else if (ICurves::matches(header)) {
+		if (ob->type != OB_CURVE) {
+			*err_str = "Object type mismatch: object path points to a curve!";
+			return NULL;
+		}
+
 		return read_curves_sample(ob, iobject, time);
 	}
 
+	*err_str = "Unsupported object type: verify object path"; // or poke developer
 	return NULL;
 }
 
@@ -1016,7 +1246,10 @@ void ABC_get_velocity_cache(AbcArchiveHandle *handle, const char *object_path, f
 		}
 	}
 
+	float fps = 1.0f / 24.0f;
 	float vel[3];
+
+	std::cerr << __func__ << ", velocity vectors: " << velocities->size() << '\n';
 
 //#define DEBUG_VELOCITY
 
@@ -1044,9 +1277,8 @@ void ABC_get_velocity_cache(AbcArchiveHandle *handle, const char *object_path, f
 		}
 #endif
 
-		(*values++) = vel[0];
-		(*values++) = vel[1];
-		(*values++) = vel[2];
+		mul_v3_fl(vel, fps);
+		copy_v3_v3(values + i * 3, vel);
 	}
 
 #ifdef DEBUG_VELOCITY

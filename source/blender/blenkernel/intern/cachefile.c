@@ -32,6 +32,7 @@
 #include "DNA_scene_types.h"
 
 #include "BLI_fileops.h"
+#include "BLI_listbase.h"
 #include "BLI_path_util.h"
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
@@ -78,6 +79,8 @@ void BKE_cachefile_free(CacheFile *cache_file)
 #ifdef WITH_ALEMBIC
 	ABC_free_handle(cache_file->handle);
 #endif
+
+	BLI_freelistN(&cache_file->object_paths);
 }
 
 CacheFile *BKE_cachefile_copy(Main *bmain, CacheFile *cache_file)
@@ -95,8 +98,8 @@ CacheFile *BKE_cachefile_copy(Main *bmain, CacheFile *cache_file)
 		BKE_cachefile_load(new_cache_file, bmain->name);
 	}
 
-	if (cache_file->id.lib) {
-		BKE_id_lib_local_paths(G.main, cache_file->id.lib, &new_cache_file->id);
+	if (ID_IS_LINKED_DATABLOCK(cache_file)) {
+		BKE_id_lib_local_paths(bmain, cache_file->id.lib, &new_cache_file->id);
 	}
 
 	return new_cache_file;
@@ -112,7 +115,7 @@ void BKE_cachefile_load(CacheFile *cache_file, const char *relabase)
 		ABC_free_handle(cache_file->handle);
 	}
 
-	cache_file->handle = ABC_create_handle(filename);
+	cache_file->handle = ABC_create_handle(filename, &cache_file->object_paths);
 #endif
 }
 
@@ -134,7 +137,7 @@ void BKE_cachefile_update_frame(Main *bmain, Scene *scene, const float ctime, co
 		if (BKE_cachefile_filepath_get(cache_file, time, filename)) {
 #ifdef WITH_ALEMBIC
 			ABC_free_handle(cache_file->handle);
-			cache_file->handle = ABC_create_handle(filename);
+			cache_file->handle = ABC_create_handle(filename, NULL);
 #endif
 		}
 	}

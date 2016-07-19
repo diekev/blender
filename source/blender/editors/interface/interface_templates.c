@@ -303,7 +303,7 @@ static void template_id_cb(bContext *C, void *arg_litem, void *arg_event)
 			break;
 		case UI_ID_LOCAL:
 			if (id) {
-				if (id_make_local(id, false)) {
+				if (id_make_local(CTX_data_main(C), id, false, false)) {
 					/* reassign to get get proper updates/notifiers */
 					idptr = RNA_property_pointer_get(&template->ptr, template->prop);
 					RNA_property_pointer_set(&template->ptr, template->prop, idptr);
@@ -457,7 +457,7 @@ static void template_ID(
 			else {
 				but = uiDefIconBut(block, UI_BTYPE_BUT, 0, ICON_LIBRARY_DATA_DIRECT, 0, 0, UI_UNIT_X, UI_UNIT_Y,
 				                   NULL, 0, 0, 0, 0, TIP_("Direct linked library datablock, click to make local"));
-				if (!id_make_local(id, true /* test */) || (idfrom && idfrom->lib))
+				if (!id_make_local(CTX_data_main(C), id, true /* test */, false) || (idfrom && idfrom->lib))
 					UI_but_flag_enable(but, UI_BUT_DISABLED);
 			}
 
@@ -477,7 +477,7 @@ static void template_ID(
 
 			UI_but_funcN_set(but, template_id_cb, MEM_dupallocN(template), SET_INT_IN_POINTER(UI_ID_ALONE));
 			if (/* test only */
-			    (id_copy(id, NULL, true) == false) ||
+			    (id_copy(CTX_data_main(C), id, NULL, true) == false) ||
 			    (idfrom && idfrom->lib) ||
 			    (!editable) ||
 			    /* object in editmode - don't change data */
@@ -3869,6 +3869,8 @@ void uiTemplateCacheFile(uiLayout *layout, bContext *C, PointerRNA *ptr, const c
 	PointerRNA fileptr = RNA_property_pointer_get(ptr, prop);
 	CacheFile *file = fileptr.data;
 
+	uiLayoutSetContextPointer(layout, "edit_cachefile", &fileptr);
+
 	uiTemplateID(layout, C, ptr, propname, NULL, "CACHEFILE_OT_open", NULL);
 
 	if (!file) {
@@ -3884,6 +3886,7 @@ void uiTemplateCacheFile(uiLayout *layout, bContext *C, PointerRNA *ptr, const c
 	row = uiLayoutRow(split, true);
 
 	uiItemR(row, &fileptr, "filepath", 0, "", ICON_NONE);
+	uiItemO(row, "", ICON_FILE_REFRESH, "cachefile.reload");
 
 	row = uiLayoutRow(layout, false);
 	uiItemR(row, &fileptr, "override_frame", 0, "Override Frame", ICON_NONE);

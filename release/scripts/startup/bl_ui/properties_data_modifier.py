@@ -151,21 +151,16 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         col = split.column()
         col.label(text="Operation:")
         col.prop(md, "operation", text="")
+        row = layout.row()
+        row.label("Solver:")
+        row.prop(md, "solver", expand=True)
 
         col = split.column()
         col.label(text="Object:")
         col.prop(md, "object", text="")
 
-        """
-        layout.prop(md, "use_bmesh")
-        if md.use_bmesh:
-            box = layout.box()
-            box.label("BMesh Options:")
-            box.prop(md, "use_bmesh_separate")
-            box.prop(md, "use_bmesh_dissolve")
-            box.prop(md, "use_bmesh_connect_regions")
-            box.prop(md, "threshold")
-        """
+        if md.solver == 'BMESH':
+            layout.prop(md, "double_threshold")
 
     def BUILD(self, layout, ob, md):
         split = layout.split()
@@ -223,8 +218,17 @@ class DATA_PT_modifiers(ModifierButtonsPanel, Panel):
         row.prop(md, "flip_axis")
 
     def MESH_SEQUENCE_CACHE(self, layout, ob, md):
-        layout.template_cache_file(md, "cache_file")
-        layout.prop(md, "abc_object_path")
+        layout.label(text="Cache File Properties:")
+        box = layout.box()
+        box.template_cache_file(md, "cache_file")
+
+        cache_file = md.cache_file
+        
+        layout.label(text="Modifier Properties:")
+        box = layout.box()
+        
+        if cache_file != None:
+            box.prop_search(md, "abc_object_path", cache_file, "object_paths")
 
     def CAST(self, layout, ob, md):
         split = layout.split(percentage=0.25)

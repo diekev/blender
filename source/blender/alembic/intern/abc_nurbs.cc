@@ -356,7 +356,7 @@ static bool check_cyclic(const INuPatchSchema::Sample &smp)
 	return notOpen;
 }
 
-void AbcNurbsReader::readObjectData(Main *bmain, Scene *scene, float time)
+void AbcNurbsReader::readObjectData(Main *bmain, float time)
 {
 	Curve *cu = static_cast<Curve *>(BKE_curve_add(bmain, "abc_curve", OB_SURF));
 	cu->actvert = CU_ACT_NONE;
@@ -442,7 +442,7 @@ void AbcNurbsReader::readObjectData(Main *bmain, Scene *scene, float time)
 
 	BLI_strncpy(cu->id.name + 2, m_data_name.c_str(), m_data_name.size() + 1);
 
-	m_object = BKE_object_add(bmain, scene, OB_SURF, m_object_name.c_str());
+	m_object = BKE_object_add_only_object(bmain, OB_SURF, m_object_name.c_str());
 	m_object->data = cu;
 }
 
