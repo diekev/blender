@@ -95,11 +95,11 @@ bAction *add_empty_action(Main *bmain, const char name[])
 /* .................................. */
 
 // does copy_fcurve...
-void BKE_action_make_local(Main *bmain, bAction *act)
+void BKE_action_make_local(Main *bmain, bAction *act, const bool force_local)
 {
 	bool is_local = false, is_lib = false;
 
-	/* - only lib users: do nothing
+	/* - only lib users: do nothing (unless force_local is set)
 	 * - only local users: set flag
 	 * - mixed: make copy
 	 */
@@ -110,17 +110,15 @@ void BKE_action_make_local(Main *bmain, bAction *act)
 
 	BKE_library_ID_test_usages(bmain, act, &is_local, &is_lib);
 
-	if (is_local) {
+	if (force_local || is_local) {
 		if (!is_lib) {
 			id_clear_lib_data(bmain, &act->id);
+			BKE_id_expand_local(&act->id);
 		}
 		else {
 			bAction *act_new = BKE_action_copy(bmain, act);
 
 			act_new->id.us = 0;
-
-			/* Remap paths of new ID using old library as base. */
-			BKE_id_lib_local_paths(bmain, act->id.lib, &act_new->id);
 
 			BKE_libblock_remap(bmain, act, act_new, ID_REMAP_SKIP_INDIRECT_USAGE);
 		}
@@ -184,6 +182,7 @@ bAction *BKE_action_copy(Main *bmain, bAction *src)
 	}
 	
 	if (ID_IS_LINKED_DATABLOCK(src)) {
+		BKE_id_expand_local(&dst->id);
 		BKE_id_lib_local_paths(bmain, src->id.lib, &dst->id);
 	}
 

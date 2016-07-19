@@ -99,20 +99,19 @@ Camera *BKE_camera_copy(Main *bmain, Camera *cam)
 	
 	camn = BKE_libblock_copy(bmain, &cam->id);
 
-	id_lib_extern((ID *)camn->dof_ob);
-
 	if (ID_IS_LINKED_DATABLOCK(cam)) {
+		BKE_id_expand_local(&camn->id);
 		BKE_id_lib_local_paths(bmain, cam->id.lib, &camn->id);
 	}
 
 	return camn;
 }
 
-void BKE_camera_make_local(Main *bmain, Camera *cam)
+void BKE_camera_make_local(Main *bmain, Camera *cam, const bool force_local)
 {
 	bool is_local = false, is_lib = false;
 
-	/* - only lib users: do nothing
+	/* - only lib users: do nothing (unless force_local is set)
 	 * - only local users: set flag
 	 * - mixed: make copy
 	 */
@@ -123,17 +122,15 @@ void BKE_camera_make_local(Main *bmain, Camera *cam)
 
 	BKE_library_ID_test_usages(bmain, cam, &is_local, &is_lib);
 
-	if (is_local) {
+	if (force_local || is_local) {
 		if (!is_lib) {
 			id_clear_lib_data(bmain, &cam->id);
+			BKE_id_expand_local(&cam->id);
 		}
 		else {
 			Camera *cam_new = BKE_camera_copy(bmain, cam);
 
 			cam_new->id.us = 0;
-
-			/* Remap paths of new ID using old library as base. */
-			BKE_id_lib_local_paths(bmain, cam->id.lib, &cam_new->id);
 
 			BKE_libblock_remap(bmain, cam, cam_new, ID_REMAP_SKIP_INDIRECT_USAGE);
 		}

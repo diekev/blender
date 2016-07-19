@@ -198,6 +198,7 @@ Brush *BKE_brush_copy(Main *bmain, Brush *brush)
 	id_fake_user_set(&brush->id);
 
 	if (ID_IS_LINKED_DATABLOCK(brush)) {
+		BKE_id_expand_local(&brushn->id);
 		BKE_id_lib_local_paths(bmain, brush->id.lib, &brushn->id);
 	}
 
@@ -218,26 +219,11 @@ void BKE_brush_free(Brush *brush)
 	BKE_previewimg_free(&(brush->preview));
 }
 
-static int extern_local_brush_callback(
-        void *UNUSED(user_data), struct ID *UNUSED(id_self), struct ID **id_pointer, int cd_flag)
-{
-	/* We only tag usercounted ID usages as extern... Why? */
-	if ((cd_flag & IDWALK_USER) && *id_pointer) {
-		id_lib_extern(*id_pointer);
-	}
-	return IDWALK_RET_NOP;
-}
-
-static void extern_local_brush(Brush *brush)
-{
-	BKE_library_foreach_ID_link(&brush->id, extern_local_brush_callback, NULL, 0);
-}
-
-void BKE_brush_make_local(Main *bmain, Brush *brush)
+void BKE_brush_make_local(Main *bmain, Brush *brush, const bool force_local)
 {
 	bool is_local = false, is_lib = false;
 
-	/* - only lib users: do nothing
+	/* - only lib users: do nothing (unless force_local is set)
 	 * - only local users: set flag
 	 * - mixed: make copy
 	 */
@@ -248,15 +234,15 @@ void BKE_brush_make_local(Main *bmain, Brush *brush)
 
 	if (brush->clone.image) {
 		/* Special case: ima always local immediately. Clone image should only have one user anyway. */
-		id_make_local(bmain, &brush->clone.image->id, false);
+		id_make_local(bmain, &brush->clone.image->id, false, false);
 	}
 
 	BKE_library_ID_test_usages(bmain, brush, &is_local, &is_lib);
 
-	if (is_local) {
+	if (force_local || is_local) {
 		if (!is_lib) {
 			id_clear_lib_data(bmain, &brush->id);
-			extern_local_brush(brush);
+			BKE_id_expand_local(&brush->id);
 
 			/* enable fake user by default */
 			id_fake_user_set(&brush->id);
@@ -265,9 +251,6 @@ void BKE_brush_make_local(Main *bmain, Brush *brush)
 			Brush *brush_new = BKE_brush_copy(bmain, brush);  /* Ensures FAKE_USER is set */
 
 			brush_new->id.us = 0;
-
-			/* Remap paths of new ID using old library as base. */
-			BKE_id_lib_local_paths(bmain, brush->id.lib, &brush_new->id);
 
 			BKE_libblock_remap(bmain, brush, brush_new, ID_REMAP_SKIP_INDIRECT_USAGE);
 		}

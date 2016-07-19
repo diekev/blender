@@ -136,10 +136,10 @@ Lamp *BKE_lamp_copy(Main *bmain, Lamp *la)
 	if (la->nodetree)
 		lan->nodetree = ntreeCopyTree(bmain, la->nodetree);
 	
-	if (la->preview)
-		lan->preview = BKE_previewimg_copy(la->preview);
-	
+	lan->preview = BKE_previewimg_copy(la->preview);
+
 	if (ID_IS_LINKED_DATABLOCK(la)) {
+		BKE_id_expand_local(&lan->id);
 		BKE_id_lib_local_paths(bmain, la->id.lib, &lan->id);
 	}
 
@@ -168,30 +168,15 @@ Lamp *localize_lamp(Lamp *la)
 		lan->nodetree = ntreeLocalize(la->nodetree);
 	
 	lan->preview = NULL;
-	
+
 	return lan;
 }
 
-static int extern_local_lamp_callback(
-        void *UNUSED(user_data), struct ID *UNUSED(id_self), struct ID **id_pointer, int cd_flag)
-{
-	/* We only tag usercounted ID usages as extern... Why? */
-	if ((cd_flag & IDWALK_USER) && *id_pointer) {
-		id_lib_extern(*id_pointer);
-	}
-	return IDWALK_RET_NOP;
-}
-
-static void extern_local_lamp(Lamp *la)
-{
-	BKE_library_foreach_ID_link(&la->id, extern_local_lamp_callback, NULL, 0);
-}
-
-void BKE_lamp_make_local(Main *bmain, Lamp *la)
+void BKE_lamp_make_local(Main *bmain, Lamp *la, const bool force_local)
 {
 	bool is_local = false, is_lib = false;
 
-	/* - only lib users: do nothing
+	/* - only lib users: do nothing (unless force_local is set)
 	 * - only local users: set flag
 	 * - mixed: make copy
 	 */
@@ -202,18 +187,15 @@ void BKE_lamp_make_local(Main *bmain, Lamp *la)
 
 	BKE_library_ID_test_usages(bmain, la, &is_local, &is_lib);
 
-	if (is_local) {
+	if (force_local || is_local) {
 		if (!is_lib) {
 			id_clear_lib_data(bmain, &la->id);
-			extern_local_lamp(la);
+			BKE_id_expand_local(&la->id);
 		}
 		else {
 			Lamp *la_new = BKE_lamp_copy(bmain, la);
 
 			la_new->id.us = 0;
-
-			/* Remap paths of new ID using old library as base. */
-			BKE_id_lib_local_paths(bmain, la->id.lib, &la_new->id);
 
 			BKE_libblock_remap(bmain, la, la_new, ID_REMAP_SKIP_INDIRECT_USAGE);
 		}

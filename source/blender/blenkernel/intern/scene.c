@@ -345,9 +345,7 @@ Scene *BKE_scene_copy(Main *bmain, Scene *sce, int type)
 		}
 	}
 
-	if (sce->preview) {
-		scen->preview = BKE_previewimg_copy(sce->preview);
-	}
+	scen->preview = BKE_previewimg_copy(sce->preview);
 
 	return scen;
 }
@@ -1126,7 +1124,7 @@ char *BKE_scene_find_last_marker_name(Scene *scene, int frame)
 
 Base *BKE_scene_base_add(Scene *sce, Object *ob)
 {
-	Base *b = MEM_callocN(sizeof(*b), "BKE_scene_base_add");
+	Base *b = MEM_callocN(sizeof(*b), __func__);
 	BLI_addhead(&sce->base, b);
 
 	b->object = ob;

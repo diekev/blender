@@ -196,20 +196,20 @@ bool AbcCurveReader::valid() const
 	return m_curves_schema.valid();
 }
 
-void AbcCurveReader::readObjectData(Main *bmain, Scene *scene, float time)
+void AbcCurveReader::readObjectData(Main *bmain, float time)
 {
 	Curve *cu = BKE_curve_add(bmain, m_data_name.c_str(), OB_CURVE);
 
 	cu->flag |= CU_DEFORM_FILL | CU_3D;
 	cu->actvert = CU_ACT_NONE;
 
-	m_object = BKE_object_add(bmain, scene, OB_CURVE, m_object_name.c_str());
+	m_object = BKE_object_add_only_object(bmain, OB_CURVE, m_object_name.c_str());
 	m_object->data = cu;
 
 	read_curve_sample(cu, m_curves_schema, time);
 
-	if (m_settings->is_sequence || !m_curves_schema.isConstant()) {
-		addDefaultModifier(bmain);
+	if (has_animations(m_curves_schema, m_settings)) {
+		addCacheModifier();
 	}
 }
 

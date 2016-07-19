@@ -27,9 +27,11 @@
 #include "DNA_cachefile_types.h"
 #include "DNA_space_types.h"
 
+#include "BLI_listbase.h"
 #include "BLI_path_util.h"
 #include "BLI_string.h"
 
+#include "BKE_cachefile.h"
 #include "BKE_context.h"
 #include "BKE_global.h"
 #include "BKE_library.h"
@@ -91,6 +93,7 @@ static int cachefile_open_exec(bContext *C, wmOperator *op)
 
 	CacheFile *cache_file = BKE_libblock_alloc(bmain, ID_CF, BLI_path_basename(filename));
 	BLI_strncpy(cache_file->filepath, filename, FILE_MAX);
+	BKE_cachefile_load(cache_file, bmain->name);
 
 	/* hook into UI */
 	PropertyPointerRNA *pprop = op->customdata;
@@ -123,4 +126,37 @@ void CACHEFILE_OT_open(wmOperatorType *ot)
 	WM_operator_properties_filesel(ot, FILE_TYPE_ALEMBIC | FILE_TYPE_FOLDER,
 	                               FILE_BLENDER, FILE_SAVE, WM_FILESEL_FILEPATH,
 	                               FILE_DEFAULTDISPLAY, FILE_SORT_ALPHA);
+}
+
+/* ***************************** Reload Operator **************************** */
+
+static int cachefile_reload_exec(bContext *C, wmOperator *op)
+{
+	CacheFile *cache_file = CTX_data_edit_cachefile(C);
+
+	if (!cache_file) {
+		return OPERATOR_CANCELLED;
+	}
+
+	Main *bmain = CTX_data_main(C);
+
+	BLI_listbase_clear(&cache_file->object_paths);
+	BKE_cachefile_load(cache_file, bmain->name);
+
+	return OPERATOR_FINISHED;
+
+	UNUSED_VARS(op);
+}
+
+void CACHEFILE_OT_reload(wmOperatorType *ot)
+{
+	ot->name = "Refresh Archive";
+	ot->description = "Update objects paths list with new data from the archive";
+	ot->idname = "CACHEFILE_OT_reload";
+
+	/* api callbacks */
+	ot->exec = cachefile_reload_exec;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
