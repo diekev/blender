@@ -1065,6 +1065,12 @@ typedef struct ImageOpenData {
 	ImageFormatData im_format;
 } ImageOpenData;
 
+typedef struct ImageFrameRange {
+	struct ImageFrameRange *next, *prev;
+	ListBase frames;
+	char filepath[FILE_MAX];
+} ImageFrameRange;
+
 typedef struct ImageFrame {
 	struct ImageFrame *next, *prev;
 	int framenr;
@@ -1090,10 +1096,10 @@ static void image_open_cancel(bContext *UNUSED(C), wmOperator *op)
  * \param frames [out] the list of frame numbers found in the files matching the first one by name
  * \param path [out] the full path of the first file in the list of image files
  */
-static void image_sequence_get_frames(PointerRNA *ptr, ListBase *frames, char *path, const size_t maxlen)
+static void image_sequence_get_frame_ranges(PointerRNA *ptr, ListBase *frames_all)
 {
 	char dir[FILE_MAXDIR];
-	bool is_first_entry = true;
+	ImageFrameRange *frame_range = NULL;
 
 	RNA_string_get(ptr, "directory", dir);
 	RNA_BEGIN (ptr, itemptr, "files")
@@ -1105,29 +1111,26 @@ static void image_sequence_get_frames(PointerRNA *ptr, ListBase *frames, char *p
 		ImageFrame *frame = MEM_callocN(sizeof(ImageFrame), "image_frame");
 
 		/* use the first file in the list as base filename */
-		if (is_first_entry) {
-			BLI_join_dirfile(path, maxlen, dir, filename);
-			frame->framenr = BLI_stringdec(filename, base_head, base_tail, &digits);
-			BLI_addtail(frames, frame);
-			is_first_entry = false;
+		frame->framenr = BLI_stringdec(filename, head, tail, &digits);
+
+		/* still in the same sequence */
+		if ((frame_range != NULL) &&
+		    (STREQLEN(base_head, head, FILE_MAX)) &&
+		    (STREQLEN(base_tail, tail, FILE_MAX)))
+		{
+			/* pass */
 		}
 		else {
-			frame->framenr = BLI_stringdec(filename, head, tail, &digits);
+			/* start a new frame range */
+			frame_range = MEM_callocN(sizeof(*frame_range), __func__);
+			BLI_join_dirfile(frame_range->filepath, sizeof(frame_range->filepath), dir, filename);
+			BLI_addtail(frames_all, frame_range);
 
-			/* still in the same sequence */
-			if ((STREQLEN(base_head, head, FILE_MAX)) &&
-			    (STREQLEN(base_tail, tail, FILE_MAX)))
-			{
-				BLI_addtail(frames, frame);
-			}
-			else {
-				/* different file base name found, is ignored */
-				MEM_freeN(filename);
-				MEM_freeN(frame);
-				break;
-			}
+			BLI_strncpy(base_head, head, sizeof(base_head));
+			BLI_strncpy(base_tail, tail, sizeof(base_tail));
 		}
 
+		BLI_addtail(&frame_range->frames, frame);
 		MEM_freeN(filename);
 	}
 	RNA_END
@@ -1168,6 +1171,52 @@ static int image_sequence_get_len(ListBase *frames, int *ofs)
 	return 0;
 }
 
+static Image *image_open_single(
+        wmOperator *op, const char *filepath, const char *relbase,
+        bool is_relative_path, bool use_multiview, int frame_seq_len)
+{
+	bool exists = false;
+	Image *ima = NULL;
+
+	errno = 0;
+	ima = BKE_image_load_exists_ex(filepath, &exists);
+
+	if (!ima) {
+		if (op->customdata) MEM_freeN(op->customdata);
+		BKE_reportf(op->reports, RPT_ERROR, "Cannot read '%s': %s",
+		            filepath, errno ? strerror(errno) : TIP_("unsupported image format"));
+		return NULL;
+	}
+
+	if (!exists) {
+		/* only image path after save, never ibuf */
+		if (is_relative_path) {
+			BLI_path_rel(ima->name, relbase);
+		}
+
+		/* handle multiview images */
+		if (use_multiview) {
+			ImageOpenData *iod = op->customdata;
+			ImageFormatData *imf = &iod->im_format;
+
+			ima->flag |= IMA_USE_VIEWS;
+			ima->views_format = imf->views_format;
+			*ima->stereo3d_format = imf->stereo3d_format;
+		}
+		else {
+			ima->flag &= ~IMA_USE_VIEWS;
+			BKE_image_free_views(ima);
+		}
+
+		if ((frame_seq_len > 1) && (ima->source == IMA_SRC_FILE)) {
+			ima->source = IMA_SRC_SEQUENCE;
+		}
+	}
+
+	return ima;
+}
+
+
 static int image_open_exec(bContext *C, wmOperator *op)
 {
 	Main *bmain = CTX_data_main(C);
@@ -1178,7 +1227,7 @@ static int image_open_exec(bContext *C, wmOperator *op)
 	ImageOpenData *iod = op->customdata;
 	PointerRNA idptr;
 	Image *ima = NULL;
-	char path[FILE_MAX];
+	char filepath[FILE_MAX];
 	int frame_seq_len = 0;
 	int frame_ofs = 1;
 	bool exists = false;
@@ -1186,90 +1235,68 @@ static int image_open_exec(bContext *C, wmOperator *op)
 	int action = RNA_enum_get(op->ptr, "action");
 
 	const bool is_relative_path = RNA_boolean_get(op->ptr, "relative_path");
+	const bool use_multiview    = RNA_boolean_get(op->ptr, "use_multiview");
 
-	RNA_string_get(op->ptr, "filepath", path);
+	if (!op->customdata)
+		image_open_init(C, op);
+
+	RNA_string_get(op->ptr, "filepath", filepath);
 
 	if (RNA_struct_property_is_set(op->ptr, "directory") &&
 	    RNA_struct_property_is_set(op->ptr, "files"))
 	{
-		/* only to pass to imbuf */
-		char path_full[FILE_MAX];
-		BLI_strncpy(path_full, path, sizeof(path_full));
-		BLI_path_abs(path_full, G.main->name);
+		bool was_relative = BLI_path_is_rel(filepath);
+		ListBase frame_ranges_all;
 
-		if (!IMB_isanim(path_full)) {
-			bool was_relative = BLI_path_is_rel(path);
-			ListBase frames;
+		BLI_listbase_clear(&frame_ranges_all);
+		image_sequence_get_frame_ranges(op->ptr, &frame_ranges_all);
+		for (ImageFrameRange *frame_range = frame_ranges_all.first; frame_range; frame_range = frame_range->next) {
+			int frame_range_ofs;
+			int frame_range_seq_len = image_sequence_get_len(&frame_range->frames, &frame_range_ofs);
+			BLI_freelistN(&frame_range->frames);
 
-			BLI_listbase_clear(&frames);
-			image_sequence_get_frames(op->ptr, &frames, path, sizeof(path));
-			frame_seq_len = image_sequence_get_len(&frames, &frame_ofs);
-			BLI_freelistN(&frames);
+			char filepath_range[FILE_MAX];
+			BLI_strncpy(filepath_range, frame_range->filepath, sizeof(filepath_range));
 
 			if (was_relative) {
-				BLI_path_rel(path, G.main->name);
+				BLI_path_rel(filepath_range, bmain->name);
+			}
+
+			Image *ima_range = image_open_single(
+			         op, filepath_range, bmain->name,
+			         is_relative_path, use_multiview, frame_range_seq_len);
+
+			/* take the first image */
+			if ((ima == NULL) && ima_range) {
+				ima = ima_range;
+				frame_seq_len = frame_range_seq_len;
+				frame_ofs = frame_range_ofs;
 			}
 		}
-	}
-
-	if (sima) {
-		if (!sima->image) {
-			entry = 1;
-		}
+		BLI_freelistN(&frame_ranges_all);
 	}
 	else {
-		entry = 1;
+		/* for drag & drop etc. */
+		ima = image_open_single(
+		        op, filepath, bmain->name,
+		        is_relative_path, use_multiview, 1);
 	}
 
-	if ((entry) || (action & IMA_LAYER_OPEN_IMAGE)) {
-		errno = 0;
-
-		ima = BKE_image_load_exists_ex(path, &exists);
-
-		if (!ima) {
-			if (op->customdata) MEM_freeN(op->customdata);
-			BKE_reportf(op->reports, RPT_ERROR, "Cannot read '%s': %s",
-						path, errno ? strerror(errno) : TIP_("unsupported image format"));
-			return OPERATOR_CANCELLED;
-		}
-
-		if (!op->customdata)
-			image_open_init(C, op);
+	if (ima == NULL) {
+		return OPERATOR_CANCELLED;
 	}
 
-	/* handle multiview images */
-	if (RNA_boolean_get(op->ptr, "use_multiview")) {
-		ImageFormatData *imf = &iod->im_format;
+	/* hook into UI */
+	iod = op->customdata;
 
-		ima->flag |= IMA_USE_VIEWS;
-		ima->views_format = imf->views_format;
-		*ima->stereo3d_format = imf->stereo3d_format;
+	if (iod->pprop.prop) {
+		/* when creating new ID blocks, use is already 1, but RNA
+		 * pointer also increases user, so this compensates it */
+		id_us_min(&ima->id);
+		RNA_id_pointer_create(&ima->id, &idptr);
+		RNA_property_pointer_set(&iod->pprop.ptr, iod->pprop.prop, idptr);
+		RNA_property_update(C, &iod->pprop.ptr, iod->pprop.prop);
 	}
-	else {
-		ima->flag &= ~IMA_USE_VIEWS;
-		BKE_image_free_views(ima);
-	}
-
-	/* only image path after save, never ibuf */
-	if (is_relative_path) {
-		if (!exists) {
-			BLI_path_rel(ima->name, bmain->name);
-		}
-
-		/* hook into UI */
-		iod = op->customdata;
-
-		if (iod->pprop.prop) {
-			/* when creating new ID blocks, use is already 1, but RNA
-			 * pointer also increases user, so this compensates it */
-			id_us_min(&ima->id);
-			if ((frame_seq_len > 1) && ima->source == IMA_SRC_FILE) {
-				ima->source = IMA_SRC_SEQUENCE;
-			}
-			RNA_id_pointer_create(&ima->id, &idptr);
-			RNA_property_pointer_set(&iod->pprop.ptr, iod->pprop.prop, idptr);
-			RNA_property_update(C, &iod->pprop.ptr, iod->pprop.prop);
-		}
 
 		if (iod->iuser) {
 			iuser = iod->iuser;
