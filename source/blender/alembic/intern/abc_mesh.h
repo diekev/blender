@@ -97,7 +97,7 @@ class AbcMeshReader : public AbcObjectReader {
 	CDStreamConfig m_mesh_data;
 
 public:
-	AbcMeshReader(const Alembic::Abc::IObject &object, ImportSettings &settings, bool is_subd);
+	AbcMeshReader(const Alembic::Abc::IObject &object, ImportSettings &settings);
 
 	bool valid() const;
 
@@ -108,9 +108,11 @@ private:
 	                        const Alembic::AbcGeom::ISampleSelector &sample_sel);
 };
 
-void read_mesh_sample(const Alembic::AbcGeom::IPolyMeshSchema &schema,
+void read_mesh_sample(ImportSettings *settings,
+                      const Alembic::AbcGeom::IPolyMeshSchema &schema,
                       const Alembic::AbcGeom::ISampleSelector &selector,
-                      CDStreamConfig &config, bool &do_normals);
+                      CDStreamConfig &config,
+                      bool &do_normals);
 
 /* ************************************************************************** */
 
@@ -127,7 +129,8 @@ public:
 	void readObjectData(Main *bmain, float time);
 };
 
-void read_subd_sample(const Alembic::AbcGeom::ISubDSchema &schema,
+void read_subd_sample(ImportSettings *settings,
+                      const Alembic::AbcGeom::ISubDSchema &schema,
                       const Alembic::AbcGeom::ISampleSelector &selector,
                       CDStreamConfig &config);
 
