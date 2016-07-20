@@ -966,9 +966,11 @@ ABC_INLINE void read_normals_params(AbcMeshData &abc_data,
 
 /* ************************************************************************** */
 
-AbcMeshReader::AbcMeshReader(const IObject &object, ImportSettings &settings, bool is_subd)
+AbcMeshReader::AbcMeshReader(const IObject &object, ImportSettings &settings)
     : AbcObjectReader(object, settings)
 {
+	m_settings->flag |= ABC_READ_ALL;
+
 	IPolyMesh ipoly_mesh(m_iobject, kWrapExisting);
 	m_schema = ipoly_mesh.getSchema();
 	get_min_max_time(m_schema, m_min_time, m_max_time);
@@ -1078,12 +1080,23 @@ void read_mesh_sample(ImportSettings *settings,
 
 	do_normals = (abc_mesh_data.face_normals != NULL);
 
-	read_uvs_params(config, abc_mesh_data, schema.getUVsParam(), selector);
+	if ((settings->flag & ABC_READ_UVS) != 0) {
+		read_uvs_params(config, abc_mesh_data, schema.getUVsParam(), selector);
+	}
 
-	read_mverts(settings, config, abc_mesh_data);
-	read_mpolys(config, abc_mesh_data);
+	if ((settings->flag & ABC_READ_VERTS) != 0) {
+		read_mverts(settings, config, abc_mesh_data);
+	}
 
-	read_custom_data(schema.getArbGeomParams(), config, selector);
+	if ((settings->flag & ABC_READ_FACES) != 0) {
+		read_mpolys(config, abc_mesh_data);
+	}
+
+	if ((settings->flag & (ABC_READ_UVS | ABC_READ_MCOLS)) != 0) {
+		read_custom_data(schema.getArbGeomParams(), config, selector);
+	}
+
+	/* TODO: face sets */
 }
 
 /* ************************************************************************** */
@@ -1104,6 +1117,8 @@ ABC_INLINE MEdge *find_edge(MEdge *edges, int totedge, int v1, int v2)
 AbcSubDReader::AbcSubDReader(const IObject &object, ImportSettings &settings)
     : AbcObjectReader(object, settings)
 {
+	m_settings->flag |= ABC_READ_ALL;
+
 	ISubD isubd_mesh(m_iobject, kWrapExisting);
 	m_schema = isubd_mesh.getSchema();
 	get_min_max_time(m_schema, m_min_time, m_max_time);
@@ -1175,10 +1190,21 @@ void read_subd_sample(ImportSettings *settings,
 	abc_mesh_data.face_normals = N3fArraySamplePtr();
 	abc_mesh_data.positions = sample.getPositions();
 
-	read_uvs_params(config, abc_mesh_data, schema.getUVsParam(), selector);
+	if ((settings->flag & ABC_READ_UVS) != 0) {
+		read_uvs_params(config, abc_mesh_data, schema.getUVsParam(), selector);
+	}
 
-	read_mverts(settings, config, abc_mesh_data);
-	read_mpolys(config, abc_mesh_data);
+	if ((settings->flag & ABC_READ_VERTS) != 0) {
+		read_mverts(settings, config, abc_mesh_data);
+	}
 
-	read_custom_data(schema.getArbGeomParams(), config, selector);
+	if ((settings->flag & ABC_READ_FACES) != 0) {
+		read_mpolys(config, abc_mesh_data);
+	}
+
+	if ((settings->flag & (ABC_READ_UVS | ABC_READ_MCOLS)) != 0) {
+		read_custom_data(schema.getArbGeomParams(), config, selector);
+	}
+
+	/* TODO: face sets */
 }
