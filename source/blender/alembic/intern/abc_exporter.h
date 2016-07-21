@@ -20,7 +20,8 @@
  * ***** END GPL LICENSE BLOCK *****
  */
 
-#pragma once
+#ifndef __ABC_EXPORTER_H__
+#define __ABC_EXPORTER_H__
 
 #include <Alembic/Abc/All.h>
 #include <map>
@@ -44,9 +45,9 @@ struct ExportSettings {
 	bool visible_layers_only;
 	bool renderable_only;
 
-	double startframe, endframe;
-	double xform_frame_step;
-	double shape_frame_step;
+	double frame_start, frame_end;
+	double frame_step_xform;
+	double frame_step_shape;
 	double shutter_open;
 	double shutter_close;
 	float global_scale;
@@ -107,3 +108,5 @@ private:
 
 	void setCurrentFrame(Main *bmain, double t);
 };
+
+#endif  /* __ABC_EXPORTER_H__ */
