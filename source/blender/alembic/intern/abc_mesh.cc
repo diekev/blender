@@ -185,7 +185,7 @@ static void get_creases(DerivedMesh *dm,
 static void get_vertex_normals(DerivedMesh *dm, std::vector<Imath::V3f> &normals)
 {
 	normals.clear();
-	normals.resize(dm->getNumVerts(dm) * 3);
+	normals.resize(dm->getNumVerts(dm));
 
 	MVert *verts = dm->getVertArray(dm);
 	float no[3];
@@ -206,12 +206,10 @@ static void get_loop_normals(DerivedMesh *dm, std::vector<Imath::V3f> &normals)
 
 	MVert *verts = dm->getVertArray(dm);
 
-	const size_t num_normals = dm->getNumLoops(dm) * 3;
-
 	const float (*lnors)[3] = static_cast<float(*)[3]>(dm->getLoopDataArray(dm, CD_NORMAL));
 
 	normals.clear();
-	normals.resize(num_normals);
+	normals.resize(dm->getNumLoops(dm));
 
 	unsigned loop_index = 0;
 
@@ -475,7 +473,7 @@ void AbcMeshWriter::writeSubD(DerivedMesh *dm)
 	get_creases(dm, crease_indices, crease_lengths, crease_sharpness);
 
 	if (m_first_frame) {
-		/* create materials' facesets */
+		/* create materials' face_sets */
 		writeCommonData(dm, m_subdiv_schema);
 	}
 
@@ -724,52 +722,49 @@ static void mesh_add_mpolygons(Mesh *mesh, size_t len)
 	mesh->totpoly = totpolys;
 }
 
-static Material *find_material(Main *bmain, const char *name)
+static void build_mat_map(const Main *bmain, std::map<std::string, Material *> &mat_map)
 {
 	Material *material = static_cast<Material *>(bmain->mat.first);
-	Material *found_material = NULL;
 
 	for (; material; material = static_cast<Material *>(material->id.next)) {
-		if (BLI_strcaseeq(material->id.name+2, name) == true) {
-			found_material = material;
-			break;
-		}
+		mat_map[material->id.name + 2] = material;
 	}
-
-	return found_material;
 }
 
-static void assign_materials(Main *bmain, Object *ob, const std::map<std::string, int> &mat_map)
+static void assign_materials(Main *bmain, Object *ob, const std::map<std::string, int> &mat_index_map)
 {
-	/* Clean up slots. */
-	while (object_remove_material_slot(ob));
-
 	bool can_assign = true;
-	std::map<std::string, int>::const_iterator it = mat_map.begin();
+	std::map<std::string, int>::const_iterator it = mat_index_map.begin();
 
 	int matcount = 0;
-	for (; it != mat_map.end(); ++it, ++matcount) {
-		Material *curmat = give_current_material(ob, matcount);
-
-		if (curmat != NULL) {
-			continue;
-		}
-
-		if (!object_add_material_slot(ob)) {
+	for (; it != mat_index_map.end(); ++it, ++matcount) {
+		if (!BKE_object_material_slot_add(ob)) {
 			can_assign = false;
 			break;
 		}
 	}
 
+	/* TODO(kevin): use global map? */
+	std::map<std::string, Material *> mat_map;
+	build_mat_map(bmain, mat_map);
+
+	std::map<std::string, Material *>::iterator mat_iter;
+
 	if (can_assign) {
-		it = mat_map.begin();
+		it = mat_index_map.begin();
 
-		for (; it != mat_map.end(); ++it) {
+		for (; it != mat_index_map.end(); ++it) {
 			std::string mat_name = it->first;
-			Material *assigned_name = find_material(bmain, mat_name.c_str());
+			mat_iter = mat_map.find(mat_name.c_str());
 
-			if (assigned_name == NULL) {
+			Material *assigned_name;
+
+			if (mat_iter == mat_map.end()) {
 				assigned_name = BKE_material_add(bmain, mat_name.c_str());
+				mat_map[mat_name] = assigned_name;
+			}
+			else {
+				assigned_name = mat_iter->second;
 			}
 
 			assign_material(ob, assigned_name, it->second, BKE_MAT_ASSIGN_OBJECT);
