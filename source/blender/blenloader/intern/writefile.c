@@ -138,6 +138,7 @@
 #include "DNA_windowmanager_types.h"
 #include "DNA_movieclip_types.h"
 #include "DNA_mask_types.h"
+#include "DNA_volume_types.h"
 
 #include "MEM_guardedalloc.h" // MEM_freeN
 #include "BLI_bitmap.h"
@@ -162,6 +163,7 @@
 #include "BKE_fcurve.h"
 #include "BKE_pointcache.h"
 #include "BKE_mesh.h"
+#include "BKE_volume.h"
 
 #ifdef USE_NODE_COMPAT_CUSTOMNODES
 #include "NOD_socket.h"	/* for sock->default_value data */
@@ -2368,6 +2370,30 @@ static void write_lamps(WriteData *wd, ListBase *idbase)
 	}
 }
 
+static void write_volumes(WriteData *wd, ListBase *idbase)
+{
+	PackedFile *pf;
+
+	for (Volume *volume = idbase->first; volume; volume = volume->id.next) {
+		if (volume->id.us < 0 && !wd->current) {
+			continue;
+		}
+
+		/* write LibData */
+		writestruct(wd, ID_VL, "Volume", 1, volume);
+		write_iddata(wd, &volume->id);
+
+		BKE_volume_prepare_write(volume);
+
+		if (volume->packedfile) {
+			printf("Writing packed file\n");
+			pf = volume->packedfile;
+			writestruct(wd, DATA, "PackedFile", 1, pf);
+			writedata(wd, DATA, pf->size, pf->data);
+		}
+	}
+}
+
 static void write_sequence_modifiers(WriteData *wd, ListBase *modbase)
 {
 	SequenceModifierData *smd;
@@ -3777,6 +3803,7 @@ static int write_file_handle(
 	write_paintcurves (wd, &mainvar->paintcurves);
 	write_gpencils (wd, &mainvar->gpencil);
 	write_linestyles(wd, &mainvar->linestyle);
+	write_volumes(wd, &mainvar->volumes);
 	write_libraries(wd,  mainvar->next);
 
 	if (write_user_block) {

@@ -78,10 +78,13 @@ typedef struct VolumeData {
 typedef struct Volume {
 	ID id;
 
+	struct PackedFile *packedfile;
+
 	ListBase fields;
 	char filename[1024];  /* FILE_MAX */
 	char has_file_sequence;
-	char pad[7];
+	char is_builtin;
+	char pad[6];
 } Volume;
 
 #endif /* __DNA_VOLUME_TYPES_H__ */

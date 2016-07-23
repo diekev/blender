@@ -38,14 +38,18 @@
 
 #include "DNA_mesh_types.h"
 #include "DNA_object_types.h"
+#include "DNA_packedFile_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_volume_types.h"
 
+#include "BKE_appdir.h"
 #include "BKE_DerivedMesh.h"
 #include "BKE_global.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_object.h"
+#include "BKE_packedFile.h"
+#include "BKE_report.h"
 #include "BKE_volume.h"
 
 #include "GPU_draw.h"
@@ -56,6 +60,9 @@
 Volume *BKE_volume_add(Main *bmain, const char *name)
 {
 	Volume *volume = BKE_libblock_alloc(bmain, ID_VL, name);
+
+	volume->is_builtin = true;
+
 	return volume;
 }
 
@@ -93,6 +100,11 @@ void BKE_volume_free(Volume *volume)
 
 		MEM_freeN(data);
 	}
+
+	if (volume->packedfile) {
+		freePackedFile(volume->packedfile);
+		volume->packedfile = NULL;
+	}
 }
 
 VolumeData *BKE_volume_field_current(const Volume *volume)
@@ -120,6 +132,121 @@ BoundBox *BKE_volume_boundbox_get(Object *ob)
 	BKE_boundbox_init_from_minmax(ob->bb, data->bbmin, data->bbmax);
 
 	return ob->bb;
+}
+
+void BKE_volume_make_local(Volume *volume)
+{
+	if (volume->id.lib == NULL) {
+		return;
+	}
+
+	Main *bmain = G.main;
+
+	/* - only lib users: do nothing
+	 * - only local users: set flag
+	 * - mixed: make copy
+	 */
+
+	if (volume->id.us == 1) {
+		id_clear_lib_data(bmain, &volume->id);
+		return;
+	}
+
+	bool is_local = false, is_lib = false;
+
+	Object *ob;
+	for (ob = bmain->object.first; ob && ELEM(false, is_lib, is_local); ob = ob->id.next) {
+		if (ob->data == volume) {
+			*((ob->id.lib) ? &is_lib : &is_local) = true;
+		}
+	}
+
+	if (is_local && is_lib == false) {
+		id_clear_lib_data(bmain, &volume->id);
+	}
+	else if (is_local && is_lib) {
+		Volume *volume_new = BKE_volume_copy(volume);
+		volume_new->id.us = 0;
+
+		/* Remap paths of new ID using old library as base. */
+		BKE_id_lib_local_paths(bmain, volume->id.lib, &volume_new->id);
+
+		ob = bmain->object.first;
+		while (ob) {
+			if (ob->data == volume) {
+
+				if (ob->id.lib == NULL) {
+					ob->data = volume_new;
+					id_us_plus(&volume_new->id);
+					id_us_min(&volume->id);
+				}
+			}
+
+			ob = ob->id.next;
+		}
+	}
+}
+
+/**
+ * Prepare the volume to be written to a file. Builtin volumes are written in an
+ * external file which is packed into the .blend file. Imported volumes are not
+ * written, only the path to the external file is stored.
+ */
+void BKE_volume_prepare_write(Volume *volume)
+{
+	if (!volume->is_builtin) {
+		return;
+	}
+
+	if (volume->packedfile) {
+		freePackedFile(volume->packedfile);
+	}
+
+	/* Create a temporary .vdb file to write the volumes to. */
+	char filename[FILE_MAX];
+	BLI_make_file_string("/", filename, BKE_tempdir_session(), volume->id.name + 2);
+	BLI_ensure_extension(filename, sizeof(filename), ".vdb");
+
+	struct OpenVDBWriter *writer = OpenVDBWriter_create();
+
+	for (VolumeData *data = volume->fields.first; data; data = data->next) {
+		OpenVDBWriter_insert_prim(writer, data->prim);
+	}
+
+	OpenVDBWriter_write(writer, filename);
+	OpenVDBWriter_free(writer);
+
+	printf("Packing file: %s\n", filename);
+
+	ReportList reports;
+	volume->packedfile = newPackedFile(&reports, filename, G.main->name);
+}
+
+/**
+ * @brief BKE_volume_copy Perform a deep copy of a volume and its fields.
+ * @param volume The volume to copy.
+ * @return A pointer to a copy of the input volume.
+ */
+Volume *BKE_volume_copy(Volume *volume)
+{
+	Volume *copy = BKE_libblock_copy(&volume->id);
+
+	for (VolumeData *data = volume->fields.first; data; data = data->next) {
+		VolumeData *data_copy = MEM_callocN(sizeof(VolumeData), "VolumeData");
+		data_copy->prim = OpenVDBPrimitive_copy(data->prim);
+
+		if (data->flags & VOLUME_DATA_CURRENT) {
+			data_copy->flags |= VOLUME_DATA_CURRENT;
+		}
+
+		BLI_addtail(&copy->fields, data_copy);
+	}
+
+	if (volume->id.lib) {
+		BKE_id_lib_local_paths(G.main, volume->id.lib, &copy->id);
+	}
+
+	return copy;
 }
 
 void BKE_volume_update(Scene *scene, Object *ob)
@@ -152,9 +279,9 @@ void BKE_volume_update(Scene *scene, Object *ob)
 	BKE_volume_load_from_file(volume, new_filename);
 }
 
-static void openvdb_get_grid_info(void *userdata, const char *name,
-                                  const char *value_type, bool is_color,
-                                  struct OpenVDBPrimitive *prim)
+static void openvdb_get_grid_cb(void *userdata, const char *name,
+                                const char *value_type, bool is_color,
+                                struct OpenVDBPrimitive *prim)
 {
 	Volume *volume = userdata;
 	VolumeData *data = MEM_mallocN(sizeof(VolumeData), "VolumeData");
@@ -165,10 +292,7 @@ static void openvdb_get_grid_info(void *userdata, const char *name,
 		data->type = VOLUME_TYPE_FLOAT;
 	}
 	else if (STREQ(value_type, "vec3s")) {
-		if (is_color)
-			data->type = VOLUME_TYPE_COLOR;
-		else
-			data->type = VOLUME_TYPE_VEC3;
+		data->type = (is_color) ? VOLUME_TYPE_COLOR : VOLUME_TYPE_VEC3;
 	}
 	else {
 		data->type = VOLUME_TYPE_UNKNOWN;
@@ -188,12 +312,33 @@ static void openvdb_get_grid_info(void *userdata, const char *name,
 
 void BKE_volume_load_from_file(Volume *volume, const char *filename)
 {
-	OpenVDB_get_grid_info(filename, openvdb_get_grid_info, volume);
+	OpenVDB_get_grid_info(filename, openvdb_get_grid_cb, volume);
 	BLI_strncpy(volume->filename, filename, sizeof(volume->filename));
 
 	/* Set the first volume field as the current one */
 	VolumeData *data = volume->fields.first;
 	data->flags |= VOLUME_DATA_CURRENT;
+}
+
+void BKE_volume_load(Main *bmain, Volume *volume)
+{
+	if (volume->packedfile) {
+		/* TODO. */
+		PackedFile *pf = volume->packedfile;
+
+		OpenVDB_get_packed_grids((char *)pf->data, pf->size, openvdb_get_grid_cb, volume);
+
+		/* Set the first volume field as the current one */
+		VolumeData *data = volume->fields.first;
+		data->flags |= VOLUME_DATA_CURRENT;
+	}
+	else if (volume->filename[0] != '\0') {
+		if (BLI_path_is_rel(volume->filename)) {
+			BLI_path_abs(volume->filename, bmain->name);
+		}
+
+		BKE_volume_load_from_file(volume, volume->filename);
+	}
 }
 
 /* ***************************** mesh conversion **************************** */
@@ -259,7 +404,7 @@ void BKE_mesh_to_volume(Scene *scene, Object *ob)
 	DerivedMesh *dm = mesh_get_derived_final(scene, ob, CD_MASK_MESH);
 
 	Volume *volume = BKE_volume_add(G.main, ob->id.name + 2);
-	bool needsFree = false;
+	bool needs_free = false;
 
 	OpenVDBDerivedMeshIterator it;
 	openvdb_dm_iter_init(&it, dm);
@@ -278,13 +423,13 @@ void BKE_mesh_to_volume(Scene *scene, Object *ob)
 		ob->data = volume;
 		ob->type = OB_VOLUME;
 
-		needsFree = true;
+		needs_free = true;
 	}
 
-	dm->needsFree = needsFree;
+	dm->needsFree = needs_free;
 	dm->release(dm);
 
-	if (needsFree) {
+	if (needs_free) {
 		ob->derivedFinal = NULL;
 
 		/* curve object could have got bounding box only in special cases */

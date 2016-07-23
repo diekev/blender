@@ -39,13 +39,18 @@ struct OpenVDBVectorGrid;
 
 int OpenVDB_getVersionHex(void);
 
-typedef void (*OpenVDBGridInfoCallback)(void *userdata, const char *name,
+typedef void (*OpenVDBGetGridCallback)(void *userdata, const char *name,
                                         const char *value_type, bool is_color,
                                         struct OpenVDBPrimitive *prim);
 
 void OpenVDB_get_grid_info(const char *filename,
-                           OpenVDBGridInfoCallback cb,
+                           OpenVDBGetGridCallback cb,
                            void *userdata);
+
+void OpenVDB_get_packed_grids(char *data,
+                              unsigned data_size,
+                              OpenVDBGetGridCallback cb,
+                              void *userdata);
 
 enum {
 	VEC_INVARIANT = 0,
@@ -101,6 +106,7 @@ void OpenVDBWriter_add_meta_v3_int(struct OpenVDBWriter *writer, const char *nam
 void OpenVDBWriter_add_meta_mat4(struct OpenVDBWriter *writer, const char *name, float value[4][4]);
 void OpenVDBWriter_add_primitive(struct OpenVDBWriter *writer, struct OpenVDBPrimitive *prim);
 void OpenVDBWriter_write(struct OpenVDBWriter *writer, const char *filename);
+void OpenVDBWriter_insert_prim(struct OpenVDBWriter *writer, struct OpenVDBPrimitive *prim);
 
 struct OpenVDBReader *OpenVDBReader_create(void);
 void OpenVDBReader_free(struct OpenVDBReader *reader);
@@ -113,6 +119,7 @@ void OpenVDBReader_get_meta_mat4(struct OpenVDBReader *reader, const char *name,
 void OpenVDBReader_read_primitive(struct OpenVDBReader *reader, struct OpenVDBPrimitive *prim, const char *name);
 
 struct OpenVDBPrimitive *OpenVDBPrimitive_create(void);
+struct OpenVDBPrimitive *OpenVDBPrimitive_copy(struct OpenVDBPrimitive *original);
 void OpenVDBPrimitive_free(struct OpenVDBPrimitive *vdb_prim);
 
 void OpenVDB_get_bounds(struct OpenVDBPrimitive *prim,

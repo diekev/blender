@@ -208,6 +208,7 @@ int BKE_idcode_to_idfilter(const short idcode)
 		CASE_IDFILTER(TE);
 		CASE_IDFILTER(TXT);
 		CASE_IDFILTER(VF);
+		CASE_IDFILTER(VL);
 		CASE_IDFILTER(WO);
 		default:
 			return 0;
@@ -251,6 +252,7 @@ short BKE_idcode_from_idfilter(const int idfilter)
 		CASE_IDFILTER(TE);
 		CASE_IDFILTER(TXT);
 		CASE_IDFILTER(VF);
+		CASE_IDFILTER(VL);
 		CASE_IDFILTER(WO);
 		default:
 			return 0;

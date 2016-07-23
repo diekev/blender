@@ -43,9 +43,17 @@ struct Volume *BKE_volume_add(struct Main *bmain, const char *name);
 struct Volume *BKE_volume_from_object(struct Object *ob);
 
 void BKE_volume_update(struct Scene *scene, struct Object *ob);
+
+void BKE_volume_load(struct Main *bmain, struct Volume *volume);
 void BKE_volume_load_from_file(struct Volume *volume, const char *filename);
 
+void BKE_volume_prepare_write(struct Volume *volume);
+
 void BKE_volume_free(struct Volume *volume);
+
+void BKE_volume_make_local(struct Volume *volume);
+
+struct Volume *BKE_volume_copy(struct Volume *volume);
 
 struct BoundBox *BKE_volume_boundbox_get(struct Object *ob);
 
