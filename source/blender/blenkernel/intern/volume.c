@@ -75,6 +75,7 @@ Volume *BKE_volume_from_object(Object *ob)
 	return NULL;
 }
 
+/** Free (or release) any data used by this volume (does not free the volume itself). */
 void BKE_volume_free(Volume *volume)
 {
 	if (volume == NULL) {
@@ -91,8 +92,9 @@ void BKE_volume_free(Volume *volume)
 
 		if (data->draw_nodes) {
 			for (int i = 0; i < data->num_draw_nodes; i++) {
-				if (data->draw_nodes[i])
+				if (data->draw_nodes[i]) {
 					GPU_volume_node_free(data->draw_nodes[i]);
+				}
 			}
 
 			MEM_freeN(data->draw_nodes);
@@ -134,57 +136,9 @@ BoundBox *BKE_volume_boundbox_get(Object *ob)
 	return ob->bb;
 }
 
-void BKE_volume_make_local(Volume *volume)
+void BKE_volume_make_local(Main *bmain, Volume *volume, bool lib_local)
 {
-	if (volume->id.lib == NULL) {
-		return;
-	}
-
-	Main *bmain = G.main;
-
-	/* - only lib users: do nothing
-	 * - only local users: set flag
-	 * - mixed: make copy
-	 */
-
-	if (volume->id.us == 1) {
-		id_clear_lib_data(bmain, &volume->id);
-		return;
-	}
-
-	bool is_local = false, is_lib = false;
-
-	Object *ob;
-	for (ob = bmain->object.first; ob && ELEM(false, is_lib, is_local); ob = ob->id.next) {
-		if (ob->data == volume) {
-			*((ob->id.lib) ? &is_lib : &is_local) = true;
-		}
-	}
-
-	if (is_local && is_lib == false) {
-		id_clear_lib_data(bmain, &volume->id);
-	}
-	else if (is_local && is_lib) {
-		Volume *volume_new = BKE_volume_copy(volume);
-		volume_new->id.us = 0;
-
-		/* Remap paths of new ID using old library as base. */
-		BKE_id_lib_local_paths(bmain, volume->id.lib, &volume_new->id);
-
-		ob = bmain->object.first;
-		while (ob) {
-			if (ob->data == volume) {
-
-				if (ob->id.lib == NULL) {
-					ob->data = volume_new;
-					id_us_plus(&volume_new->id);
-					id_us_min(&volume->id);
-				}
-			}
-
-			ob = ob->id.next;
-		}
-	}
+	BKE_id_make_local_generic(bmain, &volume->id, true, lib_local);
 }
 
 /**
@@ -192,7 +146,7 @@ void BKE_volume_make_local(Volume *volume)
  * external file which is packed into the .blend file. Imported volumes are not
  * written, only the path to the external file is stored.
  */
-void BKE_volume_prepare_write(Volume *volume)
+void BKE_volume_prepare_write(Main *bmain, Volume *volume)
 {
 	if (!volume->is_builtin) {
 		return;
@@ -216,10 +170,8 @@ void BKE_volume_prepare_write(Volume *volume)
 	OpenVDBWriter_write(writer, filename);
 	OpenVDBWriter_free(writer);
 
-	printf("Packing file: %s\n", filename);
-
 	ReportList reports;
-	volume->packedfile = newPackedFile(&reports, filename, G.main->name);
+	volume->packedfile = newPackedFile(&reports, filename, ID_BLEND_PATH(bmain, &volume->id));
 }
 
 /**
@@ -227,9 +179,9 @@ void BKE_volume_prepare_write(Volume *volume)
  * @param volume The volume to copy.
  * @return A pointer to a copy of the input volume.
  */
-Volume *BKE_volume_copy(Volume *volume)
+Volume *BKE_volume_copy(Main *bmain, Volume *volume)
 {
-	Volume *copy = BKE_libblock_copy(&volume->id);
+	Volume *copy = BKE_libblock_copy(bmain, &volume->id);
 
 	for (VolumeData *data = volume->fields.first; data; data = data->next) {
 		VolumeData *data_copy = MEM_callocN(sizeof(VolumeData), "VolumeData");
@@ -242,8 +194,8 @@ Volume *BKE_volume_copy(Volume *volume)
 		BLI_addtail(&copy->fields, data_copy);
 	}
 
-	if (volume->id.lib) {
-		BKE_id_lib_local_paths(G.main, volume->id.lib, &copy->id);
+	if (ID_IS_LINKED_DATABLOCK(volume)) {
+		BKE_id_lib_local_paths(bmain, volume->id.lib, &copy->id);
 	}
 
 	return copy;
@@ -398,12 +350,12 @@ static inline void openvdb_dm_iter_init(OpenVDBDerivedMeshIterator *it, DerivedM
 	it->loop = dm->getLoopArray(dm);
 }
 
-void BKE_mesh_to_volume(Scene *scene, Object *ob)
+void BKE_mesh_to_volume(Main *bmain, Scene *scene, Object *ob)
 {
 	/* make new mesh data from the original copy */
 	DerivedMesh *dm = mesh_get_derived_final(scene, ob, CD_MASK_MESH);
 
-	Volume *volume = BKE_volume_add(G.main, ob->id.name + 2);
+	Volume *volume = BKE_volume_add(bmain, ob->id.name + 2);
 	bool needs_free = false;
 
 	OpenVDBDerivedMeshIterator it;

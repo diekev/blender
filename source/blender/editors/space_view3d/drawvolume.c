@@ -36,6 +36,7 @@
 #include "DNA_screen_types.h"
 #include "DNA_smoke_types.h"
 #include "DNA_view3d_types.h"
+#include "DNA_poseidon_types.h"
 #include "DNA_volume_types.h"
 
 #include "BLI_utildefines.h"
@@ -57,8 +58,11 @@
 
 #include "view3d_intern.h"  // own include
 
-#include "openvdb_capi.h"
-#include "openvdb_render_capi.h"
+#ifdef WITH_OPENVDB
+#  include "openvdb_capi.h"
+#  include "openvdb_render_capi.h"
+#  include "poseidon_capi.h"
+#endif
 
 struct GPUTexture;
 
@@ -456,6 +460,7 @@ static void draw_extra_volume_data(struct OpenVDBPrimitive *prim, char mode)
 	int numverts;
 
 	switch (mode) {
+#ifdef WITH_OPENVDB
 		case VOLUME_DRAW_TOPOLOGY:
 			OpenVDB_get_draw_buffers_nodes(prim, &verts, &colors, &numverts);
 			break;
@@ -468,6 +473,7 @@ static void draw_extra_volume_data(struct OpenVDBPrimitive *prim, char mode)
 		case VOLUME_DRAW_STAGGERED:
 			OpenVDB_get_draw_buffers_staggered(prim, 1.0f, &verts, &colors, &numverts);
 			break;
+#endif
 		default:
 			return;
 	}
@@ -645,7 +651,9 @@ void draw_volume(Object *ob, const float viewnormal[3])
 #else
 
 	if (data->buffer == NULL) {
+#ifdef WITH_OPENVDB
 		data->buffer = OpenVDB_get_texture_buffer(prim, data->res, data->bbmin, data->bbmax);
+#endif
 	}
 
 	if (!data->buffer) {
@@ -671,7 +679,11 @@ void draw_volume(Object *ob, const float viewnormal[3])
 	    1.0f / size[2]
 	};
 
+#ifdef WITH_OPENVDB
 	const float dx = OpenVDB_get_voxel_size(prim);
+#else
+	const float dx = 1.0f;
+#endif
 
 	/* setup smoke shader */
 	GPUShader *shader = GPU_shader_get_builtin_shader(GPU_SHADER_OPENVDB);
@@ -835,19 +847,18 @@ void draw_smoke_heat(SmokeDomainSettings *domain, Object *ob)
 }
 #endif
 
-#include "DNA_poseidon_types.h"
-#include "poseidon_capi.h"
-
 void draw_poseidon_volume(PoseidonDomainSettings *sds, Object *ob,
                           const float viewnormal[3])
 {
 	UNUSED_VARS(ob);
 
+#ifdef WITH_OPENVDB
 	struct OpenVDBPrimitive *prim = Poseidon_get_field(sds->data, POSEIDON_FIELD_DENSITY);
 
 	if (sds->buffer == NULL) {
 		sds->buffer = OpenVDB_get_texture_buffer(prim, sds->res, sds->bbmin, sds->bbmax);
 	}
+#endif
 
 	if (!sds->buffer) {
 		fprintf(stderr, "Could not allocate OpenVDB buffer!\n");
@@ -934,7 +945,9 @@ void draw_poseidon_volume(PoseidonDomainSettings *sds, Object *ob,
 void draw_poseidon_particles(PoseidonDomainSettings *sds)
 {
 	if (sds->pbuffer == NULL) {
+#ifdef WITH_OPENVDB
 		PoseidonData_get_particle_draw_buffer(sds->data, &sds->res[0], &sds->pbuffer);
+#endif
 	}
 
 	if (!sds->pbuffer) {

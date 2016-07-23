@@ -38,8 +38,10 @@
 
 #include "view3d_intern.h"
 
-#include "openvdb_capi.h"
-#include "openvdb_render_capi.h"
+#ifdef WITH_OPENVDB
+#  include "openvdb_capi.h"
+#  include "openvdb_render_capi.h"
+#endif
 
 /* ************************* Texture Atlas ********************** */
 
@@ -114,7 +116,6 @@ static GPUTexture *build_node_indirection_texture(
         int *internal_node_counts, int num_atlases,
         const struct OpenVDBInternalNode2 **node_handles, int num_nodes)
 {
-	int internal_node_index = 0;
 	const int max_node_leaf_count = 4096;
 	const int map_size = max_node_leaf_count * num_nodes;
 
@@ -123,17 +124,25 @@ static GPUTexture *build_node_indirection_texture(
 
 	memset(indirection_map, -1, sizeof(int) * map_size);
 
+#ifdef WITH_OPENVDB
+	int internal_node_index = 0;
+
 	for (int i = 0; i < num_atlases; i++) {
 		int leaf_index = 0;
 		int node_index = 0;
 
 		while (node_index < internal_node_counts[i]) {
+
 			OpenVDB_node_get_leaf_indices(node_handles[internal_node_index], &indirection_map, &leaf_index, internal_node_index);
+
 
 			++node_index;
 			++internal_node_index;
 		}
 	}
+#else
+	UNUSED_VARS(internal_node_counts, num_atlases, node_handles);
+#endif
 
 	GPUTexture *tex = GPU_texture_create_1D_int(map_size, indirection_map, NULL);
 
@@ -149,10 +158,12 @@ void create_volume_texture_atlas(VolumeData *data)
 	const struct OpenVDBInternalNode2 **node_handles;
 	int num_nodes = 0;
 
+#ifdef WITH_OPENVDB
 	/* Calculate texture atlas sizes. */
 	OpenVDB_get_internal_nodes_count(data->prim,
 	                                 &atlas_nodes_counts, &num_atlases,
 	                                 &node_handles, &num_nodes);
+#endif
 
 	data->draw_nodes = MEM_mallocN(sizeof(VolumeDrawNode *) * num_nodes,
 	                               "Volume Data Draw Nodes");
@@ -187,6 +198,7 @@ void create_volume_texture_atlas(VolumeData *data)
 			VolumeDrawNode *drawnode = GPU_volume_node_create(indirection_tex,
 			                                                  current_node_index > 0);
 
+#ifdef WITH_OPENVDB
 			OpenVDB_get_node_bounds(data->prim, node_handles[current_node_index],
 			                        drawnode->bbmin, drawnode->bbmax);
 #if 0
@@ -198,6 +210,7 @@ void create_volume_texture_atlas(VolumeData *data)
 			/* Add all leaves of this internal node to atlas */
 			OpenVDB_get_leaf_buffers(node_handles[current_node_index],
 			                         atlas_add_texture, (void *)(&builder));
+#endif
 
 			data->draw_nodes[current_node_index] = drawnode;
 

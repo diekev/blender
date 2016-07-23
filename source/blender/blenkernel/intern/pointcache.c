@@ -56,8 +56,6 @@
 
 #include "PIL_time.h"
 
-#include "WM_api.h"
-
 #include "BKE_appdir.h"
 #include "BKE_anim.h"
 #include "BKE_cloth.h"
@@ -84,9 +82,9 @@
 #endif
 
 #ifdef WITH_OPENVDB
-#include "openvdb_capi.h"
+#  include "openvdb_capi.h"
+#  include "poseidon_capi.h"
 #endif
-#include "poseidon_capi.h"
 
 #ifdef WITH_LZO
 #  ifdef WITH_SYSTEM_LZO
@@ -2601,7 +2599,7 @@ static int ptcache_read_openvdb_stream(PTCacheID *pid, int cfra)
 #ifdef WITH_OPENVDB
 	char filename[FILE_MAX * 2];
 
-	 /* save blend file before using disk pointcache */
+	/* save blend file before using disk pointcache */
 	if (!G.relbase_valid && (pid->cache->flag & PTCACHE_EXTERNAL) == 0)
 		return 0;
 
