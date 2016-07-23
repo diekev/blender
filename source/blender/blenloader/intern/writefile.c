@@ -2595,10 +2595,9 @@ static void write_volumes(WriteData *wd, ListBase *idbase)
 		writestruct(wd, ID_VL, Volume, 1, volume);
 		write_iddata(wd, &volume->id);
 
-		BKE_volume_prepare_write(volume);
+		BKE_volume_prepare_write(G.main, volume);
 
 		if (volume->packedfile) {
-			printf("Writing packed file\n");
 			pf = volume->packedfile;
 			writestruct(wd, DATA, PackedFile, 1, pf);
 			writedata(wd, DATA, pf->size, pf->data);

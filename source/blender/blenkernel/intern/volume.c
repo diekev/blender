@@ -75,6 +75,7 @@ Volume *BKE_volume_from_object(Object *ob)
 	return NULL;
 }
 
+/** Free (or release) any data used by this volume (does not free the volume itself). */
 void BKE_volume_free(Volume *volume)
 {
 	if (volume == NULL) {
@@ -91,8 +92,9 @@ void BKE_volume_free(Volume *volume)
 
 		if (data->draw_nodes) {
 			for (int i = 0; i < data->num_draw_nodes; i++) {
-				if (data->draw_nodes[i])
+				if (data->draw_nodes[i]) {
 					GPU_volume_node_free(data->draw_nodes[i]);
+				}
 			}
 
 			MEM_freeN(data->draw_nodes);
@@ -144,7 +146,7 @@ void BKE_volume_make_local(Main *bmain, Volume *volume, bool lib_local)
  * external file which is packed into the .blend file. Imported volumes are not
  * written, only the path to the external file is stored.
  */
-void BKE_volume_prepare_write(Volume *volume)
+void BKE_volume_prepare_write(Main *bmain, Volume *volume)
 {
 	if (!volume->is_builtin) {
 		return;
@@ -168,10 +170,8 @@ void BKE_volume_prepare_write(Volume *volume)
 	OpenVDBWriter_write(writer, filename);
 	OpenVDBWriter_free(writer);
 
-	printf("Packing file: %s\n", filename);
-
 	ReportList reports;
-	volume->packedfile = newPackedFile(&reports, filename, G.main->name);
+	volume->packedfile = newPackedFile(&reports, filename, ID_BLEND_PATH(bmain, &volume->id));
 }
 
 /**
@@ -194,8 +194,8 @@ Volume *BKE_volume_copy(Main *bmain, Volume *volume)
 		BLI_addtail(&copy->fields, data_copy);
 	}
 
-	if (volume->id.lib) {
-		BKE_id_lib_local_paths(G.main, volume->id.lib, &copy->id);
+	if (ID_IS_LINKED_DATABLOCK(volume)) {
+		BKE_id_lib_local_paths(bmain, volume->id.lib, &copy->id);
 	}
 
 	return copy;
@@ -350,12 +350,12 @@ static inline void openvdb_dm_iter_init(OpenVDBDerivedMeshIterator *it, DerivedM
 	it->loop = dm->getLoopArray(dm);
 }
 
-void BKE_mesh_to_volume(Scene *scene, Object *ob)
+void BKE_mesh_to_volume(Main *bmain, Scene *scene, Object *ob)
 {
 	/* make new mesh data from the original copy */
 	DerivedMesh *dm = mesh_get_derived_final(scene, ob, CD_MASK_MESH);
 
-	Volume *volume = BKE_volume_add(G.main, ob->id.name + 2);
+	Volume *volume = BKE_volume_add(bmain, ob->id.name + 2);
 	bool needs_free = false;
 
 	OpenVDBDerivedMeshIterator it;

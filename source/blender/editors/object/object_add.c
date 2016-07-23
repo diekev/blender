@@ -1650,7 +1650,7 @@ static int convert_exec(bContext *C, wmOperator *op)
 				newob = ob;
 			}
 
-			BKE_mesh_to_volume(scene, newob);
+			BKE_mesh_to_volume(bmain, scene, newob);
 
 			if (newob->type == OB_VOLUME) {
 				BKE_object_free_modifiers(newob);   /* after derivedmesh calls! */
