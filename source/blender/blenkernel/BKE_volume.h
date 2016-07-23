@@ -51,9 +51,9 @@ void BKE_volume_prepare_write(struct Volume *volume);
 
 void BKE_volume_free(struct Volume *volume);
 
-void BKE_volume_make_local(struct Volume *volume);
+void BKE_volume_make_local(struct Main *bmain, struct Volume *volume, bool lib_local);
 
-struct Volume *BKE_volume_copy(struct Volume *volume);
+struct Volume *BKE_volume_copy(struct Main *bmain, struct Volume *volume);
 
 struct BoundBox *BKE_volume_boundbox_get(struct Object *ob);
 

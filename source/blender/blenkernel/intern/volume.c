@@ -134,57 +134,9 @@ BoundBox *BKE_volume_boundbox_get(Object *ob)
 	return ob->bb;
 }
 
-void BKE_volume_make_local(Volume *volume)
+void BKE_volume_make_local(Main *bmain, Volume *volume, bool lib_local)
 {
-	if (volume->id.lib == NULL) {
-		return;
-	}
-
-	Main *bmain = G.main;
-
-	/* - only lib users: do nothing
-	 * - only local users: set flag
-	 * - mixed: make copy
-	 */
-
-	if (volume->id.us == 1) {
-		id_clear_lib_data(bmain, &volume->id);
-		return;
-	}
-
-	bool is_local = false, is_lib = false;
-
-	Object *ob;
-	for (ob = bmain->object.first; ob && ELEM(false, is_lib, is_local); ob = ob->id.next) {
-		if (ob->data == volume) {
-			*((ob->id.lib) ? &is_lib : &is_local) = true;
-		}
-	}
-
-	if (is_local && is_lib == false) {
-		id_clear_lib_data(bmain, &volume->id);
-	}
-	else if (is_local && is_lib) {
-		Volume *volume_new = BKE_volume_copy(volume);
-		volume_new->id.us = 0;
-
-		/* Remap paths of new ID using old library as base. */
-		BKE_id_lib_local_paths(bmain, volume->id.lib, &volume_new->id);
-
-		ob = bmain->object.first;
-		while (ob) {
-			if (ob->data == volume) {
-
-				if (ob->id.lib == NULL) {
-					ob->data = volume_new;
-					id_us_plus(&volume_new->id);
-					id_us_min(&volume->id);
-				}
-			}
-
-			ob = ob->id.next;
-		}
-	}
+	BKE_id_make_local_generic(bmain, &volume->id, true, lib_local);
 }
 
 /**
@@ -227,9 +179,9 @@ void BKE_volume_prepare_write(Volume *volume)
  * @param volume The volume to copy.
  * @return A pointer to a copy of the input volume.
  */
-Volume *BKE_volume_copy(Volume *volume)
+Volume *BKE_volume_copy(Main *bmain, Volume *volume)
 {
-	Volume *copy = BKE_libblock_copy(&volume->id);
+	Volume *copy = BKE_libblock_copy(bmain, &volume->id);
 
 	for (VolumeData *data = volume->fields.first; data; data = data->next) {
 		VolumeData *data_copy = MEM_callocN(sizeof(VolumeData), "VolumeData");
