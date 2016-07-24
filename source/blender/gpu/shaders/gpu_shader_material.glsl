@@ -1008,20 +1008,10 @@ void mtex_rgb_screen(vec3 outcol, vec3 texcol, float fact, float facg, out vec3 
 
 void mtex_rgb_overlay(vec3 outcol, vec3 texcol, float fact, float facg, out vec3 incol)
 {
-	if (outcol.r < 0.5)
-		incol.r = mix(outcol.r, outcol.r*(2.0*texcol.r), fact*facg);
-	else
-		incol.r = mix(outcol.r, outcol.r + (2.0*texcol.r - 1.0) - (outcol.r * (2.0*texcol.r - 1.0)), fact*facg);
+	vec4 col;
 
-	if (outcol.g < 0.5)
-		incol.g = mix(outcol.g, outcol.g*(2.0*texcol.g), fact*facg);
-	else
-		incol.g = mix(outcol.g, outcol.g + (2.0*texcol.g - 1.0) - (outcol.g * (2.0*texcol.g - 1.0)), fact*facg);
-
-	if (outcol.b < 0.5)
-		incol.b = mix(outcol.b, outcol.b*(2.0*texcol.b), fact*facg);
-	else
-		incol.b = mix(outcol.b, outcol.b + (2.0*texcol.b - 1.0) - (outcol.b * (2.0*texcol.b - 1.0)), fact*facg);
+	mix_overlay(fact * facg, vec4(outcol, 1.0), vec4(texcol, 1.0), col);
+	incol.rgb = col.rgb;
 }
 
 void mtex_rgb_sub(vec3 outcol, vec3 texcol, float fact, float facg, out vec3 incol)
@@ -1036,14 +1026,10 @@ void mtex_rgb_add(vec3 outcol, vec3 texcol, float fact, float facg, out vec3 inc
 
 void mtex_rgb_div(vec3 outcol, vec3 texcol, float fact, float facg, out vec3 incol)
 {
-	float facm;
+	vec4 col;
 
-	fact *= facg;
-	facm = 1.0 - fact;
-
-	if (texcol.r != 0.0) incol.r = facm * outcol.r + fact * outcol.r / texcol.r;
-	if (texcol.g != 0.0) incol.g = facm * outcol.g + fact * outcol.g / texcol.g;
-	if (texcol.b != 0.0) incol.b = facm * outcol.b + fact * outcol.b / texcol.b;
+	mix_div(fact * facg, vec4(outcol, 1.0), vec4(texcol, 1.0), col);
+	incol.rgb = col.rgb;
 }
 
 void mtex_rgb_diff(vec3 outcol, vec3 texcol, float fact, float facg, out vec3 incol)
