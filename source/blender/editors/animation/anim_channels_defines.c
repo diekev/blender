@@ -4292,6 +4292,8 @@ void ANIM_channel_draw_widgets(const bContext *C, bAnimContext *ac, bAnimListEle
 			offset += ICON_WIDTH; 
 		}
 		else if (ale->type == ANIMTYPE_GPLAYER) {
+#if 0
+			/* XXX: Maybe need a better design */
 			/* color swatch for layer color */
 			bGPDlayer *gpl = (bGPDlayer *)ale->data;
 			PointerRNA ptr;
@@ -4300,7 +4302,6 @@ void ANIM_channel_draw_widgets(const bContext *C, bAnimContext *ac, bAnimListEle
 			RNA_pointer_create(ale->id, &RNA_GPencilLayer, ale->data, &ptr);
 			
 			UI_block_align_begin(block);
-			
 			UI_block_emboss_set(block, RNA_boolean_get(&ptr, "is_stroke_visible") ? UI_EMBOSS : UI_EMBOSS_NONE);
 			uiDefButR(block, UI_BTYPE_COLOR, 1, "", offset, yminc, w, ICON_WIDTH, 
 			          &ptr, "color", -1, 
@@ -4310,11 +4311,11 @@ void ANIM_channel_draw_widgets(const bContext *C, bAnimContext *ac, bAnimListEle
 			uiDefButR(block, UI_BTYPE_COLOR, 1, "", offset + w, yminc, w, ICON_WIDTH, 
 			          &ptr, "fill_color", -1, 
 			          0, 0, 0, 0, gpl->info);
-			
 			UI_block_emboss_set(block, UI_EMBOSS_NONE);
 			UI_block_align_end(block);
-			
+
 			offset += ICON_WIDTH;
+#endif
 		}
 	}
 	

@@ -154,6 +154,8 @@ static IArchive *open_archive(const std::string &filename)
 	return archive;
 }
 
+//#define USE_NURBS
+
 /* NOTE: this function is similar to visit_objects below, need to keep them in
  * sync. */
 static void gather_objects_paths(const IObject &object, ListBase *object_paths)
@@ -204,7 +206,9 @@ static void gather_objects_paths(const IObject &object, ListBase *object_paths)
 			get_path = true;
 		}
 		else if (INuPatch::matches(md)) {
+#ifdef USE_NURBS
 			get_path = true;
+#endif
 		}
 		else if (ICamera::matches(md)) {
 			get_path = true;
@@ -468,7 +472,15 @@ static void visit_object(const IObject &object,
 			reader = new AbcSubDReader(child, settings);
 		}
 		else if (INuPatch::matches(md)) {
+#ifdef USE_NURBS
+			/* TODO(kevin): importing cyclic NURBS from other software crashes
+			 * at the moment. This is due to the fact that NURBS in other
+			 * software have duplicated points which causes buffer overflows in
+			 * Blender. Need to figure out exactly how these points are
+			 * duplicated, in all cases (cyclic U, cyclic V, and cyclic UV).
+			 * Until this is fixed, disabling NURBS reading. */
 			reader = new AbcNurbsReader(child, settings);
+#endif
 		}
 		else if (ICamera::matches(md)) {
 			reader = new AbcCameraReader(child, settings);
@@ -772,7 +784,8 @@ void ABC_import(bContext *C,
                 bool is_sequence,
                 bool set_frame_range,
                 int sequence_len,
-                int offset)
+                int offset,
+                bool validate_meshes)
 {
 	/* Using new here since MEM_* funcs do not call ctor to properly initialize
 	 * data. */
@@ -794,6 +807,7 @@ void ABC_import(bContext *C,
 	job->settings.set_frame_range = set_frame_range;
 	job->settings.sequence_len = sequence_len;
 	job->settings.offset = offset;
+	job->settings.validate_meshes = validate_meshes;
 	job->parent_map = NULL;
 	job->error_code = ABC_NO_ERROR;
 	job->was_cancelled = false;
@@ -846,6 +860,7 @@ void ABC_get_transform(AbcArchiveHandle *handle, Object *ob,
 	}
 
 	ISampleSelector sample_sel(time);
+
 	ImportSettings settings;
 	settings.from_forward = forward_axis;
 	settings.from_up = up_axis;
@@ -920,7 +935,7 @@ ABC_INLINE CDStreamConfig get_config(DerivedMesh *dm)
 	return config;
 }
 
-static DerivedMesh *read_mesh_sample(ImportSettings *settings, DerivedMesh *dm, const IObject &iobject, const float time)
+static DerivedMesh *read_mesh_sample(ImportSettings *settings, DerivedMesh *dm, const IObject &iobject, const float time, int read_flag)
 {
 	IPolyMesh mesh(iobject, kWrapExisting);
 	IPolyMeshSchema schema = mesh.getSchema();
@@ -934,7 +949,7 @@ static DerivedMesh *read_mesh_sample(ImportSettings *settings, DerivedMesh *dm, 
 	DerivedMesh *new_dm = NULL;
 
 	/* Only read point data when streaming meshes, unless we need to create new ones. */
-	settings->flag |= ABC_READ_VERTS;
+	settings->read_flag |= read_flag;
 
 	if (dm->getNumVerts(dm) != positions->size()) {
 		new_dm = CDDM_from_template(dm,
@@ -944,7 +959,7 @@ static DerivedMesh *read_mesh_sample(ImportSettings *settings, DerivedMesh *dm, 
 		                            face_indices->size(),
 		                            face_counts->size());
 
-		settings->flag |= ABC_READ_ALL;
+		settings->read_flag |= MOD_MESHSEQ_READ_ALL;
 	}
 
 	CDStreamConfig config = get_config(new_dm ? new_dm : dm);
@@ -970,7 +985,7 @@ static DerivedMesh *read_mesh_sample(ImportSettings *settings, DerivedMesh *dm, 
 
 using Alembic::AbcGeom::ISubDSchema;
 
-static DerivedMesh *read_subd_sample(ImportSettings *settings, DerivedMesh *dm, const IObject &iobject, const float time)
+static DerivedMesh *read_subd_sample(ImportSettings *settings, DerivedMesh *dm, const IObject &iobject, const float time, int read_flag)
 {
 	ISubD mesh(iobject, kWrapExisting);
 	ISubDSchema schema = mesh.getSchema();
@@ -983,7 +998,7 @@ static DerivedMesh *read_subd_sample(ImportSettings *settings, DerivedMesh *dm, 
 
 	DerivedMesh *new_dm = NULL;
 
-	settings->flag |= ABC_READ_VERTS;
+	settings->read_flag |= read_flag;
 
 	if (dm->getNumVerts(dm) != positions->size()) {
 		new_dm = CDDM_from_template(dm,
@@ -993,7 +1008,7 @@ static DerivedMesh *read_subd_sample(ImportSettings *settings, DerivedMesh *dm, 
 		                            face_indices->size(),
 		                            face_counts->size());
 
-		settings->flag |= ABC_READ_ALL;
+		settings->read_flag |= MOD_MESHSEQ_READ_ALL;
 	}
 
 	/* Only read point data when streaming meshes, unless we need to create new ones. */
@@ -1025,26 +1040,16 @@ static DerivedMesh *read_points_sample(ImportSettings *settings, DerivedMesh *dm
 
 	const P3fArraySamplePtr &positions = sample.getPositions();
 
+	DerivedMesh *new_dm = NULL;
+
 	if (dm->getNumVerts(dm) != positions->size()) {
-		dm = CDDM_new(positions->size(), 0, 0, 0, 0);
+		new_dm = CDDM_new(positions->size(), 0, 0, 0, 0);
 	}
 
-	ICompoundProperty prop = schema.getArbGeomParams();
-	N3fArraySamplePtr vnormals;
+	CDStreamConfig config = get_config(new_dm ? new_dm : dm);
+	read_points_sample(settings, schema, sample_sel, config, time);
 
-	if (has_property(prop, "N")) {
-		const IN3fArrayProperty &normals_prop = IN3fArrayProperty(prop, "N", 0);
-
-		if (normals_prop) {
-			vnormals = normals_prop.getValue(sample_sel);
-		}
-	}
-
-	MVert *mverts = dm->getVertArray(dm);
-
-	read_mverts(settings, mverts, positions, vnormals);
-
-	return dm;
+	return new_dm ? new_dm : dm;
 }
 
 /* NOTE: Alembic only stores data about control points, but the DerivedMesh
@@ -1105,7 +1110,8 @@ DerivedMesh *ABC_read_mesh(AbcArchiveHandle *handle,
                            DerivedMesh *dm,
                            const char *object_path,
                            const float time, int forward_axis, int up_axis,
-                           const char **err_str)
+                           const char **err_str,
+                           int read_flag)
 {
 	IArchive *archive = archive_from_handle(handle);
 
@@ -1136,7 +1142,7 @@ DerivedMesh *ABC_read_mesh(AbcArchiveHandle *handle,
 			return NULL;
 		}
 
-		return read_mesh_sample(&settings, dm, iobject, time);
+		return read_mesh_sample(&settings, dm, iobject, time, read_flag);
 	}
 	else if (ISubD::matches(header)) {
 		if (ob->type != OB_MESH) {
@@ -1144,7 +1150,7 @@ DerivedMesh *ABC_read_mesh(AbcArchiveHandle *handle,
 			return NULL;
 		}
 
-		return read_subd_sample(&settings, dm, iobject, time);
+		return read_subd_sample(&settings, dm, iobject, time, read_flag);
 	}
 	else if (IPoints::matches(header)) {
 		if (ob->type != OB_MESH) {
@@ -1165,155 +1171,4 @@ DerivedMesh *ABC_read_mesh(AbcArchiveHandle *handle,
 
 	*err_str = "Unsupported object type: verify object path"; // or poke developer
 	return NULL;
-}
-
-/* ************************************************************************ */
-
-using Alembic::Abc::IV3fArrayProperty;
-
-static V3fArraySamplePtr get_velocity_prop(const ICompoundProperty &prop, const ISampleSelector &iss)
-{
-	std::string name = "velocity";
-
-	if (!has_property(prop, name)) {
-		name = "Velocity";
-
-		if (!has_property(prop, name)) {
-			return V3fArraySamplePtr();
-		}
-	}
-
-	const IV3fArrayProperty &velocity_prop = IV3fArrayProperty(prop, name, 0);
-
-	if (velocity_prop) {
-		return velocity_prop.getValue(iss);
-	}
-
-	return V3fArraySamplePtr();
-}
-
-bool ABC_has_velocity_cache(AbcArchiveHandle *handle, const char *object_path, const float time)
-{
-	IArchive *archive = archive_from_handle(handle);
-
-	if (!archive || !archive->valid()) {
-		return false;
-	}
-
-	IObject iobject;
-	find_iobject(archive->getTop(), iobject, object_path);
-
-	if (!iobject.valid()) {
-		return false;
-	}
-
-	const ObjectHeader &header = iobject.getHeader();
-
-	if (!IPolyMesh::matches(header)) {
-		return false;
-	}
-
-	IPolyMesh mesh(iobject, kWrapExisting);
-	IPolyMeshSchema schema = mesh.getSchema();
-	ISampleSelector sample_sel(time);
-	const IPolyMeshSchema::Sample sample = schema.getValue(sample_sel);
-
-	V3fArraySamplePtr velocities = sample.getVelocities();
-
-	if (!velocities) {
-//		std::cerr << "No velocities found, checking arbitrary params...\n";
-
-		/* Check arbitrary parameters for legacy apps like RealFlow. */
-		ICompoundProperty prop = schema.getArbGeomParams();
-
-		velocities = get_velocity_prop(prop, sample_sel);
-
-		if (!velocities) {
-//			std::cerr << "Still no velocities found.\n";
-			return false;
-		}
-	}
-
-	return true;
-}
-
-void ABC_get_velocity_cache(AbcArchiveHandle *handle, const char *object_path, float *values, const float time)
-{
-	IArchive *archive = archive_from_handle(handle);
-
-	if (!archive || !archive->valid()) {
-		return;
-	}
-
-	IObject iobject;
-	find_iobject(archive->getTop(), iobject, object_path);
-
-	if (!iobject.valid()) {
-		return;
-	}
-
-	const ObjectHeader &header = iobject.getHeader();
-
-	if (!IPolyMesh::matches(header)) {
-		return;
-	}
-
-	IPolyMesh mesh(iobject, kWrapExisting);
-	IPolyMeshSchema schema = mesh.getSchema();
-	ISampleSelector sample_sel(time);
-	const IPolyMeshSchema::Sample sample = schema.getValue(sample_sel);
-
-	V3fArraySamplePtr velocities = sample.getVelocities();
-
-	if (!velocities) {
-		/* Check arbitrary parameters for legacy apps like RealFlow. */
-		ICompoundProperty prop = schema.getArbGeomParams();
-
-		velocities = get_velocity_prop(prop, sample_sel);
-
-		if (!velocities) {
-			return;
-		}
-	}
-
-	ImportSettings settings;
-
-	float fps = 1.0f / 24.0f;
-	float vel[3];
-
-	std::cerr << __func__ << ", velocity vectors: " << velocities->size() << '\n';
-
-//#define DEBUG_VELOCITY
-
-#ifdef DEBUG_VELOCITY
-	float maxx = std::numeric_limits<float>::min();
-	float maxy = std::numeric_limits<float>::min();
-	float maxz = std::numeric_limits<float>::min();
-#endif
-
-	for (size_t i = 0; i < velocities->size(); ++i) {
-		const Imath::V3f &vel_in = (*velocities)[i];
-		copy_yup_zup(&settings, vel, vel_in.getValue());
-
-#ifdef DEBUG_VELOCITY
-		if (vel[0] > maxx) {
-			maxx = vel[0];
-		}
-
-		if (vel[1] > maxy) {
-			maxy = vel[1];
-		}
-
-		if (vel[2] > maxz) {
-			maxz = vel[2];
-		}
-#endif
-
-		mul_v3_fl(vel, fps);
-		copy_v3_v3(values + i * 3, vel);
-	}
-
-#ifdef DEBUG_VELOCITY
-	std::cerr << "Max vel: " << maxx << ", " << maxy << ", " << maxz << '\n';
-#endif
 }

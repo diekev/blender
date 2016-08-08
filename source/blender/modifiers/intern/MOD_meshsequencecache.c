@@ -31,10 +31,12 @@
 
 #include "BKE_cachefile.h"
 #include "BKE_DerivedMesh.h"
+#include "BKE_global.h"
 #include "BKE_library.h"
 #include "BKE_library_query.h"
 #include "BKE_scene.h"
 
+#include "depsgraph_private.h"
 #include "DEG_depsgraph_build.h"
 
 #include "MOD_modifiertypes.h"
@@ -48,7 +50,8 @@ static void initData(ModifierData *md)
 	MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *)md;
 
 	mcmd->cache_file = NULL;
-	mcmd->abc_object_path[0] = '\0';
+	mcmd->object_path[0] = '\0';
+	mcmd->read_flag = MOD_MESHSEQ_READ_ALL;
 }
 
 static void copyData(ModifierData *md, ModifierData *target)
@@ -79,7 +82,7 @@ static bool isDisabled(ModifierData *md, int UNUSED(useRenderParams))
 	MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *) md;
 
 	/* leave it up to the modifier to check the file is valid on calculation */
-	return (mcmd->cache_file == NULL) || (mcmd->abc_object_path[0] == '\0');
+	return (mcmd->cache_file == NULL) || (mcmd->object_path[0] == '\0');
 }
 
 static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
@@ -95,14 +98,19 @@ static DerivedMesh *applyModifier(ModifierData *md, Object *ob,
 
 	const char *err_str = NULL;
 
-	DerivedMesh *result = ABC_read_mesh(mcmd->cache_file->handle,
+	CacheFile *cache_file = mcmd->cache_file;
+
+	BKE_cachefile_ensure_handle(G.main, cache_file);
+
+	DerivedMesh *result = ABC_read_mesh(cache_file->handle,
 	                                    ob,
 	                                    dm,
-	                                    mcmd->abc_object_path,
+	                                    mcmd->object_path,
 	                                    time,
-	                                    mcmd->cache_file->forward_axis,
-	                                    mcmd->cache_file->up_axis,
-	                                    &err_str);
+	                                    cache_file->forward_axis,
+	                                    cache_file->up_axis,
+	                                    &err_str,
+	                                    mcmd->read_flag);
 
 	if (err_str) {
 		modifier_setError(md, "%s", err_str);
@@ -128,6 +136,23 @@ static void foreachIDLink(ModifierData *md, Object *ob,
 	MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *) md;
 
 	walk(userData, ob, (ID **)&mcmd->cache_file, IDWALK_USER);
+}
+
+static void updateDepgraph(ModifierData *md, DagForest *forest,
+                           struct Main *bmain,
+                           struct Scene *scene,
+                           Object *ob, DagNode *obNode)
+{
+	MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *) md;
+
+	if (mcmd->cache_file != NULL) {
+		DagNode *curNode = dag_get_node(forest, mcmd->cache_file);
+
+		dag_add_relation(forest, curNode, obNode,
+		                 DAG_RL_DATA_DATA | DAG_RL_OB_DATA, "Cache File Modifier");
+	}
+
+	UNUSED_VARS(bmain, scene, ob);
 }
 
 static void updateDepsgraph(ModifierData *md,
@@ -163,7 +188,7 @@ ModifierTypeInfo modifierType_MeshSequenceCache = {
     /* requiredDataMask */  NULL,
     /* freeData */          freeData,
     /* isDisabled */        isDisabled,
-    /* updateDepgraph */    NULL,
+    /* updateDepgraph */    updateDepgraph,
     /* updateDepsgraph */   updateDepsgraph,
     /* dependsOnTime */     dependsOnTime,
     /* dependsOnNormals */  NULL,

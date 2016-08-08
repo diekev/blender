@@ -4352,14 +4352,17 @@ static void transformcache_evaluate(bConstraint *con, bConstraintOb *cob, ListBa
 #ifdef WITH_ALEMBIC
 	bTransformCacheConstraint *data = con->data;
 	Scene *scene = cob->scene;
+
 	CacheFile *cache_file = data->cache_file;
 
 	const float frame = BKE_scene_frame_get(scene);
 	const float time = BKE_cachefile_time_offset(cache_file, frame, FPS);
 
+	BKE_cachefile_ensure_handle(G.main, cache_file);
+
 	ABC_get_transform(cache_file->handle,
 	                  cob->ob,
-	                  data->abc_object_path,
+	                  data->object_path,
 	                  cob->matrix,
 	                  time,
 	                  cache_file->scale,
@@ -4377,7 +4380,7 @@ static void transformcache_copy(bConstraint *con, bConstraint *srccon)
 	bTransformCacheConstraint *src = srccon->data;
 	bTransformCacheConstraint *dst = con->data;
 
-	BLI_strncpy(dst->abc_object_path, src->abc_object_path, sizeof(dst->abc_object_path));
+	BLI_strncpy(dst->object_path, src->object_path, sizeof(dst->object_path));
 	dst->cache_file = src->cache_file;
 
 	if (dst->cache_file) {

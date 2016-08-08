@@ -86,7 +86,8 @@ void ABC_import(struct bContext *C,
                 bool is_sequence,
                 bool set_frame_range,
                 int sequence_len,
-                int offset);
+                int offset,
+                bool validate_meshes);
 
 AbcArchiveHandle *ABC_create_handle(const char *filename, struct ListBase *object_paths);
 
@@ -104,10 +105,8 @@ struct DerivedMesh *ABC_read_mesh(AbcArchiveHandle *handle,
                                   struct DerivedMesh *dm,
                                   const char *object_path,
                                   const float time, int forward_axis, int up_axis,
-                                  const char **err_str);
-
-bool ABC_has_velocity_cache(AbcArchiveHandle *handle, const char *object_path, const float time);
-void ABC_get_velocity_cache(AbcArchiveHandle *handle, const char *object_path, float *values, float time);
+                                  const char **err_str,
+                                  int flags);
 
 #ifdef __cplusplus
 }
