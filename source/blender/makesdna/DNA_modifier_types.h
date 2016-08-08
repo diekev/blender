@@ -1546,7 +1546,21 @@ typedef struct MeshSeqCacheModifierData {
 	ModifierData modifier;
 
 	struct CacheFile *cache_file;
-	char abc_object_path[1024];  /* 1024 = FILE_MAX */
+	char object_path[1024];  /* 1024 = FILE_MAX */
+
+	char read_flag;
+	char pad[7];
 } MeshSeqCacheModifierData;
+
+/* MeshSeqCacheModifierData.read_flag */
+enum {
+	MOD_MESHSEQ_READ_VERT  = (1 << 0),
+	MOD_MESHSEQ_READ_POLY  = (1 << 1),
+	MOD_MESHSEQ_READ_UV    = (1 << 2),
+	MOD_MESHSEQ_READ_COLOR = (1 << 3),
+};
+
+#define MOD_MESHSEQ_READ_ALL \
+	(MOD_MESHSEQ_READ_VERT | MOD_MESHSEQ_READ_POLY | MOD_MESHSEQ_READ_UV | MOD_MESHSEQ_READ_COLOR)
 
 #endif  /* __DNA_MODIFIER_TYPES_H__ */

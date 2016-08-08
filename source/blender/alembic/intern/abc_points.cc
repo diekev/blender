@@ -157,23 +157,14 @@ void AbcPointsReader::readObjectData(Main *bmain, float time)
 	m_sample = m_schema.getValue(sample_sel);
 
 	const P3fArraySamplePtr &positions = m_sample.getPositions();
-
 	utils::mesh_add_verts(mesh, positions->size());
 
-	ICompoundProperty prop = m_schema.getArbGeomParams();
-	N3fArraySamplePtr vnormals;
+	CDStreamConfig config = create_config(mesh);
+	read_points_sample(m_schema, sample_sel, config, time);
 
-	if (has_property(prop, "N")) {
-		const IN3fArrayProperty &normals_prop = IN3fArrayProperty(prop, "N", time);
-
-		if (normals_prop) {
-			vnormals = normals_prop.getValue(sample_sel);
-		}
+	if (m_settings->validate_meshes) {
+		BKE_mesh_validate(mesh, false, false);
 	}
-
-	read_mverts(mesh->mvert, positions, vnormals);
-
-	BKE_mesh_validate(mesh, false, false);
 
 	m_object = BKE_object_add_only_object(bmain, OB_MESH, m_object_name.c_str());
 	m_object->data = mesh;
@@ -181,4 +172,27 @@ void AbcPointsReader::readObjectData(Main *bmain, float time)
 	if (has_animations(m_schema, m_settings)) {
 		addCacheModifier();
 	}
+}
+
+void read_points_sample(const IPointsSchema &schema,
+                        const ISampleSelector &selector,
+                        CDStreamConfig &config,
+                        float time)
+{
+	Alembic::AbcGeom::IPointsSchema::Sample sample = schema.getValue(selector);
+
+	const P3fArraySamplePtr &positions = sample.getPositions();
+
+	ICompoundProperty prop = schema.getArbGeomParams();
+	N3fArraySamplePtr vnormals;
+
+	if (has_property(prop, "N")) {
+		const IN3fArrayProperty &normals_prop = IN3fArrayProperty(prop, "N", time);
+
+		if (normals_prop) {
+			vnormals = normals_prop.getValue(selector);
+		}
+	}
+
+	read_mverts(config.mvert, positions, vnormals);
 }

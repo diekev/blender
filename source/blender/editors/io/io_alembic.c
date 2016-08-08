@@ -140,7 +140,7 @@ static void ui_alembic_export_settings(uiLayout *layout, PointerRNA *imfptr)
 	uiItemL(row, IFACE_("Manual Transform:"), ICON_NONE);
 
 	row = uiLayoutRow(box, false);
-	uiItemR(row, imfptr, "scale", 0, NULL, ICON_NONE);
+	uiItemR(row, imfptr, "global_scale", 0, NULL, ICON_NONE);
 
 	/* Scene Options */
 	box = uiLayoutBox(layout);
@@ -280,7 +280,7 @@ void WM_OT_alembic_export(wmOperatorType *ot)
 	RNA_def_enum(ot->srna, "compression_type", rna_enum_abc_compression_items,
 	             ABC_ARCHIVE_OGAWA, "Compression", "");
 
-	RNA_def_float(ot->srna, "scale", 1.0f, 0.0001f, 1000.0f, "Scale",
+	RNA_def_float(ot->srna, "global_scale", 1.0f, 0.0001f, 1000.0f, "Scale",
 	              "Value by which to enlarge or shrink the objects with respect to the world's origin",
 	              0.0001f, 1000.0f);
 }
@@ -383,6 +383,12 @@ static void ui_alembic_import_settings(uiLayout *layout, PointerRNA *imfptr)
 
 	row = uiLayoutRow(box, false);
 	uiItemR(row, imfptr, "set_frame_range", 0, NULL, ICON_NONE);
+
+	row = uiLayoutRow(box, false);
+	uiItemR(row, imfptr, "is_sequence", 0, NULL, ICON_NONE);
+
+	row = uiLayoutRow(box, false);
+	uiItemR(row, imfptr, "validate_meshes", 0, NULL, ICON_NONE);
 }
 
 static void wm_alembic_import_draw(bContext *UNUSED(C), wmOperator *op)
@@ -404,13 +410,18 @@ static int wm_alembic_import_exec(bContext *C, wmOperator *op)
 	RNA_string_get(op->ptr, "filepath", filename);
 
 	const float scale = RNA_float_get(op->ptr, "scale");
+	const bool is_sequence = RNA_boolean_get(op->ptr, "is_sequence");
 	const bool set_frame_range = RNA_boolean_get(op->ptr, "set_frame_range");
+	const bool validate_meshes = RNA_boolean_get(op->ptr, "validate_meshes");
 
 	int offset = 0;
-	int sequence_len = get_sequence_len(filename, &offset);
-	const bool is_sequence = (sequence_len > 1);
+	int sequence_len = 1;
 
-	ABC_import(C, filename, scale, is_sequence, set_frame_range, sequence_len, offset);
+	if (is_sequence) {
+		sequence_len = get_sequence_len(filename, &offset);
+	}
+
+	ABC_import(C, filename, scale, is_sequence, set_frame_range, sequence_len, offset, validate_meshes);
 
 	return OPERATOR_FINISHED;
 }
@@ -436,6 +447,12 @@ void WM_OT_alembic_import(wmOperatorType *ot)
 	RNA_def_boolean(ot->srna, "set_frame_range", true,
 	                "Set Frame Range",
 	                "If checked, update scene's start and end frame to match those of the Alembic archive");
+
+	RNA_def_boolean(ot->srna, "validate_meshes", 0,
+	                "Validate Meshes", "Check imported mesh objects for invalid data (slow)");
+
+	RNA_def_boolean(ot->srna, "is_sequence", false, "Is Sequence",
+	                "Set to true if the cache is split into separate files");
 }
 
 #endif

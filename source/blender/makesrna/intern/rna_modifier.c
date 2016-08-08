@@ -1129,35 +1129,6 @@ static int rna_CorrectiveSmoothModifier_is_bind_get(PointerRNA *ptr)
 	return (csmd->bind_coords != NULL);
 }
 
-static void rna_MeshSequenceCacheModifier_velocity_get(PointerRNA *ptr, float *values)
-{
-#ifdef WITH_ALEMBIC
-	MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *)ptr->data;
-
-	Scene *scene = mcmd->modifier.scene;
-	const float time = BKE_cachefile_time_offset(mcmd->cache_file, CFRA, FPS);
-
-	ABC_get_velocity_cache(mcmd->cache_file->handle, mcmd->abc_object_path, values, time);
-#else
-	UNUSED_VARS(ptr, values);
-#endif
-}
-
-static int rna_MeshSequenceCacheModifier_has_velocity_get(PointerRNA *ptr)
-{
-#ifdef WITH_ALEMBIC
-	MeshSeqCacheModifierData *mcmd = (MeshSeqCacheModifierData *)ptr->data;
-
-	Scene *scene = mcmd->modifier.scene;
-	const float time = BKE_cachefile_time_offset(mcmd->cache_file, CFRA, FPS);
-
-	return ABC_has_velocity_cache(mcmd->cache_file->handle, mcmd->abc_object_path, time);
-#else
-	return false;
-	UNUSED_VARS(ptr);
-#endif
-}
-
 #else
 
 static PropertyRNA *rna_def_property_subdivision_common(StructRNA *srna, const char type[])
@@ -4271,20 +4242,22 @@ static void rna_def_modifier_meshseqcache(BlenderRNA *brna)
 	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_SELF_CHECK);
 	RNA_def_property_update(prop, 0, "rna_Modifier_dependency_update");
 
-	prop = RNA_def_property(srna, "abc_object_path", PROP_STRING, PROP_NONE);
+	prop = RNA_def_property(srna, "object_path", PROP_STRING, PROP_NONE);
 	RNA_def_property_ui_text(prop, "Object Path", "Path to the object in the Alembic archive used to lookup geometric data");
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 
-	prop = RNA_def_property(srna, "velocity_cache", PROP_FLOAT, PROP_NONE);
-	RNA_def_property_array(prop, 32);
-	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
-	RNA_def_property_float_funcs(prop, "rna_MeshSequenceCacheModifier_velocity_get", NULL, NULL);
-	RNA_def_property_ui_text(prop, "Velocity Cache", "Vertices velocity cache");
+	static EnumPropertyItem read_flag_items[] = {
+		{MOD_MESHSEQ_READ_VERT,  "VERT", 0, "Vertex", ""},
+		{MOD_MESHSEQ_READ_POLY,  "POLY", 0, "Faces", ""},
+		{MOD_MESHSEQ_READ_UV,    "UV", 0, "UV", ""},
+		{MOD_MESHSEQ_READ_COLOR, "COLOR", 0, "Color", ""},
+		{0, NULL, 0, NULL, NULL}
+	};
 
-	prop = RNA_def_property(srna, "has_velocity", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_ui_text(prop, "Has Velocity Cache", "");
-	RNA_def_property_boolean_funcs(prop, "rna_MeshSequenceCacheModifier_has_velocity_get", NULL);
-	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	prop = RNA_def_property(srna, "read_data", PROP_ENUM, PROP_NONE);
+	RNA_def_property_flag(prop, PROP_ENUM_FLAG);
+	RNA_def_property_enum_sdna(prop, NULL, "read_flag");
+	RNA_def_property_enum_items(prop, read_flag_items);
 	RNA_def_property_update(prop, 0, "rna_Modifier_update");
 }
 

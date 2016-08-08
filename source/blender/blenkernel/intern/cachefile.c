@@ -52,14 +52,19 @@ void *BKE_cachefile_add(Main *bmain, const char *name)
 {
 	CacheFile *cache_file = BKE_libblock_alloc(bmain, ID_CF, name);
 
+	BKE_cachefile_init(cache_file);
+
+	return cache_file;
+}
+
+void BKE_cachefile_init(CacheFile *cache_file)
+{
 	cache_file->handle = NULL;
 	cache_file->filepath[0] = '\0';
 	cache_file->override_frame = false;
 	cache_file->frame = 0.0f;
 	cache_file->is_sequence = false;
 	cache_file->scale = 1.0f;
-
-	return cache_file;
 }
 
 /** Free (or release) any data used by this cachefile (does not free the cachefile itself). */
@@ -76,24 +81,19 @@ void BKE_cachefile_free(CacheFile *cache_file)
 
 CacheFile *BKE_cachefile_copy(Main *bmain, CacheFile *cache_file)
 {
-	CacheFile *new_cache_file = BKE_cachefile_add(bmain, cache_file->id.name + 2);
+	CacheFile *new_cache_file = BKE_libblock_copy(bmain, &cache_file->id);
+	new_cache_file->handle = NULL;
 
-	BLI_strncpy(new_cache_file->filepath, cache_file->filepath, FILE_MAX);
+	BLI_listbase_clear(&cache_file->object_paths);
 
-	new_cache_file->frame = cache_file->frame;
-	new_cache_file->override_frame = cache_file->override_frame;
-	new_cache_file->is_sequence = cache_file->is_sequence;
-	new_cache_file->scale = cache_file->scale;
-
-	if (cache_file->handle) {
-		BKE_cachefile_reload(bmain, new_cache_file);
-	}
-
-	if (ID_IS_LINKED_DATABLOCK(cache_file)) {
-		BKE_id_lib_local_paths(bmain, cache_file->id.lib, &new_cache_file->id);
-	}
+	BKE_id_copy_ensure_local(bmain, &cache_file->id, &new_cache_file->id);
 
 	return new_cache_file;
+}
+
+void BKE_cachefile_make_local(Main *bmain, CacheFile *cache_file, const bool lib_local)
+{
+	BKE_id_make_local_generic(bmain, &cache_file->id, true, lib_local);
 }
 
 void BKE_cachefile_reload(const Main *bmain, CacheFile *cache_file)
@@ -110,6 +110,13 @@ void BKE_cachefile_reload(const Main *bmain, CacheFile *cache_file)
 
 	cache_file->handle = ABC_create_handle(filepath, &cache_file->object_paths);
 #endif
+}
+
+void BKE_cachefile_ensure_handle(const Main *bmain, CacheFile *cache_file)
+{
+	if (cache_file->handle == NULL) {
+		BKE_cachefile_reload(bmain, cache_file);
+	}
 }
 
 void BKE_cachefile_update_frame(Main *bmain, Scene *scene, const float ctime, const float fps)
