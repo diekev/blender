@@ -12,28 +12,25 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software  Foundation,
+ * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2016 Blender Foundation.
- * All rights reserved.
+ * Contributor(s): Esteban Tovagliari, Cedric Paille, Kevin Dietrich
  *
  * ***** END GPL LICENSE BLOCK *****
- *
  */
 
-#ifndef __IO_CACHE_H__
-#define __IO_CACHE_H__
+#ifndef __MTLX_API_H__
+#define __MTLX_API_H__
 
-/** \file blender/editors/io/io_cache.h
- *  \ingroup editor/io
- */
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-struct wmOperatorType;
+void MTLX_export(const char *filename);
 
-void CACHEFILE_OT_open(struct wmOperatorType *ot);
-void CACHEFILE_OT_reload(struct wmOperatorType *ot);
+#ifdef __cplusplus
+}
+#endif
 
-void WM_OT_materialx_export(struct wmOperatorType *ot);
-
-#endif /* __IO_CACHE_H__ */
+#endif  /* __MTLX_API_H__ */

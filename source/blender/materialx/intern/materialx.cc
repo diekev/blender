@@ -12,28 +12,32 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software  Foundation,
+ * along with this program; if not, write to the Free Software Foundation,
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
  *
- * The Original Code is Copyright (C) 2016 Blender Foundation.
- * All rights reserved.
+ * Contributor(s): Esteban Tovagliari, Cedric Paille, Kevin Dietrich
  *
  * ***** END GPL LICENSE BLOCK *****
- *
  */
 
-#ifndef __IO_CACHE_H__
-#define __IO_CACHE_H__
+#include "../MTLX_api.h"
 
-/** \file blender/editors/io/io_cache.h
- *  \ingroup editor/io
- */
+#include "../tinyxml2/tinyxml2.h"
 
-struct wmOperatorType;
+void MTLX_export(const char *filename)
+{
+	tinyxml2::XMLDocument doc;
+	doc.InsertFirstChild(doc.NewDeclaration());
 
-void CACHEFILE_OT_open(struct wmOperatorType *ot);
-void CACHEFILE_OT_reload(struct wmOperatorType *ot);
+	tinyxml2::XMLElement *root = doc.NewElement("materialx");
+	root->SetAttribute("version", "1.32");
+	root->SetAttribute("cms", "ocio");
 
-void WM_OT_materialx_export(struct wmOperatorType *ot);
+	doc.InsertEndChild(root);
 
-#endif /* __IO_CACHE_H__ */
+	tinyxml2::XMLError eResult = doc.SaveFile(filename);
+
+	if (eResult != tinyxml2::XML_SUCCESS) {
+		printf("Error: %i\n", eResult);
+	}
+}

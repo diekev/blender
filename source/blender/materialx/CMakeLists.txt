@@ -14,55 +14,36 @@
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
 #
-# Contributor(s): Blender Foundation
+# The Original Code is Copyright (C) 2016, Blender Foundation
+# All rights reserved.
+#
+# The Original Code is: all of this file.
+#
+# Contributor(s): Kevin Dietrich.
 #
 # ***** END GPL LICENSE BLOCK *****
 
 set(INC
-	../include
-	../../blenkernel
-	../../blenlib
-	../../blentranslation
-	../../bmesh
-	../../makesdna
-	../../makesrna
-	../../windowmanager
-	../../collada
-	../../alembic
-	../../materialx
-	../../../../intern/guardedalloc
+	.
+	../blenkernel
+	../blenlib
+	../blenloader
+	../editors/include
+	../makesdna
+	../makesrna
+	../windowmanager
+	../../../intern/guardedalloc
 )
 
 set(INC_SYS
-
 )
 
 set(SRC
-	io_alembic.c
-	io_cache.c
-	io_collada.c
-	io_ops.c
+	intern/materialx.cc
+	tinyxml2/tinyxml2.cpp
 
-	io_alembic.h
-	io_cache.h
-	io_collada.h
-	io_ops.h
+	MTLX_api.h
+	tinyxml2/tinyxml2.h
 )
 
-if(WITH_OPENCOLLADA)
-	add_definitions(-DWITH_COLLADA)
-endif()
-
-if(WITH_ALEMBIC)
-	add_definitions(-DWITH_ALEMBIC)
-
-	if(WITH_ALEMBIC_HDF5)
-		add_definitions(-DWITH_ALEMBIC_HDF5)
-	endif()
-endif()
-
-if(WITH_INTERNATIONAL)
-	add_definitions(-DWITH_INTERNATIONAL)
-endif()
-
-blender_add_lib(bf_editor_io "${SRC}" "${INC}" "${INC_SYS}")
+blender_add_lib(bf_materialx "${SRC}" "${INC}" "${INC_SYS}")

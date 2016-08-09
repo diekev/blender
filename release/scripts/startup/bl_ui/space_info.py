@@ -171,6 +171,7 @@ class INFO_MT_file_export(Menu):
             self.layout.operator("wm.collada_export", text="Collada (Default) (.dae)")
         if bpy.app.build_options.alembic:
             self.layout.operator("wm.alembic_export", text="Alembic (.abc)")
+        self.layout.operator("wm.materialx_export", text="MaterialX (.mtlx)")
 
 
 class INFO_MT_file_external_data(Menu):

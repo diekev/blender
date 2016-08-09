@@ -56,4 +56,6 @@ void ED_operatortypes_io(void)
 
 	WM_operatortype_append(CACHEFILE_OT_open);
 	WM_operatortype_append(CACHEFILE_OT_reload);
+
+	WM_operatortype_append(WM_OT_materialx_export);
 }

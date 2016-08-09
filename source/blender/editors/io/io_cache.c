@@ -160,3 +160,48 @@ void CACHEFILE_OT_reload(wmOperatorType *ot)
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 }
+
+/* ***************************** Reload Operator **************************** */
+
+#include "MTLX_api.h"
+
+static int wm_materialx_export_exec(bContext *C, wmOperator *op)
+{
+	if (!RNA_struct_property_is_set(op->ptr, "filepath")) {
+		BKE_report(op->reports, RPT_ERROR, "No filename given");
+		return OPERATOR_CANCELLED;
+	}
+
+	char filename[FILE_MAX];
+	RNA_string_get(op->ptr, "filepath", filename);
+
+	Base *base = CTX_data_active_base(C);
+
+	if (base == NULL) {
+		BKE_report(op->reports, RPT_ERROR, "No Object selected");
+		return OPERATOR_CANCELLED;
+	}
+
+	MTLX_export(filename);
+
+	return OPERATOR_FINISHED;
+}
+
+void WM_OT_materialx_export(wmOperatorType *ot)
+{
+	ot->name = "Export Material to MaterialX";
+	ot->description = "Write a .mtlx file based on the material of the currently selected object";
+	ot->idname = "WM_OT_materialx_export";
+
+	/* api callbacks */
+	ot->invoke = WM_operator_filesel;
+	ot->exec = wm_materialx_export_exec;
+	ot->poll = WM_operator_winactive;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	WM_operator_properties_filesel(ot, FILE_TYPE_FOLDER,
+	                               FILE_BLENDER, FILE_SAVE, WM_FILESEL_FILEPATH,
+	                               FILE_DEFAULTDISPLAY, FILE_SORT_ALPHA);
+}

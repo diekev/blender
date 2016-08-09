@@ -113,6 +113,7 @@ add_subdirectory(nodes)
 add_subdirectory(modifiers)
 add_subdirectory(makesdna)
 add_subdirectory(makesrna)
+add_subdirectory(materialx)
 
 if(WITH_COMPOSITOR)
 	add_subdirectory(compositor)
