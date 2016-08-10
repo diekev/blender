@@ -24,6 +24,72 @@
 
 #include "../tinyxml2/tinyxml2.h"
 
+extern "C" {
+#include "DNA_material_types.h"
+}
+
+/* Only applicable for a mix rgb node with a single input connected. */
+static void mtlx_add_math_operator(tinyxml2::XMLDocument &doc,
+                                   tinyxml2::XMLElement *parent,
+                                   int optype)
+{
+	const char *opname;
+
+	switch (optype) {
+		case MA_RAMP_ADD:
+			opname = "add";
+			break;
+		case MA_RAMP_MULT:
+			opname = "multiply";
+			break;
+		case MA_RAMP_SUB:
+			opname = "subtract";
+			break;
+		case MA_RAMP_DIV:
+			opname = "divide";
+			break;
+		default:
+		case MA_RAMP_BLEND:
+		case MA_RAMP_BURN:
+		case MA_RAMP_COLOR:
+		case MA_RAMP_DARK:
+		case MA_RAMP_DIFF:
+		case MA_RAMP_DODGE:
+		case MA_RAMP_HUE:
+		case MA_RAMP_LIGHT:
+		case MA_RAMP_LINEAR:
+		case MA_RAMP_OVERLAY:
+		case MA_RAMP_SAT:
+		case MA_RAMP_SCREEN:
+		case MA_RAMP_SOFT:
+		case MA_RAMP_VAL:
+			return;
+	}
+
+	tinyxml2::XMLElement *optype_param = doc.NewElement(opname);
+	//collection->SetAttribute("name", collection_name);
+
+	tinyxml2::XMLElement *input_param = doc.NewElement("parameter");
+	input_param->SetAttribute("name", "in");
+	input_param->SetAttribute("type", "opgraphnode"); // TODO
+	input_param->SetAttribute("value", "n4"); // TODO
+
+	optype_param->InsertEndChild(input_param);
+
+	float amount = 0.4f; // TODO
+
+	tinyxml2::XMLElement *amount_param = doc.NewElement("parameter");
+	amount_param->SetAttribute("name", "amount");
+	amount_param->SetAttribute("type", "float"); // TODO
+	amount_param->SetAttribute("amount", amount);
+
+	optype_param->InsertEndChild(amount_param);
+
+	// TODO: channels param.
+
+	parent->InsertEndChild(optype_param);
+}
+
 static void mtlx_add_geom_reference(tinyxml2::XMLDocument &doc,
                                     tinyxml2::XMLElement *parent,
                                     const char *collection_name,
@@ -78,6 +144,11 @@ void MTLX_export(const char *filename)
 
 	mtlx_add_shader_reference(doc, root, "srf1", "surface", "basic_surface");
 	mtlx_add_shader_reference(doc, root, "dsp1", "displacement", "noise_bump");
+
+	mtlx_add_math_operator(doc, root, MA_RAMP_ADD);
+	mtlx_add_math_operator(doc, root, MA_RAMP_SUB);
+	mtlx_add_math_operator(doc, root, MA_RAMP_MULT);
+	mtlx_add_math_operator(doc, root, MA_RAMP_DIV);
 
 #if 0
 	tinyxml2::XMLElement *image = doc.NewElement("image");
