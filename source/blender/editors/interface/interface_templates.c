@@ -326,7 +326,9 @@ static void template_id_cb(bContext *C, void *arg_litem, void *arg_event)
 				}
 				else {
 					if (id) {
+						Main *bmain = CTX_data_main(C);
 						id_single_user(C, id, &template->ptr, template->prop);
+						DAG_relations_tag_update(bmain);
 					}
 				}
 			}
@@ -874,8 +876,8 @@ static uiLayout *draw_modifier(
 		
 		/* mode enabling buttons */
 		UI_block_align_begin(block);
-		/* Softbody not allowed in this situation, enforce! */
-		if (((md->type != eModifierType_Softbody && md->type != eModifierType_Collision) || !(ob->pd && ob->pd->deflect)) &&
+		/* Collision and Surface are always enabled, hide buttons! */
+		if (((md->type != eModifierType_Collision) || !(ob->pd && ob->pd->deflect)) &&
 		    (md->type != eModifierType_Surface) )
 		{
 			uiItemR(row, &ptr, "show_render", 0, "", ICON_NONE);

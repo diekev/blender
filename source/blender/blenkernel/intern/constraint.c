@@ -4344,7 +4344,7 @@ static bConstraintTypeInfo CTI_OBJECTSOLVER = {
 static void transformcache_id_looper(bConstraint *con, ConstraintIDFunc func, void *userdata)
 {
 	bTransformCacheConstraint *data = con->data;
-	func(con, (ID **)&data->cache_file, false, userdata);
+	func(con, (ID **)&data->cache_file, true, userdata);
 }
 
 static void transformcache_evaluate(bConstraint *con, bConstraintOb *cob, ListBase *targets)
@@ -4354,6 +4354,10 @@ static void transformcache_evaluate(bConstraint *con, bConstraintOb *cob, ListBa
 	Scene *scene = cob->scene;
 
 	CacheFile *cache_file = data->cache_file;
+
+	if (!cache_file) {
+		return;
+	}
 
 	const float frame = BKE_scene_frame_get(scene);
 	const float time = BKE_cachefile_time_offset(cache_file, frame, FPS);
@@ -4397,6 +4401,13 @@ static void transformcache_free(bConstraint *con)
 	}
 }
 
+static void transformcache_new_data(void *cdata)
+{
+	bTransformCacheConstraint *data = (bTransformCacheConstraint *)cdata;
+
+	data->cache_file = NULL;
+}
+
 static bConstraintTypeInfo CTI_TRANSFORM_CACHE = {
 	CONSTRAINT_TYPE_TRANSFORM_CACHE, /* type */
 	sizeof(bTransformCacheConstraint), /* size */
@@ -4405,7 +4416,7 @@ static bConstraintTypeInfo CTI_TRANSFORM_CACHE = {
 	transformcache_free,  /* free data */
 	transformcache_id_looper,  /* id looper */
 	transformcache_copy,  /* copy data */
-	NULL,  /* new data */
+	transformcache_new_data,  /* new data */
 	NULL,  /* get constraint targets */
 	NULL,  /* flush constraint targets */
 	NULL,  /* get target matrix */

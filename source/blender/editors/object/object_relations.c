@@ -1382,7 +1382,7 @@ static int move_to_layer_exec(bContext *C, wmOperator *op)
 			/* upper byte is used for local view */
 			local = base->lay & 0xFF000000;
 			base->lay = lay + local;
-			base->object->lay = lay;
+			base->object->lay = base->lay;
 			/* if (base->object->type == OB_LAMP) is_lamp = true; */
 		}
 		CTX_DATA_END;
@@ -2106,6 +2106,7 @@ void ED_object_single_users(Main *bmain, Scene *scene, const bool full, const bo
 	}
 
 	BKE_main_id_clear_newpoins(bmain);
+	DAG_relations_tag_update(bmain);
 }
 
 /******************************* Make Local ***********************************/

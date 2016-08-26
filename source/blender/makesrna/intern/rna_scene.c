@@ -2161,23 +2161,26 @@ static void rna_def_gpencil_brush(BlenderRNA *brna)
 	/* Angle when brush is full size */
 	prop = RNA_def_property(srna, "angle", PROP_FLOAT, PROP_ANGLE);
 	RNA_def_property_float_sdna(prop, NULL, "draw_angle");
-	RNA_def_property_range(prop, 0.0f, M_PI_2);
-	RNA_def_property_ui_text(prop, "Angle", "Angle of drawing when brush has full size");
+	RNA_def_property_range(prop, -M_PI_2, M_PI_2);
+	RNA_def_property_ui_text(prop, "Angle",
+	                         "Direction of the stroke at which brush gives maximal thickness "
+	                         "(0° for horizontal)");
 	RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, NULL);
 
 	/* Factor to change brush size depending of angle */
 	prop = RNA_def_property(srna, "angle_factor", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "draw_angle_factor");
 	RNA_def_property_range(prop, 0.0f, 1.0f);
-	RNA_def_property_ui_text(prop, "Angle Factor", "Factor to apply when the brush rotate of its full size");
+	RNA_def_property_ui_text(prop, "Angle Factor",
+	                         "Reduce brush thickness by this factor when stroke is perpendicular to 'Angle' direction");
 	RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, NULL);
 
 	/* Smoothing factor for new strokes */
 	prop = RNA_def_property(srna, "pen_smooth_factor", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "draw_smoothfac");
 	RNA_def_property_range(prop, 0.0, 2.0f);
-	RNA_def_property_ui_text(prop, "Smooth", "Amount of smoothing to apply to newly created strokes, to "
-	                         "reduce jitter/noise");
+	RNA_def_property_ui_text(prop, "Smooth",
+	                         "Amount of smoothing to apply to newly created strokes, to reduce jitter/noise");
 	RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, NULL);
 
 	/* Iterations of the Smoothing factor */
@@ -2185,8 +2188,7 @@ static void rna_def_gpencil_brush(BlenderRNA *brna)
 	RNA_def_property_int_sdna(prop, NULL, "draw_smoothlvl");
 	RNA_def_property_range(prop, 1, 3);
 	RNA_def_property_ui_text(prop, "Iterations",
-	                         "Number of times to smooth newly created strokes "
-	                         "[+ reason/effect of using higher values of this property]");
+	                         "Number of times to smooth newly created strokes");
 	RNA_def_property_update(prop, NC_GPENCIL | ND_DATA, NULL);
 
 	/* Subdivision level for new strokes */
@@ -2612,6 +2614,12 @@ static void rna_def_tool_settings(BlenderRNA  *brna)
 	                         "are included as the basis for the new one");
 	RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, NULL);
 	
+	prop = RNA_def_property(srna, "use_gpencil_draw_onback", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "gpencil_flags", GP_TOOL_FLAG_PAINT_ONBACK);
+	RNA_def_property_ui_text(prop, "Draw Strokes on Back",
+		"When draw new strokes, the new stroke is drawn below of all strokes in the layer");
+	RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, NULL);
+
 	prop = RNA_def_property(srna, "grease_pencil_source", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_bitflag_sdna(prop, NULL, "gpencil_src");
 	RNA_def_property_enum_items(prop, gpencil_source_3d_items);
