@@ -839,6 +839,21 @@ static void rna_def_pointcache(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", PTCACHE_BAKED);
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 
+	/* ----------------- For Scene time ------------------- */
+
+	prop = RNA_def_property(srna, "override_frame", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_ui_text(prop, "Override Frame",
+	                         "Whether to use a custom frame for looking up data in the cache file,"
+	                         " instead of using the current scene frame");
+	RNA_def_property_update(prop, 0, NULL);
+
+	prop = RNA_def_property(srna, "frame", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "frame");
+	RNA_def_property_range(prop, -MAXFRAME, MAXFRAME);
+	RNA_def_property_ui_text(prop, "Frame", "The time to use for looking up the data in the cache file,"
+	                                        " or to determine which file to use in a file sequence");
+	RNA_def_property_update(prop, 0, NULL);
+
 	prop = RNA_def_property(srna, "is_baking", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", PTCACHE_BAKING);
 	RNA_def_property_clear_flag(prop, PROP_EDITABLE);

@@ -146,6 +146,11 @@ def point_cache_ui(self, context, cache, enabled, cachetype):
             row.enabled = enabled
             row.prop(cache, "frame_start")
             row.prop(cache, "frame_end")
+            row = layout.row()
+            row.prop(cache, "override_frame")
+            row = layout.row()
+            row.enabled = (cache.override_frame is True)
+            row.prop(cache, "frame")
         if cachetype not in {'SMOKE', 'CLOTH', 'DYNAMIC_PAINT', 'RIGID_BODY'}:
             row.prop(cache, "frame_step")
 

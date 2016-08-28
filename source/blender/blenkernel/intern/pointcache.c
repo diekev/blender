@@ -2634,6 +2634,20 @@ static int ptcache_interpolate(PTCacheID *pid, float cfra, int cfra1, int cfra2)
 /* possible to get old or interpolated result */
 int BKE_ptcache_read(PTCacheID *pid, float cfra, bool no_extrapolate_old)
 {
+	PointCache *cache = pid->cache;
+
+	if (cache->override_frame) {
+		if (cache->frame < cache->startframe) {
+			cfra = cache->startframe;
+		}
+		else if (cache->frame > cache->endframe) {
+			cfra = cache->endframe;
+		}
+		else {
+			cfra = cache->frame;
+		}
+	}
+
 	int cfrai = (int)floor(cfra), cfra1=0, cfra2=0;
 	int ret = 0;
 
