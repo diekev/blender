@@ -39,20 +39,22 @@ endmacro()
 
 add_definitions(-DWIN32)
 # Minimum MSVC Version
-if(MSVC_VERSION EQUAL 1800)
-	set(_min_ver "18.0.31101")
-	if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${_min_ver})
-		message(FATAL_ERROR
-			"Visual Studio 2013 (Update 4, ${_min_ver}) required, "
-			"found (${CMAKE_CXX_COMPILER_VERSION})")
+if(CMAKE_CXX_COMPILER_ID MATCHES MSVC)
+	if(MSVC_VERSION EQUAL 1800)
+		set(_min_ver "18.0.31101")
+		if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${_min_ver})
+			message(FATAL_ERROR
+				"Visual Studio 2013 (Update 4, ${_min_ver}) required, "
+				"found (${CMAKE_CXX_COMPILER_VERSION})")
+		endif()
 	endif()
-endif()
-if(MSVC_VERSION EQUAL 1900)
-	set(_min_ver "19.0.24210")
-	if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${_min_ver})
-		message(FATAL_ERROR
-			"Visual Studio 2015 (Update 3, ${_min_ver}) required, "
-			"found (${CMAKE_CXX_COMPILER_VERSION})")
+	if(MSVC_VERSION EQUAL 1900)
+		set(_min_ver "19.0.24210")
+		if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS ${_min_ver})
+			message(FATAL_ERROR
+				"Visual Studio 2015 (Update 3, ${_min_ver}) required, "
+				"found (${CMAKE_CXX_COMPILER_VERSION})")
+		endif()
 	endif()
 endif()
 unset(_min_ver)
@@ -440,7 +442,7 @@ if(WITH_MOD_CLOTH_ELTOPO)
 	)
 endif()
 
-if(WITH_OPENSUBDIV)
+if(WITH_OPENSUBDIV OR WITH_CYCLES_OPENSUBDIV)
 	set(OPENSUBDIV_INCLUDE_DIR ${LIBDIR}/opensubdiv/include)
 	set(OPENSUBDIV_LIBPATH ${LIBDIR}/opensubdiv/lib)
 	set(OPENSUBDIV_LIBRARIES ${OPENSUBDIV_LIBPATH}/osdCPU.lib ${OPENSUBDIV_LIBPATH}/osdGPU.lib)
@@ -471,3 +473,15 @@ endif()
 
 # used in many places so include globally, like OpenGL
 blender_include_dirs_sys("${PTHREADS_INCLUDE_DIRS}")
+
+#find signtool  
+SET(ProgramFilesX86_NAME "ProgramFiles(x86)") #env dislikes the ( ) 
+find_program(SIGNTOOL_EXE signtool
+HINTS
+  "$ENV{${ProgramFilesX86_NAME}}/Windows Kits/10/bin/x86/"
+  "$ENV{ProgramFiles}/Windows Kits/10/bin/x86/"
+  "$ENV{${ProgramFilesX86_NAME}}/Windows Kits/8.1/bin/x86/"
+  "$ENV{ProgramFiles}/Windows Kits/8.1/bin/x86/"
+  "$ENV{${ProgramFilesX86_NAME}}/Windows Kits/8.0/bin/x86/"
+  "$ENV{ProgramFiles}/Windows Kits/8.0/bin/x86/"
+)

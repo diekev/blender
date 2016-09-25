@@ -52,6 +52,7 @@
 #include "DNA_linestyle_types.h"
 #include "DNA_actuator_types.h"
 #include "DNA_view3d_types.h"
+#include "DNA_smoke_types.h"
 
 #include "DNA_genfile.h"
 
@@ -1306,12 +1307,20 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *main)
 							/* set color attributes */
 							copy_v4_v4(palcolor->color, gpl->color);
 							copy_v4_v4(palcolor->fill, gpl->fill);
-							palcolor->flag = gpl->flag;
+							
+							if (gpl->flag & GP_LAYER_HIDE)       palcolor->flag |= PC_COLOR_HIDE;
+							if (gpl->flag & GP_LAYER_LOCKED)     palcolor->flag |= PC_COLOR_LOCKED;
+							if (gpl->flag & GP_LAYER_ONIONSKIN)  palcolor->flag |= PC_COLOR_ONIONSKIN;
+							if (gpl->flag & GP_LAYER_VOLUMETRIC) palcolor->flag |= PC_COLOR_VOLUMETRIC;
+							if (gpl->flag & GP_LAYER_HQ_FILL)    palcolor->flag |= PC_COLOR_HQ_FILL;
+							
 							/* set layer opacity to 1 */
 							gpl->opacity = 1.0f;
+							
 							/* set tint color */
 							ARRAY_SET_ITEMS(gpl->tintcolor, 0.0f, 0.0f, 0.0f, 0.0f);
-
+							
+							/* flush relevant layer-settings to strokes */
 							for (bGPDframe *gpf = gpl->frames.first; gpf; gpf = gpf->next) {
 								for (bGPDstroke *gps = gpf->strokes.first; gps; gps = gps->next) {
 									/* set stroke to palette and force recalculation */
@@ -1319,14 +1328,15 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *main)
 									gps->palcolor = NULL;
 									gps->flag |= GP_STROKE_RECALC_COLOR;
 									gps->thickness = gpl->thickness;
+									
 									/* set alpha strength to 1 */
 									for (int i = 0; i < gps->totpoints; i++) {
 										gps->points[i].strength = 1.0f;
 									}
-
 								}
 							}
 						}
+						
 						/* set thickness to 0 (now it is a factor to override stroke thickness) */
 						gpl->thickness = 0.0f;
 					}
@@ -1339,7 +1349,7 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *main)
 		/* ------- end of grease pencil initialization --------------- */
 	}
 
-	{
+	if (!MAIN_VERSION_ATLEAST(main, 278, 0)) {
 		if (!DNA_struct_elem_find(fd->filesdna, "MovieTrackingTrack", "float", "weight_stab")) {
 			MovieClip *clip;
 			for (clip = main->movieclip.first; clip; clip = clip->id.next) {
@@ -1380,6 +1390,38 @@ void blo_do_versions_270(FileData *fd, Library *UNUSED(lib), Main *main)
 				clip->tracking.stabilization.flag |= TRACKING_SHOW_STAB_TRACKS;
 				/* deprecated, not used anymore */
 				clip->tracking.stabilization.ok = false;
+			}
+		}
+	}
+	if (!MAIN_VERSION_ATLEAST(main, 279, 0)) {
+		if (!DNA_struct_elem_find(fd->filesdna, "FFMpegCodecData", "int", "ffmpeg_preset")) {
+			for (Scene *scene = main->scene.first; scene; scene = scene->id.next) {
+				/* "medium" is the preset FFmpeg uses when no presets are given. */
+				scene->r.ffcodecdata.ffmpeg_preset = FFM_PRESET_MEDIUM;
+			}
+		}
+		if (!DNA_struct_elem_find(fd->filesdna, "FFMpegCodecData", "int", "constant_rate_factor")) {
+			for (Scene *scene = main->scene.first; scene; scene = scene->id.next) {
+				/* fall back to behaviour from before we introduced CRF for old files */
+				scene->r.ffcodecdata.constant_rate_factor = FFM_CRF_NONE;
+			}
+		}
+
+		if (!DNA_struct_elem_find(fd->filesdna, "SmokeModifierData", "float", "slice_per_voxel")) {
+			Object *ob;
+			ModifierData *md;
+
+			for (ob = main->object.first; ob; ob = ob->id.next) {
+				for (md = ob->modifiers.first; md; md = md->next) {
+					if (md->type == eModifierType_Smoke) {
+						SmokeModifierData *smd = (SmokeModifierData *)md;
+						if (smd->domain) {
+							smd->domain->slice_per_voxel = 5.0f;
+							smd->domain->slice_depth = 0.5f;
+							smd->domain->display_thickness = 1.0f;
+						}
+					}
+				}
 			}
 		}
 	}
