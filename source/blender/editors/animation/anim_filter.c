@@ -53,6 +53,7 @@
 #include "DNA_anim_types.h"
 #include "DNA_armature_types.h"
 #include "DNA_camera_types.h"
+#include "DNA_cachefile_types.h"
 #include "DNA_lamp_types.h"
 #include "DNA_lattice_types.h"
 #include "DNA_linestyle_types.h"
@@ -197,6 +198,16 @@ static bool actedit_get_context(bAnimContext *ac, SpaceAction *saction)
 			ac->datatype = ANIMCONT_GPENCIL;
 			ac->data = &saction->ads;
 			
+			ac->mode = saction->mode;
+			return true;
+
+		case SACTCONT_CACHEFILE: /* Cache File */ /* XXX review how this mode is handled... */
+			/* update scene-pointer (no need to check for pinning yet, as not implemented) */
+			saction->ads.source = (ID *)ac->scene;
+
+			ac->datatype = ANIMCONT_CHANNEL;
+			ac->data = &saction->ads;
+
 			ac->mode = saction->mode;
 			return true;
 			
@@ -660,6 +671,19 @@ static bAnimListElem *make_new_animlistelem(void *data, short datatype, ID *owne
 				ale->adt = BKE_animdata_from_id(data);
 				break;
 			}
+			case ANIMTYPE_DSCACHEFILE:
+			{
+				CacheFile *cache_file = (CacheFile *)data;
+				AnimData *adt = cache_file->adt;
+
+				ale->flag = FILTER_CACHEFILE_OBJD(cache_file);
+
+				ale->key_data = (adt) ? adt->action : NULL;
+				ale->datatype = ALE_ACT;
+
+				ale->adt = BKE_animdata_from_id(data);
+				break;
+			}
 			case ANIMTYPE_DSCUR:
 			{
 				Curve *cu = (Curve *)data;
@@ -928,6 +952,9 @@ static bAnimListElem *make_new_animlistelem(void *data, short datatype, ID *owne
  */
 static bool skip_fcurve_selected_data(bDopeSheet *ads, FCurve *fcu, ID *owner_id, int filter_mode)
 {
+	if (fcu->grp != NULL && fcu->grp->flag & ADT_CURVES_ALWAYS_VISIBLE) {
+		return false;
+	}
 	/* hidden items should be skipped if we only care about visible data, but we aren't interested in hidden stuff */
 	const bool skip_hidden = (filter_mode & ANIMFILTER_DATA_VISIBLE) && !(ads->filterflag & ADS_FILTER_INCL_HIDDEN);
 	
@@ -1747,6 +1774,42 @@ static size_t animdata_filter_ds_gpencil(bAnimContext *ac, ListBase *anim_data, 
 		items += tmp_items;
 	}
 	
+	/* return the number of items added to the list */
+	return items;
+}
+
+/* Helper for Cache File data integrated with main DopeSheet */
+static size_t animdata_filter_ds_cachefile(bAnimContext *ac, ListBase *anim_data, bDopeSheet *ads, CacheFile *cache_file, int filter_mode)
+{
+	ListBase tmp_data = {NULL, NULL};
+	size_t tmp_items = 0;
+	size_t items = 0;
+
+	/* add relevant animation channels for Cache File */
+	BEGIN_ANIMFILTER_SUBCHANNELS(FILTER_CACHEFILE_OBJD(cache_file))
+	{
+		/* add animation channels */
+		tmp_items += animfilter_block_data(ac, &tmp_data, ads, &cache_file->id, filter_mode);
+	}
+	END_ANIMFILTER_SUBCHANNELS;
+
+	/* did we find anything? */
+	if (tmp_items) {
+		/* include data-expand widget first */
+		if (filter_mode & ANIMFILTER_LIST_CHANNELS) {
+			/* check if filtering by active status */
+			// XXX: active check here needs checking
+			if (ANIMCHANNEL_ACTIVEOK(cache_file)) {
+				ANIMCHANNEL_NEW_CHANNEL(cache_file, ANIMTYPE_DSCACHEFILE, cache_file);
+			}
+		}
+
+		/* now add the list of collected channels */
+		BLI_movelisttolist(anim_data, &tmp_data);
+		BLI_assert(BLI_listbase_is_empty(&tmp_data));
+		items += tmp_items;
+	}
+
 	/* return the number of items added to the list */
 	return items;
 }
@@ -2765,7 +2828,25 @@ static bool animdata_filter_base_is_ok(bDopeSheet *ads, Scene *scene, Base *base
 		if ((ob->adt) && (ob->adt->flag & ADT_CURVES_NOT_VISIBLE))
 			return false;
 	}
-	
+
+	/* Pinned curves are visible regardless of selection flags. */
+	if ((ob->adt) && (ob->adt->flag & ADT_CURVES_ALWAYS_VISIBLE)) {
+		return true;
+	}
+
+	/* Special case.
+	 * We don't do recursive checks for pin, but we need to deal with tricky
+	 * setup like animated camera lens without animated camera location.
+	 * Without such special handle here we wouldn't be able to bin such
+	 * camera data only animation to the editor.
+	 */
+	if (ob->adt == NULL && ob->data != NULL) {
+		AnimData *data_adt = BKE_animdata_from_id(ob->data);
+		if (data_adt != NULL && (data_adt->flag & ADT_CURVES_ALWAYS_VISIBLE)) {
+			return true;
+		}
+	}
+
 	/* check selection and object type filters */
 	if ((ads->filterflag & ADS_FILTER_ONLYSEL) && !((base->flag & SELECT) /*|| (base == sce->basact)*/)) {
 		/* only selected should be shown */
@@ -2839,6 +2920,12 @@ static size_t animdata_filter_dopesheet(bAnimContext *ac, ListBase *anim_data, b
 		filter_mode |= ANIMFILTER_SELEDIT;
 	}
 	
+	/* Cache files level animations (frame duration and such). */
+	CacheFile *cache_file = G.main->cachefiles.first;
+	for (; cache_file; cache_file = cache_file->id.next) {
+		items += animdata_filter_ds_cachefile(ac, anim_data, ads, cache_file, filter_mode);
+	}
+
 	/* scene-linked animation - e.g. world, compositing nodes, scene anim (including sequencer currently) */
 	items += animdata_filter_dopesheet_scene(ac, anim_data, ads, scene, filter_mode);
 	
@@ -2950,7 +3037,11 @@ static size_t animdata_filter_animchan(bAnimContext *ac, ListBase *anim_data, bD
 		case ANIMTYPE_OBJECT:
 			items += animdata_filter_dopesheet_ob(ac, anim_data, ads, channel->data, filter_mode);
 			break;
-			
+
+		case ANIMTYPE_DSCACHEFILE:
+			items += animdata_filter_ds_cachefile(ac, anim_data, ads, channel->data, filter_mode);
+			break;
+
 		case ANIMTYPE_ANIMDATA:
 			items += animfilter_block_data(ac, anim_data, ads, channel->id, filter_mode);
 			break;

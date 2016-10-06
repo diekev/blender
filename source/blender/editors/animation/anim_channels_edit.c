@@ -120,6 +120,7 @@ void ANIM_set_active_channel(bAnimContext *ac, void *data, eAnimCont_Types datat
 			case ANIMTYPE_DSMAT:    /* Datablock AnimData Expanders */
 			case ANIMTYPE_DSLAM:
 			case ANIMTYPE_DSCAM:
+			case ANIMTYPE_DSCACHEFILE:
 			case ANIMTYPE_DSCUR:
 			case ANIMTYPE_DSSKEY:
 			case ANIMTYPE_DSWOR:
@@ -175,6 +176,7 @@ void ANIM_set_active_channel(bAnimContext *ac, void *data, eAnimCont_Types datat
 			case ANIMTYPE_DSMAT:    /* Datablock AnimData Expanders */
 			case ANIMTYPE_DSLAM:
 			case ANIMTYPE_DSCAM:
+			case ANIMTYPE_DSCACHEFILE:
 			case ANIMTYPE_DSCUR:
 			case ANIMTYPE_DSSKEY:
 			case ANIMTYPE_DSWOR:
@@ -275,6 +277,7 @@ void ANIM_deselect_anim_channels(bAnimContext *ac, void *data, eAnimCont_Types d
 				case ANIMTYPE_DSMAT:    /* Datablock AnimData Expanders */
 				case ANIMTYPE_DSLAM:
 				case ANIMTYPE_DSCAM:
+				case ANIMTYPE_DSCACHEFILE:
 				case ANIMTYPE_DSCUR:
 				case ANIMTYPE_DSSKEY:
 				case ANIMTYPE_DSWOR:
@@ -370,6 +373,7 @@ void ANIM_deselect_anim_channels(bAnimContext *ac, void *data, eAnimCont_Types d
 			case ANIMTYPE_DSMAT:    /* Datablock AnimData Expanders */
 			case ANIMTYPE_DSLAM:
 			case ANIMTYPE_DSCAM:
+			case ANIMTYPE_DSCACHEFILE:
 			case ANIMTYPE_DSCUR:
 			case ANIMTYPE_DSSKEY:
 			case ANIMTYPE_DSWOR:
@@ -431,7 +435,11 @@ void ANIM_flush_setting_anim_channels(bAnimContext *ac, ListBase *anim_data, bAn
 	/* sanity check */
 	if (ELEM(NULL, anim_data, anim_data->first))
 		return;
-	
+
+	if (setting == ACHANNEL_SETTING_ALWAYS_VISIBLE) {
+		return;
+	}
+
 	/* find the channel that got changed */
 	for (ale = anim_data->first; ale; ale = ale->next) {
 		/* compare data, and type as main way of identifying the channel */
@@ -1686,7 +1694,7 @@ static int animchannels_delete_exec(bContext *C, wmOperator *UNUSED(op))
 				bGPDlayer *gpl = (bGPDlayer *)ale->data;
 				
 				/* try to delete the layer's data and the layer itself */
-				free_gpencil_frames(gpl);
+				BKE_gpencil_free_frames(gpl);
 				BLI_freelinkN(&gpd->layers, gpl);
 				break;
 			}
@@ -2137,7 +2145,7 @@ static void ANIM_OT_channels_clean_empty(wmOperatorType *ot)
 	/* identifiers */
 	ot->name = "Remove Empty Animation Data";
 	ot->idname = "ANIM_OT_channels_clean_empty";
-	ot->description = "Delete all empty animation data containers from visible datablocks";
+	ot->description = "Delete all empty animation data containers from visible data-blocks";
 	
 	/* api callbacks */
 	ot->exec = animchannels_clean_empty_exec;
@@ -2716,6 +2724,7 @@ static int mouse_anim_channels(bContext *C, bAnimContext *ac, int channel_index,
 		case ANIMTYPE_DSMAT:    /* Datablock AnimData Expanders */
 		case ANIMTYPE_DSLAM:
 		case ANIMTYPE_DSCAM:
+		case ANIMTYPE_DSCACHEFILE:
 		case ANIMTYPE_DSCUR:
 		case ANIMTYPE_DSSKEY:
 		case ANIMTYPE_DSWOR:
