@@ -36,6 +36,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "DNA_anim_types.h"
+#include "DNA_cachefile_types.h"
 
 #include "BLT_translation.h"
 
@@ -45,8 +46,15 @@
 #include "BLI_math.h" /* windows needs for M_PI */
 #include "BLI_utildefines.h"
 
+#include "BKE_cachefile.h"
 #include "BKE_fcurve.h"
+#include "BKE_global.h"
 #include "BKE_idprop.h"
+#include "BKE_library.h"
+
+#ifdef WITH_ALEMBIC
+#  include "ABC_alembic.h"
+#endif
 
 /* ******************************** F-Modifiers ********************************* */
 
@@ -1013,6 +1021,88 @@ static FModifierTypeInfo FMI_STEPPED = {
 	NULL /* evaluate with storage */
 };
 
+/* Cache F-Curve Modifier --------------------------- */
+
+static void fcm_cache_free(FModifier *fcm)
+{
+	FMod_Cache *data = (FMod_Cache *)fcm->data;
+
+	if (data->cache_file) {
+		id_us_min(&data->cache_file->id);
+	}
+
+	if (data->reader) {
+#ifdef WITH_ALEMBIC
+		ABC_remove_fcurve(data->cache_file->handle, data);
+		CacheReader_free(data->reader);
+#endif
+	}
+}
+
+static void fcm_cache_copy(FModifier *fcm, FModifier *src)
+{
+	FMod_Cache *cachemod = (FMod_Cache *)fcm->data;
+	FMod_Cache *ocachemod = (FMod_Cache *)src->data;
+
+	if (cachemod->cache_file) {
+		id_us_plus(&cachemod->cache_file->id);
+
+		if (ocachemod->reader) {
+#ifdef WITH_ALEMBIC
+			cachemod->reader = CacheReader_open_alembic_object(cachemod->cache_file->handle,
+			                                                   cachemod->reader,
+			                                                   NULL,
+			                                                   cachemod->object_path);
+
+			if (cachemod->reader) {
+				ABC_add_fcurve(cachemod->cache_file->handle, cachemod);
+			}
+#endif
+		}
+	}
+}
+
+static void fcm_cache_time(FCurve *fcu, FModifier *fcm, float *cvalue, float evaltime)
+{
+#ifdef WITH_ALEMBIC
+	FMod_Cache *data = (FMod_Cache *)fcm->data;
+
+	evaltime = BKE_cachefile_time_offset(data->cache_file, evaltime, 24.0f);
+
+	if (data->reader == NULL) {
+		data->reader = CacheReader_open_alembic_object(data->cache_file->handle,
+		                                               data->reader,
+		                                               NULL,
+		                                               data->object_path);
+	}
+
+	*cvalue = ABC_get_property_value(data->reader,
+	                                 data->property,
+	                                 evaltime);
+
+	UNUSED_VARS(fcu);
+#else
+	UNUSED_VARS(fcu, fcm, cvalue, evaltime);
+#endif
+}
+
+static FModifierTypeInfo FMI_CACHE = {
+    FMODIFIER_TYPE_CACHE,          /* type */
+    sizeof(FMod_Cache),            /* size */
+    FMI_TYPE_GENERATE_CURVE,       /* action type */
+    FMI_REQUIRES_NOTHING,          /* requirements */
+    N_("Cache"),                   /* name */
+    "FMod_Cache",                  /* struct name */
+    fcm_cache_free,                /* free data */
+    fcm_cache_copy,                /* copy data */
+    NULL,                          /* new data */
+    NULL,                          /* verify */
+    NULL,                          /* evaluate time */
+    fcm_cache_time,                /* evaluate */
+    NULL,                          /* evaluate time with storage */
+    NULL                           /* evaluate with storage */
+};
+
 /* F-Curve Modifier API --------------------------- */
 /* All of the F-Curve Modifier api functions use FModifierTypeInfo structs to carry out
  * and operations that involve F-Curve modifier specific code.
@@ -1035,6 +1125,7 @@ static void fmods_init_typeinfo(void)
 	fmodifiersTypeInfo[7] =  &FMI_PYTHON;            /* Custom Python F-Curve Modifier */
 	fmodifiersTypeInfo[8] =  &FMI_LIMITS;            /* Limits F-Curve Modifier */
 	fmodifiersTypeInfo[9] =  &FMI_STEPPED;           /* Stepped F-Curve Modifier */
+	fmodifiersTypeInfo[10] = &FMI_CACHE;             /* Cache F-Curve Modifier */
 }
 
 /* This function should be used for getting the appropriate type-info when only

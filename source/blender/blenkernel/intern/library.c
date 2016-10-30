@@ -760,6 +760,7 @@ int set_listbasepointers(Main *main, ListBase **lb)
 	 * if this data is its self freed it can crash. */
 	lb[INDEX_ID_LI] = &(main->library);  /* Libraries may be accessed from pretty much any other ID... */
 	lb[INDEX_ID_IP] = &(main->ipo);
+	lb[INDEX_ID_CF] = &(main->cachefiles); /* anim data may reference cache files (e.g. through cache fcurve modifier) */
 	lb[INDEX_ID_AC] = &(main->action); /* moved here to avoid problems when freeing with animato (aligorith) */
 	lb[INDEX_ID_KE] = &(main->key);
 	lb[INDEX_ID_GD] = &(main->gpencil); /* referenced by nodes, objects, view, scene etc, before to free after. */
@@ -775,7 +776,6 @@ int set_listbasepointers(Main *main, ListBase **lb)
 
 	lb[INDEX_ID_AR] = &(main->armature);
 
-	lb[INDEX_ID_CF] = &(main->cachefiles);
 	lb[INDEX_ID_ME] = &(main->mesh);
 	lb[INDEX_ID_CU] = &(main->curve);
 	lb[INDEX_ID_MB] = &(main->mball);

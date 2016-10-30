@@ -22,18 +22,32 @@
 
 #include "abc_camera.h"
 
+#include "abc_archive.h"
 #include "abc_transform.h"
 #include "abc_util.h"
 
 extern "C" {
+#include "MEM_guardedalloc.h"
+
+#include "DNA_anim_types.h"
 #include "DNA_camera_types.h"
+#include "DNA_cachefile_types.h"
 #include "DNA_object_types.h"
+#include "DNA_scene_types.h"
+#include "DNA_space_types.h"
+
+#include "RNA_access.h"
 
 #include "BKE_camera.h"
+#include "BKE_fcurve.h"
+#include "BKE_library.h"
 #include "BKE_object.h"
+#include "BKE_report.h"
 
 #include "BLI_math.h"
 #include "BLI_string.h"
+
+#include "ED_keyframing.h"
 }
 
 using Alembic::AbcGeom::ICamera;
@@ -157,4 +171,89 @@ void AbcCameraReader::readObjectData(Main *bmain, float time)
 
 	m_object = BKE_object_add_only_object(bmain, OB_CAMERA, m_object_name.c_str());
 	m_object->data = bcam;
+}
+
+void AbcCameraReader::setupAnimationData(Scene *scene, float time)
+{
+	if (m_schema.isConstant()) {
+		return;
+	}
+
+	Camera *bcam = static_cast<Camera *>(m_object->data);
+
+	/* Verify that the FOV is animated. */
+
+	bool fixed_fov = true;
+	const float orig_fov = bcam->lens;
+
+	const Alembic::Abc::TimeSamplingPtr &time_samp = m_schema.getTimeSampling();
+	CameraSample cam_sample;
+
+	for (size_t i = 0, e = m_schema.getNumSamples(); i < e; ++i) {
+		const chrono_t samp_time = time_samp->getSampleTime(i);
+
+		ISampleSelector sample_sel(samp_time);
+		m_schema.get(cam_sample, sample_sel);
+
+		if (orig_fov != cam_sample.getFocalLength()) {
+			fixed_fov = false;
+			break;
+		}
+	}
+
+	if (fixed_fov) {
+		return;
+	}
+
+	/* Setup data for keyframes. */
+	PointerRNA cam_ptr;
+	RNA_pointer_create(&bcam->id, &RNA_Camera, bcam, &cam_ptr);
+
+	PropertyRNA *prop = RNA_struct_find_property(&cam_ptr, "lens");
+
+	char *path = RNA_path_from_ID_to_property(&cam_ptr, prop);
+
+	ToolSettings *ts = scene->toolsettings;
+
+	ReportList reports;
+	const bool success = insert_keyframe(&reports,
+	                                     &bcam->id,
+	                                     /* bAction *act= */ NULL,
+	                                     /* const char group[]= */ NULL,
+	                                     path,
+	                                     /* index= */ -1,
+	                                     time,
+	                                     ts->keyframe_type,
+	                                     0);
+
+	MEM_freeN(path);
+
+	if (!success) {
+		/* Report error */
+		std::cerr << "Alembic reader: cannot add keyframe to camera focal lens\n";
+		return;
+	}
+
+	bool driven;
+	FCurve *fcu = id_data_find_fcurve(&bcam->id, bcam, &RNA_Camera, "lens", 0, &driven);
+	FModifier *fcm = add_fmodifier(&fcu->modifiers, FMODIFIER_TYPE_CACHE);
+
+	if (fcm == NULL) {
+		std::cerr << "Alembic reader: cannot add cache modifier to fcurve\n";
+	}
+
+	set_active_fmodifier(&fcu->modifiers, fcm);
+
+	FMod_Cache *cache_mod = static_cast<FMod_Cache *>(fcm->data);
+
+	cache_mod->cache_file = m_settings->cache_file;
+	id_us_plus(&cache_mod->cache_file->id);
+
+	BLI_strncpy(cache_mod->object_path, m_iobject.getFullName().c_str(), FILE_MAX);
+	BLI_strncpy(cache_mod->property, "focal_length", 64);
+
+	cache_mod->reader = reinterpret_cast<CacheReader *>(this);
+	this->incref();
+
+	reinterpret_cast<ArchiveReader *>(m_settings->cache_file->handle)->add_fcurve(cache_mod);
 }

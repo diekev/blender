@@ -27,6 +27,8 @@
  *  \ingroup bke
  */
 
+#include "MEM_guardedalloc.h"
+
 #include "DNA_anim_types.h"
 #include "DNA_cachefile_types.h"
 #include "DNA_constraint_types.h"
@@ -84,6 +86,20 @@ void BKE_cachefile_init(CacheFile *cache_file)
 	cache_file->handle_mutex = BLI_mutex_alloc();
 }
 
+static void BKE_cachefile_free_object_paths(CacheFile *cache_file)
+{
+	AlembicObjectPath *link = cache_file->object_paths.first;
+
+	while (link) {
+		AlembicObjectPath *next = link->next;
+		BLI_freelistN(&link->properties);
+		MEM_freeN(link);
+		link = next;
+	}
+
+	BLI_listbase_clear(&cache_file->object_paths);
+}
+
 /** Free (or release) any data used by this cachefile (does not free the cachefile itself). */
 void BKE_cachefile_free(CacheFile *cache_file)
 {
@@ -94,7 +110,7 @@ void BKE_cachefile_free(CacheFile *cache_file)
 #endif
 
 	BLI_mutex_free(cache_file->handle_mutex);
-	BLI_freelistN(&cache_file->object_paths);
+	BKE_cachefile_free_object_paths(cache_file);
 }
 
 CacheFile *BKE_cachefile_copy(Main *bmain, CacheFile *cache_file)
@@ -236,4 +252,8 @@ void BKE_cachefile_clean(Scene *scene, CacheFile *cache_file)
 			}
 		}
 	}
+
+#ifdef WITH_ALEMBIC
+	ABC_clean_fcurves(cache_file->handle);
+#endif
 }

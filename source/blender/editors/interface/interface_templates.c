@@ -3886,7 +3886,7 @@ void uiTemplateCacheFile(uiLayout *layout, bContext *C, PointerRNA *ptr, const c
 		return;
 	}
 
-	SpaceButs *sbuts = CTX_wm_space_buts(C);
+	SpaceButs *sbuts = (C != NULL) ? CTX_wm_space_buts(C) : NULL;
 
 	uiLayout *row = uiLayoutRow(layout, false);
 	uiBlock *block = uiLayoutGetBlock(row);
@@ -3913,7 +3913,7 @@ void uiTemplateCacheFile(uiLayout *layout, bContext *C, PointerRNA *ptr, const c
 	uiItemL(row, IFACE_("Manual Transform:"), ICON_NONE);
 
 	row = uiLayoutRow(layout, false);
-	uiLayoutSetEnabled(row, (sbuts->mainb == BCONTEXT_CONSTRAINT));
+	uiLayoutSetEnabled(row, (sbuts != NULL) && (sbuts->mainb == BCONTEXT_CONSTRAINT));
 	uiItemR(row, &fileptr, "scale", 0, "Scale", ICON_NONE);
 
 	/* TODO: unused for now, so no need to expose. */

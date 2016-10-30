@@ -112,6 +112,24 @@ struct CacheReader *CacheReader_open_alembic_object(struct AbcArchiveHandle *han
                                                     struct Object *object,
                                                     const char *object_path);
 
+/* Properties */
+
+void ABC_gather_object_properties(struct CacheReader *reader,
+                                  struct ListBase *object_props);
+
+float ABC_get_property_value(struct CacheReader *reader,
+                             const char *property,
+                             float time);
+
+/* F-Curve cache */
+
+void ABC_add_fcurve(struct AbcArchiveHandle *handle, void *data);
+
+void ABC_remove_fcurve(struct AbcArchiveHandle *handle, void *data);
+
+void ABC_clean_fcurves(struct AbcArchiveHandle *handle);
+
+
 #ifdef __cplusplus
 }
 #endif

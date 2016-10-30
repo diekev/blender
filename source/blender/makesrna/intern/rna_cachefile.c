@@ -79,6 +79,12 @@ static void rna_CacheFile_object_paths_begin(CollectionPropertyIterator *iter, P
 	rna_iterator_listbase_begin(iter, &cache_file->object_paths, NULL);
 }
 
+static void rna_AlembicObjectPath_properties_begin(CollectionPropertyIterator *iter, PointerRNA *ptr)
+{
+	AlembicObjectPath *object_path = (AlembicObjectPath *)ptr->data;
+	rna_iterator_listbase_begin(iter, &object_path->properties, NULL);
+}
+
 static void rna_CacheFile_filename_set(PointerRNA *ptr, const char *value)
 {
 	CacheFile *cache_file = ptr->data;
@@ -95,6 +101,26 @@ static void rna_CacheFile_filename_set(PointerRNA *ptr, const char *value)
 
 #else
 
+static void rna_def_alembic_object_property(BlenderRNA *brna)
+{
+	StructRNA *srna = RNA_def_struct(brna, "AlembicObjectProperty", NULL);
+	RNA_def_struct_sdna(srna, "AlembicObjectProperty");
+	RNA_def_struct_ui_text(srna, "Object Property", "Property of the object in the Alembic archive");
+	RNA_def_struct_ui_icon(srna, ICON_NONE);
+
+	PropertyRNA *prop = RNA_def_property(srna, "prop", PROP_STRING, PROP_NONE);
+	RNA_def_property_ui_text(prop, "Property", "Name of the property");
+	RNA_def_struct_name_property(srna, prop);
+}
+
+static void rna_def_cachefile_object_properties(BlenderRNA *brna, PropertyRNA *cprop)
+{
+	RNA_def_property_srna(cprop, "AlembicObjectProperties");
+	StructRNA *srna = RNA_def_struct(brna, "AlembicObjectProperties", NULL);
+	RNA_def_struct_sdna(srna, "AlembicObjectPath");
+	RNA_def_struct_ui_text(srna, "Alembic Object Properties", "Collection of Alembic object properties");
+}
+
 /* cachefile.object_paths */
 static void rna_def_alembic_object_path(BlenderRNA *brna)
 {
@@ -106,6 +132,16 @@ static void rna_def_alembic_object_path(BlenderRNA *brna)
 	PropertyRNA *prop = RNA_def_property(srna, "path", PROP_STRING, PROP_NONE);
 	RNA_def_property_ui_text(prop, "Path", "Object path");
 	RNA_def_struct_name_property(srna, prop);
+
+	prop = RNA_def_property(srna, "properties", PROP_COLLECTION, PROP_NONE);
+	RNA_def_property_collection_sdna(prop, NULL, "properties", NULL);
+	RNA_def_property_collection_funcs(prop, "rna_AlembicObjectPath_properties_begin", "rna_iterator_listbase_next",
+	                                  "rna_iterator_listbase_end", "rna_iterator_listbase_get",
+	                                  NULL, NULL, NULL, NULL);
+	RNA_def_property_struct_type(prop, "AlembicObjectProperty");
+	RNA_def_property_srna(prop, "AlembicObjectProperty");
+	RNA_def_property_ui_text(prop, "Object Properties", "Properties of the Alembic object");
+	rna_def_cachefile_object_properties(brna, prop);
 }
 
 /* cachefile.object_paths */
@@ -187,6 +223,7 @@ void RNA_def_cachefile(BlenderRNA *brna)
 {
 	rna_def_cachefile(brna);
 	rna_def_alembic_object_path(brna);
+	rna_def_alembic_object_property(brna);
 }
 
 #endif

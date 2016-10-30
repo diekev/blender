@@ -37,6 +37,7 @@
 extern "C" {
 #include "MEM_guardedalloc.h"
 
+#include "DNA_anim_types.h"
 #include "DNA_cachefile_types.h"
 #include "DNA_curve_types.h"
 #include "DNA_modifier_types.h"
@@ -376,6 +377,122 @@ void ABC_export(
 
 /* ********************** Import file ********************** */
 
+ABC_INLINE AlembicObjectProperty *get_prop(const char *name)
+{
+	AlembicObjectProperty *abc_prop = static_cast<AlembicObjectProperty *>(
+	                                      MEM_callocN(sizeof(AlembicObjectPath),
+	                                                  "AlembicObjectProperty"));
+
+	BLI_strncpy(abc_prop->prop, name, 64);
+
+	return abc_prop;
+}
+
+static void get_param_names(const ICompoundProperty &prop, ListBase *list)
+{
+	if (!prop.valid()) {
+		return;
+	}
+
+	const size_t num_props = prop.getNumProperties();
+
+	for (size_t i = 0; i < num_props; ++i) {
+		const Alembic::Abc::PropertyHeader &prop_header = prop.getPropertyHeader(i);
+
+		if (Alembic::AbcGeom::IFloatGeomParam::matches(prop_header)) {
+			AlembicObjectProperty *abc_prop = get_prop(prop_header.getName().c_str());
+			BLI_addtail(list, abc_prop);
+		}
+	}
+}
+
+static void gather_object_properties(const IObject &object, ListBase *list)
+{
+	const MetaData &md = object.getMetaData();
+	ICompoundProperty user_props;
+	ICompoundProperty arb_props;
+
+	if (IXform::matches(md)) {
+		/* Pass. */
+	}
+	else if (IPolyMesh::matches(md)) {
+		IPolyMesh ipoly_mesh(object, kWrapExisting);
+		IPolyMeshSchema schema = ipoly_mesh.getSchema();
+
+		user_props = schema.getUserProperties();
+		arb_props = schema.getArbGeomParams();
+	}
+	else if (ISubD::matches(md)) {
+		ISubD mesh(object, kWrapExisting);
+		Alembic::AbcGeom::ISubDSchema schema = mesh.getSchema();
+
+		user_props = schema.getUserProperties();
+		arb_props = schema.getArbGeomParams();
+	}
+	else if (INuPatch::matches(md)) {
+		/* Pass. */
+	}
+	else if (ICamera::matches(md)) {
+		AlembicObjectProperty *abc_prop = get_prop("focal_length");
+		BLI_addtail(list, abc_prop);
+
+		abc_prop = get_prop("aperture_x");
+		BLI_addtail(list, abc_prop);
+
+		abc_prop = get_prop("aperture_y");
+		BLI_addtail(list, abc_prop);
+
+		abc_prop = get_prop("horiz_film_offset");
+		BLI_addtail(list, abc_prop);
+
+		abc_prop = get_prop("vert_film_offset");
+		BLI_addtail(list, abc_prop);
+
+		abc_prop = get_prop("near_clip");
+		BLI_addtail(list, abc_prop);
+
+		abc_prop = get_prop("far_clip");
+		BLI_addtail(list, abc_prop);
+
+		abc_prop = get_prop("fstop");
+		BLI_addtail(list, abc_prop);
+
+		abc_prop = get_prop("focus_distance");
+		BLI_addtail(list, abc_prop);
+
+		ICamera cam(object, kWrapExisting);
+		Alembic::AbcGeom::ICameraSchema schema = cam.getSchema();
+
+		user_props = schema.getUserProperties();
+		arb_props = schema.getArbGeomParams();
+	}
+	else if (IPoints::matches(md)) {
+		IPoints points(object, kWrapExisting);
+		Alembic::AbcGeom::IPointsSchema schema = points.getSchema();
+
+		user_props = schema.getUserProperties();
+		arb_props = schema.getArbGeomParams();
+	}
+	else if (IMaterial::matches(md)) {
+		/* Pass for now. */
+	}
+	else if (ILight::matches(md)) {
+		/* Pass for now. */
+	}
+	else if (IFaceSet::matches(md)) {
+		/* Pass, those are handled in the mesh reader. */
+	}
+	else if (ICurves::matches(md)) {
+		/* Pass. */
+	}
+	else {
+		assert(false);
+	}
+
+	get_param_names(user_props, list);
+	get_param_names(arb_props, list);
+}
+
 static void visit_object(const IObject &object,
                          std::vector<AbcObjectReader *> &readers,
                          GHash *parent_map,
@@ -395,6 +512,8 @@ static void visit_object(const IObject &object,
 		AbcObjectReader *reader = NULL;
 
 		const MetaData &md = child.getMetaData();
+
+		bool gather_props = false;
 
 		if (IXform::matches(md)) {
 			bool create_xform = false;
@@ -444,6 +563,7 @@ static void visit_object(const IObject &object,
 #endif
 		}
 		else if (ICamera::matches(md)) {
+			gather_props = true;
 			reader = new AbcCameraReader(child, settings);
 		}
 		else if (IPoints::matches(md)) {
@@ -473,6 +593,10 @@ static void visit_object(const IObject &object,
 			                                  MEM_callocN(sizeof(AlembicObjectPath), "AlembicObjectPath"));
 
 			BLI_strncpy(abc_path->path, child.getFullName().c_str(), PATH_MAX);
+
+			if (gather_props) {
+				gather_object_properties(child, &abc_path->properties);
+			}
 
 			BLI_addtail(&settings.cache_file->object_paths, abc_path);
 
@@ -602,6 +726,7 @@ static void import_startjob(void *user_data, short *stop, short *do_update, floa
 		if (reader->valid()) {
 			reader->readObjectData(data->bmain, 0.0f);
 			reader->readObjectMatrix(0.0f);
+			reader->setupAnimationData(data->scene, 0.0f);
 
 			min_time = std::min(min_time, reader->minTime());
 			max_time = std::max(max_time, reader->maxTime());
@@ -884,4 +1009,135 @@ CacheReader *CacheReader_open_alembic_object(AbcArchiveHandle *handle, CacheRead
 	abc_reader->incref();
 
 	return reinterpret_cast<CacheReader *>(abc_reader);
+}
+
+/* ************************************************************************** */
+
+void ABC_gather_object_properties(CacheReader *reader, ListBase *object_props)
+{
+	AbcObjectReader *abc_reader = reinterpret_cast<AbcObjectReader *>(reader);
+
+	IObject iobject = abc_reader->iobject();
+
+	if (!iobject.valid()) {
+		return;
+	}
+
+	gather_object_properties(iobject, object_props);
+}
+
+float ABC_get_property_value(CacheReader *reader, const char *property, float time)
+{
+	AbcObjectReader *abc_reader = reinterpret_cast<AbcObjectReader *>(reader);
+
+	if (!abc_reader) {
+		return 0.0f;
+	}
+
+	IObject iobject = abc_reader->iobject();
+
+	if (!iobject.valid()) {
+		return 0.0f;
+	}
+
+	const ObjectHeader &header = iobject.getHeader();
+
+	if (ICamera::matches(header)) {
+		ICamera abc_cam(iobject, kWrapExisting);
+		Alembic::AbcGeom::ICameraSchema schema = abc_cam.getSchema();
+
+		ISampleSelector sample_sel(time);
+		Alembic::AbcGeom::CameraSample cam_sample;
+		schema.get(cam_sample, sample_sel);
+
+		if (STREQ(property, "focal_length")) {
+			return cam_sample.getFocalLength();
+		}
+
+		if (STREQ(property, "aperture_x")) {
+			return cam_sample.getHorizontalAperture();
+		}
+
+		if (STREQ(property, "aperture_y")) {
+			return cam_sample.getVerticalAperture();
+		}
+
+		if (STREQ(property, "horiz_film_offset")) {
+			return cam_sample.getHorizontalFilmOffset();
+		}
+
+		if (STREQ(property, "vert_film_offset")) {
+			return cam_sample.getVerticalFilmOffset();
+		}
+
+		if (STREQ(property, "near_clip")) {
+			return cam_sample.getNearClippingPlane();
+		}
+
+		if (STREQ(property, "far_clip")) {
+			return cam_sample.getFarClippingPlane();
+		}
+
+		if (STREQ(property, "fstop")) {
+			return cam_sample.getFStop();
+		}
+
+		if (STREQ(property, "focus_distance")) {
+			return cam_sample.getFocusDistance();
+		}
+	}
+
+	return 0.0f;
+}
+
+/* ************************************************************************** */
+
+/* NOTE: we store which F-Curve is using a CacheFile since it is easier to do
+ * this rather than iterating on all possible F-Curves of a given object when
+ * cleaning or removing a CacheFile data-block to figure out whether or not it
+ * is using said CacheFile.
+ */
+
+void ABC_add_fcurve(AbcArchiveHandle *handle, void *data)
+{
+	ArchiveReader *archive = archive_from_handle(handle);
+
+	if (!archive) {
+		return;
+	}
+
+	archive->add_fcurve(data);
+}
+
+void ABC_remove_fcurve(AbcArchiveHandle *handle, void *data)
+{
+	ArchiveReader *archive = archive_from_handle(handle);
+
+	if (!archive) {
+		return;
+	}
+
+	std::vector<void *> fcurves = archive->fcurves();
+	std::vector<void *>::iterator iter = std::find(fcurves.begin(), fcurves.end(), data);
+	fcurves.erase(iter);
+}
+
+static void clear_fcurve_cb(void *data)
+{
+	FMod_Cache *fmod = static_cast<FMod_Cache *>(data);
+	CacheReader_free(fmod->reader);
+	fmod->reader = NULL;
+}
+
+void ABC_clean_fcurves(AbcArchiveHandle *handle)
+{
+	ArchiveReader *archive = archive_from_handle(handle);
+
+	if (!archive) {
+		return;
+	}
+
+	std::vector<void *> fcurves = archive->fcurves();
+	std::for_each(fcurves.begin(), fcurves.end(), clear_fcurve_cb);
+	archive->fcurves().clear();
 }

@@ -41,6 +41,7 @@
 #include <string.h>
 
 #include "DNA_anim_types.h"
+#include "DNA_cachefile_types.h"
 #include "DNA_scene_types.h"
 
 #include "MEM_guardedalloc.h"
@@ -553,6 +554,53 @@ static void draw_modifier__stepped(uiLayout *layout, ID *id, FModifier *fcm, sho
 
 /* --------------- */
 
+/* draw settings for stepped interpolation modifier */
+static void draw_modifier__cache(uiLayout *layout, ID *id, FModifier *fcm, short UNUSED(width))
+{
+	FMod_Cache *data = (FMod_Cache *)fcm->data;
+	CacheFile *cache_file = data->cache_file;
+
+	PointerRNA ptr;
+
+	/* init the RNA-pointer */
+	RNA_pointer_create(id, &RNA_FModifierCache, fcm, &ptr);
+
+	uiLayout *row = uiLayoutRow(layout, false);
+	uiItemL(row, IFACE_("Cache File Properties:"), ICON_NONE);
+
+	uiLayout *box = uiLayoutBox(layout);
+	uiTemplateCacheFile(box, NULL, &ptr, "cache_file");
+
+	if (cache_file) {
+		row = uiLayoutRow(layout, false);
+		uiItemL(row, IFACE_("Modifier Properties:"), ICON_NONE);
+
+		PointerRNA cache_ptr;
+		RNA_pointer_create(&cache_file->id, &RNA_CacheFile, cache_file, &cache_ptr);
+
+		box = uiLayoutBox(layout);
+
+		row = uiLayoutRow(box, false);
+		uiItemPointerR(row, &ptr, "object_path", &cache_ptr, "object_paths", NULL, ICON_NONE);
+
+		AlembicObjectPath *path = cache_file->object_paths.first;
+
+		for (; path; path = path->next) {
+			if (STREQ(path->path, data->object_path)) {
+				break;
+			}
+		}
+
+		PointerRNA path_ptr;
+		RNA_pointer_create(NULL, &RNA_AlembicObjectPath, path, &path_ptr);
+
+		row = uiLayoutRow(box, false);
+		uiItemPointerR(row, &ptr, "property", &path_ptr, "properties", NULL, ICON_NONE);
+	}
+}
+
+/* --------------- */
+
 void ANIM_uiTemplate_fmodifier_draw(uiLayout *layout, ID *id, ListBase *modifiers, FModifier *fcm)
 {
 	const FModifierTypeInfo *fmi = fmodifier_get_typeinfo(fcm);
@@ -642,6 +690,10 @@ void ANIM_uiTemplate_fmodifier_draw(uiLayout *layout, ID *id, ListBase *modifier
 				
 			case FMODIFIER_TYPE_STEPPED: /* Stepped */
 				draw_modifier__stepped(box, id, fcm, width);
+				break;
+
+			case FMODIFIER_TYPE_CACHE: /* Cache */
+				draw_modifier__cache(box, id, fcm, width);
 				break;
 			
 			default: /* unknown type */

@@ -103,6 +103,16 @@ Alembic::Abc::IObject ArchiveReader::getTop()
 	return m_archive.getTop();
 }
 
+void ArchiveReader::add_fcurve(void *data)
+{
+	m_fcurves.push_back(data);
+}
+
+std::vector<void *> &ArchiveReader::fcurves()
+{
+	return m_fcurves;
+}
+
 /* ************************************************************************** */
 
 /* This kinda duplicates CreateArchiveWithInfo, but Alembic does not seem to

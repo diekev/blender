@@ -47,10 +47,17 @@ enum {
 	CACHEFILE_KEYFRAME_DRAWN = (1 << 0),
 };
 
+typedef struct AlembicObjectProperty {
+	struct AlembicObjectProperty *next, *prev;
+
+	char prop[64];
+} AlembicObjectProperty;
+
 typedef struct AlembicObjectPath {
 	struct AlembicObjectPath *next, *prev;
 
 	char path[1024];  /* 1024 = FILE_MAX, might use PATH_MAX in the future. */
+	ListBase properties;
 } AlembicObjectPath;
 
 typedef struct CacheFile {

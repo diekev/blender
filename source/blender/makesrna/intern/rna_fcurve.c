@@ -66,6 +66,8 @@ EnumPropertyItem rna_enum_fmodifier_type_items[] = {
 	                        "Restrict maximum and minimum values of F-Curve"},
 	{FMODIFIER_TYPE_STEPPED, "STEPPED", 0, "Stepped Interpolation",
 	                         "Snap values to nearest grid-step - e.g. for a stop-motion look"},
+	{FMODIFIER_TYPE_CACHE, "CACHE", 0, "Cache",
+	                       "Lookup values from a cache"},
 	{0, NULL, 0, NULL, NULL}
 };
 
@@ -92,6 +94,12 @@ EnumPropertyItem rna_enum_beztriple_interpolation_easing_items[] =  {
 
 #ifdef RNA_RUNTIME
 
+#include "DNA_cachefile_types.h"
+
+#ifdef WITH_ALEMBIC
+#  include "ABC_alembic.h"
+#endif
+
 #include "WM_api.h"
 
 static StructRNA *rna_FModifierType_refine(struct PointerRNA *ptr)
@@ -99,6 +107,8 @@ static StructRNA *rna_FModifierType_refine(struct PointerRNA *ptr)
 	FModifier *fcm = (FModifier *)ptr->data;
 
 	switch (fcm->type) {
+		case FMODIFIER_TYPE_CACHE:
+			return &RNA_FModifierCache;
 		case FMODIFIER_TYPE_GENERATOR:
 			return &RNA_FModifierGenerator;
 		case FMODIFIER_TYPE_FN_GENERATOR:
@@ -876,6 +886,37 @@ static void rna_FModifierEnvelope_points_remove(FModifier *fmod, ReportList *rep
 	RNA_POINTER_INVALIDATE(point);
 }
 
+static void rna_FModifierCache_properties_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+#ifdef WITH_ALEMBIC
+	FModifier *fmod = (FModifier *)ptr->data;
+	FMod_Cache *data = (FMod_Cache *)fmod->data;
+
+	CacheFile *cache_file = data->cache_file;
+
+	if (data->reader == NULL) {
+		data->reader = CacheReader_open_alembic_object(cache_file->handle,
+		                                               data->reader,
+		                                               NULL,
+		                                               data->object_path);
+	}
+
+	AlembicObjectPath *path;
+
+	for (path = cache_file->object_paths.first; path; path = path->next) {
+		if (STREQ(path->path, data->object_path)) {
+			break;
+		}
+	}
+
+	if (path) {
+		ABC_gather_object_properties(data->reader, &path->properties);
+	}
+#endif
+
+	rna_FModifier_update(bmain, scene, ptr);
+}
+
 #else
 
 static void rna_def_fmodifier_generator(BlenderRNA *brna)
@@ -1071,6 +1112,33 @@ static void rna_def_fmodifier_envelope(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "default_max", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "max");
 	RNA_def_property_ui_text(prop, "Default Maximum", "Upper distance from Reference Value for 1:1 default influence");
+	RNA_def_property_update(prop, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, "rna_FModifier_update");
+}
+
+/* --------- */
+
+static void rna_def_fmodifier_cache(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "FModifierCache", "FModifier");
+	RNA_def_struct_ui_text(srna, "Cache F-Modifier", "Lookup curve values from a cache");
+	RNA_def_struct_sdna_from(srna, "FMod_Cache", "data");
+
+	prop = RNA_def_property(srna, "cache_file", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "cache_file");
+	RNA_def_property_struct_type(prop, "CacheFile");
+	RNA_def_property_ui_text(prop, "Cache File", "");
+	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_SELF_CHECK);
+	RNA_def_property_update(prop, 0, "rna_FModifier_update");
+
+	prop = RNA_def_property(srna, "object_path", PROP_STRING, PROP_NONE);
+	RNA_def_property_ui_text(prop, "Object Path", "Path to the object in the Alembic archive used to lookup geometric data");
+	RNA_def_property_update(prop, 0, "rna_FModifierCache_properties_update");
+
+	prop = RNA_def_property(srna, "property", PROP_STRING, PROP_NONE);
+	RNA_def_property_ui_text(prop, "Property", "Name of the property to lookup");
 	RNA_def_property_update(prop, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, "rna_FModifier_update");
 }
 
@@ -2013,6 +2081,7 @@ void RNA_def_fcurve(BlenderRNA *brna)
 	rna_def_fmodifier_envelope(brna);
 	rna_def_fmodifier_envelope_ctrl(brna);
 
+	rna_def_fmodifier_cache(brna);
 	rna_def_fmodifier_cycles(brna);
 	rna_def_fmodifier_python(brna);
 	rna_def_fmodifier_limits(brna);

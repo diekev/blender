@@ -80,6 +80,7 @@ typedef enum eFModifier_Types {
 	FMODIFIER_TYPE_PYTHON = 7,
 	FMODIFIER_TYPE_LIMITS = 8,
 	FMODIFIER_TYPE_STEPPED = 9,
+	FMODIFIER_TYPE_CACHE = 10,
 	
 	/* NOTE: all new modifiers must be added above this line */
 	FMODIFIER_NUM_TYPES
@@ -259,6 +260,13 @@ typedef enum eFMod_Stepped_Flags {
 	FCM_STEPPED_NO_BEFORE 	= (1<<0),	/* don't affect frames before the start frame */
 	FCM_STEPPED_NO_AFTER 	= (1<<1),	/* don't affect frames after the end frame */
 } eFMod_Stepped_Flags;
+
+typedef struct FMod_Cache {
+	struct CacheFile *cache_file;
+	struct CacheReader *reader;
+	char object_path[1024];  /* 1024 = FILE_MAX */
+	char property[64];
+} FMod_Cache;
 
 /* Drivers -------------------------------------- */
 

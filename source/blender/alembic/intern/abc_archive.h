@@ -45,12 +45,18 @@ class ArchiveReader {
 	std::ifstream m_infile;
 	std::vector<std::istream *> m_streams;
 
+	std::vector<void *> m_fcurves;
+
 public:
 	explicit ArchiveReader(const char *filename);
 
 	bool valid() const;
 
 	Alembic::Abc::IObject getTop();
+
+	void add_fcurve(void *data);
+
+	std::vector<void *> &fcurves();
 };
 
 class ArchiveWriter {
