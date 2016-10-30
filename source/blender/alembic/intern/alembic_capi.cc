@@ -383,7 +383,7 @@ ABC_INLINE AlembicObjectProperty *get_prop(const char *name)
 	                                      MEM_callocN(sizeof(AlembicObjectPath),
 	                                                  "AlembicObjectProperty"));
 
-	BLI_strncpy(abc_prop->prop, name, 64);
+	BLI_strncpy(abc_prop->prop, name, sizeof(abc_prop->prop));
 
 	return abc_prop;
 }
@@ -1092,10 +1092,12 @@ float ABC_get_property_value(CacheReader *reader, const char *property, float ti
 
 /* ************************************************************************** */
 
-/* NOTE: we store which F-Curve is using a CacheFile since it is easier to do
- * this rather than iterating on all possible F-Curves of a given object when
- * cleaning or removing a CacheFile data-block to figure out whether or not it
- * is using said CacheFile.
+/* NOTE: each CacheFile data-block has its own private F-Curve cache where we
+ * store all the F-Curves that are using, that depend on, said CacheFile.
+ * It is easier to do this rather than iterating on all possible F-Curves of a
+ * given object, when cleaning or removing a CacheFile data-block, to figure out
+ * whether or not it is using said CacheFile. Eventually, this should perhaps
+ * better be handled by some dependency graph magic.
  */
 
 void ABC_add_fcurve(AbcArchiveHandle *handle, void *data)

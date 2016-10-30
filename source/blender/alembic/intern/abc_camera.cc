@@ -173,7 +173,7 @@ void AbcCameraReader::readObjectData(Main *bmain, float time)
 	m_object->data = bcam;
 }
 
-void AbcCameraReader::setupAnimationData(Scene *scene, float time)
+void AbcCameraReader::setupAnimationData()
 {
 	if (m_schema.isConstant()) {
 		return;
@@ -205,41 +205,24 @@ void AbcCameraReader::setupAnimationData(Scene *scene, float time)
 		return;
 	}
 
-	/* Setup data for keyframes. */
+	/* Setup data for adding F-Curve. */
+
 	PointerRNA cam_ptr;
 	RNA_pointer_create(&bcam->id, &RNA_Camera, bcam, &cam_ptr);
 
-	PropertyRNA *prop = RNA_struct_find_property(&cam_ptr, "lens");
+	bAction *act = verify_adt_action(&bcam->id, true);
+	FCurve *fcu = verify_fcurve(act, NULL, &cam_ptr, "lens", -1, true);
 
-	char *path = RNA_path_from_ID_to_property(&cam_ptr, prop);
-
-	ToolSettings *ts = scene->toolsettings;
-
-	ReportList reports;
-	const bool success = insert_keyframe(&reports,
-	                                     &bcam->id,
-	                                     /* bAction *act= */ NULL,
-	                                     /* const char group[]= */ NULL,
-	                                     path,
-	                                     /* index= */ -1,
-	                                     time,
-	                                     ts->keyframe_type,
-	                                     0);
-
-	MEM_freeN(path);
-
-	if (!success) {
-		/* Report error */
-		std::cerr << "Alembic reader: cannot add keyframe to camera focal lens\n";
+	if (fcu == NULL) {
+		std::cerr << "Alembic Camera reader: cannot add F-Curve to camera focal lens\n";
 		return;
 	}
 
-	bool driven;
-	FCurve *fcu = id_data_find_fcurve(&bcam->id, bcam, &RNA_Camera, "lens", 0, &driven);
 	FModifier *fcm = add_fmodifier(&fcu->modifiers, FMODIFIER_TYPE_CACHE);
 
 	if (fcm == NULL) {
-		std::cerr << "Alembic reader: cannot add cache modifier to fcurve\n";
+		std::cerr << "Alembic Camera reader: cannot add cache modifier to F-Curve\n";
+		return;
 	}
 
 	set_active_fmodifier(&fcu->modifiers, fcm);
@@ -250,7 +233,7 @@ void AbcCameraReader::setupAnimationData(Scene *scene, float time)
 	id_us_plus(&cache_mod->cache_file->id);
 
 	BLI_strncpy(cache_mod->object_path, m_iobject.getFullName().c_str(), FILE_MAX);
-	BLI_strncpy(cache_mod->property, "focal_length", 64);
+	BLI_strncpy(cache_mod->property, "focal_length", sizeof(cache_mod->property));
 
 	cache_mod->reader = reinterpret_cast<CacheReader *>(this);
 	this->incref();

@@ -901,13 +901,9 @@ static void rna_FModifierCache_properties_update(Main *bmain, Scene *scene, Poin
 		                                               data->object_path);
 	}
 
-	AlembicObjectPath *path;
-
-	for (path = cache_file->object_paths.first; path; path = path->next) {
-		if (STREQ(path->path, data->object_path)) {
-			break;
-		}
-	}
+	AlembicObjectPath *path = BLI_findstring(&cache_file->object_paths,
+	                                         data->object_path,
+	                                         offsetof(AlembicObjectPath, path));
 
 	if (path) {
 		ABC_gather_object_properties(data->reader, &path->properties);

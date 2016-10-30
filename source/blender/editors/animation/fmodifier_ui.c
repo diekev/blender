@@ -583,13 +583,9 @@ static void draw_modifier__cache(uiLayout *layout, ID *id, FModifier *fcm, short
 		row = uiLayoutRow(box, false);
 		uiItemPointerR(row, &ptr, "object_path", &cache_ptr, "object_paths", NULL, ICON_NONE);
 
-		AlembicObjectPath *path = cache_file->object_paths.first;
-
-		for (; path; path = path->next) {
-			if (STREQ(path->path, data->object_path)) {
-				break;
-			}
-		}
+		AlembicObjectPath *path = BLI_findstring(&cache_file->object_paths,
+		                                         data->object_path,
+		                                         offsetof(AlembicObjectPath, path));
 
 		PointerRNA path_ptr;
 		RNA_pointer_create(NULL, &RNA_AlembicObjectPath, path, &path_ptr);

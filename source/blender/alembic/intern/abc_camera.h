@@ -56,7 +56,7 @@ public:
 	bool valid() const;
 
 	void readObjectData(Main *bmain, float time);
-	void setupAnimationData(Scene *scene, float time);
+	void setupAnimationData();
 };
 
 #endif  /* __ABC_CAMERA_H__ */

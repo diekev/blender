@@ -165,7 +165,7 @@ public:
 
 	virtual void readObjectData(Main *bmain, float time) = 0;
 
-	virtual void setupAnimationData(Scene */*scene*/, float /*time*/) {}
+	virtual void setupAnimationData() {}
 
 	virtual DerivedMesh *read_derivedmesh(DerivedMesh *dm, const float time, int read_flag)
 	{
