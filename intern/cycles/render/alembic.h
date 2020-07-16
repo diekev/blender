@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright 2011-2018 Blender Foundation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -30,6 +30,8 @@ using namespace Alembic::AbcGeom;
 
 CCL_NAMESPACE_BEGIN
 
+class Geometry;
+class Object;
 class Shader;
 
 class AlembicObject : public Node {
@@ -40,10 +42,15 @@ class AlembicObject : public Node {
   ~AlembicObject();
 
   ustring path;
-  Shader *shader;
+  Shader *shader = nullptr;
+
+  Object *object = nullptr;
+  Geometry *geometry = nullptr;
 };
 
 class AlembicProcedural : public Procedural {
+  bool need_update = true;
+  bool need_update_for_frame_change = true;
  public:
   NODE_DECLARE
 
@@ -63,9 +70,16 @@ class AlembicProcedural : public Procedural {
   array<AlembicObject *> objects;
   // MotionTransform parentTransform;
 
+  void tag_update()
+  {
+    need_update = true;
+  }
+
+  void set_current_frame(Scene *scene, float frame_);
+
  private:
-  void read_mesh(Scene *scene, Shader *shader, Transform xform, IPolyMesh &mesh);
-  void read_curves(Scene *scene, Shader *shader, Transform xform, ICurves &curves);
+  void read_mesh(Scene *scene, AlembicObject *abc_object, Transform xform, IPolyMesh &mesh, Abc::chrono_t frame_time);
+  void read_curves(Scene *scene, AlembicObject *abc_object, Transform xform, ICurves &curves, Abc::chrono_t frame_time);
 };
 
 CCL_NAMESPACE_END

@@ -147,6 +147,8 @@ class BlenderSync {
                       BlenderObjectCulling &culling,
                       bool *use_portal);
 
+  void sync_procedural(BL::Object b_ob, int frame_current, float motion_time);
+
   /* Volume */
   void sync_volume(BL::Object &b_ob, Mesh *mesh, const vector<Shader *> &used_shaders);
 
@@ -218,6 +220,7 @@ class BlenderSync {
 
   id_map<void *, Shader> shader_map;
   id_map<ObjectKey, Object> object_map;
+  id_map<ObjectKey, Procedural> procedural_map;
   id_map<GeometryKey, Geometry> geometry_map;
   id_map<ObjectKey, Light> light_map;
   id_map<ParticleSystemKey, ParticleSystem> particle_system_map;

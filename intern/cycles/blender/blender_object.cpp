@@ -29,6 +29,8 @@
 #include "blender/blender_sync.h"
 #include "blender/blender_util.h"
 
+#include "render/alembic.h"
+
 #include "util/util_foreach.h"
 #include "util/util_hash.h"
 #include "util/util_logging.h"
@@ -327,6 +329,97 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
 
 /* Object Loop */
 
+static bool object_has_alembic_cache(BL::Object b_ob)
+{
+  /* Test if the object has a mesh sequence modifier. */
+  BL::Object::modifiers_iterator b_mod;
+  for (b_ob.modifiers.begin(b_mod); b_mod != b_ob.modifiers.end(); ++b_mod) {
+    if ((b_mod->type() == b_mod->type_MESH_SEQUENCE_CACHE)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void BlenderSync::sync_procedural(BL::Object b_ob, int frame_current, float motion_time)
+{
+  bool motion = motion_time != 0.0f;
+
+  // return for now
+  if (motion) {
+    return;
+  }
+
+  ObjectKey key(b_ob.parent(), NULL, b_ob, false);
+
+  AlembicProcedural *p = static_cast<AlembicProcedural *>(procedural_map.find(key));
+
+  if (!p) {
+    p = new AlembicProcedural();
+    procedural_map.add(key, p);
+  }
+  else {
+    procedural_map.used(p);
+  }
+
+  p->set_current_frame(scene, static_cast<float>(frame_current));
+
+  // check if it was already created (for synchronisation during interactive rendering)
+  if (p->objects.size()) {
+    // for interactive rendering, we need to make sure that the objects and geometries created by the procedural are "tagged" as used
+    for (auto i = 0; i < p->objects.size(); ++i) {
+      auto abc_object = p->objects[i];
+
+      if (abc_object->geometry) {
+        geometry_map.used(abc_object->geometry);
+      }
+
+      if (abc_object->object) {
+        object_map.used(abc_object->object);
+      }
+    }
+
+    return;
+  }
+
+  Shader *default_shader = (b_ob.type() == BL::Object::type_VOLUME) ? scene->default_volume :
+                                                                      scene->default_surface;
+  /* Find shader indices. */
+  vector<Shader *> used_shaders;
+
+  BL::Object::material_slots_iterator slot;
+  for (b_ob.material_slots.begin(slot); slot != b_ob.material_slots.end(); ++slot) {
+      BL::ID b_material(slot->material());
+      find_shader(b_material, used_shaders, default_shader);
+  }
+
+  if (used_shaders.size() == 0) {
+      used_shaders.push_back(default_shader);
+  }
+
+  BL::Object::modifiers_iterator b_mod;
+  for (b_ob.modifiers.begin(b_mod); b_mod != b_ob.modifiers.end(); ++b_mod) {
+    if ((b_mod->type() == b_mod->type_MESH_SEQUENCE_CACHE)) {
+      BL::MeshSequenceCacheModifier mcmd((const PointerRNA)b_mod->ptr);
+
+      auto absolute_path = blender_absolute_path(b_data, b_ob, mcmd.cache_file().filepath());
+
+      if (p->filepath != absolute_path) {
+        p->filepath = absolute_path;
+
+        AlembicObject *abc_object = new AlembicObject();
+        abc_object->path = mcmd.object_path();
+        abc_object->shader = used_shaders[0];
+
+        p->objects.push_back_slow(abc_object);
+      }
+
+      break;
+    }
+  }
+}
+
 void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
                                BL::SpaceView3D &b_v3d,
                                float motion_time)
@@ -339,6 +432,7 @@ void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
     light_map.pre_sync();
     geometry_map.pre_sync();
     object_map.pre_sync();
+    procedural_map.pre_sync();
     particle_system_map.pre_sync();
     motion_times.clear();
   }
@@ -374,14 +468,19 @@ void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
 
     /* Object itself. */
     if (b_instance.show_self()) {
-      sync_object(b_depsgraph,
-                  b_view_layer,
-                  b_instance,
-                  motion_time,
-                  false,
-                  show_lights,
-                  culling,
-                  &use_portal);
+      if (object_has_alembic_cache(b_ob)) {
+        sync_procedural(b_ob, b_depsgraph.scene().frame_current(), motion_time);
+      }
+      else {
+        sync_object(b_depsgraph,
+                    b_view_layer,
+                    b_instance,
+                    motion_time,
+                    false,
+                    show_lights,
+                    culling,
+                    &use_portal);
+      }
     }
 
     /* Particle hair as separate object. */
@@ -413,6 +512,12 @@ void BlenderSync::sync_objects(BL::Depsgraph &b_depsgraph,
       scene->object_manager->tag_update(scene);
     if (particle_system_map.post_sync())
       scene->particle_system_manager->tag_update(scene);
+    if (procedural_map.post_sync()) {
+      foreach (Procedural *p, scene->procedurals) {
+        static_cast<AlembicProcedural *>(p)->tag_update();
+      }
+      scene->geometry_manager->tag_update(scene);
+    }
   }
 
   if (motion)

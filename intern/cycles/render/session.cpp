@@ -1028,6 +1028,8 @@ bool Session::update_scene()
 
   /* update scene */
   if (scene->need_update()) {
+    /* Need to update the procedurals before tagging for used shaders as procedurals may create geometry which is not in the scene yet. */
+    scene->update_procedurals();
     /* Updated used shader tag so we know which features are need for the kernel. */
     scene->shader_manager->update_shaders_used(scene);
 

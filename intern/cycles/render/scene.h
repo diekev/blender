@@ -50,6 +50,7 @@ class Object;
 class ObjectManager;
 class ParticleSystemManager;
 class ParticleSystem;
+class Procedural;
 class CurveSystemManager;
 class Shader;
 class ShaderManager;
@@ -229,6 +230,7 @@ class Scene {
   vector<Shader *> shaders;
   vector<Light *> lights;
   vector<ParticleSystem *> particle_systems;
+  vector<Procedural *> procedurals;
 
   /* data managers */
   ImageManager *image_manager;
@@ -273,6 +275,8 @@ class Scene {
 
   void reset();
   void device_free();
+
+  void update_procedurals();
 
   void collect_statistics(RenderStats *stats);
 

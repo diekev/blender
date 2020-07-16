@@ -38,6 +38,32 @@
 
 CCL_NAMESPACE_BEGIN
 
+static float3 make_float3_from_yup(Imath::Vec3<float> const &v)
+{
+  return make_float3(v.x, -v.z, v.y);
+}
+
+static M44d convert_yup_zup(M44d const &mtx)
+{
+  Imath::Vec3<double> scale, shear, rot, trans;
+  extractSHRT(mtx, scale, shear, rot, trans);
+  M44d rotmat, scalemat, transmat;
+  rotmat.setEulerAngles(Imath::Vec3<double>(rot.x, -rot.z, rot.y));
+  scalemat.setScale(Imath::Vec3<double>(scale.x, scale.z, scale.y));
+  transmat.setTranslation(Imath::Vec3<double>(trans.x, -trans.z, trans.y));
+  return scalemat * rotmat * transmat;
+}
+
+static Transform make_transform(const Abc::M44d &a)
+{
+  auto m = convert_yup_zup(a);
+  Transform trans;
+  for (int j = 0; j < 3; j++)
+    for (int i = 0; i < 4; i++)
+      trans[j][i] = static_cast<float>(m[i][j]);
+  return trans;
+}
+
 // class AlembicMotionTransform : public MotionTransform {
 // public:
 //    AlembicMotionTransform() {
@@ -89,8 +115,8 @@ NODE_DEFINE(AlembicProcedural)
   SOCKET_BOOLEAN(use_motion_blur, "Use Motion Blur", false);
 
   SOCKET_STRING(filepath, "Filename", ustring());
-  SOCKET_FLOAT(frame, "Frame", 1.0);
-  SOCKET_FLOAT(frameRate, "Frame Rate", 24.0);
+  SOCKET_FLOAT(frame, "Frame", 1.0f);
+  SOCKET_FLOAT(frameRate, "Frame Rate", 24.0f);
 
   SOCKET_NODE_ARRAY(objects, "Objects", &AlembicObject::node_type);
 
@@ -99,26 +125,33 @@ NODE_DEFINE(AlembicProcedural)
 
 AlembicProcedural::AlembicProcedural() : Procedural(node_type)
 {
+ frame = 1.0f;
+ frameRate = 24.0f;
 }
 
 AlembicProcedural::~AlembicProcedural()
 {
 }
 
-static Transform make_transform(const Abc::M44d &a)
-{
-  Transform trans;
-  for (int j = 0; j < 4; j++)
-    for (int i = 0; i < 4; i++)
-      trans[j][i] = static_cast<float>(a[i][j]);
-  return trans;
-}
-
 void AlembicProcedural::create(Scene *scene)
 {
+  if (!need_update && !need_update_for_frame_change) {
+    printf("No update needed\n");
+    return;
+  }
+
+  printf("generate procedural...\n");
+
   Alembic::AbcCoreFactory::IFactory factory;
   factory.setPolicy(ErrorHandler::kQuietNoopPolicy);
   IArchive archive = factory.getArchive(filepath.c_str());
+
+  if (!archive.valid()) {
+    printf("The archive is invalid !\n");
+    return;
+  }
+
+  auto frame_time = (Abc::chrono_t)(frame / frameRate);
 
   /*
    * Traverse Alembic file hierarchy, avoiding recursion by
@@ -135,18 +168,18 @@ void AlembicProcedural::create(Scene *scene)
     vector<pathShaderType>::const_iterator it;
     Transform currmatrix = obj.second;
 
-    Shader *shader = NULL;
+    AlembicObject *object = NULL;
 
     for (int i = 0; i < objects.size(); i++) {
       if (fnmatch(objects[i]->path.c_str(), path.c_str(), 0) == 0) {
-        shader = objects[i]->shader;
+        object = objects[i];
       }
     }
 
     if (IXform::matches(obj.first.getHeader())) {
       IXform xform(obj.first, Alembic::Abc::kWrapExisting);
       XformSample samp = xform.getSchema().getValue(
-          ISampleSelector((Abc::chrono_t)(frame / frameRate)));
+          ISampleSelector(frame_time));
       Transform ax = make_transform(samp.getMatrix());
       //      AlembicMotionTransform ax;
       //      ax.mid = make_transform(samp.getMatrix());
@@ -160,51 +193,52 @@ void AlembicProcedural::create(Scene *scene)
       //      }
       currmatrix = currmatrix * ax;
     }
-    else if (IPolyMesh::matches(obj.first.getHeader()) &&
-             shader) { /* "shader" means matched some path pattern */
+    else if (IPolyMesh::matches(obj.first.getHeader()) && object) {
       IPolyMesh mesh(obj.first, Alembic::Abc::kWrapExisting);
-      read_mesh(scene, shader, currmatrix, mesh);
+      read_mesh(scene, object, currmatrix, mesh, frame_time);
     }
-    else if (ICurves::matches(obj.first.getHeader()) && shader) {
+    else if (ICurves::matches(obj.first.getHeader()) && object) {
       ICurves curves(obj.first, Alembic::Abc::kWrapExisting);
-      read_curves(scene, shader, currmatrix, curves);
+      read_curves(scene, object, currmatrix, curves, frame_time);
     }
 
     for (int i = 0; i < obj.first.getNumChildren(); i++)
       objstack.push(std::pair<IObject, Transform>(obj.first.getChild(i), currmatrix));
   }
+
+  need_update = false;
+  need_update_for_frame_change = false;
 }
 
-M44d convert_yup_zup(M44d &mtx)
+void ccl::AlembicProcedural::set_current_frame(ccl::Scene *scene, float frame_)
 {
-  Imath::Vec3<double> scale, shear, rot, trans;
-  extractSHRT(mtx, scale, shear, rot, trans);
-  M44d rotmat, scalemat, transmat;
-  rotmat.setEulerAngles(Imath::Vec3<double>(rot.x, -rot.z, rot.y));
-  scalemat.setScale(Imath::Vec3<double>(scale.x, scale.z, scale.y));
-  transmat.setTranslation(Imath::Vec3<double>(trans.x, -trans.z, trans.y));
-  return scalemat * rotmat * transmat;
+  if (frame != frame_) {
+    frame = frame_;
+    need_update_for_frame_change = true;
+    // hack to force an update while we don't have a procedural_manager
+    scene->geometry_manager->tag_update(scene);
+  }
 }
 
-void AlembicProcedural::read_curves(Scene *scene, Shader *shader, Transform xform, ICurves &curves)
+void AlembicProcedural::read_curves(Scene *scene, AlembicObject *abc_object, Transform xform, ICurves &curves, Abc::chrono_t frame_time)
 {
   Hair *hair = new Hair();
   scene->geometry.push_back(hair);
-  hair->used_shaders.push_back(shader);
+  hair->used_shaders.push_back(abc_object->shader);
   hair->use_motion_blur = use_motion_blur;
 
   /* create object*/
   Object *object = new Object();
   object->geometry = hair;
-  object->tfm = xform;  // transform_scale(1.0, 1.0, -1.0) * xform.mid;
+  object->tfm = xform;
   //  object->motion = AlembicMotionTransform(transform_scale(1.0, 1.0, -1.0)) * xform;
   //  object->use_motion = use_motion_blur;
   scene->objects.push_back(object);
 
-  float frameTime = frame / frameRate;
+  abc_object->object = object;
+  abc_object->geometry = hair;
 
-  ICurvesSchema::Sample samp = curves.getSchema().getValue(
-      ISampleSelector((Abc::chrono_t)frameTime));
+  ICurvesSchema::Sample samp = curves.getSchema().getValue(ISampleSelector(frame_time));
 
   hair->reserve_curves(samp.getNumCurves(), samp.getPositions()->size());
 
@@ -214,7 +248,7 @@ void AlembicProcedural::read_curves(Scene *scene, Shader *shader, Transform xfor
     int numVerts = curveNumVerts->get()[i];
     for (int j = 0; j < numVerts; j++) {
       Imath::Vec3<float> f = samp.getPositions()->get()[offset + j];
-      hair->add_curve_key(make_float3(f[0], f[1], f[2]), 0.01f);
+      hair->add_curve_key(make_float3_from_yup(f), 0.01f);
     }
     hair->add_curve(offset, 0);
     offset += numVerts;
@@ -227,13 +261,13 @@ void AlembicProcedural::read_curves(Scene *scene, Shader *shader, Transform xfor
                              scene->camera->shuttertime / 2.0f};
     AbcA::TimeSamplingPtr ts = curves.getSchema().getTimeSampling();
     for (int i = 0; i < 2; i++) {
-      frameTime = (frame + shuttertimes[i]) / frameRate;
-      std::pair<index_t, chrono_t> idx = ts->getNearIndex((Abc::chrono_t)frameTime,
+      frame_time = static_cast<Abc::chrono_t>((frame + shuttertimes[i]) / frameRate);
+      std::pair<index_t, chrono_t> idx = ts->getNearIndex(frame_time,
                                                           curves.getSchema().getNumSamples());
       ICurvesSchema::Sample shuttersamp = curves.getSchema().getValue(idx.first);
       for (int i = 0; i < shuttersamp.getPositions()->size(); i++) {
         Imath::Vec3<float> f = shuttersamp.getPositions()->get()[i];
-        float3 p = make_float3(f[0], f[1], f[2]);
+        float3 p = make_float3_from_yup(f);
         *fdata++ = p;
       }
     }
@@ -301,28 +335,40 @@ void AlembicProcedural::read_curves(Scene *scene, Shader *shader, Transform xfor
 }
 
 void AlembicProcedural::read_mesh(Scene *scene,
-                                  Shader *shader,
+                                  AlembicObject *abc_object,
                                   Transform xform,
-                                  IPolyMesh &polymesh)
+                                  IPolyMesh &polymesh,
+                                  Abc::chrono_t frame_time)
 {
-  Mesh *mesh = new Mesh();
-  scene->geometry.push_back(mesh);
-  mesh->used_shaders.push_back(shader);
+  // TODO : transform animation
+
+  if (!abc_object->geometry) {
+    Mesh *mesh = new Mesh;
+    mesh->used_shaders.push_back(abc_object->shader);
+    mesh->use_motion_blur = use_motion_blur;
+    scene->geometry.push_back(mesh);
+
+    /* create object*/
+    Object *object = new Object();
+    object->geometry = mesh;
+    object->tfm = xform;
+    //  object->tfm = transform_scale(1.0, 1.0, -1.0) * xform.mid;
+    //  object->motion = AlembicMotionTransform(transform_scale(1.0, 1.0, -1.0)) * xform;
+    //  object->use_motion = use_motion_blur;
+    scene->objects.push_back(object);
+
+    abc_object->object = object;
+    abc_object->geometry = mesh;
+  }
+
+  Mesh *mesh = static_cast<Mesh *>(abc_object->geometry);
+  // TODO : properly check if data needs to be rebuild
+  mesh->clear();
+  mesh->used_shaders.push_back(abc_object->shader);
   mesh->use_motion_blur = use_motion_blur;
+  mesh->tag_update(scene, true);
 
-  /* create object*/
-  Object *object = new Object();
-  object->geometry = mesh;
-  object->tfm = xform;
-  //  object->tfm = transform_scale(1.0, 1.0, -1.0) * xform.mid;
-  //  object->motion = AlembicMotionTransform(transform_scale(1.0, 1.0, -1.0)) * xform;
-  //  object->use_motion = use_motion_blur;
-  scene->objects.push_back(object);
-
-  float frameTime = frame / frameRate;
-
-  IPolyMeshSchema::Sample samp = polymesh.getSchema().getValue(
-      ISampleSelector((Abc::chrono_t)frameTime));
+  IPolyMeshSchema::Sample samp = polymesh.getSchema().getValue(ISampleSelector(frame_time));
 
   int num_triangles = 0;
   for (int i = 0; i < samp.getFaceCounts()->size(); i++) {
@@ -332,7 +378,7 @@ void AlembicProcedural::read_mesh(Scene *scene,
   mesh->reserve_mesh(samp.getPositions()->size(), num_triangles);
   for (int i = 0; i < samp.getPositions()->size(); i++) {
     Imath::Vec3<float> f = samp.getPositions()->get()[i];
-    mesh->verts.push_back_reserved(make_float3(f[0], f[1], f[2]));
+    mesh->verts.push_back_reserved(make_float3_from_yup(f));
   }
 
   if (use_motion_blur) {
@@ -342,13 +388,13 @@ void AlembicProcedural::read_mesh(Scene *scene,
                              scene->camera->shuttertime / 2.0f};
     AbcA::TimeSamplingPtr ts = polymesh.getSchema().getTimeSampling();
     for (int i = 0; i < 2; i++) {
-      frameTime = (frame + shuttertimes[i]) / frameRate;
-      std::pair<index_t, chrono_t> idx = ts->getNearIndex((Abc::chrono_t)frameTime,
+      frame_time = static_cast<Abc::chrono_t>((frame + shuttertimes[i]) / frameRate);
+      std::pair<index_t, chrono_t> idx = ts->getNearIndex(frame_time,
                                                           polymesh.getSchema().getNumSamples());
       IPolyMeshSchema::Sample shuttersamp = polymesh.getSchema().getValue(idx.first);
       for (int i = 0; i < shuttersamp.getPositions()->size(); i++) {
         Imath::Vec3<float> f = shuttersamp.getPositions()->get()[i];
-        float3 p = make_float3(f[0], f[1], f[2]);
+        float3 p = make_float3_from_yup(f);
         *fdata++ = p;
       }
     }
@@ -425,6 +471,8 @@ void AlembicProcedural::read_mesh(Scene *scene,
       }
     }
   }
+
+  mesh->add_face_normals();
 
   /* we don't yet support arbitrary attributes, for now add vertex
    * coordinates as generated coordinates if requested */

@@ -46,6 +46,7 @@ void BlenderSync::find_shader(BL::ID &id, vector<Shader *> &used_shaders, Shader
 {
   Shader *shader = (id) ? shader_map.find(id) : default_shader;
 
+  printf("find_shader\n");
   used_shaders.push_back(shader);
   shader->tag_used(scene);
 }

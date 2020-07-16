@@ -28,6 +28,7 @@
 #include "render/object.h"
 #include "render/osl.h"
 #include "render/particles.h"
+#include "render/procedural.h"
 #include "render/scene.h"
 #include "render/shader.h"
 #include "render/svm.h"
@@ -136,12 +137,15 @@ void Scene::free_memory(bool final)
     delete l;
   foreach (ParticleSystem *p, particle_systems)
     delete p;
+  foreach(Procedural *p, procedurals)
+    delete p;
 
   shaders.clear();
   geometry.clear();
   objects.clear();
   lights.clear();
   particle_systems.clear();
+  procedurals.clear();
 
   if (device) {
     camera->device_free(device, &dscene, this);
@@ -200,6 +204,8 @@ void Scene::device_update(Device *device_, Progress &progress)
    * - Film needs light manager to run for use_light_visibility
    * - Lookup tables are done a second time to handle film tables
    */
+
+  update_procedurals();
 
   progress.set_status("Updating Shaders");
   shader_manager->device_update(device, &dscene, this, progress);
@@ -310,6 +316,13 @@ void Scene::device_update(Device *device_, Progress &progress)
             << string_human_readable_size(mem_used) << ")\n"
             << "  Peak: " << string_human_readable_number(mem_peak) << " ("
             << string_human_readable_size(mem_peak) << ")";
+  }
+}
+
+void Scene::update_procedurals()
+{
+  foreach (Procedural *p, procedurals) {
+    p->create(this);
   }
 }
 
