@@ -86,9 +86,9 @@ ccl_device_inline void motion_triangle_normals_for_step(KernelGlobals *kg,
 {
   if (step == numsteps) {
     /* center step: regular vertex location */
-    normals[0] = float4_to_float3(kernel_tex_fetch(__tri_vnormal, tri_vindex.x));
-    normals[1] = float4_to_float3(kernel_tex_fetch(__tri_vnormal, tri_vindex.y));
-    normals[2] = float4_to_float3(kernel_tex_fetch(__tri_vnormal, tri_vindex.z));
+    normals[0] = decode_normal(kernel_tex_fetch(__tri_vnormal, tri_vindex.x));
+    normals[1] = decode_normal(kernel_tex_fetch(__tri_vnormal, tri_vindex.y));
+    normals[2] = decode_normal(kernel_tex_fetch(__tri_vnormal, tri_vindex.z));
   }
   else {
     /* center step is not stored in this array */

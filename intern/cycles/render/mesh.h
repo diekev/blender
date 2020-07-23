@@ -193,7 +193,7 @@ class Mesh : public Geometry {
   void get_uv_tiles(ustring map, unordered_set<int> &tiles) override;
 
   void pack_shaders(Scene *scene, uint *shader);
-  void pack_normals(float4 *vnormal);
+  void pack_normals(uint *vnormal);
   void pack_verts(const vector<uint> &tri_prim_index,
                   uint4 *tri_vindex,
                   uint *tri_patch,

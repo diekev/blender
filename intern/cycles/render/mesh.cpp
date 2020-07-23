@@ -29,6 +29,7 @@
 #include "subd/subd_split.h"
 
 #include "util/util_foreach.h"
+#include "util/util_normals.h"
 #include "util/util_logging.h"
 #include "util/util_progress.h"
 #include "util/util_set.h"
@@ -582,7 +583,7 @@ void Mesh::pack_shaders(Scene *scene, uint *tri_shader)
   }
 }
 
-void Mesh::pack_normals(float4 *vnormal)
+void Mesh::pack_normals(uint *vnormal)
 {
   Attribute *attr_vN = attributes.find(ATTR_STD_VERTEX_NORMAL);
   if (attr_vN == NULL) {
@@ -602,7 +603,7 @@ void Mesh::pack_normals(float4 *vnormal)
     if (do_transform)
       vNi = safe_normalize(transform_direction(&ntfm, vNi));
 
-    vnormal[i] = make_float4(vNi.x, vNi.y, vNi.z, 0.0f);
+    vnormal[i] = encode_normal(vNi);
   }
 }
 
