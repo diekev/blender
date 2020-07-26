@@ -126,6 +126,12 @@ class AdaptiveSampling {
   int min_samples;
 };
 
+class DeepRendering {
+public:
+  int width;
+  int height;
+};
+
 class DeviceTask {
  public:
   typedef enum { RENDER, FILM_CONVERT, SHADER, DENOISE_BUFFER } Type;
@@ -176,6 +182,8 @@ class DeviceTask {
   bool need_finish_queue;
   bool integrator_branched;
   AdaptiveSampling adaptive_sampling;
+
+  DeepRendering deep_rendering;
 
  protected:
   double last_update_time;

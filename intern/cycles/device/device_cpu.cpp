@@ -863,6 +863,37 @@ class CPUDevice : public Device {
     return (!any);
   }
 
+  void deep_rendering_accumulate_samples(KernelGlobals *kg, RenderTile &tile)
+  {
+
+    WorkTile wtile;
+    wtile.x = tile.x;
+    wtile.y = tile.y;
+    wtile.w = tile.w;
+    wtile.h = tile.h;
+    wtile.offset = tile.offset;
+    wtile.stride = tile.stride;
+    wtile.buffer = (float *)tile.buffer;
+    printf("stride pass Z : %d\n", kernel_data.film.pass_depth);
+    printf("stride pass RGB : %d\n", kernel_data.film.pass_combined);
+    printf("stride wtile : %d\n", tile.stride);
+
+    int number_of_samples = 0;
+
+    for (int y = wtile.y; y < wtile.y + wtile.h; ++y) {
+      for (int x = wtile.x; x < wtile.x + wtile.w; ++x) {
+        const int index = wtile.offset + x + y * wtile.stride;
+        float *z_value = wtile.buffer + index * kernel_data.film.pass_depth;
+
+        if (*z_value < 100.0f) {
+          number_of_samples += 1;
+        }
+      }
+    }
+
+    printf("number_of_samples : %d\n", number_of_samples);
+  }
+
   void adaptive_sampling_post(const RenderTile &tile, KernelGlobals *kg)
   {
     float *render_buffer = (float *)tile.buffer;
@@ -937,6 +968,8 @@ class CPUDevice : public Device {
           break;
         }
       }
+
+      deep_rendering_accumulate_samples(kg, tile);
 
       task.update_progress(&tile, tile.w * tile.h);
     }

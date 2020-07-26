@@ -1190,6 +1190,9 @@ void Session::render(bool need_denoise)
   task.adaptive_sampling.min_samples = scene->dscene.data.integrator.adaptive_min_samples;
   task.adaptive_sampling.adaptive_step = scene->dscene.data.integrator.adaptive_step;
 
+  task.deep_rendering.width = tile_manager.state.buffer.width;
+  task.deep_rendering.height = tile_manager.state.buffer.height;
+
   /* Acquire render tiles by default. */
   task.tile_types = RenderTile::PATH_TRACE;
 
