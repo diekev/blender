@@ -73,28 +73,17 @@ DenoisingTask::~DenoisingTask()
 
 void DenoisingTask::set_render_buffer(RenderTileNeighbors &neighbors)
 {
-  for (int i = 0; i < RenderTileNeighbors::SIZE; i++) {
-    RenderTile &rtile = neighbors.tiles[i];
-    tile_info->offsets[i] = rtile.offset;
-    tile_info->strides[i] = rtile.stride;
-    tile_info->buffers[i] = rtile.buffer;
-  }
-  tile_info->x[0] = neighbors.tiles[3].x;
-  tile_info->x[1] = neighbors.tiles[4].x;
-  tile_info->x[2] = neighbors.tiles[5].x;
-  tile_info->x[3] = neighbors.tiles[5].x + neighbors.tiles[5].w;
-  tile_info->y[0] = neighbors.tiles[1].y;
-  tile_info->y[1] = neighbors.tiles[4].y;
-  tile_info->y[2] = neighbors.tiles[7].y;
-  tile_info->y[3] = neighbors.tiles[7].y + neighbors.tiles[7].h;
+  neighbors.fill_tile_info(tile_info);
 
-  target_buffer.offset = neighbors.target.offset;
-  target_buffer.stride = neighbors.target.stride;
-  target_buffer.ptr = neighbors.target.buffer;
+  const RenderTile &target = neighbors.get_target();
 
-  if (do_prefilter && neighbors.target.buffers) {
+  target_buffer.offset = target.get_offset();
+  target_buffer.stride = target.get_stride();
+  target_buffer.ptr = target.get_buffer();
+
+  if (do_prefilter && target.get_buffers()) {
     target_buffer.denoising_output_offset =
-        neighbors.target.buffers->params.get_denoising_prefiltered_offset();
+        target.get_buffers()->get_params().get_denoising_prefiltered_offset();
   }
   else {
     target_buffer.denoising_output_offset = 0;

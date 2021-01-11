@@ -377,13 +377,13 @@ void BVHEmbree::add_object(Object *ob, int i)
 {
   Geometry *geom = ob->get_geometry();
 
-  if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
+  if (geom->is_mesh() || geom->is_volume()) {
     Mesh *mesh = static_cast<Mesh *>(geom);
     if (mesh->num_triangles() > 0) {
       add_triangles(ob, mesh, i);
     }
   }
-  else if (geom->geometry_type == Geometry::HAIR) {
+  else if (geom->is_hair()) {
     Hair *hair = static_cast<Hair *>(geom);
     if (hair->num_curves() > 0) {
       add_curves(ob, hair, i);
@@ -393,7 +393,7 @@ void BVHEmbree::add_object(Object *ob, int i)
 
 void BVHEmbree::add_instance(Object *ob, int i)
 {
-  BVHEmbree *instance_bvh = (BVHEmbree *)(ob->get_geometry()->bvh);
+  BVHEmbree *instance_bvh = (BVHEmbree *)(ob->get_geometry()->get_bvh());
   assert(instance_bvh != NULL);
 
   const size_t num_object_motion_steps = ob->use_motion() ? ob->get_motion().size() : 1;
@@ -436,12 +436,12 @@ void BVHEmbree::add_instance(Object *ob, int i)
 
 void BVHEmbree::add_triangles(const Object *ob, const Mesh *mesh, int i)
 {
-  size_t prim_offset = mesh->optix_prim_offset;
+  size_t prim_offset = mesh->get_optix_prim_offset();
 
   const Attribute *attr_mP = NULL;
   size_t num_motion_steps = 1;
   if (mesh->has_motion_blur()) {
-    attr_mP = mesh->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
+	attr_mP = mesh->get_attributes().find(ATTR_STD_MOTION_VERTEX_POSITION);
     if (attr_mP) {
       num_motion_steps = mesh->get_motion_steps();
     }
@@ -460,7 +460,7 @@ void BVHEmbree::add_triangles(const Object *ob, const Mesh *mesh, int i)
       geom_id, RTC_BUFFER_TYPE_INDEX, 0, RTC_FORMAT_UINT3, sizeof(int) * 3, num_triangles);
   assert(rtc_indices);
   if (!rtc_indices) {
-    VLOG(1) << "Embree could not create new geometry buffer for mesh " << mesh->name.c_str()
+	VLOG(1) << "Embree could not create new geometry buffer for mesh " << mesh->get_name().c_str()
             << ".\n";
     return;
   }
@@ -488,7 +488,7 @@ void BVHEmbree::set_tri_vertex_buffer(RTCGeometry geom_id, const Mesh *mesh, con
   size_t num_motion_steps = 1;
   int t_mid = 0;
   if (mesh->has_motion_blur()) {
-    attr_mP = mesh->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
+	attr_mP = mesh->get_attributes().find(ATTR_STD_MOTION_VERTEX_POSITION);
     if (attr_mP) {
       num_motion_steps = mesh->get_motion_steps();
       t_mid = (num_motion_steps - 1) / 2;
@@ -540,7 +540,7 @@ void BVHEmbree::set_curve_vertex_buffer(RTCGeometry geom_id, const Hair *hair, c
   const Attribute *attr_mP = NULL;
   size_t num_motion_steps = 1;
   if (hair->has_motion_blur()) {
-    attr_mP = hair->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
+    attr_mP = hair->get_attributes().find(ATTR_STD_MOTION_VERTEX_POSITION);
     if (attr_mP) {
       num_motion_steps = hair->get_motion_steps();
     }
@@ -550,7 +550,7 @@ void BVHEmbree::set_curve_vertex_buffer(RTCGeometry geom_id, const Hair *hair, c
   size_t num_keys = 0;
   for (size_t j = 0; j < num_curves; ++j) {
     const Hair::Curve c = hair->get_curve(j);
-    num_keys += c.num_keys;
+    num_keys += c.get_num_keys();
   }
 
   /* Catmull-Rom splines need extra CVs at the beginning and end of each curve. */
@@ -584,16 +584,16 @@ void BVHEmbree::set_curve_vertex_buffer(RTCGeometry geom_id, const Hair *hair, c
       const size_t num_curves = hair->num_curves();
       for (size_t j = 0; j < num_curves; ++j) {
         Hair::Curve c = hair->get_curve(j);
-        int fk = c.first_key;
+        int fk = c.get_first_key();
         int k = 1;
-        for (; k < c.num_keys + 1; ++k, ++fk) {
+        for (; k < c.get_num_keys() + 1; ++k, ++fk) {
           rtc_verts[k] = float3_to_float4(verts[fk]);
           rtc_verts[k].w = curve_radius[fk];
         }
         /* Duplicate Embree's Catmull-Rom spline CVs at the start and end of each curve. */
         rtc_verts[0] = rtc_verts[1];
         rtc_verts[k] = rtc_verts[k - 1];
-        rtc_verts += c.num_keys + 2;
+        rtc_verts += c.get_num_keys() + 2;
       }
     }
 
@@ -605,12 +605,12 @@ void BVHEmbree::set_curve_vertex_buffer(RTCGeometry geom_id, const Hair *hair, c
 
 void BVHEmbree::add_curves(const Object *ob, const Hair *hair, int i)
 {
-  size_t prim_offset = hair->optix_prim_offset;
+  size_t prim_offset = hair->get_optix_prim_offset();
 
   const Attribute *attr_mP = NULL;
   size_t num_motion_steps = 1;
   if (hair->has_motion_blur()) {
-    attr_mP = hair->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
+    attr_mP = hair->get_attributes().find(ATTR_STD_MOTION_VERTEX_POSITION);
     if (attr_mP) {
       num_motion_steps = hair->get_motion_steps();
     }
@@ -627,7 +627,7 @@ void BVHEmbree::add_curves(const Object *ob, const Hair *hair, int i)
     num_segments += c.num_segments();
   }
 
-  enum RTCGeometryType type = (hair->curve_shape == CURVE_RIBBON ?
+  enum RTCGeometryType type = (hair->get_curve_shape() == CURVE_RIBBON ?
                                    RTC_GEOMETRY_TYPE_FLAT_CATMULL_ROM_CURVE :
                                    RTC_GEOMETRY_TYPE_ROUND_CATMULL_ROM_CURVE);
 
@@ -639,7 +639,7 @@ void BVHEmbree::add_curves(const Object *ob, const Hair *hair, int i)
   for (size_t j = 0; j < num_curves; ++j) {
     Hair::Curve c = hair->get_curve(j);
     for (size_t k = 0; k < c.num_segments(); ++k) {
-      rtc_indices[rtc_index] = c.first_key + k;
+      rtc_indices[rtc_index] = c.get_first_key() + k;
       /* Room for extra CVs at Catmull-Rom splines. */
       rtc_indices[rtc_index] += j * 2;
 
@@ -653,7 +653,7 @@ void BVHEmbree::add_curves(const Object *ob, const Hair *hair, int i)
   set_curve_vertex_buffer(geom_id, hair, false);
 
   rtcSetGeometryUserData(geom_id, (void *)prim_offset);
-  if (hair->curve_shape == CURVE_RIBBON) {
+  if (hair->get_curve_shape() == CURVE_RIBBON) {
     rtcSetGeometryOccludedFilterFunction(geom_id, rtc_filter_occluded_func);
   }
   else {
@@ -677,21 +677,21 @@ void BVHEmbree::refit(Progress &progress)
     if (!params.top_level || (ob->is_traceable() && !ob->get_geometry()->is_instanced())) {
       Geometry *geom = ob->get_geometry();
 
-      if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
+      if (geom->is_mesh() || geom->is_volume()) {
         Mesh *mesh = static_cast<Mesh *>(geom);
         if (mesh->num_triangles() > 0) {
           RTCGeometry geom = rtcGetGeometry(scene, geom_id);
           set_tri_vertex_buffer(geom, mesh, true);
-          rtcSetGeometryUserData(geom, (void *)mesh->optix_prim_offset);
+          rtcSetGeometryUserData(geom, (void *)mesh->get_optix_prim_offset());
           rtcCommitGeometry(geom);
         }
       }
-      else if (geom->geometry_type == Geometry::HAIR) {
+      else if (geom->is_hair()) {
         Hair *hair = static_cast<Hair *>(geom);
         if (hair->num_curves() > 0) {
           RTCGeometry geom = rtcGetGeometry(scene, geom_id + 1);
           set_curve_vertex_buffer(geom, hair, true);
-          rtcSetGeometryUserData(geom, (void *)hair->optix_prim_offset);
+          rtcSetGeometryUserData(geom, (void *)hair->get_optix_prim_offset());
           rtcCommitGeometry(geom);
         }
       }

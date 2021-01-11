@@ -228,22 +228,22 @@ class OsdData {
   {
     Far::PrimvarRefiner primvar_refiner(*refiner);
 
-    if (attr.element == ATTR_ELEMENT_VERTEX) {
+    if (attr.get_element() == ATTR_ELEMENT_VERTEX) {
       int num_refiner_verts = refiner->GetNumVerticesTotal();
       int num_local_points = patch_table->GetNumLocalPoints();
 
       attr.resize(num_refiner_verts + num_local_points);
-      attr.flags |= ATTR_FINAL_SIZE;
+      attr.get_flags() |= ATTR_FINAL_SIZE;
 
-      char *src = attr.buffer.data();
+      char *src = attr.get_buffer().data();
 
       for (int i = 0; i < refiner->GetMaxLevel(); i++) {
         char *dest = src + refiner->GetLevel(i).GetNumVertices() * attr.data_sizeof();
 
-        if (attr.same_storage(attr.type, TypeDesc::TypeFloat)) {
+        if (attr.same_storage(attr.get_type(), TypeDesc::TypeFloat)) {
           primvar_refiner.Interpolate(i + 1, (OsdValue<float> *)src, (OsdValue<float> *&)dest);
         }
-        else if (attr.same_storage(attr.type, TypeFloat2)) {
+        else if (attr.same_storage(attr.get_type(), TypeFloat2)) {
           primvar_refiner.Interpolate(i + 1, (OsdValue<float2> *)src, (OsdValue<float2> *&)dest);
         }
         else {
@@ -254,24 +254,25 @@ class OsdData {
       }
 
       if (num_local_points) {
-        if (attr.same_storage(attr.type, TypeDesc::TypeFloat)) {
+        if (attr.same_storage(attr.get_type(), TypeDesc::TypeFloat)) {
           patch_table->ComputeLocalPointValues(
-              (OsdValue<float> *)&attr.buffer[0],
-              (OsdValue<float> *)&attr.buffer[num_refiner_verts * attr.data_sizeof()]);
+              (OsdValue<float> *)&attr.get_buffer()[0],
+              (OsdValue<float> *)&attr.get_buffer()[num_refiner_verts * attr.data_sizeof()]);
         }
-        else if (attr.same_storage(attr.type, TypeFloat2)) {
+        else if (attr.same_storage(attr.get_type(), TypeFloat2)) {
           patch_table->ComputeLocalPointValues(
-              (OsdValue<float2> *)&attr.buffer[0],
-              (OsdValue<float2> *)&attr.buffer[num_refiner_verts * attr.data_sizeof()]);
+              (OsdValue<float2> *)&attr.get_buffer()[0],
+              (OsdValue<float2> *)&attr.get_buffer()[num_refiner_verts * attr.data_sizeof()]);
         }
         else {
           patch_table->ComputeLocalPointValues(
-              (OsdValue<float4> *)&attr.buffer[0],
-              (OsdValue<float4> *)&attr.buffer[num_refiner_verts * attr.data_sizeof()]);
+              (OsdValue<float4> *)&attr.get_buffer()[0],
+              (OsdValue<float4> *)&attr.get_buffer()[num_refiner_verts * attr.data_sizeof()]);
         }
       }
     }
-    else if (attr.element == ATTR_ELEMENT_CORNER || attr.element == ATTR_ELEMENT_CORNER_BYTE) {
+    else if (attr.get_element() == ATTR_ELEMENT_CORNER ||
+             attr.get_element() == ATTR_ELEMENT_CORNER_BYTE) {
       // TODO(mai): fvar interpolation
     }
   }
@@ -393,8 +394,8 @@ void Mesh::tessellate(DiagSplit *split)
     subdivision_type = SUBDIVISION_LINEAR;
 
     /* force disable attribute subdivision for same reason as above */
-    foreach (Attribute &attr, subd_attributes.attributes) {
-      attr.flags &= ~ATTR_SUBDIVIDED;
+    foreach (Attribute &attr, subd_attributes.get_attributes()) {
+      attr.get_flags() &= ~ATTR_SUBDIVIDED;
     }
   }
 
@@ -542,12 +543,13 @@ void Mesh::tessellate(DiagSplit *split)
   }
 
   /* interpolate center points for attributes */
-  foreach (Attribute &attr, subd_attributes.attributes) {
+  foreach (Attribute &attr, subd_attributes.get_attributes()) {
 #ifdef WITH_OPENSUBDIV
-    if (subdivision_type == SUBDIVISION_CATMULL_CLARK && attr.flags & ATTR_SUBDIVIDED) {
-      if (attr.element == ATTR_ELEMENT_CORNER || attr.element == ATTR_ELEMENT_CORNER_BYTE) {
+    if (subdivision_type == SUBDIVISION_CATMULL_CLARK && attr.get_flags() & ATTR_SUBDIVIDED) {
+      if (attr.get_element() == ATTR_ELEMENT_CORNER ||
+          attr.get_element() == ATTR_ELEMENT_CORNER_BYTE) {
         /* keep subdivision for corner attributes disabled for now */
-        attr.flags &= ~ATTR_SUBDIVIDED;
+        attr.get_flags() &= ~ATTR_SUBDIVIDED;
       }
       else if (get_num_subd_faces()) {
         osd_data.subdivide_attribute(attr);
@@ -562,7 +564,7 @@ void Mesh::tessellate(DiagSplit *split)
     size_t stride = attr.data_sizeof();
     int ngons = 0;
 
-    switch (attr.element) {
+    switch (attr.get_element()) {
       case ATTR_ELEMENT_VERTEX: {
         for (int f = 0; f < num_faces; f++) {
           SubdFace face = get_subd_face(f);

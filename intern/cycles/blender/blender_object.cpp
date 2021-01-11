@@ -244,7 +244,7 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
   /* holdout */
   object->set_use_holdout(use_holdout);
   if (object->use_holdout_is_modified()) {
-    scene->object_manager->tag_update(scene);
+    scene->get_object_manager()->tag_update(scene);
   }
 
   object->set_visibility(visibility);
@@ -275,7 +275,7 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
   if (object->is_modified() || object_updated ||
       (object->get_geometry() && object->get_geometry()->is_modified()) ||
       tfm != object->get_tfm()) {
-    object->name = b_ob.name().c_str();
+    object->set_name(ustring(b_ob.name().c_str()));
     object->set_pass_id(b_ob.pass_index());
     object->set_color(get_float3(b_ob.color()));
     object->set_tfm(tfm);
@@ -327,7 +327,7 @@ Object *BlenderSync::sync_object(BL::Depsgraph &b_depsgraph,
     else {
       object->set_dupli_generated(make_float3(0.0f, 0.0f, 0.0f));
       object->set_dupli_uv(make_float2(0.0f, 0.0f));
-      object->set_random_id(hash_uint2(hash_string(object->name.c_str()), 0));
+      object->set_random_id(hash_uint2(hash_string(object->get_name().c_str()), 0));
     }
 
     object->tag_update(scene);
@@ -422,7 +422,7 @@ bool BlenderSync::sync_object_attributes(BL::DepsgraphObjectInstance &b_instance
   AttributeRequestSet requests = object->get_geometry()->needed_attributes();
 
   /* Delete attributes that became unnecessary. */
-  vector<ParamValue> &attributes = object->attributes;
+  vector<ParamValue> &attributes = object->get_attributes();
   bool changed = false;
 
   for (int i = attributes.size() - 1; i >= 0; i--) {
@@ -433,8 +433,8 @@ bool BlenderSync::sync_object_attributes(BL::DepsgraphObjectInstance &b_instance
   }
 
   /* Update attribute values. */
-  foreach (AttributeRequest &req, requests.requests) {
-    ustring name = req.name;
+  foreach (const AttributeRequest &req, requests.get_requests()) {
+    const ustring &name = req.get_name();
 
     std::string real_name;
     BlenderAttributeType type = blender_attribute_name_split_type(name, &real_name);
@@ -594,13 +594,13 @@ void BlenderSync::sync_motion(BL::RenderSettings &b_render,
   float frame_center_delta = 0.0f;
 
   if (scene->need_motion() != Scene::MOTION_PASS &&
-      scene->camera->get_motion_position() != Camera::MOTION_POSITION_CENTER) {
-    float shuttertime = scene->camera->get_shuttertime();
-    if (scene->camera->get_motion_position() == Camera::MOTION_POSITION_END) {
+      scene->get_camera()->get_motion_position() != Camera::MOTION_POSITION_CENTER) {
+    float shuttertime = scene->get_camera()->get_shuttertime();
+    if (scene->get_camera()->get_motion_position() == Camera::MOTION_POSITION_END) {
       frame_center_delta = -shuttertime * 0.5f;
     }
     else {
-      assert(scene->camera->get_motion_position() == Camera::MOTION_POSITION_START);
+      assert(scene->get_camera()->get_motion_position() == Camera::MOTION_POSITION_START);
       frame_center_delta = shuttertime * 0.5f;
     }
 
@@ -621,7 +621,7 @@ void BlenderSync::sync_motion(BL::RenderSettings &b_render,
   if (b_cam) {
     uint camera_motion_steps = object_motion_steps(b_cam, b_cam);
     for (size_t step = 0; step < camera_motion_steps; step++) {
-      motion_times.insert(scene->camera->motion_time(step));
+      motion_times.insert(scene->get_camera()->motion_time(step));
     }
   }
 

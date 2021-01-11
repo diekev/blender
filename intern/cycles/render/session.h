@@ -23,6 +23,7 @@
 #include "render/stats.h"
 #include "render/tile.h"
 
+#include "util/util_api.h"
 #include "util/util_progress.h"
 #include "util/util_stats.h"
 #include "util/util_thread.h"
@@ -127,21 +128,22 @@ class SessionParams {
  * control loop and dispatching tasks. */
 
 class Session {
+ private:
+  GET(Device *, device)
+  GET_SET(Scene *, scene)
+  GET(RenderBuffers *, buffers)
+  GET(DisplayBuffer *, display)
+  GET(Progress, progress)
+  GET(SessionParams, params)
+  GET(TileManager, tile_manager)
+  GET(Stats, stats)
+  GET(Profiler, profiler)
+
+  GET_SET(function<void(RenderTile &)>, write_render_tile_cb)
+  GET_SET(function<void(RenderTile &, bool)>, update_render_tile_cb)
+  GET_SET(function<void(RenderTile &)>, read_bake_tile_cb)
+
  public:
-  Device *device;
-  Scene *scene;
-  RenderBuffers *buffers;
-  DisplayBuffer *display;
-  Progress progress;
-  SessionParams params;
-  TileManager tile_manager;
-  Stats stats;
-  Profiler profiler;
-
-  function<void(RenderTile &)> write_render_tile_cb;
-  function<void(RenderTile &, bool)> update_render_tile_cb;
-  function<void(RenderTile &)> read_bake_tile_cb;
-
   explicit Session(const SessionParams &params);
   ~Session();
 
@@ -160,10 +162,6 @@ class Session {
   bool update_scene();
 
   void device_free();
-
-  /* Returns the rendering progress or 0 if no progress can be determined
-   * (for example, when rendering with unlimited samples). */
-  float get_progress();
 
   void collect_statistics(RenderStats *stats);
 

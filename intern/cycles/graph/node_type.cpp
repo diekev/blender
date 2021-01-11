@@ -159,37 +159,37 @@ void NodeType::register_input(ustring name,
                               int extra_flags)
 {
   SocketType socket;
-  socket.name = name;
-  socket.ui_name = ui_name;
-  socket.type = type;
-  socket.struct_offset = struct_offset;
-  socket.default_value = default_value;
-  socket.enum_values = enum_values;
-  socket.node_type = node_type;
-  socket.flags = flags | extra_flags;
+  socket.set_name(name);
+  socket.set_ui_name(ui_name);
+  socket.set_type(type);
+  socket.set_struct_offset(struct_offset);
+  socket.set_default_value(default_value);
+  socket.set_enum_values(enum_values);
+  socket.set_node_type(node_type);
+  socket.set_flags(flags | extra_flags);
   assert(inputs.size() < std::numeric_limits<SocketModifiedFlags>::digits);
-  socket.modified_flag_bit = (1ull << inputs.size());
+  socket.set_modified_flag_bit(1ull << inputs.size());
   inputs.push_back(socket);
 }
 
 void NodeType::register_output(ustring name, ustring ui_name, SocketType::Type type)
 {
   SocketType socket;
-  socket.name = name;
-  socket.ui_name = ui_name;
-  socket.type = type;
-  socket.struct_offset = 0;
-  socket.default_value = NULL;
-  socket.enum_values = NULL;
-  socket.node_type = NULL;
-  socket.flags = SocketType::LINKABLE;
+  socket.set_name(name);
+  socket.set_ui_name(ui_name);
+  socket.set_type(type);
+  socket.set_struct_offset(0);
+  socket.set_default_value(NULL);
+  socket.set_enum_values(NULL);
+  socket.set_node_type(NULL);
+  socket.set_flags(SocketType::LINKABLE);
   outputs.push_back(socket);
 }
 
 const SocketType *NodeType::find_input(ustring name) const
 {
   foreach (const SocketType &socket, inputs) {
-    if (socket.name == name) {
+    if (socket.get_name() == name) {
       return &socket;
     }
   }
@@ -200,7 +200,7 @@ const SocketType *NodeType::find_input(ustring name) const
 const SocketType *NodeType::find_output(ustring name) const
 {
   foreach (const SocketType &socket, outputs) {
-    if (socket.name == name) {
+    if (socket.get_name() == name) {
       return &socket;
     }
   }

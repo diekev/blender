@@ -57,8 +57,8 @@ bool GeometryManager::displace(
   /* find object index. todo: is arbitrary */
   size_t object_index = OBJECT_NONE;
 
-  for (size_t i = 0; i < scene->objects.size(); i++) {
-    if (scene->objects[i]->get_geometry() == mesh) {
+  for (size_t i = 0; i < scene->get_objects().size(); i++) {
+    if (scene->get_objects()[i]->get_geometry() == mesh) {
       object_index = i;
       break;
     }
@@ -77,9 +77,9 @@ bool GeometryManager::displace(
     int shader_index = mesh->shader[i];
     Shader *shader = (shader_index < mesh->used_shaders.size()) ?
                          static_cast<Shader *>(mesh->used_shaders[shader_index]) :
-                         scene->default_surface;
+                         scene->get_default_surface();
 
-    if (!shader->has_displacement || shader->get_displacement_method() == DISPLACE_BUMP) {
+    if (!shader->get_has_displacement() || shader->get_displacement_method() == DISPLACE_BUMP) {
       continue;
     }
 
@@ -161,9 +161,9 @@ bool GeometryManager::displace(
     int shader_index = mesh->shader[i];
     Shader *shader = (shader_index < mesh->used_shaders.size()) ?
                          static_cast<Shader *>(mesh->used_shaders[shader_index]) :
-                         scene->default_surface;
+                         scene->get_default_surface();
 
-    if (!shader->has_displacement || shader->get_displacement_method() == DISPLACE_BUMP) {
+    if (!shader->get_has_displacement() || shader->get_displacement_method() == DISPLACE_BUMP) {
       continue;
     }
 
@@ -229,7 +229,7 @@ bool GeometryManager::displace(
 
   foreach (Node *node, mesh->get_used_shaders()) {
     Shader *shader = static_cast<Shader *>(node);
-    if (shader->has_displacement && shader->get_displacement_method() == DISPLACE_TRUE) {
+    if (shader->get_has_displacement() && shader->get_displacement_method() == DISPLACE_TRUE) {
       need_recompute_vertex_normals = true;
       break;
     }
@@ -243,9 +243,9 @@ bool GeometryManager::displace(
       int shader_index = mesh->shader[i];
       Shader *shader = (shader_index < mesh->used_shaders.size()) ?
                            static_cast<Shader *>(mesh->used_shaders[shader_index]) :
-                           scene->default_surface;
+                           scene->get_default_surface();
 
-      tri_has_true_disp[i] = shader->has_displacement &&
+      tri_has_true_disp[i] = shader->get_has_displacement() &&
                              shader->get_displacement_method() == DISPLACE_TRUE;
     }
 

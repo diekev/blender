@@ -17,6 +17,7 @@
 #pragma once
 
 #include "graph/node_enum.h"
+#include "util/util_api.h"
 #include "util/util_array.h"
 #include "util/util_map.h"
 #include "util/util_param.h"
@@ -82,16 +83,18 @@ struct SocketType {
     DEFAULT_LINK_MASK = (1 << 4) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8) | (1 << 9) | (1 << 10)
   };
 
-  ustring name;
-  Type type;
-  int struct_offset;
-  const void *default_value;
-  const NodeEnum *enum_values;
-  const NodeType **node_type;
-  int flags;
-  ustring ui_name;
-  SocketModifiedFlags modified_flag_bit;
+ private:
+  GET_SET(ustring, name)
+  GET_SET(Type, type)
+  GET_SET(int, struct_offset)
+  GET_SET(const void *, default_value)
+  GET_SET(const NodeEnum *, enum_values)
+  GET_SET(const NodeType **, node_type)
+  GET_SET(int, flags)
+  GET_SET(ustring, ui_name)
+  GET_SET(SocketModifiedFlags, modified_flag_bit)
 
+ public:
   size_t size() const;
   bool is_array() const;
   static size_t size(Type type);
@@ -125,13 +128,18 @@ struct NodeType {
 
   typedef Node *(*CreateFunc)(const NodeType *type);
 
-  ustring name;
-  Type type;
-  const NodeType *base;
-  vector<SocketType, std::allocator<SocketType>> inputs;
-  vector<SocketType, std::allocator<SocketType>> outputs;
-  CreateFunc create;
+ private:
+  GET_READ_ONLY(ustring, name)
+  GET_READ_ONLY(Type, type)
+  GET_READ_ONLY(const NodeType *, base)
 
+  using SocketTypeVector = vector<SocketType, std::allocator<SocketType>>;
+
+  GET_READ_ONLY(SocketTypeVector, inputs)
+  GET_READ_ONLY(SocketTypeVector, outputs)
+  GET_READ_ONLY(CreateFunc, create)
+
+ public:
   static NodeType *add(const char *name,
                        CreateFunc create,
                        Type type = NONE,

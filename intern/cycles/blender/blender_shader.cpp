@@ -207,8 +207,8 @@ static void set_default_value(ShaderInput *input,
                               BL::BlendData &b_data,
                               BL::ID &b_id)
 {
-  Node *node = input->parent;
-  const SocketType &socket = input->socket_type;
+  Node *node = input->get_parent();
+  const SocketType &socket = input->get_socket_type();
 
   /* copy values for non linked inputs */
   switch (input->type()) {
@@ -680,11 +680,11 @@ static ShaderNode *add_node(Scene *scene,
   }
   else if (b_node.is_a(&RNA_ShaderNodeScript)) {
 #ifdef WITH_OSL
-    if (scene->shader_manager->use_osl()) {
+    if (scene->get_shader_manager()->use_osl()) {
       /* create script node */
       BL::ShaderNodeScript b_script_node(b_node);
 
-      ShaderManager *manager = scene->shader_manager;
+      ShaderManager *manager = scene->get_shader_manager();
       string bytecode_hash = b_script_node.bytecode_hash();
 
       if (!bytecode_hash.empty()) {
@@ -745,7 +745,7 @@ static ShaderNode *add_node(Scene *scene,
          */
         int scene_frame = b_scene.frame_current();
         int image_frame = image_user_frame_number(b_image_user, b_image, scene_frame);
-        image->handle = scene->image_manager->add_image(
+        image->handle = scene->get_image_manager()->add_image(
             new BlenderImageLoader(b_image, image_frame), image->image_params());
       }
       else {
@@ -781,8 +781,8 @@ static ShaderNode *add_node(Scene *scene,
       if (is_builtin) {
         int scene_frame = b_scene.frame_current();
         int image_frame = image_user_frame_number(b_image_user, b_image, scene_frame);
-        env->handle = scene->image_manager->add_image(new BlenderImageLoader(b_image, image_frame),
-                                                      env->image_params());
+        env->handle = scene->get_image_manager()->add_image(
+            new BlenderImageLoader(b_image, image_frame), env->image_params());
       }
       else {
         env->set_filename(
@@ -943,9 +943,9 @@ static ShaderNode *add_node(Scene *scene,
     PointDensityTextureNode *point_density = graph->create_node<PointDensityTextureNode>();
     point_density->set_space((NodeTexVoxelSpace)b_point_density_node.space());
     point_density->set_interpolation(get_image_interpolation(b_point_density_node));
-    point_density->handle = scene->image_manager->add_image(
+    point_density->set_handle(scene->get_image_manager()->add_image(
         new BlenderPointDensityLoader(b_depsgraph, b_point_density_node),
-        point_density->image_params());
+        point_density->image_params()));
 
     b_point_density_node.cache_point_density(b_depsgraph);
     node = point_density;
@@ -990,7 +990,7 @@ static ShaderNode *add_node(Scene *scene,
   }
 
   if (node) {
-    node->name = b_node.name();
+    node->set_name(ustring(b_node.name()));
     graph->add(node);
   }
 
@@ -999,7 +999,7 @@ static ShaderNode *add_node(Scene *scene,
 
 static bool node_use_modified_socket_name(ShaderNode *node)
 {
-  if (node->special_type == SHADER_SPECIAL_TYPE_OSL)
+  if (node->get_special_type() == SHADER_SPECIAL_TYPE_OSL)
     return false;
 
   return true;
@@ -1108,8 +1108,8 @@ static void add_nodes(Scene *scene,
 
         ConvertNode *proxy = graph->create_node<ConvertNode>(to_socket_type, to_socket_type, true);
 
-        input_map[b_link->from_socket().ptr.data] = proxy->inputs[0];
-        output_map[b_link->to_socket().ptr.data] = proxy->outputs[0];
+        input_map[b_link->from_socket().ptr.data] = proxy->get_inputs()[0];
+        output_map[b_link->to_socket().ptr.data] = proxy->get_outputs()[0];
 
         graph->add(proxy);
       }
@@ -1143,9 +1143,9 @@ static void add_nodes(Scene *scene,
         /* register the proxy node for internal binding */
         group_proxy_input_map[b_input->identifier()] = proxy;
 
-        input_map[b_input->ptr.data] = proxy->inputs[0];
+        input_map[b_input->ptr.data] = proxy->get_inputs()[0];
 
-        set_default_value(proxy->inputs[0], *b_input, b_data, b_ntree);
+        set_default_value(proxy->get_inputs()[0], *b_input, b_data, b_ntree);
       }
       for (b_node->outputs.begin(b_output); b_output != b_node->outputs.end(); ++b_output) {
         SocketType::Type output_type = convert_socket_type(*b_output);
@@ -1159,7 +1159,7 @@ static void add_nodes(Scene *scene,
         /* register the proxy node for internal binding */
         group_proxy_output_map[b_output->identifier()] = proxy;
 
-        output_map[b_output->ptr.data] = proxy->outputs[0];
+        output_map[b_output->ptr.data] = proxy->get_outputs()[0];
       }
 
       if (b_group_ntree) {
@@ -1181,7 +1181,7 @@ static void add_nodes(Scene *scene,
         if (proxy_it != proxy_input_map.end()) {
           ConvertNode *proxy = proxy_it->second;
 
-          output_map[b_output->ptr.data] = proxy->outputs[0];
+          output_map[b_output->ptr.data] = proxy->get_outputs()[0];
         }
       }
     }
@@ -1195,9 +1195,9 @@ static void add_nodes(Scene *scene,
           if (proxy_it != proxy_output_map.end()) {
             ConvertNode *proxy = proxy_it->second;
 
-            input_map[b_input->ptr.data] = proxy->inputs[0];
+            input_map[b_input->ptr.data] = proxy->get_inputs()[0];
 
-            set_default_value(proxy->inputs[0], *b_input, b_data, b_ntree);
+            set_default_value(proxy->get_inputs()[0], *b_input, b_data, b_ntree);
           }
         }
       }
@@ -1293,7 +1293,7 @@ static void add_nodes(Scene *scene,
 
 void BlenderSync::sync_materials(BL::Depsgraph &b_depsgraph, bool update_all)
 {
-  shader_map.set_default(scene->default_surface);
+  shader_map.set_default(scene->get_default_surface());
 
   TaskPool pool;
   set<Shader *> updated_shaders;
@@ -1311,7 +1311,7 @@ void BlenderSync::sync_materials(BL::Depsgraph &b_depsgraph, bool update_all)
     if (shader_map.add_or_update(&shader, b_mat) || update_all) {
       ShaderGraph *graph = new ShaderGraph();
 
-      shader->name = b_mat.name().c_str();
+      shader->set_name(ustring(b_mat.name().c_str()));
       shader->set_pass_id(b_mat.pass_index());
 
       /* create nodes */
@@ -1377,7 +1377,7 @@ void BlenderSync::sync_materials(BL::Depsgraph &b_depsgraph, bool update_all)
 
 void BlenderSync::sync_world(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d, bool update_all)
 {
-  Background *background = scene->background;
+  Background *background = scene->get_background();
 
   BL::World b_world = b_scene.world();
 
@@ -1385,7 +1385,7 @@ void BlenderSync::sync_world(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d,
 
   if (world_recalc || update_all || b_world.ptr.data != world_map ||
       viewport_parameters.modified(new_viewport_parameters)) {
-    Shader *shader = scene->default_background;
+    Shader *shader = scene->get_default_background();
     ShaderGraph *graph = new ShaderGraph();
 
     /* create nodes */
@@ -1525,7 +1525,7 @@ void BlenderSync::sync_world(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3d,
 
 void BlenderSync::sync_lights(BL::Depsgraph &b_depsgraph, bool update_all)
 {
-  shader_map.set_default(scene->default_light);
+  shader_map.set_default(scene->get_default_light());
 
   BL::Depsgraph::ids_iterator b_id;
   for (b_depsgraph.ids.begin(b_id); b_id != b_depsgraph.ids.end(); ++b_id) {
@@ -1542,7 +1542,7 @@ void BlenderSync::sync_lights(BL::Depsgraph &b_depsgraph, bool update_all)
 
       /* create nodes */
       if (b_light.use_nodes() && b_light.node_tree()) {
-        shader->name = b_light.name().c_str();
+        shader->set_name(ustring(b_light.name().c_str()));
 
         BL::ShaderNodeTree b_ntree(b_light.node_tree());
 
@@ -1570,7 +1570,7 @@ void BlenderSync::sync_shaders(BL::Depsgraph &b_depsgraph, BL::SpaceView3D &b_v3
   bool auto_refresh_update = false;
 
   if (preview) {
-    ImageManager *image_manager = scene->image_manager;
+    ImageManager *image_manager = scene->get_image_manager();
     int frame = b_scene.frame_current();
     auto_refresh_update = image_manager->set_animation_frame_update(frame);
   }

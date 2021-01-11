@@ -23,14 +23,18 @@
 
 #include "kernel/kernel_types.h"
 
+#include "util/util_api.h"
 #include "util/util_half.h"
 #include "util/util_string.h"
 #include "util/util_thread.h"
 #include "util/util_types.h"
 
+struct TileInfo;
+
 CCL_NAMESPACE_BEGIN
 
 class Device;
+class DeviceTask;
 struct DeviceDrawParams;
 struct float4;
 
@@ -38,27 +42,27 @@ struct float4;
  * Size of render buffer and how it fits in the full image (border render). */
 
 class BufferParams {
- public:
   /* width/height of the physical buffer */
-  int width;
-  int height;
+  GET_SET(int, width)
+  GET_SET(int, height)
 
   /* offset into and width/height of the full buffer */
-  int full_x;
-  int full_y;
-  int full_width;
-  int full_height;
+  GET_SET(int, full_x)
+  GET_SET(int, full_y)
+  GET_SET(int, full_width)
+  GET_SET(int, full_height)
 
   /* passes */
-  vector<Pass> passes;
-  bool denoising_data_pass;
+  GET_SET(vector<Pass>, passes)
+  GET_SET(bool, denoising_data_pass)
   /* If only some light path types should be target, an additional pass is needed. */
-  bool denoising_clean_pass;
+  GET_SET(bool, denoising_clean_pass)
   /* When we're prefiltering the passes during rendering, we need to keep both the
    * original and the prefiltered data around because neighboring tiles might still
    * need the original data. */
-  bool denoising_prefiltered_pass;
+  GET_SET(bool, denoising_prefiltered_pass)
 
+ public:
   /* functions */
   BufferParams();
 
@@ -72,15 +76,14 @@ class BufferParams {
 /* Render Buffers */
 
 class RenderBuffers {
- public:
   /* buffer parameters */
-  BufferParams params;
+  GET_SET(BufferParams, params)
 
   /* float buffer */
-  device_vector<float> buffer;
-  bool map_neighbor_copied;
-  double render_time;
-
+  GET(device_vector<float>, buffer)
+  GET_SET(bool, map_neighbor_copied)
+  GET_SET(double, render_time)
+ public:
   explicit RenderBuffers(Device *device);
   ~RenderBuffers();
 
@@ -101,21 +104,22 @@ class RenderBuffers {
  * buffers to byte of half float storage */
 
 class DisplayBuffer {
- public:
   /* buffer parameters */
-  BufferParams params;
+  GET_SET(BufferParams, params)
   /* dimensions for how much of the buffer is actually ready for display.
    * with progressive render we can be using only a subset of the buffer.
    * if these are zero, it means nothing can be drawn yet */
-  int draw_width, draw_height;
+  GET_SET(int, draw_width)
+  GET_SET(int, draw_height)
   /* draw alpha channel? */
-  bool transparent;
+  GET_SET(bool, transparent)
   /* use half float? */
-  bool half_float;
+  GET_SET(bool, half_float)
   /* byte buffer for converted result */
-  device_pixels<uchar4> rgba_byte;
-  device_pixels<half4> rgba_half;
+  GET(device_pixels<uchar4>, rgba_byte)
+  GET(device_pixels<half4>, rgba_half)
 
+ public:
   DisplayBuffer(Device *device, bool linear = false);
   ~DisplayBuffer();
 
@@ -132,25 +136,29 @@ class DisplayBuffer {
 class RenderTile {
  public:
   typedef enum { PATH_TRACE = (1 << 0), BAKE = (1 << 1), DENOISE = (1 << 2) } Task;
-
-  Task task;
-  int x, y, w, h;
-  int start_sample;
-  int num_samples;
-  int sample;
-  int resolution;
-  int offset;
-  int stride;
-  int tile_index;
-
-  device_ptr buffer;
-  int device_size;
-
   typedef enum { NO_STEALING = 0, CAN_BE_STOLEN = 1, WAS_STOLEN = 2 } StealingState;
-  StealingState stealing_state;
 
-  RenderBuffers *buffers;
+  GET_SET(Task, task)
+  GET_SET(int, x)
+  GET_SET(int, y)
+  GET_SET(int, w)
+  GET_SET(int, h)
+  GET_SET(int, start_sample)
+  GET_SET(int, num_samples)
+  GET_SET(int, sample)
+  GET_SET(int, resolution)
+  GET_SET(int, offset)
+  GET_SET(int, stride)
+  GET_SET(int, tile_index)
 
+  GET_SET(device_ptr, buffer)
+  GET_SET(int, device_size)
+
+  GET_SET(StealingState, stealing_state)
+
+  GET_SET(RenderBuffers *, buffers)
+
+ public:
   RenderTile();
 
   int4 bounds() const
@@ -160,6 +168,13 @@ class RenderTile {
                      x + w,  /* xmax */
                      y + h); /* ymax */
   }
+
+  /* Create a WorkTile from this RenderTile. */
+  WorkTile work_tile() const;
+
+  /* Create a RenderTile from a DeviceTask, the set_sample parameter controls
+   * whether to inherit the current sample from the task. */
+  static RenderTile from_device_task(const DeviceTask &task, bool set_sample);
 };
 
 /* Render Tile Neighbors
@@ -173,9 +188,12 @@ class RenderTileNeighbors {
   static const int SIZE = 9;
   static const int CENTER = 4;
 
-  RenderTile tiles[SIZE];
-  RenderTile target;
+  /* cannot use a template in a macro */
+  using RenderTileArray = std::array<RenderTile, SIZE>;
+  GET(RenderTileArray, tiles)
+  GET_SET(RenderTile, target)
 
+ public:
   RenderTileNeighbors(const RenderTile &center)
   {
     tiles[CENTER] = center;
@@ -183,19 +201,21 @@ class RenderTileNeighbors {
 
   int4 bounds() const
   {
-    return make_int4(tiles[3].x,               /* xmin */
-                     tiles[1].y,               /* ymin */
-                     tiles[5].x + tiles[5].w,  /* xmax */
-                     tiles[7].y + tiles[7].h); /* ymax */
+    return make_int4(tiles[3].get_x(),                     /* xmin */
+                     tiles[1].get_y(),                     /* ymin */
+                     tiles[5].get_x() + tiles[5].get_w(),  /* xmax */
+                     tiles[7].get_y() + tiles[7].get_h()); /* ymax */
   }
 
   void set_bounds_from_center()
   {
-    tiles[3].x = tiles[CENTER].x;
-    tiles[1].y = tiles[CENTER].y;
-    tiles[5].x = tiles[CENTER].x + tiles[CENTER].w;
-    tiles[7].y = tiles[CENTER].y + tiles[CENTER].h;
+    tiles[3].set_x(tiles[CENTER].get_x());
+    tiles[1].set_y(tiles[CENTER].get_y());
+    tiles[5].set_x(tiles[CENTER].get_x() + tiles[CENTER].get_w());
+    tiles[7].set_y(tiles[CENTER].get_y() + tiles[CENTER].get_h());
   }
+
+  void fill_tile_info(TileInfo *tile_info);
 };
 
 CCL_NAMESPACE_END

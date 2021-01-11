@@ -21,6 +21,7 @@
 
 #include "kernel/kernel_types.h"
 
+#include "util/util_api.h"
 #include "util/util_list.h"
 #include "util/util_param.h"
 #include "util/util_set.h"
@@ -45,15 +46,17 @@ struct Transform;
  * Supported types: Float, Color, Vector, Normal, Point */
 
 class Attribute {
+  GET_READ_ONLY(ustring, name)
+
+  GET_SET(AttributeStandard, std)
+
+  GET_READ_ONLY(TypeDesc, type)
+  GET(vector<char>, buffer)
+
+  GET_READ_ONLY(AttributeElement, element)
+  GET_SET(uint, flags) /* enum AttributeFlag */
+
  public:
-  ustring name;
-  AttributeStandard std;
-
-  TypeDesc type;
-  vector<char> buffer;
-  AttributeElement element;
-  uint flags; /* enum AttributeFlag */
-
   Attribute(ustring name,
             TypeDesc type,
             AttributeElement element,
@@ -171,11 +174,12 @@ class Attribute {
  * Set of attributes on a mesh. */
 
 class AttributeSet {
- public:
   Geometry *geometry;
-  AttributePrimitive prim;
-  list<Attribute> attributes;
 
+  GET(AttributePrimitive, prim)
+  GET(list<Attribute>, attributes)
+
+ public:
   AttributeSet(Geometry *geometry, AttributePrimitive prim);
   AttributeSet(AttributeSet &&) = default;
   ~AttributeSet();
@@ -188,7 +192,7 @@ class AttributeSet {
   Attribute *find(AttributeStandard std) const;
   void remove(AttributeStandard std);
 
-  Attribute *find(AttributeRequest &req);
+  Attribute *find(const AttributeRequest &req);
 
   void remove(Attribute *attribute);
 
@@ -203,14 +207,16 @@ class AttributeSet {
  * The attribute is found either by name or by standard attribute type. */
 
 class AttributeRequest {
- public:
-  ustring name;
-  AttributeStandard std;
+  GET_READ_ONLY(ustring, name)
+  GET_READ_ONLY(AttributeStandard, std)
 
   /* temporary variables used by GeometryManager */
-  TypeDesc type, subd_type;
-  AttributeDescriptor desc, subd_desc;
+  GET_SET(TypeDesc, type)
+  GET_SET(TypeDesc, subd_type)
+  GET_SET(AttributeDescriptor, desc)
+  GET_SET(AttributeDescriptor, subd_desc)
 
+ public:
   explicit AttributeRequest(ustring name_);
   explicit AttributeRequest(AttributeStandard std);
 };
@@ -220,9 +226,9 @@ class AttributeRequest {
  * Set of attributes requested by a shader. */
 
 class AttributeRequestSet {
- public:
-  vector<AttributeRequest> requests;
+  GET(vector<AttributeRequest>, requests)
 
+ public:
   AttributeRequestSet();
   ~AttributeRequestSet();
 

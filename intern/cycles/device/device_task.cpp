@@ -123,7 +123,7 @@ void DeviceTask::update_progress(RenderTile *rtile, int pixel_samples)
     if (pixel_samples == -1) {
       pixel_samples = shader_w;
     }
-    update_progress_sample(pixel_samples, rtile ? rtile->sample : 0);
+    update_progress_sample(pixel_samples, rtile ? rtile->get_sample() : 0);
   }
 
   if (update_tile_sample) {

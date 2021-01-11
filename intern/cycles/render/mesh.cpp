@@ -664,7 +664,7 @@ void Mesh::add_undisplaced()
 
   /* get attribute */
   Attribute *attr = attrs.add(ATTR_STD_POSITION_UNDISPLACED);
-  attr->flags |= ATTR_SUBDIVIDED;
+  attr->get_flags() |= ATTR_SUBDIVIDED;
 
   float3 *data = attr->data_float3();
 
@@ -697,8 +697,8 @@ void Mesh::pack_shaders(Scene *scene, uint *tri_shader)
       last_smooth = smooth[i];
       Shader *shader = (last_shader < used_shaders.size()) ?
                            static_cast<Shader *>(used_shaders[last_shader]) :
-                           scene->default_surface;
-      shader_id = scene->shader_manager->get_shader_id(shader, last_smooth);
+                           scene->get_default_surface();
+      shader_id = scene->get_shader_manager()->get_shader_id(shader, last_smooth);
     }
 
     tri_shader[i] = shader_id;

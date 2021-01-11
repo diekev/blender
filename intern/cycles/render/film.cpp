@@ -35,9 +35,9 @@ CCL_NAMESPACE_BEGIN
 
 static bool compare_pass_order(const Pass &a, const Pass &b)
 {
-  if (a.components == b.components)
-    return (a.type < b.type);
-  return (a.components > b.components);
+  if (a.get_components() == b.get_components())
+    return (a.get_pass_type() < b.get_pass_type());
+  return (a.get_components() > b.get_components());
 }
 
 static NodeEnum *get_pass_type_enum()
@@ -90,8 +90,7 @@ NODE_DEFINE(Pass)
   NodeType *type = NodeType::add("pass", create);
 
   NodeEnum *pass_type_enum = get_pass_type_enum();
-  SOCKET_ENUM(type, "Type", *pass_type_enum, PASS_COMBINED);
-  SOCKET_STRING(name, "Name", ustring());
+  SOCKET_ENUM(pass_type, "Type", *pass_type_enum, PASS_COMBINED);
 
   return type;
 }
@@ -103,7 +102,7 @@ Pass::Pass() : Node(node_type)
 void Pass::add(PassType type, vector<Pass> &passes, const char *name)
 {
   for (size_t i = 0; i < passes.size(); i++) {
-    if (passes[i].type != type) {
+    if (passes[i].get_pass_type() != type) {
       continue;
     }
 
@@ -137,7 +136,7 @@ void Pass::add(PassType type, vector<Pass> &passes, const char *name)
 
   Pass pass;
 
-  pass.type = type;
+  pass.pass_type = type;
   pass.filter = true;
   pass.exposure = false;
   pass.divide_type = PASS_NONE;
@@ -295,7 +294,7 @@ bool Pass::equals(const vector<Pass> &A, const vector<Pass> &B)
 bool Pass::contains(const vector<Pass> &passes, PassType type)
 {
   for (size_t i = 0; i < passes.size(); i++)
-    if (passes[i].type == type)
+    if (passes[i].get_pass_type() == type)
       return true;
 
   return false;
@@ -421,7 +420,7 @@ Film::~Film()
 
 void Film::add_default(Scene *scene)
 {
-  Pass::add(PASS_COMBINED, scene->passes);
+  Pass::add(PASS_COMBINED, scene->get_passes());
 }
 
 void Film::device_update(Device *device, DeviceScene *dscene, Scene *scene)
@@ -430,8 +429,8 @@ void Film::device_update(Device *device, DeviceScene *dscene, Scene *scene)
     return;
 
   scoped_callback_timer timer([scene](double time) {
-    if (scene->update_stats) {
-      scene->update_stats->film.times.add_entry({"update", time});
+    if (scene->get_update_stats()) {
+      scene->get_update_stats()->film.times.add_entry({"update", time});
     }
   });
 
@@ -457,34 +456,34 @@ void Film::device_update(Device *device, DeviceScene *dscene, Scene *scene)
 
   bool have_cryptomatte = false;
 
-  for (size_t i = 0; i < scene->passes.size(); i++) {
-    Pass &pass = scene->passes[i];
+  for (size_t i = 0; i < scene->get_passes().size(); i++) {
+    Pass &pass = scene->get_passes()[i];
 
-    if (pass.type == PASS_NONE) {
+    if (pass.get_pass_type() == PASS_NONE) {
       continue;
     }
 
     /* Can't do motion pass if no motion vectors are available. */
-    if (pass.type == PASS_MOTION || pass.type == PASS_MOTION_WEIGHT) {
+    if (pass.get_pass_type() == PASS_MOTION || pass.get_pass_type() == PASS_MOTION_WEIGHT) {
       if (scene->need_motion() != Scene::MOTION_PASS) {
-        kfilm->pass_stride += pass.components;
+        kfilm->pass_stride += pass.get_components();
         continue;
       }
     }
 
-    int pass_flag = (1 << (pass.type % 32));
-    if (pass.type <= PASS_CATEGORY_MAIN_END) {
+    int pass_flag = (1 << (pass.get_pass_type() % 32));
+    if (pass.get_pass_type() <= PASS_CATEGORY_MAIN_END) {
       kfilm->pass_flag |= pass_flag;
     }
-    else if (pass.type <= PASS_CATEGORY_LIGHT_END) {
+    else if (pass.get_pass_type() <= PASS_CATEGORY_LIGHT_END) {
       kfilm->use_light_pass = 1;
       kfilm->light_pass_flag |= pass_flag;
     }
     else {
-      assert(pass.type <= PASS_CATEGORY_BAKE_END);
+      assert(pass.get_pass_type() <= PASS_CATEGORY_BAKE_END);
     }
 
-    switch (pass.type) {
+    switch (pass.get_pass_type()) {
       case PASS_COMBINED:
         kfilm->pass_combined = kfilm->pass_stride;
         break;
@@ -615,17 +614,18 @@ void Film::device_update(Device *device, DeviceScene *dscene, Scene *scene)
         break;
     }
 
-    if (pass.type == display_pass) {
+    if (pass.get_pass_type() == display_pass) {
       kfilm->display_pass_stride = kfilm->pass_stride;
-      kfilm->display_pass_components = pass.components;
-      kfilm->use_display_exposure = pass.exposure && (kfilm->exposure != 1.0f);
+      kfilm->display_pass_components = pass.get_components();
+      kfilm->use_display_exposure = pass.get_exposure() && (kfilm->exposure != 1.0f);
     }
-    else if (pass.type == PASS_DIFFUSE_COLOR || pass.type == PASS_TRANSMISSION_COLOR ||
-             pass.type == PASS_GLOSSY_COLOR) {
+    else if (pass.get_pass_type() == PASS_DIFFUSE_COLOR ||
+             pass.get_pass_type() == PASS_TRANSMISSION_COLOR ||
+             pass.get_pass_type() == PASS_GLOSSY_COLOR) {
       kfilm->display_divide_pass_stride = kfilm->pass_stride;
     }
 
-    kfilm->pass_stride += pass.components;
+    kfilm->pass_stride += pass.get_components();
   }
 
   kfilm->pass_denoising_data = 0;
@@ -661,8 +661,8 @@ void Film::device_update(Device *device, DeviceScene *dscene, Scene *scene)
 
   /* update filter table */
   vector<float> table = filter_table(filter_type, filter_width);
-  scene->lookup_tables->remove_table(&filter_table_offset);
-  filter_table_offset = scene->lookup_tables->add_table(dscene, table);
+  scene->get_lookup_tables()->remove_table(&filter_table_offset);
+  filter_table_offset = scene->get_lookup_tables()->add_table(dscene, table);
   kfilm->filter_table_offset = (int)filter_table_offset;
 
   /* mist pass parameters */
@@ -682,45 +682,46 @@ void Film::device_update(Device *device, DeviceScene *dscene, Scene *scene)
 
 void Film::device_free(Device * /*device*/, DeviceScene * /*dscene*/, Scene *scene)
 {
-  scene->lookup_tables->remove_table(&filter_table_offset);
+  scene->get_lookup_tables()->remove_table(&filter_table_offset);
 }
 
 void Film::tag_passes_update(Scene *scene, const vector<Pass> &passes_, bool update_passes)
 {
-  if (Pass::contains(scene->passes, PASS_UV) != Pass::contains(passes_, PASS_UV)) {
-    scene->geometry_manager->tag_update(scene);
+  if (Pass::contains(scene->get_passes(), PASS_UV) != Pass::contains(passes_, PASS_UV)) {
+    scene->get_geometry_manager()->tag_update(scene);
 
-    foreach (Shader *shader, scene->shaders)
-      shader->need_update_geometry = true;
+    foreach (Shader *shader, scene->get_shaders())
+      shader->set_need_update_geometry(true);
   }
-  else if (Pass::contains(scene->passes, PASS_MOTION) != Pass::contains(passes_, PASS_MOTION)) {
-    scene->geometry_manager->tag_update(scene);
+  else if (Pass::contains(scene->get_passes(), PASS_MOTION) !=
+           Pass::contains(passes_, PASS_MOTION)) {
+    scene->get_geometry_manager()->tag_update(scene);
   }
-  else if (Pass::contains(scene->passes, PASS_AO) != Pass::contains(passes_, PASS_AO)) {
-    scene->integrator->tag_update(scene);
+  else if (Pass::contains(scene->get_passes(), PASS_AO) != Pass::contains(passes_, PASS_AO)) {
+    scene->get_integrator()->tag_update(scene);
   }
 
   if (update_passes) {
-    scene->passes = passes_;
+    scene->get_passes() = passes_;
   }
 }
 
 int Film::get_aov_offset(Scene *scene, string name, bool &is_color)
 {
   int num_color = 0, num_value = 0;
-  foreach (const Pass &pass, scene->passes) {
-    if (pass.type == PASS_AOV_COLOR) {
+  foreach (const Pass &pass, scene->get_passes()) {
+    if (pass.get_pass_type() == PASS_AOV_COLOR) {
       num_color++;
     }
-    else if (pass.type == PASS_AOV_VALUE) {
+    else if (pass.get_pass_type() == PASS_AOV_VALUE) {
       num_value++;
     }
     else {
       continue;
     }
 
-    if (pass.name == name) {
-      is_color = (pass.type == PASS_AOV_COLOR);
+    if (pass.get_name() == name) {
+      is_color = (pass.get_pass_type() == PASS_AOV_COLOR);
       return (is_color ? num_color : num_value) - 1;
     }
   }

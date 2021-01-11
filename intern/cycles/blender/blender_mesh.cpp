@@ -48,8 +48,8 @@ struct MikkUserData {
                float *tangent_sign)
       : mesh(mesh), texface(NULL), orco(NULL), tangent(tangent), tangent_sign(tangent_sign)
   {
-    const AttributeSet &attributes = (mesh->get_num_subd_faces()) ? mesh->subd_attributes :
-                                                                    mesh->attributes;
+    const AttributeSet &attributes = (mesh->get_num_subd_faces()) ? mesh->get_subd_attributes() :
+                                                                    mesh->get_attributes();
 
     Attribute *attr_vN = attributes.find(ATTR_STD_VERTEX_NORMAL);
     vertex_normal = attr_vN->data_float3();
@@ -222,8 +222,8 @@ static void mikk_compute_tangents(
     const BL::Mesh &b_mesh, const char *layer_name, Mesh *mesh, bool need_sign, bool active_render)
 {
   /* Create tangent attributes. */
-  AttributeSet &attributes = (mesh->get_num_subd_faces()) ? mesh->subd_attributes :
-                                                            mesh->attributes;
+  AttributeSet &attributes = (mesh->get_num_subd_faces()) ? mesh->get_subd_attributes() :
+                                                            mesh->get_attributes();
   Attribute *attr;
   ustring name;
   if (layer_name != NULL) {
@@ -299,9 +299,10 @@ static void attr_create_sculpt_vertex_color(Scene *scene,
       continue;
     }
 
-    AttributeSet &attributes = (subdivision) ? mesh->subd_attributes : mesh->attributes;
+    AttributeSet &attributes = (subdivision) ? mesh->get_subd_attributes() :
+                                               mesh->get_attributes();
     Attribute *vcol_attr = attributes.add(vcol_name, TypeRGBA, ATTR_ELEMENT_VERTEX);
-    vcol_attr->std = vcol_std;
+    vcol_attr->set_std(vcol_std);
 
     float4 *cdata = vcol_attr->data_float4();
     int numverts = b_mesh.vertices.length();
@@ -333,10 +334,10 @@ static void attr_create_vertex_color(Scene *scene, Mesh *mesh, BL::Mesh &b_mesh,
 
     if (subdivision) {
       if (active_render) {
-        vcol_attr = mesh->subd_attributes.add(vcol_std, vcol_name);
+        vcol_attr = mesh->get_subd_attributes().add(vcol_std, vcol_name);
       }
       else {
-        vcol_attr = mesh->subd_attributes.add(vcol_name, TypeRGBA, ATTR_ELEMENT_CORNER_BYTE);
+        vcol_attr = mesh->get_subd_attributes().add(vcol_name, TypeRGBA, ATTR_ELEMENT_CORNER_BYTE);
       }
 
       BL::Mesh::polygons_iterator p;
@@ -353,10 +354,10 @@ static void attr_create_vertex_color(Scene *scene, Mesh *mesh, BL::Mesh &b_mesh,
     }
     else {
       if (active_render) {
-        vcol_attr = mesh->attributes.add(vcol_std, vcol_name);
+        vcol_attr = mesh->get_attributes().add(vcol_std, vcol_name);
       }
       else {
-        vcol_attr = mesh->attributes.add(vcol_name, TypeRGBA, ATTR_ELEMENT_CORNER_BYTE);
+        vcol_attr = mesh->get_attributes().add(vcol_name, TypeRGBA, ATTR_ELEMENT_CORNER_BYTE);
       }
 
       BL::Mesh::loop_triangles_iterator t;
@@ -406,10 +407,10 @@ static void attr_create_uv_map(Scene *scene, Mesh *mesh, BL::Mesh &b_mesh)
       Attribute *uv_attr = NULL;
       if (need_uv || need_tangent) {
         if (active_render) {
-          uv_attr = mesh->attributes.add(uv_std, uv_name);
+          uv_attr = mesh->get_attributes().add(uv_std, uv_name);
         }
         else {
-          uv_attr = mesh->attributes.add(uv_name, TypeFloat2, ATTR_ELEMENT_CORNER);
+          uv_attr = mesh->get_attributes().add(uv_name, TypeFloat2, ATTR_ELEMENT_CORNER);
         }
 
         BL::Mesh::loop_triangles_iterator t;
@@ -434,7 +435,7 @@ static void attr_create_uv_map(Scene *scene, Mesh *mesh, BL::Mesh &b_mesh)
       }
       /* Remove temporarily created UV attribute. */
       if (!need_uv && uv_attr != NULL) {
-        mesh->attributes.remove(uv_attr);
+        mesh->get_attributes().remove(uv_attr);
       }
     }
   }
@@ -442,7 +443,7 @@ static void attr_create_uv_map(Scene *scene, Mesh *mesh, BL::Mesh &b_mesh)
     bool need_sign = mesh->need_attribute(scene, ATTR_STD_UV_TANGENT_SIGN);
     mikk_compute_tangents(b_mesh, NULL, mesh, need_sign, true);
     if (!mesh->need_attribute(scene, ATTR_STD_GENERATED)) {
-      mesh->attributes.remove(ATTR_STD_GENERATED);
+      mesh->get_attributes().remove(ATTR_STD_GENERATED);
     }
   }
 }
@@ -472,12 +473,12 @@ static void attr_create_subd_uv_map(Scene *scene, Mesh *mesh, BL::Mesh &b_mesh, 
       /* UV map */
       if (need_uv || need_tangent) {
         if (active_render)
-          uv_attr = mesh->subd_attributes.add(uv_std, uv_name);
+          uv_attr = mesh->get_subd_attributes().add(uv_std, uv_name);
         else
-          uv_attr = mesh->subd_attributes.add(uv_name, TypeFloat2, ATTR_ELEMENT_CORNER);
+          uv_attr = mesh->get_subd_attributes().add(uv_name, TypeFloat2, ATTR_ELEMENT_CORNER);
 
         if (subdivide_uvs) {
-          uv_attr->flags |= ATTR_SUBDIVIDED;
+          uv_attr->get_flags() |= ATTR_SUBDIVIDED;
         }
 
         BL::Mesh::polygons_iterator p;
@@ -501,7 +502,7 @@ static void attr_create_subd_uv_map(Scene *scene, Mesh *mesh, BL::Mesh &b_mesh, 
       }
       /* Remove temporarily created UV attribute. */
       if (!need_uv && uv_attr != NULL) {
-        mesh->subd_attributes.remove(uv_attr);
+        mesh->get_subd_attributes().remove(uv_attr);
       }
     }
   }
@@ -509,7 +510,7 @@ static void attr_create_subd_uv_map(Scene *scene, Mesh *mesh, BL::Mesh &b_mesh, 
     bool need_sign = mesh->need_attribute(scene, ATTR_STD_UV_TANGENT_SIGN);
     mikk_compute_tangents(b_mesh, NULL, mesh, need_sign, true);
     if (!mesh->need_attribute(scene, ATTR_STD_GENERATED)) {
-      mesh->subd_attributes.remove(ATTR_STD_GENERATED);
+      mesh->get_subd_attributes().remove(ATTR_STD_GENERATED);
     }
   }
 }
@@ -651,7 +652,7 @@ static void attr_create_pointiness(Scene *scene, Mesh *mesh, BL::Mesh &b_mesh, b
     }
   }
   /* STEP 3: Blur vertices to approximate 2 ring neighborhood. */
-  AttributeSet &attributes = (subdivision) ? mesh->subd_attributes : mesh->attributes;
+  AttributeSet &attributes = (subdivision) ? mesh->get_subd_attributes() : mesh->get_attributes();
   Attribute *attr = attributes.add(ATTR_STD_POINTINESS);
   float *data = attr->data_float();
   memcpy(data, &raw_data[0], sizeof(float) * raw_data.size());
@@ -711,7 +712,7 @@ static void attr_create_random_per_island(Scene *scene,
     vertices_sets.join(e->vertices()[0], e->vertices()[1]);
   }
 
-  AttributeSet &attributes = (subdivision) ? mesh->subd_attributes : mesh->attributes;
+  AttributeSet &attributes = (subdivision) ? mesh->get_subd_attributes() : mesh->get_attributes();
   Attribute *attribute = attributes.add(ATTR_STD_RANDOM_PER_ISLAND);
   float *data = attribute->data_float();
 
@@ -775,7 +776,7 @@ static void create_mesh(Scene *scene,
   for (b_mesh.vertices.begin(v); v != b_mesh.vertices.end(); ++v)
     mesh->add_vertex(get_float3(v->co()));
 
-  AttributeSet &attributes = (subdivision) ? mesh->subd_attributes : mesh->attributes;
+  AttributeSet &attributes = (subdivision) ? mesh->get_subd_attributes() : mesh->get_attributes();
   Attribute *attr_N = attributes.add(ATTR_STD_VERTEX_NORMAL);
   float3 *N = attr_N->data_float3();
 
@@ -788,7 +789,7 @@ static void create_mesh(Scene *scene,
                                     (mesh->need_attribute(scene, ATTR_STD_UV_TANGENT));
   if (mesh->need_attribute(scene, ATTR_STD_GENERATED) || need_default_tangent) {
     Attribute *attr = attributes.add(ATTR_STD_GENERATED);
-    attr->flags |= ATTR_SUBDIVIDED;
+    attr->get_flags() |= ATTR_SUBDIVIDED;
 
     float3 loc, size;
     mesh_texture_space(b_mesh, loc, size);
@@ -866,7 +867,7 @@ static void create_mesh(Scene *scene,
    * mesh texture space. this does not work with deformations but that can
    * probably only be done well with a volume grid mapping of coordinates. */
   if (mesh->need_attribute(scene, ATTR_STD_GENERATED_TRANSFORM)) {
-    Attribute *attr = mesh->attributes.add(ATTR_STD_GENERATED_TRANSFORM);
+    Attribute *attr = mesh->get_attributes().add(ATTR_STD_GENERATED_TRANSFORM);
     Transform *tfm = attr->data_transform();
 
     float3 loc, size;
@@ -958,10 +959,10 @@ static void sync_mesh_cached_velocities(BL::Object &b_ob, Scene *scene, Mesh *me
 
   /* Find or add attribute */
   float3 *P = &mesh->get_verts()[0];
-  Attribute *attr_mP = mesh->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
+  Attribute *attr_mP = mesh->get_attributes().find(ATTR_STD_MOTION_VERTEX_POSITION);
 
   if (!attr_mP) {
-    attr_mP = mesh->attributes.add(ATTR_STD_MOTION_VERTEX_POSITION);
+    attr_mP = mesh->get_attributes().add(ATTR_STD_MOTION_VERTEX_POSITION);
   }
 
   /* Only export previous and next frame, we don't have any in between data. */
@@ -996,10 +997,10 @@ static void sync_mesh_fluid_motion(BL::Object &b_ob, Scene *scene, Mesh *mesh)
 
   /* Find or add attribute */
   float3 *P = &mesh->get_verts()[0];
-  Attribute *attr_mP = mesh->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
+  Attribute *attr_mP = mesh->get_attributes().find(ATTR_STD_MOTION_VERTEX_POSITION);
 
   if (!attr_mP) {
-    attr_mP = mesh->attributes.add(ATTR_STD_MOTION_VERTEX_POSITION);
+    attr_mP = mesh->get_attributes().add(ATTR_STD_MOTION_VERTEX_POSITION);
   }
 
   /* Only export previous and next frame, we don't have any in between data. */
@@ -1030,7 +1031,7 @@ void BlenderSync::sync_mesh(BL::Depsgraph b_depsgraph, BL::Object b_ob, Mesh *me
   if (view_layer.use_surfaces) {
     /* Adaptive subdivision setup. Not for baking since that requires
      * exact mapping to the Blender mesh. */
-    if (!scene->bake_manager->get_baking()) {
+    if (!scene->get_bake_manager()->get_baking()) {
       new_mesh.set_subdivision_type(object_subdivision_type(b_ob, preview, experimental));
     }
 
@@ -1066,23 +1067,23 @@ void BlenderSync::sync_mesh(BL::Depsgraph b_depsgraph, BL::Object b_ob, Mesh *me
 
   mesh->clear_non_sockets();
 
-  for (const SocketType &socket : new_mesh.type->inputs) {
+  for (const SocketType &socket : new_mesh.get_type()->get_inputs()) {
     /* Those sockets are updated in sync_object, so do not modify them. */
-    if (socket.name == "use_motion_blur" || socket.name == "motion_steps" ||
-        socket.name == "used_shaders") {
+    if (socket.get_name() == "use_motion_blur" || socket.get_name() == "motion_steps" ||
+        socket.get_name() == "used_shaders") {
       continue;
     }
     mesh->set_value(socket, new_mesh, socket);
   }
 
-  mesh->attributes.clear();
-  foreach (Attribute &attr, new_mesh.attributes.attributes) {
-    mesh->attributes.attributes.push_back(std::move(attr));
+  mesh->get_attributes().clear();
+  foreach (Attribute &attr, new_mesh.get_attributes().get_attributes()) {
+    mesh->get_attributes().get_attributes().push_back(std::move(attr));
   }
 
-  mesh->subd_attributes.clear();
-  foreach (Attribute &attr, new_mesh.subd_attributes.attributes) {
-    mesh->subd_attributes.attributes.push_back(std::move(attr));
+  mesh->get_subd_attributes().clear();
+  foreach (Attribute &attr, new_mesh.get_subd_attributes().get_attributes()) {
+    mesh->get_subd_attributes().get_attributes().push_back(std::move(attr));
   }
 
   mesh->set_num_subd_faces(new_mesh.get_num_subd_faces());
@@ -1132,15 +1133,15 @@ void BlenderSync::sync_mesh_motion(BL::Depsgraph b_depsgraph,
   if (b_mesh) {
     /* Export deformed coordinates. */
     /* Find attributes. */
-    Attribute *attr_mP = mesh->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
-    Attribute *attr_mN = mesh->attributes.find(ATTR_STD_MOTION_VERTEX_NORMAL);
-    Attribute *attr_N = mesh->attributes.find(ATTR_STD_VERTEX_NORMAL);
+    Attribute *attr_mP = mesh->get_attributes().find(ATTR_STD_MOTION_VERTEX_POSITION);
+    Attribute *attr_mN = mesh->get_attributes().find(ATTR_STD_MOTION_VERTEX_NORMAL);
+    Attribute *attr_N = mesh->get_attributes().find(ATTR_STD_VERTEX_NORMAL);
     bool new_attribute = false;
     /* Add new attributes if they don't exist already. */
     if (!attr_mP) {
-      attr_mP = mesh->attributes.add(ATTR_STD_MOTION_VERTEX_POSITION);
+      attr_mP = mesh->get_attributes().add(ATTR_STD_MOTION_VERTEX_POSITION);
       if (attr_N)
-        attr_mN = mesh->attributes.add(ATTR_STD_MOTION_VERTEX_NORMAL);
+        attr_mN = mesh->get_attributes().add(ATTR_STD_MOTION_VERTEX_NORMAL);
 
       new_attribute = true;
     }
@@ -1168,9 +1169,9 @@ void BlenderSync::sync_mesh_motion(BL::Depsgraph b_depsgraph,
         else {
           VLOG(1) << "No actual deformation motion for object " << b_ob.name();
         }
-        mesh->attributes.remove(ATTR_STD_MOTION_VERTEX_POSITION);
+        mesh->get_attributes().remove(ATTR_STD_MOTION_VERTEX_POSITION);
         if (attr_mN)
-          mesh->attributes.remove(ATTR_STD_MOTION_VERTEX_NORMAL);
+          mesh->get_attributes().remove(ATTR_STD_MOTION_VERTEX_NORMAL);
       }
       else if (motion_step > 0) {
         VLOG(1) << "Filling deformation motion for object " << b_ob.name();

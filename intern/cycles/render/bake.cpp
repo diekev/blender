@@ -36,8 +36,8 @@ static int aa_samples(Scene *scene, Object *object, ShaderEvalType type)
     if (object->get_geometry()) {
       foreach (Node *node, object->get_geometry()->get_used_shaders()) {
         Shader *shader = static_cast<Shader *>(node);
-        if (shader->has_bump) {
-          return scene->integrator->get_aa_samples();
+        if (shader->get_has_bump()) {
+          return scene->get_integrator()->get_aa_samples();
         }
       }
     }
@@ -45,7 +45,7 @@ static int aa_samples(Scene *scene, Object *object, ShaderEvalType type)
     return 1;
   }
   else {
-    return scene->integrator->get_aa_samples();
+    return scene->get_integrator()->get_aa_samples();
   }
 }
 
@@ -99,22 +99,22 @@ void BakeManager::set(Scene *scene,
   type = type_;
   pass_filter = shader_type_to_pass_filter(type_, pass_filter_);
 
-  Pass::add(PASS_BAKE_PRIMITIVE, scene->passes);
-  Pass::add(PASS_BAKE_DIFFERENTIAL, scene->passes);
+  Pass::add(PASS_BAKE_PRIMITIVE, scene->get_passes());
+  Pass::add(PASS_BAKE_DIFFERENTIAL, scene->get_passes());
 
   if (type == SHADER_EVAL_UV) {
     /* force UV to be available */
-    Pass::add(PASS_UV, scene->passes);
+    Pass::add(PASS_UV, scene->get_passes());
   }
 
   /* force use_light_pass to be true if we bake more than just colors */
   if (pass_filter & ~BAKE_FILTER_COLOR) {
-    Pass::add(PASS_LIGHT, scene->passes);
+    Pass::add(PASS_LIGHT, scene->get_passes());
   }
 
   /* create device and update scene */
-  scene->film->tag_modified();
-  scene->integrator->tag_update(scene);
+  scene->get_film()->tag_modified();
+  scene->get_integrator()->tag_update(scene);
 
   need_update = true;
 }
@@ -128,8 +128,8 @@ void BakeManager::device_update(Device * /*device*/,
     return;
 
   scoped_callback_timer timer([scene](double time) {
-    if (scene->update_stats) {
-      scene->update_stats->bake.times.add_entry({"device_update", time});
+    if (scene->get_update_stats()) {
+      scene->get_update_stats()->bake.times.add_entry({"device_update", time});
     }
   });
 
@@ -140,11 +140,11 @@ void BakeManager::device_update(Device * /*device*/,
   kbake->pass_filter = pass_filter;
 
   int object_index = 0;
-  foreach (Object *object, scene->objects) {
+  foreach (Object *object, scene->get_objects()) {
     const Geometry *geom = object->get_geometry();
-    if (object->name == object_name && geom->geometry_type == Geometry::MESH) {
+    if (object->get_name() == object_name && geom->is_mesh()) {
       kbake->object_index = object_index;
-      kbake->tri_offset = geom->prim_offset;
+      kbake->tri_offset = geom->get_prim_offset();
       kintegrator->aa_samples = aa_samples(scene, object, type);
       break;
     }

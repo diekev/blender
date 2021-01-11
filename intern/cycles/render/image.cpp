@@ -656,7 +656,7 @@ void ImageManager::device_load_image(Device *device, Scene *scene, int slot, Pro
 
   progress->set_status("Updating Images", "Loading " + img->loader->name());
 
-  const int texture_limit = scene->params.texture_limit;
+  const int texture_limit = scene->get_params().texture_limit;
 
   load_image_metadata(img);
   ImageDataType type = img->metadata.type;
@@ -815,8 +815,8 @@ void ImageManager::device_update(Device *device, Scene *scene, Progress &progres
   }
 
   scoped_callback_timer timer([scene](double time) {
-    if (scene->update_stats) {
-      scene->update_stats->image.times.add_entry({"device_update", time});
+    if (scene->get_update_stats()) {
+      scene->get_update_stats()->image.times.add_entry({"device_update", time});
     }
   });
 

@@ -165,7 +165,7 @@ class Mesh : public Geometry {
   NODE_SOCKET_API(int, subd_max_level)
   NODE_SOCKET_API(Transform, subd_objecttoworld)
 
-  AttributeSet subd_attributes;
+  GET(AttributeSet, subd_attributes)
 
  private:
   PackedPatchTable *patch_table;

@@ -204,13 +204,13 @@ static void sync_smoke_volume(Scene *scene, BL::Object &b_ob, Volume *volume, fl
 
     volume->set_clipping(b_domain.clipping());
 
-    Attribute *attr = volume->attributes.add(std);
+    Attribute *attr = volume->get_attributes().add(std);
 
     ImageLoader *loader = new BlenderSmokeLoader(b_ob, std);
     ImageParams params;
     params.frame = frame;
 
-    attr->data_voxel() = scene->image_manager->add_image(loader, params);
+    attr->data_voxel() = scene->get_image_manager()->add_image(loader, params);
   }
 }
 
@@ -287,15 +287,16 @@ static void sync_volume_object(BL::BlendData &b_data,
 
     if ((std != ATTR_STD_NONE && volume->need_attribute(scene, std)) ||
         volume->need_attribute(scene, name)) {
-      Attribute *attr = (std != ATTR_STD_NONE) ?
-                            volume->attributes.add(std) :
-                            volume->attributes.add(name, TypeDesc::TypeFloat, ATTR_ELEMENT_VOXEL);
+      Attribute *attr = (std != ATTR_STD_NONE) ? volume->get_attributes().add(std) :
+                                                 volume->get_attributes().add(name,
+                                                                              TypeDesc::TypeFloat,
+                                                                              ATTR_ELEMENT_VOXEL);
 
       ImageLoader *loader = new BlenderVolumeLoader(b_data, b_volume, name.string());
       ImageParams params;
       params.frame = b_volume.grids.frame();
 
-      attr->data_voxel() = scene->image_manager->add_image(loader, params, false);
+      attr->data_voxel() = scene->get_image_manager()->add_image(loader, params, false);
     }
   }
 }

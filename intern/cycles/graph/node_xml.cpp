@@ -55,24 +55,24 @@ void xml_read_node(XMLReader &reader, Node *node, xml_node xml_node)
 {
   xml_attribute name_attr = xml_node.attribute("name");
   if (name_attr) {
-    node->name = ustring(name_attr.value());
+    node->set_name(ustring(name_attr.value()));
   }
 
-  foreach (const SocketType &socket, node->type->inputs) {
-    if (socket.type == SocketType::CLOSURE || socket.type == SocketType::UNDEFINED) {
+  foreach (const SocketType &socket, node->get_type()->get_inputs()) {
+    if (socket.get_type() == SocketType::CLOSURE || socket.get_type() == SocketType::UNDEFINED) {
       continue;
     }
-    if (socket.flags & SocketType::INTERNAL) {
+    if (socket.get_flags() & SocketType::INTERNAL) {
       continue;
     }
 
-    xml_attribute attr = xml_node.attribute(socket.name.c_str());
+    xml_attribute attr = xml_node.attribute(socket.get_name().c_str());
 
     if (!attr) {
       continue;
     }
 
-    switch (socket.type) {
+    switch (socket.get_type()) {
       case SocketType::BOOLEAN: {
         node->set(socket, xml_read_boolean(attr.value()));
         break;
@@ -158,14 +158,14 @@ void xml_read_node(XMLReader &reader, Node *node, xml_node xml_node)
       }
       case SocketType::ENUM: {
         ustring value(attr.value());
-        if (socket.enum_values->exists(value)) {
+        if (socket.get_enum_values()->exists(value)) {
           node->set(socket, value);
         }
         else {
           fprintf(stderr,
                   "Unknown value \"%s\" for attribute \"%s\".\n",
                   value.c_str(),
-                  socket.name.c_str());
+                  socket.get_name().c_str());
         }
         break;
       }
@@ -200,7 +200,7 @@ void xml_read_node(XMLReader &reader, Node *node, xml_node xml_node)
         map<ustring, Node *>::iterator it = reader.node_map.find(value);
         if (it != reader.node_map.end()) {
           Node *value_node = it->second;
-          if (value_node->is_a(*(socket.node_type)))
+          if (value_node->is_a(*(socket.get_node_type())))
             node->set(socket, it->second);
         }
         break;
@@ -215,7 +215,7 @@ void xml_read_node(XMLReader &reader, Node *node, xml_node xml_node)
           map<ustring, Node *>::iterator it = reader.node_map.find(ustring(tokens[i]));
           if (it != reader.node_map.end()) {
             Node *value_node = it->second;
-            value[i] = (value_node->is_a(*(socket.node_type))) ? value_node : NULL;
+            value[i] = (value_node->is_a(*(socket.get_node_type()))) ? value_node : NULL;
           }
           else {
             value[i] = NULL;
@@ -230,30 +230,30 @@ void xml_read_node(XMLReader &reader, Node *node, xml_node xml_node)
     }
   }
 
-  if (!node->name.empty())
-    reader.node_map[node->name] = node;
+  if (!node->get_name().empty())
+    reader.node_map[node->get_name()] = node;
 }
 
 xml_node xml_write_node(Node *node, xml_node xml_root)
 {
-  xml_node xml_node = xml_root.append_child(node->type->name.c_str());
+  xml_node xml_node = xml_root.append_child(node->get_type()->get_name().c_str());
 
-  xml_node.append_attribute("name") = node->name.c_str();
+  xml_node.append_attribute("name") = node->get_name().c_str();
 
-  foreach (const SocketType &socket, node->type->inputs) {
-    if (socket.type == SocketType::CLOSURE || socket.type == SocketType::UNDEFINED) {
+  foreach (const SocketType &socket, node->get_type()->get_inputs()) {
+    if (socket.get_type() == SocketType::CLOSURE || socket.get_type() == SocketType::UNDEFINED) {
       continue;
     }
-    if (socket.flags & SocketType::INTERNAL) {
+    if (socket.get_flags() & SocketType::INTERNAL) {
       continue;
     }
     if (node->has_default_value(socket)) {
       continue;
     }
 
-    xml_attribute attr = xml_node.append_attribute(socket.name.c_str());
+    xml_attribute attr = xml_node.append_attribute(socket.get_name().c_str());
 
-    switch (socket.type) {
+    switch (socket.get_type()) {
       case SocketType::BOOLEAN: {
         attr = xml_write_boolean(node->get_bool(socket));
         break;
@@ -402,7 +402,7 @@ xml_node xml_write_node(Node *node, xml_node xml_root)
       case SocketType::NODE: {
         Node *value = node->get_node(socket);
         if (value) {
-          attr = value->name.c_str();
+          attr = value->get_name().c_str();
         }
         break;
       }
@@ -411,7 +411,7 @@ xml_node xml_write_node(Node *node, xml_node xml_root)
         const array<Node *> &value = node->get_node_array(socket);
         for (size_t i = 0; i < value.size(); i++) {
           if (value[i]) {
-            ss << value[i]->name.c_str();
+            ss << value[i]->get_name().c_str();
           }
           if (i != value.size() - 1) {
             ss << " ";

@@ -42,8 +42,8 @@ void LookupTables::device_update(Device *, DeviceScene *dscene, Scene *scene)
     return;
 
   scoped_callback_timer timer([scene](double time) {
-    if (scene->update_stats) {
-      scene->update_stats->tables.times.add_entry({"device_update", time});
+    if (scene->get_update_stats()) {
+      scene->get_update_stats()->tables.times.add_entry({"device_update", time});
     }
   });
 

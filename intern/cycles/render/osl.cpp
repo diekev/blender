@@ -100,24 +100,24 @@ void OSLShaderManager::device_update(Device *device,
     return;
 
   scoped_callback_timer timer([scene](double time) {
-    if (scene->update_stats) {
-      scene->update_stats->osl.times.add_entry({"device_update", time});
+    if (scene->get_update_stats()) {
+      scene->get_update_stats()->osl.times.add_entry({"device_update", time});
     }
   });
 
-  VLOG(1) << "Total " << scene->shaders.size() << " shaders.";
+  VLOG(1) << "Total " << scene->get_shaders().size() << " shaders.";
 
   device_free(device, dscene, scene);
 
   /* set texture system */
-  scene->image_manager->set_osl_texture_system((void *)ts);
+  scene->get_image_manager()->set_osl_texture_system((void *)ts);
 
   /* create shaders */
   OSLGlobals *og = (OSLGlobals *)device->osl_memory();
-  Shader *background_shader = scene->background->get_shader(scene);
+  Shader *background_shader = scene->get_background()->get_shader(scene);
 
-  foreach (Shader *shader, scene->shaders) {
-    assert(shader->graph);
+  foreach (Shader *shader, scene->get_shaders()) {
+    assert(shader->get_graph());
 
     if (progress.get_cancel())
       return;
@@ -131,8 +131,8 @@ void OSLShaderManager::device_update(Device *device,
     compiler.background = (shader == background_shader);
     compiler.compile(og, shader);
 
-    if (shader->get_use_mis() && shader->has_surface_emission)
-      scene->light_manager->need_update = true;
+    if (shader->get_use_mis() && shader->get_has_surface_emission())
+      scene->get_light_manager()->need_update = true;
   }
 
   /* setup shader engine */
@@ -140,11 +140,11 @@ void OSLShaderManager::device_update(Device *device,
   og->ts = ts;
   og->services = services;
 
-  int background_id = scene->shader_manager->get_shader_id(background_shader);
+  int background_id = scene->get_shader_manager()->get_shader_id(background_shader);
   og->background_state = og->surface_state[background_id & SHADER_MASK];
   og->use = true;
 
-  foreach (Shader *shader, scene->shaders)
+  foreach (Shader *shader, scene->get_shaders())
     shader->clear_modified();
 
   need_update = false;
@@ -564,14 +564,14 @@ OSLNode *OSLShaderManager::osl_node(ShaderGraph *graph,
 
   /* set bytcode hash or filepath */
   if (!bytecode_hash.empty()) {
-    node->bytecode_hash = bytecode_hash;
+    node->set_bytecode_hash(bytecode_hash);
   }
   else {
-    node->filepath = filepath;
+    node->set_filepath(filepath);
   }
 
   /* Generate inputs and outputs */
-  node->create_inputs_outputs(node->type);
+  node->create_inputs_outputs(node->get_type());
 
   return node;
 }
@@ -593,7 +593,7 @@ string OSLCompiler::id(ShaderNode *node)
 {
   /* assign layer unique name based on pointer address + bump mode */
   stringstream stream;
-  stream << "node_" << node->type->name << "_" << node;
+  stream << "node_" << node->get_type()->get_name() << "_" << node;
 
   return stream.str();
 }
@@ -608,7 +608,7 @@ string OSLCompiler::compatible_name(ShaderNode *node, ShaderInput *input)
     sname.replace(i, 1, "");
 
   /* if output exists with the same name, add "In" suffix */
-  foreach (ShaderOutput *output, node->outputs) {
+  foreach (ShaderOutput *output, node->get_outputs()) {
     if (input->name() == output->name()) {
       sname += "In";
       break;
@@ -628,7 +628,7 @@ string OSLCompiler::compatible_name(ShaderNode *node, ShaderOutput *output)
     sname.replace(i, 1, "");
 
   /* if input exists with the same name, add "Out" suffix */
-  foreach (ShaderInput *input, node->inputs) {
+  foreach (ShaderInput *input, node->get_inputs()) {
     if (input->name() == output->name()) {
       sname += "Out";
       break;
@@ -646,7 +646,7 @@ bool OSLCompiler::node_skip_input(ShaderNode *node, ShaderInput *input)
   if (input->flags() & SocketType::SVM_INTERNAL)
     return true;
 
-  if (node->special_type == SHADER_SPECIAL_TYPE_OUTPUT) {
+  if (node->get_special_type() == SHADER_SPECIAL_TYPE_OUTPUT) {
     if (input->name() == "Surface" && current_type != SHADER_TYPE_SURFACE)
       return true;
     if (input->name() == "Volume" && current_type != SHADER_TYPE_VOLUME)
@@ -656,12 +656,12 @@ bool OSLCompiler::node_skip_input(ShaderNode *node, ShaderInput *input)
     if (input->name() == "Normal" && current_type != SHADER_TYPE_BUMP)
       return true;
   }
-  else if (node->special_type == SHADER_SPECIAL_TYPE_BUMP) {
+  else if (node->get_special_type() == SHADER_SPECIAL_TYPE_BUMP) {
     if (input->name() == "Height")
       return true;
   }
-  else if (current_type == SHADER_TYPE_DISPLACEMENT && input->link &&
-           input->link->parent->special_type == SHADER_SPECIAL_TYPE_BUMP)
+  else if (current_type == SHADER_TYPE_DISPLACEMENT && input->get_link() &&
+           input->get_link()->get_parent()->get_special_type() == SHADER_SPECIAL_TYPE_BUMP)
     return true;
 
   return false;
@@ -678,14 +678,14 @@ void OSLCompiler::add(ShaderNode *node, const char *name, bool isfilepath)
   }
 
   /* pass in fixed parameter values */
-  foreach (ShaderInput *input, node->inputs) {
-    if (!input->link) {
+  foreach (ShaderInput *input, node->get_inputs()) {
+    if (!input->get_link()) {
       /* checks to untangle graphs */
       if (node_skip_input(node, input))
         continue;
 
       string param_name = compatible_name(node, input);
-      const SocketType &socket = input->socket_type;
+      const SocketType &socket = input->get_socket_type();
       switch (input->type()) {
         case SocketType::COLOR:
           parameter_color(param_name.c_str(), node->get_float3(socket));
@@ -730,15 +730,15 @@ void OSLCompiler::add(ShaderNode *node, const char *name, bool isfilepath)
     assert(0);
 
   /* link inputs to other nodes */
-  foreach (ShaderInput *input, node->inputs) {
-    if (input->link) {
+  foreach (ShaderInput *input, node->get_inputs()) {
+    if (input->get_link()) {
       if (node_skip_input(node, input))
         continue;
 
       /* connect shaders */
-      string id_from = id(input->link->parent);
+      string id_from = id(input->get_link()->get_parent());
       string id_to = id(node);
-      string param_from = compatible_name(input->link->parent, input->link);
+      string param_from = compatible_name(input->get_link()->get_parent(), input->get_link());
       string param_to = compatible_name(node, input);
 
       ss->ConnectShaders(id_from.c_str(), param_from.c_str(), id_to.c_str(), param_to.c_str());
@@ -751,29 +751,29 @@ void OSLCompiler::add(ShaderNode *node, const char *name, bool isfilepath)
   if (current_type == SHADER_TYPE_SURFACE) {
     if (info) {
       if (info->has_surface_emission)
-        current_shader->has_surface_emission = true;
+        current_shader->set_has_surface_emission(true);
       if (info->has_surface_transparent)
-        current_shader->has_surface_transparent = true;
+        current_shader->set_has_surface_transparent(true);
       if (info->has_surface_bssrdf) {
-        current_shader->has_surface_bssrdf = true;
-        current_shader->has_bssrdf_bump = true; /* can't detect yet */
+        current_shader->set_has_surface_bssrdf(true);
+        current_shader->set_has_bssrdf_bump(true); /* can't detect yet */
       }
-      current_shader->has_bump = true; /* can't detect yet */
+      current_shader->set_has_bump(true); /* can't detect yet */
     }
 
     if (node->has_spatial_varying()) {
-      current_shader->has_surface_spatial_varying = true;
+      current_shader->set_has_surface_spatial_varying(true);
     }
   }
   else if (current_type == SHADER_TYPE_VOLUME) {
     if (node->has_spatial_varying())
-      current_shader->has_volume_spatial_varying = true;
+      current_shader->set_has_volume_spatial_varying(true);
     if (node->has_attribute_dependency())
-      current_shader->has_volume_attribute_dependency = true;
+      current_shader->set_has_volume_attribute_dependency(true);
   }
 
   if (node->has_integrator_dependency()) {
-    current_shader->has_integrator_dependency = true;
+    current_shader->set_has_integrator_dependency(true);
   }
 }
 
@@ -788,9 +788,9 @@ static TypeDesc array_typedesc(TypeDesc typedesc, int arraylength)
 void OSLCompiler::parameter(ShaderNode *node, const char *name)
 {
   ustring uname = ustring(name);
-  const SocketType &socket = *(node->type->find_input(uname));
+  const SocketType &socket = *(node->get_type()->find_input(uname));
 
-  switch (socket.type) {
+  switch (socket.get_type()) {
     case SocketType::BOOLEAN: {
       int value = node->get_bool(socket);
       ss->Parameter(name, TypeDesc::TypeInt, &value);
@@ -873,7 +873,7 @@ void OSLCompiler::parameter(ShaderNode *node, const char *name)
     case SocketType::NORMAL_ARRAY: {
       TypeDesc typedesc;
 
-      switch (socket.type) {
+      switch (socket.get_type()) {
         case SocketType::COLOR_ARRAY:
           typedesc = TypeDesc::TypeColor;
           break;
@@ -1017,10 +1017,10 @@ void OSLCompiler::parameter_attribute(const char *name, ustring s)
 
 void OSLCompiler::find_dependencies(ShaderNodeSet &dependencies, ShaderInput *input)
 {
-  ShaderNode *node = (input->link) ? input->link->parent : NULL;
+  ShaderNode *node = (input->get_link()) ? input->get_link()->get_parent() : NULL;
 
   if (node != NULL && dependencies.find(node) == dependencies.end()) {
-    foreach (ShaderInput *in, node->inputs)
+    foreach (ShaderInput *in, node->get_inputs())
       if (!node_skip_input(node, in))
         find_dependencies(dependencies, in);
 
@@ -1040,9 +1040,9 @@ void OSLCompiler::generate_nodes(const ShaderNodeSet &nodes)
       if (done.find(node) == done.end()) {
         bool inputs_done = true;
 
-        foreach (ShaderInput *input, node->inputs)
+        foreach (ShaderInput *input, node->get_inputs())
           if (!node_skip_input(node, input))
-            if (input->link && done.find(input->link->parent) == done.end())
+            if (input->get_link() && done.find(input->get_link()->get_parent()) == done.end())
               inputs_done = false;
 
         if (inputs_done) {
@@ -1051,23 +1051,23 @@ void OSLCompiler::generate_nodes(const ShaderNodeSet &nodes)
 
           if (current_type == SHADER_TYPE_SURFACE) {
             if (node->has_surface_emission())
-              current_shader->has_surface_emission = true;
+              current_shader->set_has_surface_emission(true);
             if (node->has_surface_transparent())
-              current_shader->has_surface_transparent = true;
+              current_shader->set_has_surface_transparent(true);
             if (node->has_spatial_varying())
-              current_shader->has_surface_spatial_varying = true;
+              current_shader->set_has_surface_spatial_varying(true);
             if (node->has_surface_bssrdf()) {
-              current_shader->has_surface_bssrdf = true;
+              current_shader->set_has_surface_bssrdf(true);
               if (node->has_bssrdf_bump())
-                current_shader->has_bssrdf_bump = true;
+                current_shader->set_has_bssrdf_bump(true);
             }
             if (node->has_bump()) {
-              current_shader->has_bump = true;
+              current_shader->set_has_bump(true);
             }
           }
           else if (current_type == SHADER_TYPE_VOLUME) {
             if (node->has_spatial_varying())
-              current_shader->has_volume_spatial_varying = true;
+              current_shader->set_has_volume_spatial_varying(true);
           }
         }
         else
@@ -1081,7 +1081,7 @@ OSL::ShaderGroupRef OSLCompiler::compile_type(Shader *shader, ShaderGraph *graph
 {
   current_type = type;
 
-  OSL::ShaderGroupRef group = ss->ShaderGroupBegin(shader->name.c_str());
+  OSL::ShaderGroupRef group = ss->ShaderGroupBegin(shader->get_name().c_str());
 
   ShaderNode *output = graph->output();
   ShaderNodeSet dependencies;
@@ -1121,71 +1121,72 @@ OSL::ShaderGroupRef OSLCompiler::compile_type(Shader *shader, ShaderGraph *graph
 void OSLCompiler::compile(OSLGlobals *og, Shader *shader)
 {
   if (shader->is_modified()) {
-    ShaderGraph *graph = shader->graph;
+    ShaderGraph *graph = shader->get_graph();
     ShaderNode *output = (graph) ? graph->output() : NULL;
 
     bool has_bump = (shader->get_displacement_method() != DISPLACE_TRUE) &&
-                    output->input("Surface")->link && output->input("Displacement")->link;
+                    output->input("Surface")->get_link() &&
+                    output->input("Displacement")->get_link();
 
     /* finalize */
-    shader->graph->finalize(scene,
-                            has_bump,
-                            shader->has_integrator_dependency,
-                            shader->get_displacement_method() == DISPLACE_BOTH);
+    graph->finalize(scene,
+                    has_bump,
+                    shader->get_has_integrator_dependency(),
+                    shader->get_displacement_method() == DISPLACE_BOTH);
 
     current_shader = shader;
 
-    shader->has_surface = false;
-    shader->has_surface_emission = false;
-    shader->has_surface_transparent = false;
-    shader->has_surface_bssrdf = false;
-    shader->has_bump = has_bump;
-    shader->has_bssrdf_bump = has_bump;
-    shader->has_volume = false;
-    shader->has_displacement = false;
-    shader->has_surface_spatial_varying = false;
-    shader->has_volume_spatial_varying = false;
-    shader->has_volume_attribute_dependency = false;
-    shader->has_integrator_dependency = false;
+    shader->set_has_surface(false);
+    shader->set_has_surface_emission(false);
+    shader->set_has_surface_transparent(false);
+    shader->set_has_surface_bssrdf(false);
+    shader->set_has_bump(has_bump);
+    shader->set_has_bssrdf_bump(has_bump);
+    shader->set_has_volume(false);
+    shader->set_has_displacement(false);
+    shader->set_has_surface_spatial_varying(false);
+    shader->set_has_volume_spatial_varying(false);
+    shader->set_has_volume_attribute_dependency(false);
+    shader->set_has_integrator_dependency(false);
 
     /* generate surface shader */
-    if (shader->used && graph && output->input("Surface")->link) {
-      shader->osl_surface_ref = compile_type(shader, shader->graph, SHADER_TYPE_SURFACE);
+    if (shader->get_used() && graph && output->input("Surface")->get_link()) {
+      shader->set_osl_surface_ref(compile_type(shader, graph, SHADER_TYPE_SURFACE));
 
       if (has_bump)
-        shader->osl_surface_bump_ref = compile_type(shader, shader->graph, SHADER_TYPE_BUMP);
+        shader->set_osl_surface_bump_ref(compile_type(shader, graph, SHADER_TYPE_BUMP));
       else
-        shader->osl_surface_bump_ref = OSL::ShaderGroupRef();
+        shader->set_osl_surface_bump_ref(OSL::ShaderGroupRef());
 
-      shader->has_surface = true;
+      shader->set_has_surface(true);
     }
     else {
-      shader->osl_surface_ref = OSL::ShaderGroupRef();
-      shader->osl_surface_bump_ref = OSL::ShaderGroupRef();
+      shader->set_osl_surface_ref(OSL::ShaderGroupRef());
+      shader->set_osl_surface_bump_ref(OSL::ShaderGroupRef());
     }
 
     /* generate volume shader */
-    if (shader->used && graph && output->input("Volume")->link) {
-      shader->osl_volume_ref = compile_type(shader, shader->graph, SHADER_TYPE_VOLUME);
-      shader->has_volume = true;
+    if (shader->get_used() && graph && output->input("Volume")->get_link()) {
+      shader->set_osl_volume_ref(compile_type(shader, graph, SHADER_TYPE_VOLUME));
+      shader->set_has_volume(true);
     }
     else
-      shader->osl_volume_ref = OSL::ShaderGroupRef();
+      shader->set_osl_volume_ref(OSL::ShaderGroupRef());
 
     /* generate displacement shader */
-    if (shader->used && graph && output->input("Displacement")->link) {
-      shader->osl_displacement_ref = compile_type(shader, shader->graph, SHADER_TYPE_DISPLACEMENT);
-      shader->has_displacement = true;
+    if (shader->get_used() && graph && output->input("Displacement")->get_link()) {
+      shader->set_osl_displacement_ref(compile_type(shader, graph, SHADER_TYPE_DISPLACEMENT));
+      shader->set_has_displacement(true);
     }
     else
-      shader->osl_displacement_ref = OSL::ShaderGroupRef();
+      shader->set_osl_displacement_ref(OSL::ShaderGroupRef());
   }
 
   /* push state to array for lookup */
-  og->surface_state.push_back(shader->osl_surface_ref);
-  og->volume_state.push_back(shader->osl_volume_ref);
-  og->displacement_state.push_back(shader->osl_displacement_ref);
-  og->bump_state.push_back(shader->osl_surface_bump_ref);
+  og->surface_state.push_back(shader->get_osl_surface_ref());
+  og->volume_state.push_back(shader->get_osl_volume_ref());
+  og->displacement_state.push_back(shader->get_osl_displacement_ref());
+  og->bump_state.push_back(shader->get_osl_surface_bump_ref());
 }
 
 void OSLCompiler::parameter_texture(const char *name, ustring filename, ustring colorspace)

@@ -67,8 +67,8 @@ void Background::device_update(Device *device, DeviceScene *dscene, Scene *scene
     return;
 
   scoped_callback_timer timer([scene](double time) {
-    if (scene->update_stats) {
-      scene->update_stats->background.times.add_entry({"device_update", time});
+    if (scene->get_update_stats()) {
+      scene->get_update_stats()->background.times.add_entry({"device_update", time});
     }
   });
 
@@ -84,7 +84,7 @@ void Background::device_update(Device *device, DeviceScene *dscene, Scene *scene
   kbackground->ao_distance = ao_distance;
 
   kbackground->transparent = transparent;
-  kbackground->surface_shader = scene->shader_manager->get_shader_id(bg_shader);
+  kbackground->surface_shader = scene->get_shader_manager()->get_shader_id(bg_shader);
 
   if (transparent && transparent_glass) {
     /* Square twice, once for principled BSDF convention, and once for
@@ -96,15 +96,16 @@ void Background::device_update(Device *device, DeviceScene *dscene, Scene *scene
     kbackground->transparent_roughness_squared_threshold = -1.0f;
   }
 
-  if (bg_shader->has_volume)
+  if (bg_shader->get_has_volume())
     kbackground->volume_shader = kbackground->surface_shader;
   else
     kbackground->volume_shader = SHADER_NONE;
 
-  kbackground->volume_step_size = volume_step_size * scene->integrator->get_volume_step_rate();
+  kbackground->volume_step_size = volume_step_size *
+                                  scene->get_integrator()->get_volume_step_rate();
 
   /* No background node, make world shader invisible to all rays, to skip evaluation in kernel. */
-  if (bg_shader->graph->nodes.size() <= 1) {
+  if (bg_shader->get_graph()->get_nodes().size() <= 1) {
     kbackground->surface_shader |= SHADER_EXCLUDE_ANY;
   }
   /* Background present, check visibilities */
@@ -130,13 +131,14 @@ void Background::device_free(Device * /*device*/, DeviceScene * /*dscene*/)
 
 void Background::tag_update(Scene *scene)
 {
-  scene->integrator->tag_update(scene);
+  scene->get_integrator()->tag_update(scene);
   tag_modified();
 }
 
 Shader *Background::get_shader(const Scene *scene)
 {
-  return (use_shader) ? ((shader) ? shader : scene->default_background) : scene->default_empty;
+  return (use_shader) ? ((shader) ? shader : scene->get_default_background()) :
+                        scene->get_default_empty();
 }
 
 CCL_NAMESPACE_END

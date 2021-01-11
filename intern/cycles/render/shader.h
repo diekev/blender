@@ -28,6 +28,7 @@
 
 #include "graph/node.h"
 
+#include "util/util_api.h"
 #include "util/util_map.h"
 #include "util/util_param.h"
 #include "util/util_string.h"
@@ -78,11 +79,13 @@ enum DisplacementMethod {
  * separately. */
 
 class Shader : public Node {
+  float prev_volume_step_rate;
+
  public:
   NODE_DECLARE
 
   /* shader graph */
-  ShaderGraph *graph;
+  GET_READ_ONLY(ShaderGraph *, graph)
 
   NODE_SOCKET_API(int, pass_id)
 
@@ -97,10 +100,8 @@ class Shader : public Node {
   /* displacement */
   NODE_SOCKET_API(DisplacementMethod, displacement_method)
 
-  float prev_volume_step_rate;
-
   /* synchronization */
-  bool need_update_geometry;
+  GET_SET(bool, need_update_geometry)
 
   /* If the shader has only volume components, the surface is assumed to
    * be transparent.
@@ -109,37 +110,38 @@ class Shader : public Node {
    * should still be transparent.
    * Therefore, has_volume_connected stores whether some volume sub-tree
    * was connected before optimization. */
-  bool has_volume_connected;
+  GET_SET(bool, has_volume_connected)
 
   /* information about shader after compiling */
-  bool has_surface;
-  bool has_surface_emission;
-  bool has_surface_transparent;
-  bool has_volume;
-  bool has_displacement;
-  bool has_surface_bssrdf;
-  bool has_bump;
-  bool has_bssrdf_bump;
-  bool has_surface_spatial_varying;
-  bool has_volume_spatial_varying;
-  bool has_volume_attribute_dependency;
-  bool has_integrator_dependency;
+  GET_SET(bool, has_surface)
+  GET_SET(bool, has_surface_emission)
+  GET_SET(bool, has_surface_transparent)
+  GET_SET(bool, has_volume)
+  GET_SET(bool, has_displacement)
+  GET_SET(bool, has_surface_bssrdf)
+  GET_SET(bool, has_bump)
+  GET_SET(bool, has_bssrdf_bump)
+  GET_SET(bool, has_surface_spatial_varying)
+  GET_SET(bool, has_volume_spatial_varying)
+  GET_SET(bool, has_volume_attribute_dependency)
+  GET_SET(bool, has_integrator_dependency)
 
   /* requested mesh attributes */
-  AttributeRequestSet attributes;
+  GET_SET(AttributeRequestSet, attributes)
 
   /* determined before compiling */
-  uint id;
-  bool used;
+  GET_SET(uint, id)
+  GET_SET(bool, used)
 
 #ifdef WITH_OSL
   /* osl shading state references */
-  OSL::ShaderGroupRef osl_surface_ref;
-  OSL::ShaderGroupRef osl_surface_bump_ref;
-  OSL::ShaderGroupRef osl_volume_ref;
-  OSL::ShaderGroupRef osl_displacement_ref;
+  GET_SET(OSL::ShaderGroupRef, osl_surface_ref)
+  GET_SET(OSL::ShaderGroupRef, osl_surface_bump_ref)
+  GET_SET(OSL::ShaderGroupRef, osl_volume_ref)
+  GET_SET(OSL::ShaderGroupRef, osl_displacement_ref)
 #endif
 
+ public:
   Shader();
   ~Shader();
 

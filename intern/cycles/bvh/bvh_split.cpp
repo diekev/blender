@@ -390,7 +390,7 @@ void BVHSpatialSplit::split_curve_primitive(const Hair *hair,
 {
   /* curve split: NOTE - Currently ignores curve width and needs to be fixed.*/
   Hair::Curve curve = hair->get_curve(prim_index);
-  const int k0 = curve.first_key + segment_index;
+  const int k0 = curve.get_first_key() + segment_index;
   const int k1 = k0 + 1;
   float3 v0 = hair->get_curve_keys()[k0];
   float3 v1 = hair->get_curve_keys()[k1];
@@ -458,18 +458,18 @@ void BVHSpatialSplit::split_object_reference(
 {
   Geometry *geom = object->get_geometry();
 
-  if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
+  if (geom->is_mesh() || geom->is_volume()) {
     Mesh *mesh = static_cast<Mesh *>(geom);
     for (int tri_idx = 0; tri_idx < mesh->num_triangles(); ++tri_idx) {
       split_triangle_primitive(
           mesh, &object->get_tfm(), tri_idx, dim, pos, left_bounds, right_bounds);
     }
   }
-  else if (geom->geometry_type == Geometry::HAIR) {
+  else if (geom->is_hair()) {
     Hair *hair = static_cast<Hair *>(geom);
     for (int curve_idx = 0; curve_idx < hair->num_curves(); ++curve_idx) {
       Hair::Curve curve = hair->get_curve(curve_idx);
-      for (int segment_idx = 0; segment_idx < curve.num_keys - 1; ++segment_idx) {
+      for (int segment_idx = 0; segment_idx < curve.get_num_keys() - 1; ++segment_idx) {
         split_curve_primitive(
             hair, &object->get_tfm(), curve_idx, segment_idx, dim, pos, left_bounds, right_bounds);
       }

@@ -243,8 +243,8 @@ void Camera::update(Scene *scene)
     return;
 
   scoped_callback_timer timer([scene](double time) {
-    if (scene->update_stats) {
-      scene->update_stats->camera.times.add_entry({"update", time});
+    if (scene->get_update_stats()) {
+      scene->get_update_stats()->camera.times.add_entry({"update", time});
     }
   });
 
@@ -487,12 +487,12 @@ void Camera::device_update(Device * /* device */, DeviceScene *dscene, Scene *sc
     return;
 
   scoped_callback_timer timer([scene](double time) {
-    if (scene->update_stats) {
-      scene->update_stats->camera.times.add_entry({"device_update", time});
+    if (scene->get_update_stats()) {
+      scene->get_update_stats()->camera.times.add_entry({"device_update", time});
     }
   });
 
-  scene->lookup_tables->remove_table(&shutter_table_offset);
+  scene->get_lookup_tables()->remove_table(&shutter_table_offset);
   if (kernel_camera.shuttertime != -1.0f) {
     vector<float> shutter_table;
     util_cdf_inverted(SHUTTER_TABLE_SIZE,
@@ -501,7 +501,7 @@ void Camera::device_update(Device * /* device */, DeviceScene *dscene, Scene *sc
                       function_bind(shutter_curve_eval, _1, shutter_curve),
                       false,
                       shutter_table);
-    shutter_table_offset = scene->lookup_tables->add_table(dscene, shutter_table);
+    shutter_table_offset = scene->get_lookup_tables()->add_table(dscene, shutter_table);
     kernel_camera.shutter_table_offset = (int)shutter_table_offset;
   }
 
@@ -532,12 +532,12 @@ void Camera::device_update_volume(Device * /*device*/, DeviceScene *dscene, Scen
     /* Parallel object update, with grain size to avoid too much threading overhead
      * for individual objects. */
     static const int OBJECTS_PER_TASK = 32;
-    parallel_for(blocked_range<size_t>(0, scene->objects.size(), OBJECTS_PER_TASK),
+    parallel_for(blocked_range<size_t>(0, scene->get_objects().size(), OBJECTS_PER_TASK),
                  [&](const blocked_range<size_t> &r) {
                    for (size_t i = r.begin(); i != r.end(); i++) {
-                     Object *object = scene->objects[i];
-                     if (object->get_geometry()->has_volume &&
-                         viewplane_boundbox.intersects(object->bounds)) {
+                     Object *object = scene->get_objects()[i];
+                     if (object->get_geometry()->get_has_volume() &&
+                         viewplane_boundbox.intersects(object->get_bounds())) {
                        /* TODO(sergey): Consider adding more grained check. */
                        VLOG(1) << "Detected camera inside volume.";
                        kcam->is_inside_volume = 1;
@@ -558,7 +558,7 @@ void Camera::device_update_volume(Device * /*device*/, DeviceScene *dscene, Scen
 
 void Camera::device_free(Device * /*device*/, DeviceScene *dscene, Scene *scene)
 {
-  scene->lookup_tables->remove_table(&shutter_table_offset);
+  scene->get_lookup_tables()->remove_table(&shutter_table_offset);
   dscene->camera_motion.free();
 }
 

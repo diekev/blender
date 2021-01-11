@@ -484,11 +484,11 @@ void Hair::pack_curves(Scene *scene,
     int shader_id = curve_shader[i];
     Shader *shader = (shader_id < used_shaders.size()) ?
                          static_cast<Shader *>(used_shaders[shader_id]) :
-                         scene->default_surface;
-    shader_id = scene->shader_manager->get_shader_id(shader, false);
+                         scene->get_default_surface();
+    shader_id = scene->get_shader_manager()->get_shader_id(shader, false);
 
-    curve_data[i] = make_float4(__int_as_float(curve.first_key + curvekey_offset),
-                                __int_as_float(curve.num_keys),
+    curve_data[i] = make_float4(__int_as_float(curve.get_first_key() + curvekey_offset),
+                                __int_as_float(curve.get_num_keys()),
                                 __int_as_float(shader_id),
                                 0.0f);
   }

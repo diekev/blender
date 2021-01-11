@@ -105,12 +105,12 @@ Session::~Session()
     delete display;
 
     display = new DisplayBuffer(device, false);
-    display->reset(buffers->params);
+    display->reset(buffers->get_params());
     copy_to_display_buffer(params.samples);
 
-    int w = display->draw_width;
-    int h = display->draw_height;
-    uchar4 *pixels = display->rgba_byte.copy_from_device(0, w, h);
+    int w = display->get_draw_width();
+    int h = display->get_draw_height();
+    uchar4 *pixels = display->get_rgba_byte().copy_from_device(0, w, h);
     params.write_render_cb((uchar *)pixels, w, h, 4);
   }
 
@@ -193,8 +193,8 @@ bool Session::draw_gpu(BufferParams &buffer_params, DeviceDrawParams &draw_param
   if (gpu_draw_ready) {
     /* then verify the buffers have the expected size, so we don't
      * draw previous results in a resized window */
-    if (buffer_params.width == display->params.width &&
-        buffer_params.height == display->params.height) {
+    if (buffer_params.get_width() == display->get_params().get_width() &&
+        buffer_params.get_height() == display->get_params().get_height()) {
       /* for CUDA we need to do tone-mapping still, since we can
        * only access GL buffers from the main thread. */
       if (gpu_need_display_buffer_update) {
@@ -288,7 +288,7 @@ void Session::run_gpu()
       /* update scene */
       scoped_timer update_timer;
       if (update_scene()) {
-        profiler.reset(scene->shaders.size(), scene->objects.size());
+        profiler.reset(scene->get_shaders().size(), scene->get_objects().size());
       }
       progress.add_skip_time(update_timer, params.background);
 
@@ -373,8 +373,8 @@ bool Session::draw_cpu(BufferParams &buffer_params, DeviceDrawParams &draw_param
   if (display->draw_ready()) {
     /* then verify the buffers have the expected size, so we don't
      * draw previous results in a resized window */
-    if (buffer_params.width == display->params.width &&
-        buffer_params.height == display->params.height) {
+    if (buffer_params.get_width() == display->get_params().get_width() &&
+        buffer_params.get_height() == display->get_params().get_height()) {
       display->draw(device, draw_params);
 
       if (display_outdated && (time_dt() - reset_time) > params.text_timeout)
@@ -421,11 +421,11 @@ bool Session::steal_tile(RenderTile &rtile, Device *tile_device, thread_scoped_l
 
   /* Successfully stole a tile, now move it to the new device. */
   rtile = stolen_tile;
-  rtile.buffers->buffer.move_device(tile_device);
-  rtile.buffer = rtile.buffers->buffer.device_pointer;
-  rtile.stealing_state = RenderTile::NO_STEALING;
-  rtile.num_samples -= (rtile.sample - rtile.start_sample);
-  rtile.start_sample = rtile.sample;
+  rtile.get_buffers()->get_buffer().move_device(tile_device);
+  rtile.set_buffer(rtile.get_buffers()->get_buffer().device_pointer);
+  rtile.set_stealing_state(RenderTile::NO_STEALING);
+  rtile.get_num_samples() -= (rtile.get_sample() - rtile.get_start_sample());
+  rtile.set_start_sample(rtile.get_sample());
 
   tile_stealing_state = NOT_STEALING;
 
@@ -469,29 +469,29 @@ bool Session::acquire_tile(RenderTile &rtile, Device *tile_device, uint tile_typ
   }
 
   /* fill render tile */
-  rtile.x = tile_manager.state.buffer.full_x + tile->x;
-  rtile.y = tile_manager.state.buffer.full_y + tile->y;
-  rtile.w = tile->w;
-  rtile.h = tile->h;
-  rtile.start_sample = tile_manager.state.sample;
-  rtile.num_samples = tile_manager.state.num_samples;
-  rtile.resolution = tile_manager.state.resolution_divider;
-  rtile.tile_index = tile->index;
+  rtile.set_x(tile_manager.state.buffer.get_full_x() + tile->x);
+  rtile.set_y(tile_manager.state.buffer.get_full_y() + tile->y);
+  rtile.set_w(tile->w);
+  rtile.set_h(tile->h);
+  rtile.set_start_sample(tile_manager.state.sample);
+  rtile.set_num_samples(tile_manager.state.num_samples);
+  rtile.set_resolution(tile_manager.state.resolution_divider);
+  rtile.set_tile_index(tile->index);
 
   if (tile->state == Tile::DENOISE) {
-    rtile.task = RenderTile::DENOISE;
+    rtile.set_task(RenderTile::DENOISE);
   }
   else {
     if (tile_device->info.type == DEVICE_CPU) {
       stealable_tiles++;
-      rtile.stealing_state = RenderTile::CAN_BE_STOLEN;
+      rtile.set_stealing_state(RenderTile::CAN_BE_STOLEN);
     }
 
     if (read_bake_tile_cb) {
-      rtile.task = RenderTile::BAKE;
+      rtile.set_task(RenderTile::BAKE);
     }
     else {
-      rtile.task = RenderTile::PATH_TRACE;
+      rtile.set_task(RenderTile::PATH_TRACE);
     }
   }
 
@@ -500,21 +500,23 @@ bool Session::acquire_tile(RenderTile &rtile, Device *tile_device, uint tile_typ
   /* in case of a permanent buffer, return it, otherwise we will allocate
    * a new temporary buffer */
   if (buffers) {
-    tile_manager.state.buffer.get_offset_stride(rtile.offset, rtile.stride);
+    tile_manager.state.buffer.get_offset_stride(rtile.get_offset(), rtile.get_stride());
 
-    rtile.buffer = buffers->buffer.device_pointer;
-    rtile.buffers = buffers;
+    rtile.set_buffer(buffers->get_buffer().device_pointer);
+    rtile.set_buffers(buffers);
 
     device->map_tile(tile_device, rtile);
 
     /* Reset copy state, since buffer contents change after the tile was acquired */
-    buffers->map_neighbor_copied = false;
+    buffers->set_map_neighbor_copied(false);
 
     /* This hack ensures that the copy in 'MultiDevice::map_neighbor_tiles' accounts
      * for the buffer resolution divider. */
-    buffers->buffer.data_width = (buffers->params.width * buffers->params.get_passes_size()) /
-                                 tile_manager.state.resolution_divider;
-    buffers->buffer.data_height = buffers->params.height / tile_manager.state.resolution_divider;
+    buffers->get_buffer().data_width = (buffers->get_params().get_width() *
+                                        buffers->get_params().get_passes_size()) /
+                                       tile_manager.state.resolution_divider;
+    buffers->get_buffer().data_height = buffers->get_params().get_height() /
+                                        tile_manager.state.resolution_divider;
 
     return true;
   }
@@ -522,23 +524,23 @@ bool Session::acquire_tile(RenderTile &rtile, Device *tile_device, uint tile_typ
   if (tile->buffers == NULL) {
     /* fill buffer parameters */
     BufferParams buffer_params = tile_manager.params;
-    buffer_params.full_x = rtile.x;
-    buffer_params.full_y = rtile.y;
-    buffer_params.width = rtile.w;
-    buffer_params.height = rtile.h;
+    buffer_params.set_full_x(rtile.get_x());
+    buffer_params.set_full_y(rtile.get_y());
+    buffer_params.set_width(rtile.get_w());
+    buffer_params.set_height(rtile.get_h());
 
     /* allocate buffers */
     tile->buffers = new RenderBuffers(tile_device);
     tile->buffers->reset(buffer_params);
   }
 
-  tile->buffers->map_neighbor_copied = false;
+  tile->buffers->set_map_neighbor_copied(false);
 
-  tile->buffers->params.get_offset_stride(rtile.offset, rtile.stride);
+  tile->buffers->get_params().get_offset_stride(rtile.get_offset(), rtile.get_stride());
 
-  rtile.buffer = tile->buffers->buffer.device_pointer;
-  rtile.buffers = tile->buffers;
-  rtile.sample = tile_manager.state.sample;
+  rtile.set_buffer(tile->buffers->get_buffer().device_pointer);
+  rtile.set_buffers(tile->buffers);
+  rtile.set_sample(tile_manager.state.sample);
 
   if (read_bake_tile_cb) {
     /* This will read any passes needed as input for baking. */
@@ -546,7 +548,7 @@ bool Session::acquire_tile(RenderTile &rtile, Device *tile_device, uint tile_typ
       thread_scoped_lock tile_lock(tile_mutex);
       read_bake_tile_cb(rtile);
     }
-    rtile.buffers->buffer.copy_to_device();
+    rtile.get_buffers()->get_buffer().copy_to_device();
   }
   else {
     /* This will tag tile as IN PROGRESS in blender-side render pipeline,
@@ -577,14 +579,14 @@ void Session::release_tile(RenderTile &rtile, const bool need_denoise)
 {
   thread_scoped_lock tile_lock(tile_mutex);
 
-  if (rtile.stealing_state != RenderTile::NO_STEALING) {
+  if (rtile.get_stealing_state() != RenderTile::NO_STEALING) {
     stealable_tiles--;
-    if (rtile.stealing_state == RenderTile::WAS_STOLEN) {
+    if (rtile.get_stealing_state() == RenderTile::WAS_STOLEN) {
       /* If the tile is being stolen, don't release it here - the new device will pick up where
        * the old one left off. */
 
       assert(tile_stealing_state == RELEASING_TILE);
-      assert(rtile.sample < rtile.start_sample + rtile.num_samples);
+      assert(rtile.get_sample() < rtile.get_start_sample() + rtile.get_num_samples());
 
       tile_stealing_state = GOT_TILE;
       stolen_tile = rtile;
@@ -597,19 +599,19 @@ void Session::release_tile(RenderTile &rtile, const bool need_denoise)
     }
   }
 
-  progress.add_finished_tile(rtile.task == RenderTile::DENOISE);
+  progress.add_finished_tile(rtile.get_task() == RenderTile::DENOISE);
 
   bool delete_tile;
 
-  if (tile_manager.finish_tile(rtile.tile_index, need_denoise, delete_tile)) {
+  if (tile_manager.finish_tile(rtile.get_tile_index(), need_denoise, delete_tile)) {
     /* Finished tile pixels write. */
     if (write_render_tile_cb && params.progressive_refine == false) {
       write_render_tile_cb(rtile);
     }
 
     if (delete_tile) {
-      delete rtile.buffers;
-      tile_manager.state.tiles[rtile.tile_index].buffers = NULL;
+      delete rtile.get_buffers();
+      tile_manager.state.tiles[rtile.get_tile_index()].buffers = NULL;
     }
   }
   else {
@@ -630,76 +632,79 @@ void Session::map_neighbor_tiles(RenderTileNeighbors &neighbors, Device *tile_de
   thread_scoped_lock tile_lock(tile_mutex);
 
   const int4 image_region = make_int4(
-      tile_manager.state.buffer.full_x,
-      tile_manager.state.buffer.full_y,
-      tile_manager.state.buffer.full_x + tile_manager.state.buffer.width,
-      tile_manager.state.buffer.full_y + tile_manager.state.buffer.height);
+      tile_manager.state.buffer.get_full_x(),
+      tile_manager.state.buffer.get_full_y(),
+      tile_manager.state.buffer.get_full_x() + tile_manager.state.buffer.get_width(),
+      tile_manager.state.buffer.get_full_y() + tile_manager.state.buffer.get_height());
 
-  RenderTile &center_tile = neighbors.tiles[RenderTileNeighbors::CENTER];
+  RenderTile &center_tile = neighbors.get_tiles()[RenderTileNeighbors::CENTER];
 
   if (!tile_manager.schedule_denoising) {
     /* Fix up tile slices with overlap. */
     if (tile_manager.slice_overlap != 0) {
-      int y = max(center_tile.y - tile_manager.slice_overlap, image_region.y);
-      center_tile.h = min(center_tile.y + center_tile.h + tile_manager.slice_overlap,
-                          image_region.w) -
-                      y;
-      center_tile.y = y;
+      int y = max(center_tile.get_y() - tile_manager.slice_overlap, image_region.y);
+      int h = min(center_tile.get_y() + center_tile.get_h() + tile_manager.slice_overlap,
+                  image_region.w) -
+              y;
+
+      center_tile.set_h(h);
+      center_tile.set_y(y);
     }
 
     /* Tiles are not being denoised individually, which means the entire image is processed. */
     neighbors.set_bounds_from_center();
   }
   else {
-    int center_idx = center_tile.tile_index;
+    int center_idx = center_tile.get_tile_index();
     assert(tile_manager.state.tiles[center_idx].state == Tile::DENOISE);
 
     for (int dy = -1, i = 0; dy <= 1; dy++) {
       for (int dx = -1; dx <= 1; dx++, i++) {
-        RenderTile &rtile = neighbors.tiles[i];
+        RenderTile &rtile = neighbors.get_tiles()[i];
         int nindex = tile_manager.get_neighbor_index(center_idx, i);
         if (nindex >= 0) {
           Tile *tile = &tile_manager.state.tiles[nindex];
 
-          rtile.x = image_region.x + tile->x;
-          rtile.y = image_region.y + tile->y;
-          rtile.w = tile->w;
-          rtile.h = tile->h;
+          rtile.set_x(image_region.x + tile->x);
+          rtile.set_y(image_region.y + tile->y);
+          rtile.set_w(tile->w);
+          rtile.set_h(tile->h);
 
           if (buffers) {
-            tile_manager.state.buffer.get_offset_stride(rtile.offset, rtile.stride);
+            tile_manager.state.buffer.get_offset_stride(rtile.get_offset(), rtile.get_stride());
 
-            rtile.buffer = buffers->buffer.device_pointer;
-            rtile.buffers = buffers;
+            rtile.set_buffer(buffers->get_buffer().device_pointer);
+            rtile.set_buffers(buffers);
           }
           else {
             assert(tile->buffers);
-            tile->buffers->params.get_offset_stride(rtile.offset, rtile.stride);
+            tile->buffers->get_params().get_offset_stride(rtile.get_offset(), rtile.get_stride());
 
-            rtile.buffer = tile->buffers->buffer.device_pointer;
-            rtile.buffers = tile->buffers;
+            rtile.set_buffer(tile->buffers->get_buffer().device_pointer);
+            rtile.set_buffers(tile->buffers);
           }
         }
         else {
-          int px = center_tile.x + dx * params.tile_size.x;
-          int py = center_tile.y + dy * params.tile_size.y;
+          int px = center_tile.get_x() + dx * params.tile_size.x;
+          int py = center_tile.get_y() + dy * params.tile_size.y;
 
-          rtile.x = clamp(px, image_region.x, image_region.z);
-          rtile.y = clamp(py, image_region.y, image_region.w);
-          rtile.w = rtile.h = 0;
+          rtile.set_x(clamp(px, image_region.x, image_region.z));
+          rtile.set_y(clamp(py, image_region.y, image_region.w));
+          rtile.set_h(0);
+          rtile.set_w(0);
 
-          rtile.buffer = (device_ptr)NULL;
-          rtile.buffers = NULL;
+          rtile.set_buffer((device_ptr)NULL);
+          rtile.set_buffers(NULL);
         }
       }
     }
   }
 
-  assert(center_tile.buffers);
+  assert(center_tile.get_buffers());
   device->map_neighbor_tiles(tile_device, neighbors);
 
   /* The denoised result is written back to the original tile. */
-  neighbors.target = center_tile;
+  neighbors.set_target(center_tile);
 }
 
 void Session::unmap_neighbor_tiles(RenderTileNeighbors &neighbors, Device *tile_device)
@@ -792,7 +797,7 @@ void Session::run_cpu()
       /* update scene */
       scoped_timer update_timer;
       if (update_scene()) {
-        profiler.reset(scene->shaders.size(), scene->objects.size());
+        profiler.reset(scene->get_shaders().size(), scene->get_objects().size());
       }
       progress.add_skip_time(update_timer, params.background);
 
@@ -1003,22 +1008,22 @@ void Session::wait()
 
 bool Session::update_scene()
 {
-  thread_scoped_lock scene_lock(scene->mutex);
+  thread_scoped_lock scene_lock(scene->get_mutex());
 
   /* update camera if dimensions changed for progressive render. the camera
    * knows nothing about progressive or cropped rendering, it just gets the
    * image dimensions passed in */
-  Camera *cam = scene->camera;
-  int width = tile_manager.state.buffer.full_width;
-  int height = tile_manager.state.buffer.full_height;
+  Camera *cam = scene->get_camera();
+  int width = tile_manager.state.buffer.get_full_width();
+  int height = tile_manager.state.buffer.get_full_height();
   int resolution = tile_manager.state.resolution_divider;
 
   cam->set_screen_size_and_resolution(width, height, resolution);
 
   /* number of samples is needed by multi jittered
    * sampling pattern and by baking */
-  Integrator *integrator = scene->integrator;
-  BakeManager *bake_manager = scene->bake_manager;
+  Integrator *integrator = scene->get_integrator();
+  BakeManager *bake_manager = scene->get_bake_manager();
 
   if (integrator->get_sampling_pattern() != SAMPLING_PATTERN_SOBOL || bake_manager->get_baking()) {
     int aa_samples = tile_manager.num_samples;
@@ -1119,7 +1124,7 @@ bool Session::render_need_denoise(bool &delayed)
   /* Viewport render. */
 
   /* It can happen that denoising was already enabled, but the scene still needs an update. */
-  if (scene->film->is_modified() || !scene->film->get_denoising_data_offset()) {
+  if (scene->get_film()->is_modified() || !scene->get_film()->get_denoising_data_offset()) {
     return false;
   }
 
@@ -1148,7 +1153,7 @@ void Session::render(bool need_denoise)
     buffers->zero();
   }
 
-  if (tile_manager.state.buffer.width == 0 || tile_manager.state.buffer.height == 0) {
+  if (tile_manager.state.buffer.get_width() == 0 || tile_manager.state.buffer.get_height() == 0) {
     return; /* Avoid empty launches. */
   }
 
@@ -1164,13 +1169,13 @@ void Session::render(bool need_denoise)
   task.update_progress_sample = function_bind(&Progress::add_samples, &this->progress, _1, _2);
   task.get_tile_stolen = function_bind(&Session::get_tile_stolen, this);
   task.need_finish_queue = params.progressive_refine;
-  task.integrator_branched = scene->integrator->get_method() == Integrator::BRANCHED_PATH;
+  task.integrator_branched = scene->get_integrator()->get_method() == Integrator::BRANCHED_PATH;
 
-  task.adaptive_sampling.use = (scene->integrator->get_sampling_pattern() ==
+  task.adaptive_sampling.use = (scene->get_integrator()->get_sampling_pattern() ==
                                 SAMPLING_PATTERN_PMJ) &&
-                               scene->dscene.data.film.pass_adaptive_aux_buffer;
-  task.adaptive_sampling.min_samples = scene->dscene.data.integrator.adaptive_min_samples;
-  task.adaptive_sampling.adaptive_step = scene->dscene.data.integrator.adaptive_step;
+                               scene->get_dscene().data.film.pass_adaptive_aux_buffer;
+  task.adaptive_sampling.min_samples = scene->get_dscene().data.integrator.adaptive_min_samples;
+  task.adaptive_sampling.adaptive_step = scene->get_dscene().data.integrator.adaptive_step;
 
   /* Acquire render tiles by default. */
   task.tile_types = RenderTile::PATH_TRACE;
@@ -1178,10 +1183,10 @@ void Session::render(bool need_denoise)
   if (need_denoise) {
     task.denoising = params.denoising;
 
-    task.pass_stride = scene->film->get_pass_stride();
+    task.pass_stride = scene->get_film()->get_pass_stride();
     task.target_pass_stride = task.pass_stride;
-    task.pass_denoising_data = scene->film->get_denoising_data_offset();
-    task.pass_denoising_clean = scene->film->get_denoising_clean_offset();
+    task.pass_denoising_data = scene->get_film()->get_denoising_data_offset();
+    task.pass_denoising_clean = scene->get_film()->get_denoising_clean_offset();
 
     task.denoising_from_render = true;
 
@@ -1198,11 +1203,11 @@ void Session::render(bool need_denoise)
 
       /* Then run denoising on the whole image at once. */
       task.type = DeviceTask::DENOISE_BUFFER;
-      task.x = tile_manager.state.buffer.full_x;
-      task.y = tile_manager.state.buffer.full_y;
-      task.w = tile_manager.state.buffer.width;
-      task.h = tile_manager.state.buffer.height;
-      task.buffer = buffers->buffer.device_pointer;
+      task.x = tile_manager.state.buffer.get_full_x();
+      task.y = tile_manager.state.buffer.get_full_y();
+      task.w = tile_manager.state.buffer.get_width();
+      task.h = tile_manager.state.buffer.get_height();
+      task.buffer = buffers->get_buffer().device_pointer;
       task.sample = tile_manager.state.sample;
       task.num_samples = tile_manager.state.num_samples;
       tile_manager.state.buffer.get_offset_stride(task.offset, task.stride);
@@ -1218,13 +1223,13 @@ void Session::copy_to_display_buffer(int sample)
   /* add film conversion task */
   DeviceTask task(DeviceTask::FILM_CONVERT);
 
-  task.x = tile_manager.state.buffer.full_x;
-  task.y = tile_manager.state.buffer.full_y;
-  task.w = tile_manager.state.buffer.width;
-  task.h = tile_manager.state.buffer.height;
-  task.rgba_byte = display->rgba_byte.device_pointer;
-  task.rgba_half = display->rgba_half.device_pointer;
-  task.buffer = buffers->buffer.device_pointer;
+  task.x = tile_manager.state.buffer.get_full_x();
+  task.y = tile_manager.state.buffer.get_full_y();
+  task.w = tile_manager.state.buffer.get_width();
+  task.h = tile_manager.state.buffer.get_height();
+  task.rgba_byte = display->get_rgba_byte().device_pointer;
+  task.rgba_half = display->get_rgba_half().device_pointer;
+  task.buffer = buffers->get_buffer().device_pointer;
   task.sample = sample;
   tile_manager.state.buffer.get_offset_stride(task.offset, task.stride);
 
@@ -1261,12 +1266,12 @@ bool Session::update_progressive_refine(bool cancel)
       }
 
       RenderTile rtile;
-      rtile.x = tile_manager.state.buffer.full_x + tile.x;
-      rtile.y = tile_manager.state.buffer.full_y + tile.y;
-      rtile.w = tile.w;
-      rtile.h = tile.h;
-      rtile.sample = sample;
-      rtile.buffers = tile.buffers;
+      rtile.set_x(tile_manager.state.buffer.get_full_x() + tile.x);
+      rtile.set_y(tile_manager.state.buffer.get_full_y() + tile.y);
+      rtile.set_w(tile.w);
+      rtile.set_h(tile.h);
+      rtile.set_sample(sample);
+      rtile.set_buffers(tile.buffers);
 
       if (write) {
         if (write_render_tile_cb)

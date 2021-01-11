@@ -155,7 +155,8 @@ void TileManager::reset(BufferParams &params_, int num_samples_)
   state.sample = range_start_sample - 1;
   state.num_tiles = 0;
   state.num_samples = 0;
-  state.resolution_divider = get_divider(params.width, params.height, start_resolution);
+  state.resolution_divider = get_divider(
+      params.get_width(), params.get_height(), start_resolution);
   state.render_tiles.clear();
   state.denoising_tiles.clear();
   device_free();
@@ -174,20 +175,21 @@ void TileManager::set_samples(int num_samples_)
     /* While rendering in the viewport, the initial preview resolution is increased to the native
      * resolution before the actual rendering begins. Therefore, additional pixel samples will be
      * rendered. */
-    int divider = max(get_divider(params.width, params.height, start_resolution) / 2, pixel_size);
+    int divider = max(get_divider(params.get_width(), params.get_height(), start_resolution) / 2,
+                      pixel_size);
     while (divider > pixel_size) {
-      int image_w = max(1, params.width / divider);
-      int image_h = max(1, params.height / divider);
+      int image_w = max(1, params.get_width() / divider);
+      int image_h = max(1, params.get_height() / divider);
       pixel_samples += image_w * image_h;
       divider >>= 1;
     }
 
-    int image_w = max(1, params.width / divider);
-    int image_h = max(1, params.height / divider);
+    int image_w = max(1, params.get_width() / divider);
+    int image_h = max(1, params.get_height() / divider);
     state.total_pixel_samples = pixel_samples +
                                 (uint64_t)get_num_effective_samples() * image_w * image_h;
     if (schedule_denoising) {
-      state.total_pixel_samples += params.width * params.height;
+      state.total_pixel_samples += params.get_width() * params.get_height();
     }
   }
 }
@@ -198,8 +200,8 @@ void TileManager::set_samples(int num_samples_)
 int TileManager::gen_tiles(bool sliced)
 {
   int resolution = state.resolution_divider;
-  int image_w = max(1, params.width / resolution);
-  int image_h = max(1, params.height / resolution);
+  int image_w = max(1, params.get_width() / resolution);
+  int image_h = max(1, params.get_height() / resolution);
   int2 center = make_int2(image_w / 2, image_h / 2);
 
   int num = preserve_tile_device || sliced ? min(image_h, num_devices) : 1;
@@ -377,18 +379,18 @@ void TileManager::gen_render_tiles()
 void TileManager::set_tiles()
 {
   int resolution = state.resolution_divider;
-  int image_w = max(1, params.width / resolution);
-  int image_h = max(1, params.height / resolution);
+  int image_w = max(1, params.get_width() / resolution);
+  int image_h = max(1, params.get_height() / resolution);
 
   state.num_tiles = gen_tiles(!background);
 
-  state.buffer.width = image_w;
-  state.buffer.height = image_h;
+  state.buffer.set_width(image_w);
+  state.buffer.set_height(image_h);
 
-  state.buffer.full_x = params.full_x / resolution;
-  state.buffer.full_y = params.full_y / resolution;
-  state.buffer.full_width = max(1, params.full_width / resolution);
-  state.buffer.full_height = max(1, params.full_height / resolution);
+  state.buffer.set_full_x(params.get_full_x() / resolution);
+  state.buffer.set_full_y(params.get_full_y() / resolution);
+  state.buffer.set_full_width(max(1, params.get_full_width() / resolution));
+  state.buffer.set_full_height(max(1, params.get_full_height() / resolution));
 }
 
 int TileManager::get_neighbor_index(int index, int neighbor)
@@ -402,8 +404,8 @@ int TileManager::get_neighbor_index(int index, int neighbor)
   static const int dy[] = {-1, -1, -1, 0, 0, 0, 1, 1, 1};
 
   int resolution = state.resolution_divider;
-  int image_w = max(1, params.width / resolution);
-  int image_h = max(1, params.height / resolution);
+  int image_w = max(1, params.get_width() / resolution);
+  int image_h = max(1, params.get_height() / resolution);
 
   int num = min(image_h, num_devices);
   int slice_num = !background ? num : 1;

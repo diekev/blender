@@ -43,7 +43,7 @@ template<typename T> class ShaderNodeBuilder {
   ShaderNodeBuilder(ShaderGraph &graph, const string &name) : name_(name)
   {
     node_ = graph.create_node<T>();
-    node_->name = name;
+    node_->set_name(ustring(name));
   }
 
   const string &name() const
@@ -66,7 +66,7 @@ template<typename T> class ShaderNodeBuilder {
 
   template<typename V> ShaderNodeBuilder &set_param(const string &input_name, V value)
   {
-    const SocketType *input_socket = node_->type->find_input(ustring(input_name.c_str()));
+    const SocketType *input_socket = node_->get_type()->find_input(ustring(input_name.c_str()));
     EXPECT_NE((void *)NULL, input_socket);
     node_->set(*input_socket, value);
     return *this;
@@ -229,7 +229,7 @@ TEST_F(RenderGraph, deduplicate_deep)
 
   graph.finalize(scene);
 
-  EXPECT_EQ(graph.nodes.size(), 5);
+  EXPECT_EQ(graph.get_nodes().size(), 5);
 }
 
 /*

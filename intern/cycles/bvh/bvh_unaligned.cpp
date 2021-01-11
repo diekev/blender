@@ -74,7 +74,7 @@ bool BVHUnaligned::compute_aligned_space(const BVHReference &ref, Transform *ali
     const int segment = PRIMITIVE_UNPACK_SEGMENT(packed_type);
     const Hair *hair = static_cast<const Hair *>(object->get_geometry());
     const Hair::Curve &curve = hair->get_curve(curve_index);
-    const int key = curve.first_key + segment;
+    const int key = curve.get_first_key() + segment;
     const float3 v1 = hair->get_curve_keys()[key], v2 = hair->get_curve_keys()[key + 1];
     float length;
     const float3 axis = normalize_len(v2 - v1, &length);

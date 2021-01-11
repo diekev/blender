@@ -229,37 +229,37 @@ Shader::~Shader()
 bool Shader::is_constant_emission(float3 *emission)
 {
   /* If the shader has AOVs, they need to be evaluated, so we can't skip the shader. */
-  foreach (ShaderNode *node, graph->nodes) {
-    if (node->special_type == SHADER_SPECIAL_TYPE_OUTPUT_AOV) {
+  foreach (ShaderNode *node, graph->get_nodes()) {
+    if (node->get_special_type() == SHADER_SPECIAL_TYPE_OUTPUT_AOV) {
       return false;
     }
   }
 
   ShaderInput *surf = graph->output()->input("Surface");
 
-  if (surf->link == NULL) {
+  if (surf->get_link() == NULL) {
     return false;
   }
 
-  if (surf->link->parent->type == EmissionNode::node_type) {
-    EmissionNode *node = (EmissionNode *)surf->link->parent;
+  if (surf->get_link()->get_parent()->get_type() == EmissionNode::node_type) {
+    EmissionNode *node = (EmissionNode *)surf->get_link()->get_parent();
 
     assert(node->input("Color"));
     assert(node->input("Strength"));
 
-    if (node->input("Color")->link || node->input("Strength")->link) {
+    if (node->input("Color")->get_link() || node->input("Strength")->get_link()) {
       return false;
     }
 
     *emission = node->get_color() * node->get_strength();
   }
-  else if (surf->link->parent->type == BackgroundNode::node_type) {
-    BackgroundNode *node = (BackgroundNode *)surf->link->parent;
+  else if (surf->get_link()->get_parent()->get_type() == BackgroundNode::node_type) {
+    BackgroundNode *node = (BackgroundNode *)surf->get_link()->get_parent();
 
     assert(node->input("Color"));
     assert(node->input("Strength"));
 
-    if (node->input("Color")->link || node->input("Strength")->link) {
+    if (node->input("Color")->get_link() || node->input("Strength")->get_link()) {
       return false;
     }
 
@@ -301,29 +301,29 @@ void Shader::set_graph(ShaderGraph *graph_)
 
   /* Store info here before graph optimization to make sure that
    * nodes that get optimized away still count. */
-  has_volume_connected = (graph->output()->input("Volume")->link != NULL);
+  has_volume_connected = (graph->output()->input("Volume")->get_link() != NULL);
 }
 
 void Shader::tag_update(Scene *scene)
 {
   /* update tag */
   tag_modified();
-  scene->shader_manager->need_update = true;
+  scene->get_shader_manager()->need_update = true;
 
   /* if the shader previously was emissive, update light distribution,
    * if the new shader is emissive, a light manager update tag will be
    * done in the shader manager device update. */
   if (use_mis && has_surface_emission)
-    scene->light_manager->need_update = true;
+    scene->get_light_manager()->need_update = true;
 
   /* Special handle of background MIS light for now: for some reason it
    * has use_mis set to false. We are quite close to release now, so
    * better to be safe.
    */
-  if (this == scene->background->get_shader(scene)) {
-    scene->light_manager->need_update_background = true;
-    if (scene->light_manager->has_background_light(scene)) {
-      scene->light_manager->need_update = true;
+  if (this == scene->get_background()->get_shader(scene)) {
+    scene->get_light_manager()->need_update_background = true;
+    if (scene->get_light_manager()->has_background_light(scene)) {
+      scene->get_light_manager()->need_update = true;
     }
   }
 
@@ -332,9 +332,9 @@ void Shader::tag_update(Scene *scene)
    * be more fine grained but it's better than nothing */
   OutputNode *output = graph->output();
   bool prev_has_volume = has_volume;
-  has_surface = has_surface || output->input("Surface")->link;
-  has_volume = has_volume || output->input("Volume")->link;
-  has_displacement = has_displacement || output->input("Displacement")->link;
+  has_surface = has_surface || output->input("Surface")->get_link();
+  has_volume = has_volume || output->input("Volume")->get_link();
+  has_displacement = has_displacement || output->input("Displacement")->get_link();
 
   /* get requested attributes. this could be optimized by pruning unused
    * nodes here already, but that's the job of the shader manager currently,
@@ -344,7 +344,7 @@ void Shader::tag_update(Scene *scene)
   AttributeRequestSet prev_attributes = attributes;
 
   attributes.clear();
-  foreach (ShaderNode *node, graph->nodes)
+  foreach (ShaderNode *node, graph->get_nodes())
     node->attributes(this, &attributes);
 
   if (has_displacement) {
@@ -353,8 +353,8 @@ void Shader::tag_update(Scene *scene)
     }
     if (displacement_method_is_modified()) {
       need_update_geometry = true;
-      scene->geometry_manager->need_update = true;
-      scene->object_manager->need_flags_update = true;
+	  scene->get_geometry_manager()->need_update = true;
+	  scene->get_object_manager()->need_flags_update = true;
     }
   }
 
@@ -362,12 +362,12 @@ void Shader::tag_update(Scene *scene)
    * need_update_geometry, update the relevant meshes and clear it. */
   if (attributes.modified(prev_attributes)) {
     need_update_geometry = true;
-    scene->geometry_manager->need_update = true;
+    scene->get_geometry_manager()->need_update = true;
   }
 
   if (has_volume != prev_has_volume || volume_step_rate != prev_volume_step_rate) {
-    scene->geometry_manager->need_flags_update = true;
-    scene->object_manager->need_flags_update = true;
+    scene->get_geometry_manager()->need_flags_update = true;
+    scene->get_object_manager()->need_flags_update = true;
     prev_volume_step_rate = volume_step_rate;
   }
 }
@@ -378,7 +378,7 @@ void Shader::tag_used(Scene *scene)
    * recompiled because it was skipped for compilation before */
   if (!used) {
     tag_modified();
-    scene->shader_manager->need_update = true;
+    scene->get_shader_manager()->need_update = true;
   }
 }
 
@@ -470,7 +470,7 @@ uint ShaderManager::get_attribute_id(AttributeStandard std)
 int ShaderManager::get_shader_id(Shader *shader, bool smooth)
 {
   /* get a shader id to pass to the kernel */
-  int id = shader->id;
+  int id = shader->get_id();
 
   /* smooth flag */
   if (smooth)
@@ -491,28 +491,28 @@ void ShaderManager::update_shaders_used(Scene *scene)
   /* figure out which shaders are in use, so SVM/OSL can skip compiling them
    * for speed and avoid loading image textures into memory */
   uint id = 0;
-  foreach (Shader *shader, scene->shaders) {
-    shader->used = false;
-    shader->id = id++;
+  foreach (Shader *shader, scene->get_shaders()) {
+    shader->set_used(false);
+    shader->set_id(id++);
   }
 
-  scene->default_surface->used = true;
-  scene->default_light->used = true;
-  scene->default_background->used = true;
-  scene->default_empty->used = true;
+  scene->get_default_surface()->set_used(true);
+  scene->get_default_light()->set_used(true);
+  scene->get_default_background()->set_used(true);
+  scene->get_default_empty()->set_used(true);
 
-  if (scene->background->get_shader())
-    scene->background->get_shader()->used = true;
+  if (scene->get_background()->get_shader())
+    scene->get_background()->get_shader()->set_used(true);
 
-  foreach (Geometry *geom, scene->geometry)
+  foreach (Geometry *geom, scene->get_geometry())
     foreach (Node *node, geom->get_used_shaders()) {
       Shader *shader = static_cast<Shader *>(node);
-      shader->used = true;
+      shader->set_used(true);
     }
 
-  foreach (Light *light, scene->lights)
+  foreach (Light *light, scene->get_lights())
     if (light->get_shader())
-      const_cast<Shader *>(light->get_shader())->used = true;
+      const_cast<Shader *>(light->get_shader())->set_used(true);
 }
 
 void ShaderManager::device_update_common(Device *device,
@@ -522,21 +522,21 @@ void ShaderManager::device_update_common(Device *device,
 {
   dscene->shaders.free();
 
-  if (scene->shaders.size() == 0)
+  if (scene->get_shaders().size() == 0)
     return;
 
-  KernelShader *kshader = dscene->shaders.alloc(scene->shaders.size());
+  KernelShader *kshader = dscene->shaders.alloc(scene->get_shaders().size());
   bool has_volumes = false;
   bool has_transparent_shadow = false;
 
-  foreach (Shader *shader, scene->shaders) {
+  foreach (Shader *shader, scene->get_shaders()) {
     uint flag = 0;
 
     if (shader->get_use_mis())
       flag |= SD_USE_MIS;
-    if (shader->has_surface_transparent && shader->get_use_transparent_shadow())
+    if (shader->get_has_surface_transparent() && shader->get_use_transparent_shadow())
       flag |= SD_HAS_TRANSPARENT_SHADOW;
-    if (shader->has_volume) {
+    if (shader->get_has_volume()) {
       flag |= SD_HAS_VOLUME;
       has_volumes = true;
 
@@ -546,15 +546,15 @@ void ShaderManager::device_update_common(Device *device,
       flag |= SD_HAS_TRANSPARENT_SHADOW;
     }
     /* in this case we can assume transparent surface */
-    if (shader->has_volume_connected && !shader->has_surface)
+    if (shader->get_has_volume_connected() && !shader->get_has_surface())
       flag |= SD_HAS_ONLY_VOLUME;
-    if (shader->has_volume) {
-      if (shader->get_heterogeneous_volume() && shader->has_volume_spatial_varying)
+    if (shader->get_has_volume()) {
+      if (shader->get_heterogeneous_volume() && shader->get_has_volume_spatial_varying())
         flag |= SD_HETEROGENEOUS_VOLUME;
     }
-    if (shader->has_volume_attribute_dependency)
+    if (shader->get_has_volume_attribute_dependency())
       flag |= SD_NEED_VOLUME_ATTRIBUTES;
-    if (shader->has_bssrdf_bump)
+    if (shader->get_has_bssrdf_bump())
       flag |= SD_HAS_BSSRDF_BUMP;
     if (device->info.has_volume_decoupled) {
       if (shader->get_volume_sampling_method() == VOLUME_SAMPLING_EQUIANGULAR)
@@ -564,7 +564,7 @@ void ShaderManager::device_update_common(Device *device,
     }
     if (shader->get_volume_interpolation_method() == VOLUME_INTERPOLATION_CUBIC)
       flag |= SD_VOLUME_CUBIC;
-    if (shader->has_bump)
+    if (shader->get_has_bump())
       flag |= SD_HAS_BUMP;
     if (shader->get_displacement_method() != DISPLACE_BUMP)
       flag |= SD_HAS_DISPLACEMENT;
@@ -574,7 +574,8 @@ void ShaderManager::device_update_common(Device *device,
     if (shader->is_constant_emission(&constant_emission))
       flag |= SD_HAS_CONSTANT_EMISSION;
 
-    uint32_t cryptomatte_id = util_murmur_hash3(shader->name.c_str(), shader->name.length(), 0);
+    uint32_t cryptomatte_id = util_murmur_hash3(
+        shader->get_name().c_str(), shader->get_name().length(), 0);
 
     /* regular shader */
     kshader->flags = flag;
@@ -602,7 +603,7 @@ void ShaderManager::device_update_common(Device *device,
         beckmann_table_ready = true;
       }
     }
-    beckmann_table_offset = scene->lookup_tables->add_table(dscene, beckmann_table);
+    beckmann_table_offset = scene->get_lookup_tables()->add_table(dscene, beckmann_table);
   }
   ktables->beckmann_offset = (int)beckmann_table_offset;
 
@@ -623,7 +624,7 @@ void ShaderManager::device_update_common(Device *device,
 
 void ShaderManager::device_free_common(Device *, DeviceScene *dscene, Scene *scene)
 {
-  scene->lookup_tables->remove_table(&beckmann_table_offset);
+  scene->get_lookup_tables()->remove_table(&beckmann_table_offset);
 
   dscene->shaders.free();
 }
@@ -641,9 +642,9 @@ void ShaderManager::add_default(Scene *scene)
     graph->connect(diffuse->output("BSDF"), graph->output()->input("Surface"));
 
     Shader *shader = scene->create_node<Shader>();
-    shader->name = "default_surface";
+    shader->get_name() = "default_surface";
     shader->set_graph(graph);
-    scene->default_surface = shader;
+    scene->set_default_surface(shader);
     shader->tag_update(scene);
   }
 
@@ -657,9 +658,9 @@ void ShaderManager::add_default(Scene *scene)
     graph->connect(principled->output("Volume"), graph->output()->input("Volume"));
 
     Shader *shader = scene->create_node<Shader>();
-    shader->name = "default_volume";
+    shader->get_name() = "default_volume";
     shader->set_graph(graph);
-    scene->default_volume = shader;
+    scene->set_default_volume(shader);
     shader->tag_update(scene);
   }
 
@@ -675,9 +676,9 @@ void ShaderManager::add_default(Scene *scene)
     graph->connect(emission->output("Emission"), graph->output()->input("Surface"));
 
     Shader *shader = scene->create_node<Shader>();
-    shader->name = "default_light";
+    shader->get_name() = "default_light";
     shader->set_graph(graph);
-    scene->default_light = shader;
+    scene->set_default_light(shader);
     shader->tag_update(scene);
   }
 
@@ -686,9 +687,9 @@ void ShaderManager::add_default(Scene *scene)
     ShaderGraph *graph = new ShaderGraph();
 
     Shader *shader = scene->create_node<Shader>();
-    shader->name = "default_background";
+    shader->get_name() = "default_background";
     shader->set_graph(graph);
-    scene->default_background = shader;
+    scene->set_default_background(shader);
     shader->tag_update(scene);
   }
 
@@ -697,9 +698,9 @@ void ShaderManager::add_default(Scene *scene)
     ShaderGraph *graph = new ShaderGraph();
 
     Shader *shader = scene->create_node<Shader>();
-    shader->name = "default_empty";
+    shader->get_name() = "default_empty";
     shader->set_graph(graph);
-    scene->default_empty = shader;
+    scene->set_default_empty(shader);
     shader->tag_update(scene);
   }
 }
@@ -707,11 +708,11 @@ void ShaderManager::add_default(Scene *scene)
 void ShaderManager::get_requested_graph_features(ShaderGraph *graph,
                                                  DeviceRequestedFeatures *requested_features)
 {
-  foreach (ShaderNode *node, graph->nodes) {
+  foreach (ShaderNode *node, graph->get_nodes()) {
     requested_features->max_nodes_group = max(requested_features->max_nodes_group,
                                               node->get_group());
     requested_features->nodes_features |= node->get_feature();
-    if (node->special_type == SHADER_SPECIAL_TYPE_CLOSURE) {
+    if (node->get_special_type() == SHADER_SPECIAL_TYPE_CLOSURE) {
       BsdfBaseNode *bsdf_node = static_cast<BsdfBaseNode *>(node);
       if (CLOSURE_IS_VOLUME(bsdf_node->get_closure_type())) {
         requested_features->nodes_features |= NODE_FEATURE_VOLUME;
@@ -737,16 +738,15 @@ void ShaderManager::get_requested_features(Scene *scene,
 {
   requested_features->max_nodes_group = NODE_GROUP_LEVEL_0;
   requested_features->nodes_features = 0;
-  for (int i = 0; i < scene->shaders.size(); i++) {
-    Shader *shader = scene->shaders[i];
-    if (!shader->used) {
+  foreach (Shader *shader, scene->get_shaders()) {
+    if (!shader->get_used()) {
       continue;
     }
 
     /* Gather requested features from all the nodes from the graph nodes. */
-    get_requested_graph_features(shader->graph, requested_features);
-    ShaderNode *output_node = shader->graph->output();
-    if (output_node->input("Displacement")->link != NULL) {
+    get_requested_graph_features(shader->get_graph(), requested_features);
+    ShaderNode *output_node = shader->get_graph()->output();
+    if (output_node->input("Displacement")->get_link() != NULL) {
       requested_features->nodes_features |= NODE_FEATURE_BUMP;
       if (shader->get_displacement_method() == DISPLACE_BOTH) {
         requested_features->nodes_features |= NODE_FEATURE_BUMP_STATE;
@@ -756,7 +756,7 @@ void ShaderManager::get_requested_features(Scene *scene,
     }
     /* On top of volume nodes, also check if we need volume sampling because
      * e.g. an Emission node would slip through the NODE_FEATURE_VOLUME check */
-    if (shader->has_volume)
+    if (shader->get_has_volume())
       requested_features->use_volume |= true;
   }
 }
@@ -781,13 +781,14 @@ string ShaderManager::get_cryptomatte_materials(Scene *scene)
 {
   string manifest = "{";
   unordered_set<ustring, ustringHash> materials;
-  foreach (Shader *shader, scene->shaders) {
-    if (materials.count(shader->name)) {
+  foreach (Shader *shader, scene->get_shaders()) {
+    if (materials.count(shader->get_name())) {
       continue;
     }
-    materials.insert(shader->name);
-    uint32_t cryptomatte_id = util_murmur_hash3(shader->name.c_str(), shader->name.length(), 0);
-    manifest += string_printf("\"%s\":\"%08x\",", shader->name.c_str(), cryptomatte_id);
+    materials.insert(shader->get_name());
+    uint32_t cryptomatte_id = util_murmur_hash3(
+        shader->get_name().c_str(), shader->get_name().length(), 0);
+    manifest += string_printf("\"%s\":\"%08x\",", shader->get_name().c_str(), cryptomatte_id);
   }
   manifest[manifest.size() - 1] = '}';
   return manifest;

@@ -1798,8 +1798,8 @@ void CUDADevice::denoise(RenderTile &rtile, DenoisingTask &denoising)
   denoising.functions.detect_outliers = function_bind(
       &CUDADevice::denoising_detect_outliers, this, _1, _2, _3, _4, &denoising);
 
-  denoising.filter_area = make_int4(rtile.x, rtile.y, rtile.w, rtile.h);
-  denoising.render_buffer.samples = rtile.sample;
+  denoising.filter_area = make_int4(rtile.get_x(), rtile.get_y(), rtile.get_w(), rtile.get_h());
+  denoising.render_buffer.samples = rtile.get_sample();
   denoising.buffer.gpu_temporary_mem = true;
 
   denoising.run_denoising(rtile);
@@ -1864,7 +1864,7 @@ void CUDADevice::adaptive_sampling_post(RenderTile &rtile,
   const int num_threads_per_block = functions.adaptive_num_threads_per_block;
   uint total_work_size = wtile->h * wtile->w;
 
-  void *args[] = {&d_wtile, &rtile.start_sample, &rtile.sample, &total_work_size};
+  void *args[] = {&d_wtile, &rtile.get_start_sample(), &rtile.get_sample(), &total_work_size};
   uint num_blocks = divide_up(total_work_size, num_threads_per_block);
   cuda_assert(cuLaunchKernel(functions.adaptive_scale_samples,
                              num_blocks,
@@ -1881,7 +1881,7 @@ void CUDADevice::adaptive_sampling_post(RenderTile &rtile,
 
 void CUDADevice::render(DeviceTask &task, RenderTile &rtile, device_vector<WorkTile> &work_tiles)
 {
-  scoped_timer timer(&rtile.buffers->render_time);
+  scoped_timer timer(&rtile.get_buffers()->get_render_time());
 
   if (have_error())
     return;
@@ -1890,7 +1890,7 @@ void CUDADevice::render(DeviceTask &task, RenderTile &rtile, device_vector<WorkT
   CUfunction cuRender;
 
   /* Get kernel function. */
-  if (rtile.task == RenderTile::BAKE) {
+  if (rtile.get_task() == RenderTile::BAKE) {
     cuda_assert(cuModuleGetFunction(&cuRender, cuModule, "kernel_cuda_bake"));
   }
   else if (task.integrator_branched) {
@@ -1910,13 +1910,7 @@ void CUDADevice::render(DeviceTask &task, RenderTile &rtile, device_vector<WorkT
   work_tiles.alloc(1);
 
   WorkTile *wtile = work_tiles.data();
-  wtile->x = rtile.x;
-  wtile->y = rtile.y;
-  wtile->w = rtile.w;
-  wtile->h = rtile.h;
-  wtile->offset = rtile.offset;
-  wtile->stride = rtile.stride;
-  wtile->buffer = (float *)(CUdeviceptr)rtile.buffer;
+  *wtile = rtile.work_tile();
 
   /* Prepare work size. More step samples render faster, but for now we
    * remain conservative for GPUs connected to a display to avoid driver
@@ -1934,8 +1928,8 @@ void CUDADevice::render(DeviceTask &task, RenderTile &rtile, device_vector<WorkT
   }
 
   /* Render all samples. */
-  int start_sample = rtile.start_sample;
-  int end_sample = rtile.start_sample + rtile.num_samples;
+  int start_sample = rtile.get_start_sample();
+  int end_sample = rtile.get_start_sample() + rtile.get_num_samples();
 
   for (int sample = start_sample; sample < end_sample; sample += step_samples) {
     /* Setup and copy work tile to device. */
@@ -1962,8 +1956,8 @@ void CUDADevice::render(DeviceTask &task, RenderTile &rtile, device_vector<WorkT
     cuda_assert(cuCtxSynchronize());
 
     /* Update progress. */
-    rtile.sample = sample + wtile->num_samples;
-    task.update_progress(&rtile, rtile.w * rtile.h * wtile->num_samples);
+    rtile.get_sample() = sample + wtile->num_samples;
+    task.update_progress(&rtile, rtile.get_w() * rtile.get_h() * wtile->num_samples);
 
     if (task.get_cancel()) {
       if (task.need_finish_queue == false)
@@ -1976,7 +1970,7 @@ void CUDADevice::render(DeviceTask &task, RenderTile &rtile, device_vector<WorkT
     CUdeviceptr d_work_tiles = (CUdeviceptr)work_tiles.device_pointer;
     adaptive_sampling_post(rtile, wtile, d_work_tiles);
     cuda_assert(cuCtxSynchronize());
-    task.update_progress(&rtile, rtile.w * rtile.h * wtile->num_samples);
+    task.update_progress(&rtile, rtile.get_w() * rtile.get_h() * wtile->num_samples);
   }
 }
 
@@ -2388,7 +2382,7 @@ void CUDADevice::thread_run(DeviceTask &task)
     DenoisingTask denoising(this, task);
 
     while (task.acquire_tile(this, tile, task.tile_types)) {
-      if (tile.task == RenderTile::PATH_TRACE) {
+      if (tile.get_task() == RenderTile::PATH_TRACE) {
         if (use_split_kernel()) {
           device_only_memory<uchar> void_buffer(this, "void_buffer");
           split_kernel->path_trace(task, tile, void_buffer, void_buffer);
@@ -2397,15 +2391,15 @@ void CUDADevice::thread_run(DeviceTask &task)
           render(task, tile, work_tiles);
         }
       }
-      else if (tile.task == RenderTile::BAKE) {
+      else if (tile.get_task() == RenderTile::BAKE) {
         render(task, tile, work_tiles);
       }
-      else if (tile.task == RenderTile::DENOISE) {
-        tile.sample = tile.start_sample + tile.num_samples;
+      else if (tile.get_task() == RenderTile::DENOISE) {
+        tile.get_sample() = tile.get_start_sample() + tile.get_num_samples();
 
         denoise(tile, denoising);
 
-        task.update_progress(&tile, tile.w * tile.h);
+        task.update_progress(&tile, tile.get_w() * tile.get_h());
       }
 
       task.release_tile(tile);
@@ -2424,22 +2418,11 @@ void CUDADevice::thread_run(DeviceTask &task)
     cuda_assert(cuCtxSynchronize());
   }
   else if (task.type == DeviceTask::DENOISE_BUFFER) {
-    RenderTile tile;
-    tile.x = task.x;
-    tile.y = task.y;
-    tile.w = task.w;
-    tile.h = task.h;
-    tile.buffer = task.buffer;
-    tile.sample = task.sample + task.num_samples;
-    tile.num_samples = task.num_samples;
-    tile.start_sample = task.sample;
-    tile.offset = task.offset;
-    tile.stride = task.stride;
-    tile.buffers = task.buffers;
+    RenderTile tile = RenderTile::from_device_task(task, true);
 
     DenoisingTask denoising(this, task);
     denoise(tile, denoising);
-    task.update_progress(&tile, tile.w * tile.h);
+    task.update_progress(&tile, tile.get_w() * tile.get_h());
   }
 }
 
@@ -2609,9 +2592,9 @@ bool CUDASplitKernel::enqueue_split_kernel_data_init(const KernelDimensions &dim
   CUdeviceptr d_use_queues_flag = (CUdeviceptr)use_queues_flag.device_pointer;
   CUdeviceptr d_work_pool_wgs = (CUdeviceptr)work_pool_wgs.device_pointer;
 
-  CUdeviceptr d_buffer = (CUdeviceptr)rtile.buffer;
+  CUdeviceptr d_buffer = (CUdeviceptr)rtile.get_buffer();
 
-  int end_sample = rtile.start_sample + rtile.num_samples;
+  int end_sample = rtile.get_start_sample() + rtile.get_num_samples();
   int queue_size = dim.global_size[0] * dim.global_size[1];
 
   struct args_t {
@@ -2637,19 +2620,19 @@ bool CUDASplitKernel::enqueue_split_kernel_data_init(const KernelDimensions &dim
   args_t args = {&d_split_data,
                  &num_global_elements,
                  &d_ray_state,
-                 &rtile.start_sample,
+                 &rtile.get_start_sample(),
                  &end_sample,
-                 &rtile.x,
-                 &rtile.y,
-                 &rtile.w,
-                 &rtile.h,
-                 &rtile.offset,
-                 &rtile.stride,
+                 &rtile.get_x(),
+                 &rtile.get_y(),
+                 &rtile.get_w(),
+                 &rtile.get_h(),
+                 &rtile.get_offset(),
+                 &rtile.get_stride(),
                  &d_queue_index,
                  &queue_size,
                  &d_use_queues_flag,
                  &d_work_pool_wgs,
-                 &rtile.num_samples,
+                 &rtile.get_num_samples(),
                  &d_buffer};
 
   CUfunction data_init;

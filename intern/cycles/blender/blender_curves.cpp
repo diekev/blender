@@ -289,9 +289,9 @@ static void ExportCurveSegments(Scene *scene, Hair *hair, ParticleCurveData *CDa
   Attribute *attr_random = NULL;
 
   if (hair->need_attribute(scene, ATTR_STD_CURVE_INTERCEPT))
-    attr_intercept = hair->attributes.add(ATTR_STD_CURVE_INTERCEPT);
+    attr_intercept = hair->get_attributes().add(ATTR_STD_CURVE_INTERCEPT);
   if (hair->need_attribute(scene, ATTR_STD_CURVE_RANDOM))
-    attr_random = hair->attributes.add(ATTR_STD_CURVE_RANDOM);
+    attr_random = hair->get_attributes().add(ATTR_STD_CURVE_RANDOM);
 
   /* compute and reserve size of arrays */
   for (int sys = 0; sys < CData->psys_firstcurve.size(); sys++) {
@@ -304,7 +304,7 @@ static void ExportCurveSegments(Scene *scene, Hair *hair, ParticleCurveData *CDa
   }
 
   if (num_curves > 0) {
-    VLOG(1) << "Exporting curve segments for mesh " << hair->name;
+    VLOG(1) << "Exporting curve segments for mesh " << hair->get_name();
   }
 
   hair->reserve_curves(hair->num_curves() + num_curves, hair->get_curve_keys().size() + num_keys);
@@ -401,7 +401,7 @@ static void export_hair_motion_validate_attribute(Hair *hair,
                                                   int num_motion_keys,
                                                   bool have_motion)
 {
-  Attribute *attr_mP = hair->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
+  Attribute *attr_mP = hair->get_attributes().find(ATTR_STD_MOTION_VERTEX_POSITION);
   const int num_keys = hair->get_curve_keys().size();
 
   if (num_motion_keys != num_keys || !have_motion) {
@@ -412,7 +412,7 @@ static void export_hair_motion_validate_attribute(Hair *hair,
     else {
       VLOG(1) << "No motion, removing attribute.";
     }
-    hair->attributes.remove(ATTR_STD_MOTION_VERTEX_POSITION);
+    hair->get_attributes().remove(ATTR_STD_MOTION_VERTEX_POSITION);
   }
   else if (motion_step > 0) {
     VLOG(1) << "Filling in new motion vertex position for motion_step " << motion_step;
@@ -432,17 +432,17 @@ static void export_hair_motion_validate_attribute(Hair *hair,
 
 static void ExportCurveSegmentsMotion(Hair *hair, ParticleCurveData *CData, int motion_step)
 {
-  VLOG(1) << "Exporting curve motion segments for hair " << hair->name << ", motion step "
+  VLOG(1) << "Exporting curve motion segments for hair " << hair->get_name() << ", motion step "
           << motion_step;
 
   /* find attribute */
-  Attribute *attr_mP = hair->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
+  Attribute *attr_mP = hair->get_attributes().find(ATTR_STD_MOTION_VERTEX_POSITION);
   bool new_attribute = false;
 
   /* add new attribute if it doesn't exist already */
   if (!attr_mP) {
     VLOG(1) << "Creating new motion vertex position attribute";
-    attr_mP = hair->attributes.add(ATTR_STD_MOTION_VERTEX_POSITION);
+    attr_mP = hair->get_attributes().add(ATTR_STD_MOTION_VERTEX_POSITION);
     new_attribute = true;
   }
 
@@ -556,11 +556,11 @@ void BlenderSync::sync_particle_hair(
       float3 loc, size;
       mesh_texture_space(b_mesh, loc, size);
 
-      Attribute *attr_generated = hair->attributes.add(ATTR_STD_GENERATED);
+      Attribute *attr_generated = hair->get_attributes().add(ATTR_STD_GENERATED);
       float3 *generated = attr_generated->data_float3();
 
       for (size_t i = 0; i < hair->num_curves(); i++) {
-        float3 co = hair->get_curve_keys()[hair->get_curve(i).first_key];
+        float3 co = hair->get_curve_keys()[hair->get_curve(i).get_first_key()];
         generated[i] = co * size - loc;
       }
     }
@@ -577,7 +577,7 @@ void BlenderSync::sync_particle_hair(
 
       ObtainCacheParticleVcol(hair, &b_mesh, &b_ob, &CData, !preview, vcol_num);
 
-      Attribute *attr_vcol = hair->attributes.add(
+      Attribute *attr_vcol = hair->get_attributes().add(
           ustring(l->name().c_str()), TypeRGBA, ATTR_ELEMENT_CURVE);
 
       float4 *fdata = attr_vcol->data_float4();
@@ -610,9 +610,9 @@ void BlenderSync::sync_particle_hair(
         ObtainCacheParticleUV(hair, &b_mesh, &b_ob, &CData, !preview, uv_num);
 
         if (active_render)
-          attr_uv = hair->attributes.add(std, name);
+          attr_uv = hair->get_attributes().add(std, name);
         else
-          attr_uv = hair->attributes.add(name, TypeFloat2, ATTR_ELEMENT_CURVE);
+          attr_uv = hair->get_attributes().add(name, TypeFloat2, ATTR_ELEMENT_CURVE);
 
         float2 *uv = attr_uv->data_float2();
 
@@ -659,10 +659,10 @@ static void export_hair_curves(Scene *scene, Hair *hair, BL::Hair b_hair)
   Attribute *attr_random = NULL;
 
   if (hair->need_attribute(scene, ATTR_STD_CURVE_INTERCEPT)) {
-    attr_intercept = hair->attributes.add(ATTR_STD_CURVE_INTERCEPT);
+    attr_intercept = hair->get_attributes().add(ATTR_STD_CURVE_INTERCEPT);
   }
   if (hair->need_attribute(scene, ATTR_STD_CURVE_RANDOM)) {
-    attr_random = hair->attributes.add(ATTR_STD_CURVE_RANDOM);
+    attr_random = hair->get_attributes().add(ATTR_STD_CURVE_RANDOM);
   }
 
   /* Reserve memory. */
@@ -670,7 +670,7 @@ static void export_hair_curves(Scene *scene, Hair *hair, BL::Hair b_hair)
   const int num_curves = b_hair.curves.length();
 
   if (num_curves > 0) {
-    VLOG(1) << "Exporting curve segments for hair " << hair->name;
+    VLOG(1) << "Exporting curve segments for hair " << hair->get_name();
   }
 
   hair->reserve_curves(num_curves, num_keys);
@@ -728,16 +728,16 @@ static void export_hair_curves(Scene *scene, Hair *hair, BL::Hair b_hair)
 
 static void export_hair_curves_motion(Hair *hair, BL::Hair b_hair, int motion_step)
 {
-  VLOG(1) << "Exporting curve motion segments for hair " << hair->name << ", motion step "
+  VLOG(1) << "Exporting curve motion segments for hair " << hair->get_name() << ", motion step "
           << motion_step;
 
   /* Find or add attribute. */
-  Attribute *attr_mP = hair->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
+  Attribute *attr_mP = hair->get_attributes().find(ATTR_STD_MOTION_VERTEX_POSITION);
   bool new_attribute = false;
 
   if (!attr_mP) {
     VLOG(1) << "Creating new motion vertex position attribute";
-    attr_mP = hair->attributes.add(ATTR_STD_MOTION_VERTEX_POSITION);
+    attr_mP = hair->get_attributes().add(ATTR_STD_MOTION_VERTEX_POSITION);
     new_attribute = true;
   }
 
@@ -757,7 +757,7 @@ static void export_hair_curves_motion(Hair *hair, BL::Hair b_hair, int motion_st
     Hair::Curve curve = hair->get_curve(curve_index);
     curve_index++;
 
-    if (num_points == curve.num_keys) {
+    if (num_points == curve.get_num_keys()) {
       /* Number of keys matches. */
       for (int i = 0; i < num_points; i++) {
         int point_index = first_point_index + i;
@@ -779,8 +779,8 @@ static void export_hair_curves_motion(Hair *hair, BL::Hair b_hair, int motion_st
     else {
       /* Number of keys has changed. Generate an interpolated version
        * to preserve motion blur. */
-      const float step_size = curve.num_keys > 1 ? 1.0f / (curve.num_keys - 1) : 0.0f;
-      for (int i = 0; i < curve.num_keys; i++) {
+      const float step_size = curve.get_num_keys() > 1 ? 1.0f / (curve.get_num_keys() - 1) : 0.0f;
+      for (int i = 0; i < curve.get_num_keys(); i++) {
         const float step = i * step_size;
         mP[num_motion_keys] = interpolate_hair_points(b_hair, first_point_index, num_points, step);
         num_motion_keys++;
@@ -846,18 +846,18 @@ void BlenderSync::sync_hair(BL::Depsgraph b_depsgraph, BL::Object b_ob, Hair *ha
 
   /* update original sockets */
 
-  for (const SocketType &socket : new_hair.type->inputs) {
+  for (const SocketType &socket : new_hair.get_type()->get_inputs()) {
     /* Those sockets are updated in sync_object, so do not modify them. */
-    if (socket.name == "use_motion_blur" || socket.name == "motion_steps" ||
-        socket.name == "used_shaders") {
+    if (socket.get_name() == "use_motion_blur" || socket.get_name() == "motion_steps" ||
+        socket.get_name() == "used_shaders") {
       continue;
     }
     hair->set_value(socket, new_hair, socket);
   }
 
-  hair->attributes.clear();
-  foreach (Attribute &attr, new_hair.attributes.attributes) {
-    hair->attributes.attributes.push_back(std::move(attr));
+  hair->get_attributes().clear();
+  foreach (Attribute &attr, new_hair.get_attributes().get_attributes()) {
+    hair->get_attributes().get_attributes().push_back(std::move(attr));
   }
 
   /* tag update */

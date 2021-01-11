@@ -17,6 +17,7 @@
 #ifndef __PARTICLES_H__
 #define __PARTICLES_H__
 
+#include "util/util_api.h"
 #include "util/util_array.h"
 #include "util/util_types.h"
 
@@ -43,15 +44,25 @@ struct Particle {
 };
 
 class ParticleSystem : public Node {
+  GET(array<Particle>, particles)
+
  public:
   NODE_DECLARE
 
   ParticleSystem();
   ~ParticleSystem();
 
-  void tag_update(Scene *scene);
+  void clear()
+  {
+    particles.clear();
+  }
 
-  array<Particle> particles;
+  void add_particle(const Particle &pa)
+  {
+    particles.push_back_slow(pa);
+  }
+
+  void tag_update(Scene *scene);
 };
 
 /* ParticleSystem Manager */

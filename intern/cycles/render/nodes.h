@@ -189,7 +189,7 @@ class SkyTextureNode : public TextureNode {
   NODE_SOCKET_API(float, dust_density)
   NODE_SOCKET_API(float, ozone_density)
   NODE_SOCKET_API(float3, vector)
-  ImageHandle handle;
+  GET_SET(ImageHandle, handle)
 
   float get_sun_size()
   {
@@ -426,7 +426,7 @@ class PointDensityTextureNode : public ShaderNode {
   NODE_SOCKET_API(float3, vector)
 
   /* Runtime. */
-  ImageHandle handle;
+  GET_SET(ImageHandle, handle)
 
   ImageParams image_params() const;
 
@@ -1627,8 +1627,8 @@ class OSLNode : public ShaderNode {
     return false;
   }
 
-  string filepath;
-  string bytecode_hash;
+  GET_SET(string, filepath)
+  GET_SET(string, bytecode_hash)
 };
 
 class NormalMapNode : public ShaderNode {

@@ -27,8 +27,12 @@ class Hair : public Geometry {
 
   /* Hair Curve */
   struct Curve {
-    int first_key;
-    int num_keys;
+    GET(int, first_key)
+    GET(int, num_keys)
+
+    Curve(int first_key_, int num_keys_) : first_key(first_key_), num_keys(num_keys_)
+    {
+    }
 
     int num_segments() const
     {
@@ -95,9 +99,10 @@ class Hair : public Geometry {
   NODE_SOCKET_API(array<int>, curve_shader)
 
   /* BVH */
-  size_t curvekey_offset;
-  CurveShapeType curve_shape;
+  GET_SET(size_t, curvekey_offset)
+  GET_SET(CurveShapeType, curve_shape)
 
+ public:
   /* Constructor/Destructor */
   Hair();
   ~Hair();

@@ -26,6 +26,7 @@
 #include "device/device.h"
 #include "device/device_memory.h"
 
+#include "util/util_api.h"
 #include "util/util_param.h"
 #include "util/util_string.h"
 #include "util/util_system.h"
@@ -216,56 +217,57 @@ class SceneParams {
 /* Scene */
 
 class Scene : public NodeOwner {
- public:
+ private:
   /* Optional name. Is used for logging and reporting. */
-  string name;
+  GET_SET(string, name)
 
   /* data */
-  BVH *bvh;
-  Camera *camera;
-  Camera *dicing_camera;
-  LookupTables *lookup_tables;
-  Film *film;
-  Background *background;
-  Integrator *integrator;
+  GET_SET(BVH *, bvh)
+  GET_SET(Camera *, camera)
+  GET_SET(Camera *, dicing_camera)
+  GET(LookupTables *, lookup_tables)
+  GET(Film *, film)
+  GET(Background *, background)
+  GET(Integrator *, integrator)
 
   /* data lists */
-  vector<Object *> objects;
-  vector<Geometry *> geometry;
-  vector<Shader *> shaders;
-  vector<Light *> lights;
-  vector<ParticleSystem *> particle_systems;
-  vector<Pass> passes;
+  GET(vector<Object *>, objects)
+  GET(vector<Geometry *>, geometry)
+  GET(vector<Shader *>, shaders)
+  GET(vector<Light *>, lights)
+  GET(vector<ParticleSystem *>, particle_systems)
+  GET(vector<Pass>, passes)
 
   /* data managers */
-  ImageManager *image_manager;
-  LightManager *light_manager;
-  ShaderManager *shader_manager;
-  GeometryManager *geometry_manager;
-  ObjectManager *object_manager;
-  ParticleSystemManager *particle_system_manager;
-  BakeManager *bake_manager;
+  GET(ImageManager *, image_manager)
+  GET(LightManager *, light_manager)
+  GET(ShaderManager *, shader_manager)
+  GET(GeometryManager *, geometry_manager)
+  GET(ObjectManager *, object_manager)
+  GET(ParticleSystemManager *, particle_system_manager)
+  GET(BakeManager *, bake_manager)
 
   /* default shaders */
-  Shader *default_surface;
-  Shader *default_volume;
-  Shader *default_light;
-  Shader *default_background;
-  Shader *default_empty;
+  GET_SET(Shader *, default_surface)
+  GET_SET(Shader *, default_volume)
+  GET_SET(Shader *, default_light)
+  GET_SET(Shader *, default_background)
+  GET_SET(Shader *, default_empty)
 
   /* device */
   Device *device;
-  DeviceScene dscene;
+  GET(DeviceScene, dscene)
 
   /* parameters */
-  SceneParams params;
+  GET(SceneParams, params)
 
   /* mutex must be locked manually by callers */
-  thread_mutex mutex;
+  GET(thread_mutex, mutex)
 
   /* scene update statistics */
-  SceneUpdateStats *update_stats;
+  GET(SceneUpdateStats *, update_stats)
 
+ public:
   Scene(const SceneParams &params, Device *device);
   ~Scene();
 

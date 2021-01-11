@@ -313,18 +313,18 @@ void RenderStats::collect_profiling(Scene *scene, Profiler &prof)
   prefilter.add_entry("Combine Halves", prof.get_event(PROFILING_DENOISING_COMBINE_HALVES));
 
   shaders.entries.clear();
-  foreach (Shader *shader, scene->shaders) {
+  foreach (Shader *shader, scene->get_shaders()) {
     uint64_t samples, hits;
-    if (prof.get_shader(shader->id, samples, hits)) {
-      shaders.add(shader->name, samples, hits);
+    if (prof.get_shader(shader->get_id(), samples, hits)) {
+      shaders.add(shader->get_name(), samples, hits);
     }
   }
 
   objects.entries.clear();
-  foreach (Object *object, scene->objects) {
+  foreach (Object *object, scene->get_objects()) {
     uint64_t samples, hits;
     if (prof.get_object(object->get_device_index(), samples, hits)) {
-      objects.add(object->name, samples, hits);
+      objects.add(object->get_name(), samples, hits);
     }
   }
 }

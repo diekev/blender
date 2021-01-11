@@ -570,8 +570,8 @@ int Scene::get_max_closure_count()
   int max_closures = 0;
   for (int i = 0; i < shaders.size(); i++) {
     Shader *shader = shaders[i];
-    if (shader->used) {
-      int num_closures = shader->graph->get_num_closures();
+    if (shader->get_used()) {
+      int num_closures = shader->get_graph()->get_num_closures();
       max_closures = max(max_closures, num_closures);
     }
   }

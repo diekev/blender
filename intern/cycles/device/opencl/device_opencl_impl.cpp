@@ -471,8 +471,8 @@ class OpenCLSplitKernel : public DeviceSplitKernel {
     /* Set the range of samples to be processed for every ray in
      * path-regeneration logic.
      */
-    cl_int start_sample = rtile.start_sample;
-    cl_int end_sample = rtile.start_sample + rtile.num_samples;
+    cl_int start_sample = rtile.get_start_sample();
+    cl_int end_sample = rtile.get_start_sample() + rtile.get_num_samples();
 
     OpenCLDevice::OpenCLSplitPrograms *programs = device->get_split_programs();
     cl_kernel kernel_data_init = programs->program_split(ustring("path_trace_data_init"));
@@ -491,18 +491,18 @@ class OpenCLSplitKernel : public DeviceSplitKernel {
                                                start_arg_index,
                                                start_sample,
                                                end_sample,
-                                               rtile.x,
-                                               rtile.y,
-                                               rtile.w,
-                                               rtile.h,
-                                               rtile.offset,
-                                               rtile.stride,
+                                               rtile.get_x(),
+                                               rtile.get_y(),
+                                               rtile.get_w(),
+                                               rtile.get_h(),
+                                               rtile.get_offset(),
+                                               rtile.get_stride(),
                                                queue_index,
                                                dQueue_size,
                                                use_queues_flag,
                                                work_pool_wgs,
-                                               rtile.num_samples,
-                                               rtile.buffer);
+                                               rtile.get_num_samples(),
+                                               rtile.get_buffer());
 
     /* Enqueue ckPathTraceKernel_data_init kernel. */
     device->ciErr = clEnqueueNDRangeKernel(device->cqCommandQueue,
@@ -529,7 +529,7 @@ class OpenCLSplitKernel : public DeviceSplitKernel {
     cached_memory.queue_index = &queue_index;
     cached_memory.use_queues_flag = &use_queues_flag;
     cached_memory.work_pools = &work_pool_wgs;
-    cached_memory.buffer = &rtile.buffer;
+    cached_memory.buffer = &rtile.get_buffer();
     cached_memory.id++;
 
     return true;
@@ -556,8 +556,8 @@ class OpenCLSplitKernel : public DeviceSplitKernel {
         device->cdDevice, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(cl_ulong), &max_buffer_size, NULL);
 
     if (DebugFlags().opencl.mem_limit) {
-      max_buffer_size = min(max_buffer_size,
-                            cl_ulong(DebugFlags().opencl.mem_limit - device->stats.mem_used));
+      max_buffer_size = min(
+          max_buffer_size, cl_ulong(DebugFlags().opencl.mem_limit - device->stats.get_mem_used()));
     }
 
     VLOG(1) << "Maximum device allocation size: " << string_human_readable_number(max_buffer_size)
@@ -939,7 +939,8 @@ void OpenCLDevice::mem_alloc(device_memory &mem)
   clGetDeviceInfo(cdDevice, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(cl_ulong), &max_alloc_size, NULL);
 
   if (DebugFlags().opencl.mem_limit) {
-    max_alloc_size = min(max_alloc_size, cl_ulong(DebugFlags().opencl.mem_limit - stats.mem_used));
+    max_alloc_size = min(max_alloc_size,
+                         cl_ulong(DebugFlags().opencl.mem_limit - stats.get_mem_used()));
   }
 
   if (size > max_alloc_size) {
@@ -1360,9 +1361,9 @@ void OpenCLDevice::thread_run(DeviceTask &task)
 
     /* Keep rendering tiles until done. */
     while (task.acquire_tile(this, tile, task.tile_types)) {
-      if (tile.task == RenderTile::PATH_TRACE) {
-        assert(tile.task == RenderTile::PATH_TRACE);
-        scoped_timer timer(&tile.buffers->render_time);
+      if (tile.get_task() == RenderTile::PATH_TRACE) {
+        assert(tile.get_task() == RenderTile::PATH_TRACE);
+        scoped_timer timer(&tile.get_buffers()->get_render_time());
 
         split_kernel->path_trace(task, tile, kgbuffer, *const_mem_map["__data"]);
 
@@ -1377,13 +1378,13 @@ void OpenCLDevice::thread_run(DeviceTask &task)
          */
         clFinish(cqCommandQueue);
       }
-      else if (tile.task == RenderTile::BAKE) {
+      else if (tile.get_task() == RenderTile::BAKE) {
         bake(task, tile);
       }
-      else if (tile.task == RenderTile::DENOISE) {
-        tile.sample = tile.start_sample + tile.num_samples;
+      else if (tile.get_task() == RenderTile::DENOISE) {
+        tile.get_sample() = tile.get_start_sample() + tile.get_num_samples();
         denoise(tile, denoising);
-        task.update_progress(&tile, tile.w * tile.h);
+        task.update_progress(&tile, tile.get_w() * tile.get_h());
       }
 
       task.release_tile(tile);
@@ -1399,21 +1400,21 @@ void OpenCLDevice::thread_run(DeviceTask &task)
   }
   else if (task.type == DeviceTask::DENOISE_BUFFER) {
     RenderTile tile;
-    tile.x = task.x;
-    tile.y = task.y;
-    tile.w = task.w;
-    tile.h = task.h;
-    tile.buffer = task.buffer;
-    tile.sample = task.sample + task.num_samples;
-    tile.num_samples = task.num_samples;
-    tile.start_sample = task.sample;
-    tile.offset = task.offset;
-    tile.stride = task.stride;
-    tile.buffers = task.buffers;
+    tile.get_x() = task.x;
+    tile.get_y() = task.y;
+    tile.get_w() = task.w;
+    tile.get_h() = task.h;
+    tile.get_buffer() = task.buffer;
+    tile.get_sample() = task.sample + task.num_samples;
+    tile.get_num_samples() = task.num_samples;
+    tile.get_start_sample() = task.sample;
+    tile.get_offset() = task.offset;
+    tile.get_stride() = task.stride;
+    tile.get_buffers() = task.buffers;
 
     DenoisingTask denoising(this, task);
     denoise(tile, denoising);
-    task.update_progress(&tile, tile.w * tile.h);
+    task.update_progress(&tile, tile.get_w() * tile.get_h());
   }
 }
 
@@ -1851,8 +1852,8 @@ void OpenCLDevice::denoise(RenderTile &rtile, DenoisingTask &denoising)
   denoising.functions.detect_outliers = function_bind(
       &OpenCLDevice::denoising_detect_outliers, this, _1, _2, _3, _4, &denoising);
 
-  denoising.filter_area = make_int4(rtile.x, rtile.y, rtile.w, rtile.h);
-  denoising.render_buffer.samples = rtile.sample;
+  denoising.filter_area = make_int4(rtile.get_x(), rtile.get_y(), rtile.get_w(), rtile.get_h());
+  denoising.render_buffer.samples = rtile.get_sample();
   denoising.buffer.gpu_temporary_mem = true;
 
   denoising.run_denoising(rtile);
@@ -1904,17 +1905,17 @@ void OpenCLDevice::shader(DeviceTask &task)
 
 void OpenCLDevice::bake(DeviceTask &task, RenderTile &rtile)
 {
-  scoped_timer timer(&rtile.buffers->render_time);
+  scoped_timer timer(&rtile.get_buffers()->get_render_time());
 
   /* Cast arguments to cl types. */
   cl_mem d_data = CL_MEM_PTR(const_mem_map["__data"]->device_pointer);
-  cl_mem d_buffer = CL_MEM_PTR(rtile.buffer);
-  cl_int d_x = rtile.x;
-  cl_int d_y = rtile.y;
-  cl_int d_w = rtile.w;
-  cl_int d_h = rtile.h;
-  cl_int d_offset = rtile.offset;
-  cl_int d_stride = rtile.stride;
+  cl_mem d_buffer = CL_MEM_PTR(rtile.get_buffer());
+  cl_int d_x = rtile.get_x();
+  cl_int d_y = rtile.get_y();
+  cl_int d_w = rtile.get_w();
+  cl_int d_h = rtile.get_h();
+  cl_int d_offset = rtile.get_offset();
+  cl_int d_stride = rtile.get_stride();
 
   bake_program.wait_for_availability();
   cl_kernel kernel = bake_program();
@@ -1926,8 +1927,8 @@ void OpenCLDevice::bake(DeviceTask &task, RenderTile &rtile)
   start_arg_index += kernel_set_args(
       kernel, start_arg_index, d_x, d_y, d_w, d_h, d_offset, d_stride);
 
-  int start_sample = rtile.start_sample;
-  int end_sample = rtile.start_sample + rtile.num_samples;
+  int start_sample = rtile.get_start_sample();
+  int end_sample = rtile.get_start_sample() + rtile.get_num_samples();
 
   for (int sample = start_sample; sample < end_sample; sample++) {
     if (task.get_cancel()) {
@@ -1940,9 +1941,9 @@ void OpenCLDevice::bake(DeviceTask &task, RenderTile &rtile)
     enqueue_kernel(kernel, d_w, d_h);
     clFinish(cqCommandQueue);
 
-    rtile.sample = sample + 1;
+    rtile.get_sample() = sample + 1;
 
-    task.update_progress(&rtile, rtile.w * rtile.h);
+    task.update_progress(&rtile, rtile.get_w() * rtile.get_h());
   }
 }
 

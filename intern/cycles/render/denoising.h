@@ -22,6 +22,7 @@
 
 #include "render/buffers.h"
 
+#include "util/util_api.h"
 #include "util/util_string.h"
 #include "util/util_unique_ptr.h"
 #include "util/util_vector.h"
@@ -35,29 +36,31 @@ CCL_NAMESPACE_BEGIN
 /* Denoiser */
 
 class Denoiser {
+  /* Error message after running, in case of failure. */
+  GET_READ_ONLY(string, error)
+
+  /* Sequential list of frame filepaths to denoise. */
+  GET_SET(vector<string>, input)
+
+  /* Sequential list of frame filepaths to write result to. Empty entries
+   * are skipped, so only a subset of the sequence can be denoised while
+   * taking into account all input frames. */
+  GET_SET(vector<string>, output)
+
+  /* Sample number override, takes precedence over values from input frames. */
+  GET_SET(int, samples_override)
+
+  /* Tile size for processing on device. */
+  GET_SET(int2, tile_size)
+
+  /* Equivalent to the settings in the regular denoiser. */
+  GET_SET(DenoiseParams, params)
+
  public:
   Denoiser(DeviceInfo &device_info);
   ~Denoiser();
 
   bool run();
-
-  /* Error message after running, in case of failure. */
-  string error;
-
-  /* Sequential list of frame filepaths to denoise. */
-  vector<string> input;
-  /* Sequential list of frame filepaths to write result to. Empty entries
-   * are skipped, so only a subset of the sequence can be denoised while
-   * taking into account all input frames. */
-  vector<string> output;
-
-  /* Sample number override, takes precedence over values from input frames. */
-  int samples_override;
-  /* Tile size for processing on device. */
-  int2 tile_size;
-
-  /* Equivalent to the settings in the regular denoiser. */
-  DenoiseParams params;
 
  protected:
   friend class DenoiseTask;

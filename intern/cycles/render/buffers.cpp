@@ -19,6 +19,8 @@
 #include "device/device.h"
 #include "render/buffers.h"
 
+#include "kernel/filter/filter_defines.h"
+
 #include "util/util_foreach.h"
 #include "util/util_hash.h"
 #include "util/util_math.h"
@@ -55,12 +57,13 @@ void BufferParams::get_offset_stride(int &offset, int &stride)
 
 bool BufferParams::modified(const BufferParams &params)
 {
-  return !(full_x == params.full_x && full_y == params.full_y && width == params.width &&
-           height == params.height && full_width == params.full_width &&
-           full_height == params.full_height && Pass::equals(passes, params.passes) &&
-           denoising_data_pass == params.denoising_data_pass &&
-           denoising_clean_pass == params.denoising_clean_pass &&
-           denoising_prefiltered_pass == params.denoising_prefiltered_pass);
+  return !(full_x == params.get_full_x() && full_y == params.get_full_y() &&
+           width == params.get_width() && height == params.get_height() &&
+           full_width == params.get_full_width() && full_height == params.get_full_height() &&
+           Pass::equals(passes, params.get_passes()) &&
+           denoising_data_pass == params.get_denoising_data_pass() &&
+           denoising_clean_pass == params.get_denoising_clean_pass() &&
+           denoising_prefiltered_pass == params.get_denoising_prefiltered_pass());
 }
 
 int BufferParams::get_passes_size()
@@ -68,7 +71,7 @@ int BufferParams::get_passes_size()
   int size = 0;
 
   for (size_t i = 0; i < passes.size(); i++)
-    size += passes[i].components;
+    size += passes[i].get_components();
 
   if (denoising_data_pass) {
     size += DENOISING_PASS_SIZE_BASE;
@@ -86,7 +89,7 @@ int BufferParams::get_denoising_offset()
   int offset = 0;
 
   for (size_t i = 0; i < passes.size(); i++)
-    offset += passes[i].components;
+    offset += passes[i].get_components();
 
   return offset;
 }
@@ -128,6 +131,41 @@ RenderTile::RenderTile()
   stealing_state = NO_STEALING;
 }
 
+WorkTile RenderTile::work_tile() const
+{
+  WorkTile wtile;
+  wtile.x = x;
+  wtile.y = y;
+  wtile.w = w;
+  wtile.h = h;
+  wtile.offset = offset;
+  wtile.stride = stride;
+  wtile.buffer = (float *)buffer;
+  return wtile;
+}
+
+RenderTile RenderTile::from_device_task(const DeviceTask &task, bool set_sample)
+{
+  RenderTile tile;
+  tile.x = task.x;
+  tile.y = task.y;
+  tile.w = task.w;
+  tile.h = task.h;
+  tile.buffer = task.buffer;
+  tile.num_samples = task.num_samples;
+  tile.start_sample = task.sample;
+  tile.offset = task.offset;
+  tile.stride = task.stride;
+  tile.buffers = task.buffers;
+
+  /* sample is not set in OptiX denoising */
+  if (set_sample) {
+    tile.sample = task.sample + task.num_samples;
+  }
+
+  return tile;
+}
+
 /* Render Buffers */
 
 RenderBuffers::RenderBuffers(Device *device)
@@ -147,7 +185,7 @@ void RenderBuffers::reset(BufferParams &params_)
   params = params_;
 
   /* re-allocate buffer */
-  buffer.alloc(params.width * params.get_passes_size(), params.height);
+  buffer.alloc(params.get_width() * params.get_passes_size(), params.get_height());
   buffer.zero_to_device();
 }
 
@@ -161,7 +199,7 @@ bool RenderBuffers::copy_from_device()
   if (!buffer.device_pointer)
     return false;
 
-  buffer.copy_from_device(0, params.width * params.get_passes_size(), params.height);
+  buffer.copy_from_device(0, params.get_width() * params.get_passes_size(), params.get_height());
 
   return true;
 }
@@ -189,7 +227,7 @@ bool RenderBuffers::get_denoising_pass_rect(
     offset = type + params.get_denoising_offset();
     scale /= sample;
   }
-  else if (params.denoising_prefiltered_pass) {
+  else if (params.get_denoising_prefiltered_pass()) {
     offset = type + params.get_denoising_prefiltered_offset();
   }
   else {
@@ -214,7 +252,7 @@ bool RenderBuffers::get_denoising_pass_rect(
   }
 
   int pass_stride = params.get_passes_size();
-  int size = params.width * params.height;
+  int size = params.get_width() * params.get_height();
 
   float *in = buffer.data() + offset;
 
@@ -232,12 +270,12 @@ bool RenderBuffers::get_denoising_pass_rect(
   }
   else if (components == 4) {
     /* Since the alpha channel is not involved in denoising, output the Combined alpha channel. */
-    assert(params.passes[0].type == PASS_COMBINED);
+    assert(params.get_passes()[0].get_pass_type() == PASS_COMBINED);
     float *in_combined = buffer.data();
 
     for (int i = 0; i < size; i++, in += pass_stride, in_combined += pass_stride, pixels += 4) {
       float3 val = make_float3(in[0], in[1], in[2]);
-      if (type == DENOISING_PASS_PREFILTERED_COLOR && params.denoising_prefiltered_pass) {
+      if (type == DENOISING_PASS_PREFILTERED_COLOR && params.get_denoising_prefiltered_pass()) {
         /* Remove highlight compression from the image. */
         val = color_highlight_uncompress(val);
       }
@@ -264,10 +302,10 @@ bool RenderBuffers::get_pass_rect(
   float *sample_count = NULL;
   if (name == "Combined") {
     int sample_offset = 0;
-    for (size_t j = 0; j < params.passes.size(); j++) {
-      Pass &pass = params.passes[j];
-      if (pass.type != PASS_SAMPLE_COUNT) {
-        sample_offset += pass.components;
+    for (size_t j = 0; j < params.get_passes().size(); j++) {
+      Pass &pass = params.get_passes()[j];
+      if (pass.get_pass_type() != PASS_SAMPLE_COUNT) {
+        sample_offset += pass.get_components();
         continue;
       }
       else {
@@ -279,35 +317,36 @@ bool RenderBuffers::get_pass_rect(
 
   int pass_offset = 0;
 
-  for (size_t j = 0; j < params.passes.size(); j++) {
-    Pass &pass = params.passes[j];
+  for (size_t j = 0; j < params.get_passes().size(); j++) {
+    Pass &pass = params.get_passes()[j];
 
     /* Pass is identified by both type and name, multiple of the same type
      * may exist with a different name. */
-    if (pass.name != name) {
-      pass_offset += pass.components;
+    if (pass.get_name() != name) {
+      pass_offset += pass.get_components();
       continue;
     }
 
-    PassType type = pass.type;
+    PassType type = pass.get_pass_type();
 
     float *in = buffer.data() + pass_offset;
     int pass_stride = params.get_passes_size();
 
-    float scale = (pass.filter) ? 1.0f / (float)sample : 1.0f;
-    float scale_exposure = (pass.exposure) ? scale * exposure : scale;
+    float scale = (pass.get_filter()) ? 1.0f / (float)sample : 1.0f;
+    float scale_exposure = (pass.get_exposure()) ? scale * exposure : scale;
 
-    int size = params.width * params.height;
+    int size = params.get_width() * params.get_height();
 
     if (components == 1 && type == PASS_RENDER_TIME) {
       /* Render time is not stored by kernel, but measured per tile. */
-      float val = (float)(1000.0 * render_time / (params.width * params.height * sample));
+      float val = (float)(1000.0 * render_time /
+                          (params.get_width() * params.get_height() * sample));
       for (int i = 0; i < size; i++, pixels++) {
         pixels[0] = val;
       }
     }
     else if (components == 1) {
-      assert(pass.components == components);
+      assert(pass.get_components() == components);
 
       /* Scalar */
       if (type == PASS_DEPTH) {
@@ -339,7 +378,7 @@ bool RenderBuffers::get_pass_rect(
       }
     }
     else if (components == 3) {
-      assert(pass.components == 4);
+      assert(pass.get_components() == 4);
 
       /* RGBA */
       if (type == PASS_SHADOW) {
@@ -352,14 +391,13 @@ bool RenderBuffers::get_pass_rect(
           pixels[2] = f.z * invw;
         }
       }
-      else if (pass.divide_type != PASS_NONE) {
+      else if (pass.get_divide_type() != PASS_NONE) {
         /* RGB lighting passes that need to divide out color */
         pass_offset = 0;
-        for (size_t k = 0; k < params.passes.size(); k++) {
-          Pass &color_pass = params.passes[k];
-          if (color_pass.type == pass.divide_type)
+        foreach (Pass &color_pass, params.get_passes()) {
+          if (color_pass.get_pass_type() == pass.get_divide_type())
             break;
-          pass_offset += color_pass.components;
+          pass_offset += color_pass.get_components();
         }
 
         float *in_divide = buffer.data() + pass_offset;
@@ -387,7 +425,7 @@ bool RenderBuffers::get_pass_rect(
       }
     }
     else if (components == 4) {
-      assert(pass.components == components);
+      assert(pass.get_components() == components);
 
       /* RGBA */
       if (type == PASS_SHADOW) {
@@ -404,11 +442,10 @@ bool RenderBuffers::get_pass_rect(
       else if (type == PASS_MOTION) {
         /* need to normalize by number of samples accumulated for motion */
         pass_offset = 0;
-        for (size_t k = 0; k < params.passes.size(); k++) {
-          Pass &color_pass = params.passes[k];
-          if (color_pass.type == PASS_MOTION_WEIGHT)
+        foreach (Pass &color_pass, params.get_passes()) {
+          if (color_pass.get_pass_type() == PASS_MOTION_WEIGHT)
             break;
-          pass_offset += color_pass.components;
+          pass_offset += color_pass.get_components();
         }
 
         float *in_weight = buffer.data() + pass_offset;
@@ -438,8 +475,8 @@ bool RenderBuffers::get_pass_rect(
       else {
         for (int i = 0; i < size; i++, in += pass_stride, pixels += 4) {
           if (sample_count && sample_count[i * pass_stride] < 0.0f) {
-            scale = (pass.filter) ? -1.0f / (sample_count[i * pass_stride]) : 1.0f;
-            scale_exposure = (pass.exposure) ? scale * exposure : scale;
+            scale = (pass.get_filter()) ? -1.0f / (sample_count[i * pass_stride]) : 1.0f;
+            scale_exposure = (pass.get_exposure()) ? scale * exposure : scale;
           }
 
           float4 f = make_float4(in[0], in[1], in[2], in[3]);
@@ -468,22 +505,20 @@ bool RenderBuffers::set_pass_rect(PassType type, int components, float *pixels, 
 
   int pass_offset = 0;
 
-  for (size_t j = 0; j < params.passes.size(); j++) {
-    Pass &pass = params.passes[j];
-
-    if (pass.type != type) {
-      pass_offset += pass.components;
+  foreach (Pass &pass, params.get_passes()) {
+    if (pass.get_pass_type() != type) {
+      pass_offset += pass.get_components();
       continue;
     }
 
     float *out = buffer.data() + pass_offset;
     int pass_stride = params.get_passes_size();
-    int size = params.width * params.height;
+    int size = params.get_width() * params.get_height();
 
-    assert(pass.components == components);
+    assert(pass.get_components() == components);
 
     for (int i = 0; i < size; i++, out += pass_stride, pixels += components) {
-      if (pass.filter) {
+      if (pass.get_filter()) {
         /* Scale by the number of samples, inverse of what we do in get_pass_rect.
          * A better solution would be to remove the need for set_pass_rect entirely,
          * and change baking to bake multiple objects in a tile at once. */
@@ -530,16 +565,16 @@ void DisplayBuffer::reset(BufferParams &params_)
 
   /* allocate display pixels */
   if (half_float) {
-    rgba_half.alloc_to_device(params.width, params.height);
+    rgba_half.alloc_to_device(params.get_width(), params.get_height());
   }
   else {
-    rgba_byte.alloc_to_device(params.width, params.height);
+    rgba_byte.alloc_to_device(params.get_width(), params.get_height());
   }
 }
 
 void DisplayBuffer::draw_set(int width, int height)
 {
-  assert(width <= params.width && height <= params.height);
+  assert(width <= params.get_width() && height <= params.get_height());
 
   draw_width = width;
   draw_height = height;
@@ -554,12 +589,12 @@ void DisplayBuffer::draw(Device *device, const DeviceDrawParams &draw_params)
                         0,
                         draw_width,
                         draw_height,
-                        params.width,
-                        params.height,
-                        params.full_x,
-                        params.full_y,
-                        params.full_width,
-                        params.full_height,
+                        params.get_width(),
+                        params.get_height(),
+                        params.get_full_x(),
+                        params.get_full_y(),
+                        params.get_full_width(),
+                        params.get_full_height(),
                         transparent,
                         draw_params);
   }
@@ -568,6 +603,23 @@ void DisplayBuffer::draw(Device *device, const DeviceDrawParams &draw_params)
 bool DisplayBuffer::draw_ready()
 {
   return (draw_width != 0 && draw_height != 0);
+}
+
+void RenderTileNeighbors::fill_tile_info(TileInfo *tile_info)
+{
+  for (int i = 0; i < RenderTileNeighbors::SIZE; i++) {
+    tile_info->offsets[i] = tiles[i].get_offset();
+    tile_info->strides[i] = tiles[i].get_stride();
+    tile_info->buffers[i] = tiles[i].get_buffer();
+  }
+  tile_info->x[0] = tiles[3].get_x();
+  tile_info->x[1] = tiles[4].get_x();
+  tile_info->x[2] = tiles[5].get_x();
+  tile_info->x[3] = tiles[5].get_x() + tiles[5].get_w();
+  tile_info->y[0] = tiles[1].get_y();
+  tile_info->y[1] = tiles[4].get_y();
+  tile_info->y[2] = tiles[7].get_y();
+  tile_info->y[3] = tiles[7].get_y() + tiles[7].get_h();
 }
 
 CCL_NAMESPACE_END

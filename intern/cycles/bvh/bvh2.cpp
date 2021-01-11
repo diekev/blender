@@ -382,14 +382,14 @@ void BVH2::refit_primitives(int start, int end, BoundBox &bbox, uint &visibility
 
     if (pidx == -1) {
       /* Object instance. */
-      bbox.grow(ob->bounds);
+	  bbox.grow(ob->get_bounds());
     }
     else {
       /* Primitives. */
       if (pack.prim_type[prim] & PRIMITIVE_ALL_CURVE) {
         /* Curves. */
         const Hair *hair = static_cast<const Hair *>(ob->get_geometry());
-        int prim_offset = (params.top_level) ? hair->prim_offset : 0;
+		int prim_offset = (params.top_level) ? hair->get_prim_offset() : 0;
         Hair::Curve curve = hair->get_curve(pidx - prim_offset);
         int k = PRIMITIVE_UNPACK_SEGMENT(pack.prim_type[prim]);
 
@@ -397,7 +397,7 @@ void BVH2::refit_primitives(int start, int end, BoundBox &bbox, uint &visibility
 
         /* Motion curves. */
         if (hair->get_use_motion_blur()) {
-          Attribute *attr = hair->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
+		  Attribute *attr = hair->get_attributes().find(ATTR_STD_MOTION_VERTEX_POSITION);
 
           if (attr) {
             size_t hair_size = hair->get_curve_keys().size();
@@ -508,7 +508,7 @@ void BVH2::pack_instances(size_t nodes_size, size_t leaf_nodes_size)
    */
   for (size_t i = 0; i < pack.prim_index.size(); i++) {
     if (pack.prim_index[i] != -1) {
-      pack.prim_index[i] += objects[pack.prim_object[i]]->get_geometry()->prim_offset;
+	  pack.prim_index[i] += objects[pack.prim_object[i]]->get_geometry()->get_prim_offset();
     }
   }
 
@@ -531,7 +531,7 @@ void BVH2::pack_instances(size_t nodes_size, size_t leaf_nodes_size)
   size_t object_offset = 0;
 
   foreach (Geometry *geom, geometry) {
-    BVH2 *bvh = static_cast<BVH2 *>(geom->bvh);
+	BVH2 *bvh = static_cast<BVH2 *>(geom->get_bvh());
 
     if (geom->need_build_bvh(params.bvh_layout)) {
       prim_index_size += bvh->pack.prim_index.size();
@@ -589,11 +589,11 @@ void BVH2::pack_instances(size_t nodes_size, size_t leaf_nodes_size)
       continue;
     }
 
-    BVH2 *bvh = static_cast<BVH2 *>(geom->bvh);
+	BVH2 *bvh = static_cast<BVH2 *>(geom->get_bvh());
 
     int noffset = nodes_offset;
     int noffset_leaf = nodes_leaf_offset;
-    int geom_prim_offset = geom->prim_offset;
+	int geom_prim_offset = geom->get_prim_offset();
 
     /* fill in node indexes for instances */
     if (bvh->pack.root_index == -1)

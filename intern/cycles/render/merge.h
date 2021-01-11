@@ -17,6 +17,7 @@
 #ifndef __MERGE_H__
 #define __MERGE_H__
 
+#include "util/util_api.h"
 #include "util/util_string.h"
 #include "util/util_vector.h"
 
@@ -30,12 +31,12 @@ class ImageMerger {
   bool run();
 
   /* Error message after running, in case of failure. */
-  string error;
+  GET_READ_ONLY(string, error)
 
   /* List of image filepaths to merge. */
-  vector<string> input;
+  GET_SET(vector<string>, input)
   /* Output filepath. */
-  string output;
+  GET_SET(string, output)
 };
 
 CCL_NAMESPACE_END

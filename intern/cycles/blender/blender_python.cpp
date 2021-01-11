@@ -782,20 +782,20 @@ static PyObject *denoise_func(PyObject * /*self*/, PyObject *args, PyObject *key
 
   /* Create denoiser. */
   Denoiser denoiser(device);
-  denoiser.params = params;
-  denoiser.input = input;
-  denoiser.output = output;
+  denoiser.set_params(params);
+  denoiser.set_input(input);
+  denoiser.set_output(output);
 
   if (tile_size > 0) {
-    denoiser.tile_size = make_int2(tile_size, tile_size);
+    denoiser.set_tile_size(make_int2(tile_size, tile_size));
   }
   if (samples > 0) {
-    denoiser.samples_override = samples;
+    denoiser.set_samples_override(samples);
   }
 
   /* Run denoiser. */
   if (!denoiser.run()) {
-    PyErr_SetString(PyExc_ValueError, denoiser.error.c_str());
+    PyErr_SetString(PyExc_ValueError, denoiser.get_error().c_str());
     return NULL;
   }
 
@@ -827,11 +827,11 @@ static PyObject *merge_func(PyObject * /*self*/, PyObject *args, PyObject *keywo
 
   /* Merge. */
   ImageMerger merger;
-  merger.input = input;
-  merger.output = output;
+  merger.set_input(input);
+  merger.set_output(output);
 
   if (!merger.run()) {
-    PyErr_SetString(PyExc_ValueError, merger.error.c_str());
+    PyErr_SetString(PyExc_ValueError, merger.get_error().c_str());
     return NULL;
   }
 

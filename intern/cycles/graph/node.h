@@ -45,7 +45,7 @@ struct Transform;
   void tag_##name##_modified() \
   { \
     const SocketType *socket = get_##name##_socket(); \
-    socket_modified |= socket->modified_flag_bit; \
+    socket_modified |= socket->get_modified_flag_bit(); \
   } \
   type_ const &get_##name() const \
   { \
@@ -171,18 +171,24 @@ struct Node {
 
   void print_modified_sockets() const;
 
-  ustring name;
-  const NodeType *type;
+  const NodeType *get_type() const
+  {
+    return type;
+  }
 
   const NodeOwner *get_owner() const;
   void set_owner(const NodeOwner *owner_);
 
+  GET_SET(ustring, name)
+
  protected:
+  const NodeType *type;
+
   const NodeOwner *owner;
 
   template<typename T> static T &get_socket_value(const Node *node, const SocketType &socket)
   {
-    return (T &)*(((char *)node) + socket.struct_offset);
+    return (T &)*(((char *)node) + socket.get_struct_offset());
   }
 
   SocketModifiedFlags socket_modified;

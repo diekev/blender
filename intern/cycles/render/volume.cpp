@@ -511,7 +511,7 @@ void GeometryManager::create_volume_mesh(Volume *volume, Progress &progress)
   foreach (Node *node, volume->get_used_shaders()) {
     Shader *shader = static_cast<Shader *>(node);
 
-    if (!shader->has_volume) {
+    if (!shader->get_has_volume()) {
       continue;
     }
 
@@ -542,8 +542,8 @@ void GeometryManager::create_volume_mesh(Volume *volume, Progress &progress)
   VolumeMeshBuilder builder;
 
 #ifdef WITH_OPENVDB
-  foreach (Attribute &attr, volume->attributes.attributes) {
-    if (attr.element != ATTR_ELEMENT_VOXEL) {
+  foreach (Attribute &attr, volume->attributes.get_attributes()) {
+    if (attr.get_element() != ATTR_ELEMENT_VOXEL) {
       continue;
     }
 

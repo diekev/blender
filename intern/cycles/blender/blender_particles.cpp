@@ -57,12 +57,12 @@ bool BlenderSync::sync_dupli_particle(BL::Object &b_ob,
 
   /* no update needed? */
   if (!need_update && !object->get_geometry()->is_modified() &&
-      !scene->object_manager->need_update)
+      !scene->get_object_manager()->need_update)
     return true;
 
   /* first time used in this sync loop? clear and tag update */
   if (first_use) {
-    psys->particles.clear();
+    psys->clear();
     psys->tag_update(scene);
   }
 
@@ -79,13 +79,13 @@ bool BlenderSync::sync_dupli_particle(BL::Object &b_ob,
   pa.velocity = get_float3(b_pa.velocity());
   pa.angular_velocity = get_float3(b_pa.angular_velocity());
 
-  psys->particles.push_back_slow(pa);
+  psys->add_particle(pa);
 
   object->set_particle_system(psys);
-  object->set_particle_index(psys->particles.size() - 1);
+  object->set_particle_index(psys->get_particles().size() - 1);
 
   if (object->particle_index_is_modified())
-    scene->object_manager->tag_update(scene);
+    scene->get_object_manager()->tag_update(scene);
 
   /* return that this object has particle data */
   return true;

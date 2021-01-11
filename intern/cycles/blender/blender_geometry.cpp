@@ -53,8 +53,8 @@ Geometry *BlenderSync::sync_geometry(BL::Depsgraph &b_depsgraph,
   BL::ID b_ob_data = b_ob.data();
   BL::ID b_key_id = (BKE_object_is_modified(b_ob)) ? b_ob_instance : b_ob_data;
   BL::Material material_override = view_layer.material_override;
-  Shader *default_shader = (b_ob.type() == BL::Object::type_VOLUME) ? scene->default_volume :
-                                                                      scene->default_surface;
+  Shader *default_shader = (b_ob.type() == BL::Object::type_VOLUME) ? scene->get_default_volume() :
+                                                                      scene->get_default_surface();
   Geometry::Type geom_type = determine_geom_type(b_ob, use_particle_hair);
   GeometryKey key(b_key_id.ptr.data, geom_type);
 
@@ -109,7 +109,7 @@ Geometry *BlenderSync::sync_geometry(BL::Depsgraph &b_depsgraph,
 
   if (!sync) {
     /* If transform was applied to geometry, need full update. */
-    if (object_updated && geom->transform_applied) {
+    if (object_updated && geom->get_transform_applied()) {
       ;
     }
     /* Test if shaders changed, these can be object level so geometry
@@ -124,7 +124,7 @@ Geometry *BlenderSync::sync_geometry(BL::Depsgraph &b_depsgraph,
 
       foreach (Node *node, geom->get_used_shaders()) {
         Shader *shader = static_cast<Shader *>(node);
-        if (shader->need_update_geometry) {
+        if (shader->get_need_update_geometry()) {
           attribute_recalc = true;
         }
       }
@@ -137,7 +137,7 @@ Geometry *BlenderSync::sync_geometry(BL::Depsgraph &b_depsgraph,
 
   geometry_synced.insert(geom);
 
-  geom->name = ustring(b_ob_data.name().c_str());
+  geom->set_name(ustring(b_ob_data.name().c_str()));
 
   /* Store the shaders immediately for the object attribute code. */
   geom->set_used_shaders(used_shaders);

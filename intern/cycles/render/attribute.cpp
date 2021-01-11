@@ -167,7 +167,7 @@ size_t Attribute::element_size(Geometry *geom, AttributePrimitive prim) const
       size = 1;
       break;
     case ATTR_ELEMENT_VERTEX:
-      if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
+      if (geom->is_mesh() || geom->is_volume()) {
         Mesh *mesh = static_cast<Mesh *>(geom);
         size = mesh->get_verts().size() + mesh->get_num_ngons();
         if (prim == ATTR_PRIM_SUBD) {
@@ -176,7 +176,7 @@ size_t Attribute::element_size(Geometry *geom, AttributePrimitive prim) const
       }
       break;
     case ATTR_ELEMENT_VERTEX_MOTION:
-      if (geom->geometry_type == Geometry::MESH) {
+      if (geom->is_mesh()) {
         Mesh *mesh = static_cast<Mesh *>(geom);
         size = (mesh->get_verts().size() + mesh->get_num_ngons()) * (mesh->get_motion_steps() - 1);
         if (prim == ATTR_PRIM_SUBD) {
@@ -185,7 +185,7 @@ size_t Attribute::element_size(Geometry *geom, AttributePrimitive prim) const
       }
       break;
     case ATTR_ELEMENT_FACE:
-      if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
+      if (geom->is_mesh() || geom->is_volume()) {
         Mesh *mesh = static_cast<Mesh *>(geom);
         if (prim == ATTR_PRIM_GEOMETRY) {
           size = mesh->num_triangles();
@@ -197,7 +197,7 @@ size_t Attribute::element_size(Geometry *geom, AttributePrimitive prim) const
       break;
     case ATTR_ELEMENT_CORNER:
     case ATTR_ELEMENT_CORNER_BYTE:
-      if (geom->geometry_type == Geometry::MESH) {
+      if (geom->is_mesh()) {
         Mesh *mesh = static_cast<Mesh *>(geom);
         if (prim == ATTR_PRIM_GEOMETRY) {
           size = mesh->num_triangles() * 3;
@@ -208,19 +208,19 @@ size_t Attribute::element_size(Geometry *geom, AttributePrimitive prim) const
       }
       break;
     case ATTR_ELEMENT_CURVE:
-      if (geom->geometry_type == Geometry::HAIR) {
+      if (geom->is_hair()) {
         Hair *hair = static_cast<Hair *>(geom);
         size = hair->num_curves();
       }
       break;
     case ATTR_ELEMENT_CURVE_KEY:
-      if (geom->geometry_type == Geometry::HAIR) {
+      if (geom->is_hair()) {
         Hair *hair = static_cast<Hair *>(geom);
         size = hair->get_curve_keys().size();
       }
       break;
     case ATTR_ELEMENT_CURVE_KEY_MOTION:
-      if (geom->geometry_type == Geometry::HAIR) {
+      if (geom->is_hair()) {
         Hair *hair = static_cast<Hair *>(geom);
         size = hair->get_curve_keys().size() * (hair->get_motion_steps() - 1);
       }
@@ -401,7 +401,7 @@ Attribute *AttributeSet::add(ustring name, TypeDesc type, AttributeElement eleme
 
   if (attr) {
     /* return if same already exists */
-    if (attr->type == type && attr->element == element)
+    if (attr->get_type() == type && attr->get_element() == element)
       return attr;
 
     /* overwrite attribute with same name but different type/element */
@@ -416,7 +416,7 @@ Attribute *AttributeSet::add(ustring name, TypeDesc type, AttributeElement eleme
 Attribute *AttributeSet::find(ustring name) const
 {
   foreach (const Attribute &attr, attributes)
-    if (attr.name == name)
+    if (attr.get_name() == name)
       return (Attribute *)&attr;
 
   return NULL;
@@ -445,7 +445,7 @@ Attribute *AttributeSet::add(AttributeStandard std, ustring name)
   if (name == ustring())
     name = Attribute::standard_name(std);
 
-  if (geometry->geometry_type == Geometry::MESH) {
+  if (geometry->is_mesh()) {
     switch (std) {
       case ATTR_STD_VERTEX_NORMAL:
         attr = add(name, TypeDesc::TypeNormal, ATTR_ELEMENT_VERTEX);
@@ -496,7 +496,7 @@ Attribute *AttributeSet::add(AttributeStandard std, ustring name)
         break;
     }
   }
-  else if (geometry->geometry_type == Geometry::VOLUME) {
+  else if (geometry->is_volume()) {
     switch (std) {
       case ATTR_STD_VERTEX_NORMAL:
         attr = add(name, TypeDesc::TypeNormal, ATTR_ELEMENT_VERTEX);
@@ -521,7 +521,7 @@ Attribute *AttributeSet::add(AttributeStandard std, ustring name)
         break;
     }
   }
-  else if (geometry->geometry_type == Geometry::HAIR) {
+  else if (geometry->is_hair()) {
     switch (std) {
       case ATTR_STD_UV:
         attr = add(name, TypeFloat2, ATTR_ELEMENT_CURVE);
@@ -553,7 +553,7 @@ Attribute *AttributeSet::add(AttributeStandard std, ustring name)
     }
   }
 
-  attr->std = std;
+  attr->set_std(std);
 
   return attr;
 }
@@ -561,7 +561,7 @@ Attribute *AttributeSet::add(AttributeStandard std, ustring name)
 Attribute *AttributeSet::find(AttributeStandard std) const
 {
   foreach (const Attribute &attr, attributes)
-    if (attr.std == std)
+    if (attr.get_std() == std)
       return (Attribute *)&attr;
 
   return NULL;
@@ -583,21 +583,21 @@ void AttributeSet::remove(AttributeStandard std)
   }
 }
 
-Attribute *AttributeSet::find(AttributeRequest &req)
+Attribute *AttributeSet::find(const AttributeRequest &req)
 {
-  if (req.std == ATTR_STD_NONE)
-    return find(req.name);
+  if (req.get_std() == ATTR_STD_NONE)
+    return find(req.get_name());
   else
-    return find(req.std);
+    return find(req.get_std());
 }
 
 void AttributeSet::remove(Attribute *attribute)
 {
-  if (attribute->std == ATTR_STD_NONE) {
-    remove(attribute->name);
+  if (attribute->get_std() == ATTR_STD_NONE) {
+    remove(attribute->get_name());
   }
   else {
-    remove(attribute->std);
+    remove(attribute->get_std());
   }
 }
 
@@ -614,7 +614,8 @@ void AttributeSet::clear(bool preserve_voxel_data)
     list<Attribute>::iterator it;
 
     for (it = attributes.begin(); it != attributes.end();) {
-      if (it->element == ATTR_ELEMENT_VOXEL || it->std == ATTR_STD_GENERATED_TRANSFORM) {
+      if (it->get_element() == ATTR_ELEMENT_VOXEL ||
+          it->get_std() == ATTR_STD_GENERATED_TRANSFORM) {
         it++;
       }
       else {
@@ -680,7 +681,8 @@ bool AttributeRequestSet::modified(const AttributeRequestSet &other)
     bool found = false;
 
     for (size_t j = 0; j < requests.size() && !found; j++)
-      if (requests[i].name == other.requests[j].name && requests[i].std == other.requests[j].std) {
+      if (requests[i].get_name() == other.requests[j].get_name() &&
+          requests[i].get_std() == other.requests[j].get_std()) {
         found = true;
       }
 
@@ -695,7 +697,7 @@ bool AttributeRequestSet::modified(const AttributeRequestSet &other)
 void AttributeRequestSet::add(ustring name)
 {
   foreach (AttributeRequest &req, requests) {
-    if (req.name == name) {
+    if (req.get_name() == name) {
       return;
     }
   }
@@ -706,7 +708,7 @@ void AttributeRequestSet::add(ustring name)
 void AttributeRequestSet::add(AttributeStandard std)
 {
   foreach (AttributeRequest &req, requests)
-    if (req.std == std)
+    if (req.get_std() == std)
       return;
 
   requests.push_back(AttributeRequest(std));
@@ -715,10 +717,10 @@ void AttributeRequestSet::add(AttributeStandard std)
 void AttributeRequestSet::add(AttributeRequestSet &reqs)
 {
   foreach (AttributeRequest &req, reqs.requests) {
-    if (req.std == ATTR_STD_NONE)
-      add(req.name);
+    if (req.get_std() == ATTR_STD_NONE)
+      add(req.get_name());
     else
-      add(req.std);
+      add(req.get_std());
   }
 }
 
@@ -741,7 +743,7 @@ void AttributeRequestSet::add_standard(ustring name)
 bool AttributeRequestSet::find(ustring name)
 {
   foreach (AttributeRequest &req, requests)
-    if (req.name == name)
+    if (req.get_name() == name)
       return true;
 
   return false;
@@ -750,7 +752,7 @@ bool AttributeRequestSet::find(ustring name)
 bool AttributeRequestSet::find(AttributeStandard std)
 {
   foreach (AttributeRequest &req, requests)
-    if (req.std == std)
+    if (req.get_std() == std)
       return true;
 
   return false;

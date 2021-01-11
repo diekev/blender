@@ -116,7 +116,7 @@ void BlenderSync::sync_light(BL::Object &b_parent,
 
   /* shader */
   array<Node *> used_shaders;
-  find_shader(b_light, used_shaders, scene->default_light);
+  find_shader(b_light, used_shaders, scene->get_default_light());
   light->set_shader(static_cast<Shader *>(used_shaders[0]));
 
   /* shadow */
@@ -185,7 +185,7 @@ void BlenderSync::sync_background_light(BL::SpaceView3D &b_v3d, bool use_portal)
         else {
           light->set_map_resolution(0);
         }
-        light->set_shader(scene->default_background);
+        light->set_shader(scene->get_default_background());
         light->set_use_mis(sample_as_light);
         light->set_max_bounces(get_int(cworld, "max_bounces"));
 

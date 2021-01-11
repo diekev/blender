@@ -238,7 +238,7 @@ void BlenderSync::sync_data(BL::RenderSettings &b_render,
   geometry_synced.clear(); /* use for objects and motion sync */
 
   if (scene->need_motion() == Scene::MOTION_PASS || scene->need_motion() == Scene::MOTION_NONE ||
-      scene->camera->get_motion_position() == Camera::MOTION_POSITION_CENTER) {
+      scene->get_camera()->get_motion_position() == Camera::MOTION_POSITION_CENTER) {
     sync_objects(b_depsgraph, b_v3d);
   }
   sync_motion(b_render, b_depsgraph, b_v3d, b_override, width, height, python_thread_state);
@@ -263,7 +263,7 @@ void BlenderSync::sync_integrator()
 
   experimental = (get_enum(cscene, "feature_set") != 0);
 
-  Integrator *integrator = scene->integrator;
+  Integrator *integrator = scene->get_integrator();
 
   integrator->set_min_bounce(get_int(cscene, "min_light_bounces"));
   integrator->set_max_bounce(get_int(cscene, "max_bounces"));
@@ -303,8 +303,8 @@ void BlenderSync::sync_integrator()
   integrator->set_sample_clamp_indirect(get_float(cscene, "sample_clamp_indirect"));
   if (!preview) {
     if (integrator->get_motion_blur() != r.use_motion_blur()) {
-      scene->object_manager->tag_update(scene);
-      scene->camera->tag_modified();
+      scene->get_object_manager()->tag_update(scene);
+      scene->get_camera()->tag_modified();
     }
 
     integrator->set_motion_blur(r.use_motion_blur());
@@ -385,12 +385,12 @@ void BlenderSync::sync_film(BL::SpaceView3D &b_v3d)
 {
   PointerRNA cscene = RNA_pointer_get(&b_scene.ptr, "cycles");
 
-  Film *film = scene->film;
+  Film *film = scene->get_film();
 
-  vector<Pass> prevpasses = scene->passes;
+  vector<Pass> prevpasses = scene->get_passes();
 
   if (b_v3d) {
-    film->set_display_pass(update_viewport_display_passes(b_v3d, scene->passes));
+    film->set_display_pass(update_viewport_display_passes(b_v3d, scene->get_passes()));
   }
 
   film->set_exposure(get_float(cscene, "film_exposure"));
@@ -419,7 +419,7 @@ void BlenderSync::sync_film(BL::SpaceView3D &b_v3d)
     }
   }
 
-  if (!Pass::equals(prevpasses, scene->passes)) {
+  if (!Pass::equals(prevpasses, scene->get_passes())) {
     film->tag_passes_update(scene, prevpasses, false);
     film->tag_modified();
   }
@@ -435,7 +435,7 @@ void BlenderSync::sync_view_layer(BL::SpaceView3D & /*b_v3d*/, BL::ViewLayer &b_
   view_layer.use_background_shader = b_view_layer.use_sky();
   view_layer.use_background_ao = b_view_layer.use_ao();
   /* Always enable surfaces for baking, otherwise there is nothing to bake to. */
-  view_layer.use_surfaces = b_view_layer.use_solid() || scene->bake_manager->get_baking();
+  view_layer.use_surfaces = b_view_layer.use_solid() || scene->get_bake_manager()->get_baking();
   view_layer.use_hair = b_view_layer.use_strand();
   view_layer.use_volumes = b_view_layer.use_volumes();
 
@@ -587,7 +587,7 @@ vector<Pass> BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay,
     BL::RenderPass b_pass(*b_pass_iter);
     PassType pass_type = get_pass_type(b_pass);
 
-    if (pass_type == PASS_MOTION && scene->integrator->get_motion_blur())
+    if (pass_type == PASS_MOTION && scene->get_integrator()->get_motion_blur())
       continue;
     if (pass_type != PASS_NONE)
       Pass::add(pass_type, passes, b_pass.name().c_str());
@@ -613,7 +613,7 @@ vector<Pass> BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay,
     }
     b_engine.add_pass("Noisy Image", 4, "RGBA", b_view_layer.name().c_str());
   }
-  scene->film->set_denoising_flags(denoising_flags);
+  scene->get_film()->set_denoising_flags(denoising_flags);
 
   if (denoising.store_passes) {
     b_engine.add_pass("Denoising Normal", 3, "XYZ", b_view_layer.name().c_str());
@@ -625,7 +625,7 @@ vector<Pass> BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay,
       b_engine.add_pass("Denoising Intensity", 1, "X", b_view_layer.name().c_str());
     }
 
-    if (scene->film->get_denoising_flags() & DENOISING_CLEAN_ALL_PASSES) {
+    if (scene->get_film()->get_denoising_flags() & DENOISING_CLEAN_ALL_PASSES) {
       b_engine.add_pass("Denoising Clean", 3, "RGB", b_view_layer.name().c_str());
     }
   }
@@ -667,8 +667,9 @@ vector<Pass> BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay,
 
   /* Cryptomatte stores two ID/weight pairs per RGBA layer.
    * User facing parameter is the number of pairs. */
+  Film *film = scene->get_film();
   int crypto_depth = divide_up(min(16, b_view_layer.pass_cryptomatte_depth()), 2);
-  scene->film->set_cryptomatte_depth(crypto_depth);
+  film->set_cryptomatte_depth(crypto_depth);
   CryptomatteType cryptomatte_passes = CRYPT_NONE;
   if (b_view_layer.use_pass_cryptomatte_object()) {
     for (int i = 0; i < crypto_depth; i++) {
@@ -697,7 +698,7 @@ vector<Pass> BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay,
   if (b_view_layer.use_pass_cryptomatte_accurate() && cryptomatte_passes != CRYPT_NONE) {
     cryptomatte_passes = (CryptomatteType)(cryptomatte_passes | CRYPT_ACCURATE);
   }
-  scene->film->set_cryptomatte_passes(cryptomatte_passes);
+  film->set_cryptomatte_passes(cryptomatte_passes);
 
   if (adaptive_sampling) {
     Pass::add(PASS_ADAPTIVE_AUX_BUFFER, passes);
@@ -721,15 +722,13 @@ vector<Pass> BlenderSync::sync_render_passes(BL::RenderLayer &b_rlay,
   }
   RNA_END;
 
-  scene->film->set_denoising_data_pass(denoising.use || denoising.store_passes);
-  scene->film->set_denoising_clean_pass(scene->film->get_denoising_flags() &
-                                        DENOISING_CLEAN_ALL_PASSES);
-  scene->film->set_denoising_prefiltered_pass(denoising.store_passes &&
-                                              denoising.type == DENOISER_NLM);
+  film->set_denoising_data_pass(denoising.use || denoising.store_passes);
+  film->set_denoising_clean_pass(film->get_denoising_flags() & DENOISING_CLEAN_ALL_PASSES);
+  film->set_denoising_prefiltered_pass(denoising.store_passes && denoising.type == DENOISER_NLM);
 
-  scene->film->set_pass_alpha_threshold(b_view_layer.pass_alpha_threshold());
-  scene->film->tag_passes_update(scene, passes);
-  scene->integrator->tag_update(scene);
+  film->set_pass_alpha_threshold(b_view_layer.pass_alpha_threshold());
+  film->tag_passes_update(scene, passes);
+  scene->get_integrator()->tag_update(scene);
 
   return passes;
 }
@@ -745,7 +744,7 @@ void BlenderSync::free_data_after_sync(BL::Depsgraph &b_depsgraph)
                                /* Baking re-uses the depsgraph multiple times, clearing crashes
                                 * reading un-evaluated mesh data which isn't aligned with the
                                 * geometry we're baking, see T71012. */
-                               !scene->bake_manager->get_baking();
+                               !scene->get_bake_manager()->get_baking();
   if (!can_free_caches) {
     return;
   }

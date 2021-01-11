@@ -37,12 +37,12 @@ void util_guarded_mem_free(size_t n)
 
 size_t util_guarded_get_mem_used()
 {
-  return global_stats.mem_used;
+  return global_stats.get_mem_used();
 }
 
 size_t util_guarded_get_mem_peak()
 {
-  return global_stats.mem_peak;
+  return global_stats.get_mem_peak();
 }
 
 CCL_NAMESPACE_END

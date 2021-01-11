@@ -108,8 +108,8 @@ void Integrator::device_update(Device *device, DeviceScene *dscene, Scene *scene
     return;
 
   scoped_callback_timer timer([scene](double time) {
-    if (scene->update_stats) {
-      scene->update_stats->integrator.times.add_entry({"device_update", time});
+    if (scene->get_update_stats()) {
+      scene->get_update_stats()->integrator.times.add_entry({"device_update", time});
     }
   });
 
@@ -141,10 +141,10 @@ void Integrator::device_update(Device *device, DeviceScene *dscene, Scene *scene
    * transparent shaders in the scene. Otherwise we can disable it
    * to improve performance a bit. */
   kintegrator->transparent_shadows = false;
-  foreach (Shader *shader, scene->shaders) {
+  foreach (Shader *shader, scene->get_shaders()) {
     /* keep this in sync with SD_HAS_TRANSPARENT_SHADOW in shader.cpp */
-    if ((shader->has_surface_transparent && shader->get_use_transparent_shadow()) ||
-        shader->has_volume) {
+    if ((shader->get_has_surface_transparent() && shader->get_use_transparent_shadow()) ||
+        shader->get_has_volume()) {
       kintegrator->transparent_shadows = true;
       break;
     }
@@ -159,7 +159,7 @@ void Integrator::device_update(Device *device, DeviceScene *dscene, Scene *scene
 
   kintegrator->seed = hash_uint2(seed, 0);
 
-  kintegrator->use_ambient_occlusion = ((Pass::contains(scene->passes, PASS_AO)) ||
+  kintegrator->use_ambient_occlusion = ((Pass::contains(scene->get_passes(), PASS_AO)) ||
                                         dscene->data.background.ao_factor != 0.0f);
 
   kintegrator->sample_clamp_direct = (sample_clamp_direct == 0.0f) ? FLT_MAX :
@@ -225,7 +225,7 @@ void Integrator::device_update(Device *device, DeviceScene *dscene, Scene *scene
   int max_samples = 1;
 
   if (method == BRANCHED_PATH) {
-    foreach (Light *light, scene->lights)
+    foreach (Light *light, scene->get_lights())
       max_samples = max(max_samples, light->get_samples());
 
     max_samples = max(max_samples,
@@ -274,9 +274,9 @@ void Integrator::device_free(Device *, DeviceScene *dscene)
 
 void Integrator::tag_update(Scene *scene)
 {
-  foreach (Shader *shader, scene->shaders) {
-    if (shader->has_integrator_dependency) {
-      scene->shader_manager->need_update = true;
+  foreach (Shader *shader, scene->get_shaders()) {
+    if (shader->get_has_integrator_dependency()) {
+      scene->get_shader_manager()->need_update = true;
       break;
     }
   }

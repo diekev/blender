@@ -46,7 +46,7 @@ ParticleSystem::~ParticleSystem()
 
 void ParticleSystem::tag_update(Scene *scene)
 {
-  scene->particle_system_manager->need_update = true;
+  scene->get_particle_system_manager()->need_update = true;
 }
 
 /* Particle System Manager */
@@ -69,8 +69,8 @@ void ParticleSystemManager::device_update_particles(Device *,
    * adds one dummy particle at the beginning to avoid invalid lookups,
    * in case a shader uses particle info without actual particle data. */
   int num_particles = 1;
-  for (size_t j = 0; j < scene->particle_systems.size(); j++)
-    num_particles += scene->particle_systems[j]->particles.size();
+  foreach (ParticleSystem *psys, scene->get_particle_systems())
+    num_particles += psys->get_particles().size();
 
   KernelParticle *kparticles = dscene->particles.alloc(num_particles);
 
@@ -78,13 +78,9 @@ void ParticleSystemManager::device_update_particles(Device *,
   memset(kparticles, 0, sizeof(KernelParticle));
 
   int i = 1;
-  for (size_t j = 0; j < scene->particle_systems.size(); j++) {
-    ParticleSystem *psys = scene->particle_systems[j];
-
-    for (size_t k = 0; k < psys->particles.size(); k++) {
+  foreach (ParticleSystem *psys, scene->get_particle_systems()) {
+    foreach (const Particle &pa, psys->get_particles()) {
       /* pack in texture */
-      Particle &pa = psys->particles[k];
-
       kparticles[i].index = pa.index;
       kparticles[i].age = pa.age;
       kparticles[i].lifetime = pa.lifetime;
@@ -113,12 +109,12 @@ void ParticleSystemManager::device_update(Device *device,
     return;
 
   scoped_callback_timer timer([scene](double time) {
-    if (scene->update_stats) {
-      scene->update_stats->particles.times.add_entry({"device_update", time});
+    if (scene->get_update_stats()) {
+      scene->get_update_stats()->particles.times.add_entry({"device_update", time});
     }
   });
 
-  VLOG(1) << "Total " << scene->particle_systems.size() << " particle systems.";
+  VLOG(1) << "Total " << scene->get_particle_systems().size() << " particle systems.";
 
   device_free(device, dscene);
 

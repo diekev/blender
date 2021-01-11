@@ -17,6 +17,7 @@
 #ifndef __UTIL_STATS_H__
 #define __UTIL_STATS_H__
 
+#include "util/util_api.h"
 #include "util/util_atomic.h"
 #include "util/util_profiling.h"
 
@@ -45,8 +46,8 @@ class Stats {
     atomic_sub_and_fetch_z(&mem_used, size);
   }
 
-  size_t mem_used;
-  size_t mem_peak;
+  GET_SET(size_t, mem_used)
+  GET_SET(size_t, mem_peak)
 };
 
 CCL_NAMESPACE_END

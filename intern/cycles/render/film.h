@@ -24,6 +24,8 @@
 
 #include "graph/node.h"
 
+#include "util/util_api.h"
+
 CCL_NAMESPACE_BEGIN
 
 class Device;
@@ -44,13 +46,14 @@ class Pass : public Node {
 
   Pass();
 
-  PassType type;
-  int components;
-  bool filter;
-  bool exposure;
-  PassType divide_type;
-  ustring name;
+  NODE_SOCKET_API(PassType, pass_type)
 
+  GET_READ_ONLY(int, components)
+  GET_READ_ONLY(bool, filter)
+  GET_READ_ONLY(bool, exposure)
+  GET_READ_ONLY(PassType, divide_type)
+
+ public:
   static void add(PassType type, vector<Pass> &passes, const char *name = NULL);
   static bool equals(const vector<Pass> &A, const vector<Pass> &B);
   static bool contains(const vector<Pass> &passes, PassType);

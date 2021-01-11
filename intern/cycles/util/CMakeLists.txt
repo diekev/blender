@@ -66,6 +66,7 @@ endif()
 set(SRC_HEADERS
   util_algorithm.h
   util_aligned_malloc.h
+  util_api.h
   util_args.h
   util_array.h
   util_atomic.h

@@ -39,11 +39,11 @@ Node::Node(const NodeType *type_, ustring name_) : name(name_), type(type_)
 
   /* assign non-empty name, convenient for debugging */
   if (name.empty()) {
-    name = type->name;
+    name = type->get_name();
   }
 
   /* initialize default values */
-  foreach (const SocketType &socket, type->inputs) {
+  foreach (const SocketType &socket, type->get_inputs()) {
     set_default_value(socket);
   }
 }
@@ -55,45 +55,47 @@ Node::~Node()
 #ifndef NDEBUG
 static bool is_socket_float3(const SocketType &socket)
 {
-  return socket.type == SocketType::COLOR || socket.type == SocketType::POINT ||
-         socket.type == SocketType::VECTOR || socket.type == SocketType::NORMAL;
+  return socket.get_type() == SocketType::COLOR || socket.get_type() == SocketType::POINT ||
+         socket.get_type() == SocketType::VECTOR || socket.get_type() == SocketType::NORMAL;
 }
 
 static bool is_socket_array_float3(const SocketType &socket)
 {
-  return socket.type == SocketType::COLOR_ARRAY || socket.type == SocketType::POINT_ARRAY ||
-         socket.type == SocketType::VECTOR_ARRAY || socket.type == SocketType::NORMAL_ARRAY;
+  return socket.get_type() == SocketType::COLOR_ARRAY ||
+         socket.get_type() == SocketType::POINT_ARRAY ||
+         socket.get_type() == SocketType::VECTOR_ARRAY ||
+         socket.get_type() == SocketType::NORMAL_ARRAY;
 }
 #endif
 
 /* set values */
 void Node::set(const SocketType &input, bool value)
 {
-  assert(input.type == SocketType::BOOLEAN);
+  assert(input.get_type() == SocketType::BOOLEAN);
   set_if_different(input, value);
 }
 
 void Node::set(const SocketType &input, int value)
 {
-  assert((input.type == SocketType::INT || input.type == SocketType::ENUM));
+  assert((input.get_type() == SocketType::INT || input.get_type() == SocketType::ENUM));
   set_if_different(input, value);
 }
 
 void Node::set(const SocketType &input, uint value)
 {
-  assert(input.type == SocketType::UINT);
+  assert(input.get_type() == SocketType::UINT);
   set_if_different(input, value);
 }
 
 void Node::set(const SocketType &input, float value)
 {
-  assert(input.type == SocketType::FLOAT);
+  assert(input.get_type() == SocketType::FLOAT);
   set_if_different(input, value);
 }
 
 void Node::set(const SocketType &input, float2 value)
 {
-  assert(input.type == SocketType::POINT2);
+  assert(input.get_type() == SocketType::POINT2);
   set_if_different(input, value);
 }
 
@@ -110,11 +112,11 @@ void Node::set(const SocketType &input, const char *value)
 
 void Node::set(const SocketType &input, ustring value)
 {
-  if (input.type == SocketType::STRING) {
+  if (input.get_type() == SocketType::STRING) {
     set_if_different(input, value);
   }
-  else if (input.type == SocketType::ENUM) {
-    const NodeEnum &enm = *input.enum_values;
+  else if (input.get_type() == SocketType::ENUM) {
+    const NodeEnum &enm = *input.get_enum_values();
     if (enm.exists(value)) {
       set_if_different(input, enm[value]);
     }
@@ -129,38 +131,38 @@ void Node::set(const SocketType &input, ustring value)
 
 void Node::set(const SocketType &input, const Transform &value)
 {
-  assert(input.type == SocketType::TRANSFORM);
+  assert(input.get_type() == SocketType::TRANSFORM);
   set_if_different(input, value);
 }
 
 void Node::set(const SocketType &input, Node *value)
 {
-  assert(input.type == SocketType::NODE);
+  assert(input.get_type() == SocketType::NODE);
   set_if_different(input, value);
 }
 
 /* set array values */
 void Node::set(const SocketType &input, array<bool> &value)
 {
-  assert(input.type == SocketType::BOOLEAN_ARRAY);
+  assert(input.get_type() == SocketType::BOOLEAN_ARRAY);
   set_if_different(input, value);
 }
 
 void Node::set(const SocketType &input, array<int> &value)
 {
-  assert(input.type == SocketType::INT_ARRAY);
+  assert(input.get_type() == SocketType::INT_ARRAY);
   set_if_different(input, value);
 }
 
 void Node::set(const SocketType &input, array<float> &value)
 {
-  assert(input.type == SocketType::FLOAT_ARRAY);
+  assert(input.get_type() == SocketType::FLOAT_ARRAY);
   set_if_different(input, value);
 }
 
 void Node::set(const SocketType &input, array<float2> &value)
 {
-  assert(input.type == SocketType::POINT2_ARRAY);
+  assert(input.get_type() == SocketType::POINT2_ARRAY);
   set_if_different(input, value);
 }
 
@@ -172,50 +174,50 @@ void Node::set(const SocketType &input, array<float3> &value)
 
 void Node::set(const SocketType &input, array<ustring> &value)
 {
-  assert(input.type == SocketType::STRING_ARRAY);
+  assert(input.get_type() == SocketType::STRING_ARRAY);
   set_if_different(input, value);
 }
 
 void Node::set(const SocketType &input, array<Transform> &value)
 {
-  assert(input.type == SocketType::TRANSFORM_ARRAY);
+  assert(input.get_type() == SocketType::TRANSFORM_ARRAY);
   set_if_different(input, value);
 }
 
 void Node::set(const SocketType &input, array<Node *> &value)
 {
-  assert(input.type == SocketType::NODE_ARRAY);
+  assert(input.get_type() == SocketType::NODE_ARRAY);
   set_if_different(input, value);
 }
 
 /* get values */
 bool Node::get_bool(const SocketType &input) const
 {
-  assert(input.type == SocketType::BOOLEAN);
+  assert(input.get_type() == SocketType::BOOLEAN);
   return get_socket_value<bool>(this, input);
 }
 
 int Node::get_int(const SocketType &input) const
 {
-  assert(input.type == SocketType::INT || input.type == SocketType::ENUM);
+  assert(input.get_type() == SocketType::INT || input.get_type() == SocketType::ENUM);
   return get_socket_value<int>(this, input);
 }
 
 uint Node::get_uint(const SocketType &input) const
 {
-  assert(input.type == SocketType::UINT);
+  assert(input.get_type() == SocketType::UINT);
   return get_socket_value<uint>(this, input);
 }
 
 float Node::get_float(const SocketType &input) const
 {
-  assert(input.type == SocketType::FLOAT);
+  assert(input.get_type() == SocketType::FLOAT);
   return get_socket_value<float>(this, input);
 }
 
 float2 Node::get_float2(const SocketType &input) const
 {
-  assert(input.type == SocketType::POINT2);
+  assert(input.get_type() == SocketType::POINT2);
   return get_socket_value<float2>(this, input);
 }
 
@@ -227,11 +229,11 @@ float3 Node::get_float3(const SocketType &input) const
 
 ustring Node::get_string(const SocketType &input) const
 {
-  if (input.type == SocketType::STRING) {
+  if (input.get_type() == SocketType::STRING) {
     return get_socket_value<ustring>(this, input);
   }
-  else if (input.type == SocketType::ENUM) {
-    const NodeEnum &enm = *input.enum_values;
+  else if (input.get_type() == SocketType::ENUM) {
+    const NodeEnum &enm = *input.get_enum_values();
     int intvalue = get_socket_value<int>(this, input);
     return (enm.exists(intvalue)) ? enm[intvalue] : ustring();
   }
@@ -243,38 +245,38 @@ ustring Node::get_string(const SocketType &input) const
 
 Transform Node::get_transform(const SocketType &input) const
 {
-  assert(input.type == SocketType::TRANSFORM);
+  assert(input.get_type() == SocketType::TRANSFORM);
   return get_socket_value<Transform>(this, input);
 }
 
 Node *Node::get_node(const SocketType &input) const
 {
-  assert(input.type == SocketType::NODE);
+  assert(input.get_type() == SocketType::NODE);
   return get_socket_value<Node *>(this, input);
 }
 
 /* get array values */
 const array<bool> &Node::get_bool_array(const SocketType &input) const
 {
-  assert(input.type == SocketType::BOOLEAN_ARRAY);
+  assert(input.get_type() == SocketType::BOOLEAN_ARRAY);
   return get_socket_value<array<bool>>(this, input);
 }
 
 const array<int> &Node::get_int_array(const SocketType &input) const
 {
-  assert(input.type == SocketType::INT_ARRAY);
+  assert(input.get_type() == SocketType::INT_ARRAY);
   return get_socket_value<array<int>>(this, input);
 }
 
 const array<float> &Node::get_float_array(const SocketType &input) const
 {
-  assert(input.type == SocketType::FLOAT_ARRAY);
+  assert(input.get_type() == SocketType::FLOAT_ARRAY);
   return get_socket_value<array<float>>(this, input);
 }
 
 const array<float2> &Node::get_float2_array(const SocketType &input) const
 {
-  assert(input.type == SocketType::POINT2_ARRAY);
+  assert(input.get_type() == SocketType::POINT2_ARRAY);
   return get_socket_value<array<float2>>(this, input);
 }
 
@@ -286,19 +288,19 @@ const array<float3> &Node::get_float3_array(const SocketType &input) const
 
 const array<ustring> &Node::get_string_array(const SocketType &input) const
 {
-  assert(input.type == SocketType::STRING_ARRAY);
+  assert(input.get_type() == SocketType::STRING_ARRAY);
   return get_socket_value<array<ustring>>(this, input);
 }
 
 const array<Transform> &Node::get_transform_array(const SocketType &input) const
 {
-  assert(input.type == SocketType::TRANSFORM_ARRAY);
+  assert(input.get_type() == SocketType::TRANSFORM_ARRAY);
   return get_socket_value<array<Transform>>(this, input);
 }
 
 const array<Node *> &Node::get_node_array(const SocketType &input) const
 {
-  assert(input.type == SocketType::NODE_ARRAY);
+  assert(input.get_type() == SocketType::NODE_ARRAY);
   return get_socket_value<array<Node *>>(this, input);
 }
 
@@ -306,15 +308,15 @@ const array<Node *> &Node::get_node_array(const SocketType &input) const
 
 bool Node::has_default_value(const SocketType &input) const
 {
-  const void *src = input.default_value;
+  const void *src = input.get_default_value();
   void *dst = &get_socket_value<char>(this, input);
   return memcmp(dst, src, input.size()) == 0;
 }
 
 void Node::set_default_value(const SocketType &socket)
 {
-  const void *src = socket.default_value;
-  void *dst = ((char *)this) + socket.struct_offset;
+  const void *src = socket.get_default_value();
+  void *dst = ((char *)this) + socket.get_struct_offset();
   if (socket.size() > 0) {
     memcpy(dst, src, socket.size());
   }
@@ -326,17 +328,17 @@ static void copy_array(const Node *node,
                        const Node *other,
                        const SocketType &other_socket)
 {
-  const array<T> *src = (const array<T> *)(((char *)other) + other_socket.struct_offset);
-  array<T> *dst = (array<T> *)(((char *)node) + socket.struct_offset);
+  const array<T> *src = (const array<T> *)(((char *)other) + other_socket.get_struct_offset());
+  array<T> *dst = (array<T> *)(((char *)node) + socket.get_struct_offset());
   *dst = *src;
 }
 
 void Node::copy_value(const SocketType &socket, const Node &other, const SocketType &other_socket)
 {
-  assert(socket.type == other_socket.type);
+  assert(socket.get_type() == other_socket.get_type());
 
   if (socket.is_array()) {
-    switch (socket.type) {
+    switch (socket.get_type()) {
       case SocketType::BOOLEAN_ARRAY:
         copy_array<bool>(this, socket, &other, other_socket);
         break;
@@ -376,19 +378,19 @@ void Node::copy_value(const SocketType &socket, const Node &other, const SocketT
     }
   }
   else {
-    const void *src = ((char *)&other) + other_socket.struct_offset;
-    void *dst = ((char *)this) + socket.struct_offset;
+    const void *src = ((char *)&other) + other_socket.get_struct_offset();
+    void *dst = ((char *)this) + socket.get_struct_offset();
     memcpy(dst, src, socket.size());
   }
 }
 
 void Node::set_value(const SocketType &socket, const Node &other, const SocketType &other_socket)
 {
-  assert(socket.type == other_socket.type);
+  assert(socket.get_type() == other_socket.get_type());
   (void)other_socket;
 
   if (socket.is_array()) {
-    switch (socket.type) {
+    switch (socket.get_type()) {
       case SocketType::BOOLEAN_ARRAY:
         set(socket, get_socket_value<array<bool>>(&other, socket));
         break;
@@ -422,7 +424,7 @@ void Node::set_value(const SocketType &socket, const Node &other, const SocketTy
     }
   }
   else {
-    switch (socket.type) {
+    switch (socket.get_type()) {
       case SocketType::BOOLEAN:
         set(socket, get_socket_value<bool>(&other, socket));
         break;
@@ -466,22 +468,22 @@ void Node::set_value(const SocketType &socket, const Node &other, const SocketTy
 template<typename T>
 static bool is_array_equal(const Node *node, const Node *other, const SocketType &socket)
 {
-  const array<T> *a = (const array<T> *)(((char *)node) + socket.struct_offset);
-  const array<T> *b = (const array<T> *)(((char *)other) + socket.struct_offset);
+  const array<T> *a = (const array<T> *)(((char *)node) + socket.get_struct_offset());
+  const array<T> *b = (const array<T> *)(((char *)other) + socket.get_struct_offset());
   return *a == *b;
 }
 
 template<typename T>
 static bool is_value_equal(const Node *node, const Node *other, const SocketType &socket)
 {
-  const T *a = (const T *)(((char *)node) + socket.struct_offset);
-  const T *b = (const T *)(((char *)other) + socket.struct_offset);
+  const T *a = (const T *)(((char *)node) + socket.get_struct_offset());
+  const T *b = (const T *)(((char *)other) + socket.get_struct_offset());
   return *a == *b;
 }
 
 bool Node::equals_value(const Node &other, const SocketType &socket) const
 {
-  switch (socket.type) {
+  switch (socket.get_type()) {
     case SocketType::BOOLEAN:
       return is_value_equal<bool>(this, &other, socket);
     case SocketType::FLOAT:
@@ -545,9 +547,9 @@ bool Node::equals_value(const Node &other, const SocketType &socket) const
 
 bool Node::equals(const Node &other) const
 {
-  assert(type == other.type);
+  assert(type == other.get_type());
 
-  foreach (const SocketType &socket, type->inputs) {
+  foreach (const SocketType &socket, type->get_inputs()) {
     if (!equals_value(other, socket))
       return false;
   }
@@ -561,18 +563,18 @@ namespace {
 
 template<typename T> void value_hash(const Node *node, const SocketType &socket, MD5Hash &md5)
 {
-  md5.append(((uint8_t *)node) + socket.struct_offset, socket.size());
+  md5.append(((uint8_t *)node) + socket.get_struct_offset(), socket.size());
 }
 
 void float3_hash(const Node *node, const SocketType &socket, MD5Hash &md5)
 {
   /* Don't compare 4th element used for padding. */
-  md5.append(((uint8_t *)node) + socket.struct_offset, sizeof(float) * 3);
+  md5.append(((uint8_t *)node) + socket.get_struct_offset(), sizeof(float) * 3);
 }
 
 template<typename T> void array_hash(const Node *node, const SocketType &socket, MD5Hash &md5)
 {
-  const array<T> &a = *(const array<T> *)(((char *)node) + socket.struct_offset);
+  const array<T> &a = *(const array<T> *)(((char *)node) + socket.get_struct_offset());
   for (size_t i = 0; i < a.size(); i++) {
     md5.append((uint8_t *)&a[i], sizeof(T));
   }
@@ -581,7 +583,7 @@ template<typename T> void array_hash(const Node *node, const SocketType &socket,
 void float3_array_hash(const Node *node, const SocketType &socket, MD5Hash &md5)
 {
   /* Don't compare 4th element used for padding. */
-  const array<float3> &a = *(const array<float3> *)(((char *)node) + socket.struct_offset);
+  const array<float3> &a = *(const array<float3> *)(((char *)node) + socket.get_struct_offset());
   for (size_t i = 0; i < a.size(); i++) {
     md5.append((uint8_t *)&a[i], sizeof(float) * 3);
   }
@@ -591,12 +593,12 @@ void float3_array_hash(const Node *node, const SocketType &socket, MD5Hash &md5)
 
 void Node::hash(MD5Hash &md5)
 {
-  md5.append(type->name.string());
+  md5.append(type->get_name().string());
 
-  foreach (const SocketType &socket, type->inputs) {
-    md5.append(socket.name.string());
+  foreach (const SocketType &socket, type->get_inputs()) {
+    md5.append(socket.get_name().string());
 
-    switch (socket.type) {
+    switch (socket.get_type()) {
       case SocketType::BOOLEAN:
         value_hash<bool>(this, socket, md5);
         break;
@@ -683,7 +685,7 @@ namespace {
 
 template<typename T> size_t array_size_in_bytes(const Node *node, const SocketType &socket)
 {
-  const array<T> &a = *(const array<T> *)(((char *)node) + socket.struct_offset);
+  const array<T> &a = *(const array<T> *)(((char *)node) + socket.get_struct_offset());
   return a.size() * sizeof(T);
 }
 
@@ -692,8 +694,8 @@ template<typename T> size_t array_size_in_bytes(const Node *node, const SocketTy
 size_t Node::get_total_size_in_bytes() const
 {
   size_t total_size = 0;
-  foreach (const SocketType &socket, type->inputs) {
-    switch (socket.type) {
+  foreach (const SocketType &socket, type->get_inputs()) {
+    switch (socket.get_type()) {
       case SocketType::BOOLEAN:
       case SocketType::FLOAT:
       case SocketType::INT:
@@ -754,7 +756,7 @@ size_t Node::get_total_size_in_bytes() const
 
 bool Node::is_a(const NodeType *type_)
 {
-  for (const NodeType *base = type; base; base = base->base) {
+  for (const NodeType *base = type; base; base = base->get_base()) {
     if (base == type_) {
       return true;
     }
@@ -775,7 +777,7 @@ void Node::set_owner(const NodeOwner *owner_)
 
 bool Node::socket_is_modified(const SocketType &input) const
 {
-  return (socket_modified & input.modified_flag_bit) != 0;
+  return (socket_modified & input.get_modified_flag_bit()) != 0;
 }
 
 bool Node::is_modified()
@@ -800,7 +802,7 @@ template<typename T> void Node::set_if_different(const SocketType &input, T valu
   }
 
   get_socket_value<T>(this, input) = value;
-  socket_modified |= input.modified_flag_bit;
+  socket_modified |= input.get_modified_flag_bit();
 }
 
 template<typename T> void Node::set_if_different(const SocketType &input, array<T> &value)
@@ -812,15 +814,15 @@ template<typename T> void Node::set_if_different(const SocketType &input, array<
   }
 
   get_socket_value<array<T>>(this, input).steal_data(value);
-  socket_modified |= input.modified_flag_bit;
+  socket_modified |= input.get_modified_flag_bit();
 }
 
 void Node::print_modified_sockets() const
 {
   printf("Node : %s\n", name.c_str());
-  for (auto &socket : type->inputs) {
+  for (auto &socket : type->get_inputs()) {
     if (socket_is_modified(socket)) {
-      printf("-- socket modified : %s\n", socket.name.c_str());
+      printf("-- socket modified : %s\n", socket.get_name().c_str());
     }
   }
 }

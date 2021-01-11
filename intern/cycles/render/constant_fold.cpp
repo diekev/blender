@@ -32,8 +32,8 @@ ConstantFolder::ConstantFolder(ShaderGraph *graph,
 
 bool ConstantFolder::all_inputs_constant() const
 {
-  foreach (ShaderInput *input, node->inputs) {
-    if (input->link) {
+  foreach (ShaderInput *input, node->get_inputs()) {
+    if (input->get_link()) {
       return false;
     }
   }
@@ -43,10 +43,10 @@ bool ConstantFolder::all_inputs_constant() const
 
 void ConstantFolder::make_constant(float value) const
 {
-  VLOG(1) << "Folding " << node->name << "::" << output->name() << " to constant (" << value
+  VLOG(1) << "Folding " << node->get_name() << "::" << output->name() << " to constant (" << value
           << ").";
 
-  foreach (ShaderInput *sock, output->links) {
+  foreach (ShaderInput *sock, output->get_links()) {
     sock->set(value);
   }
 
@@ -55,9 +55,10 @@ void ConstantFolder::make_constant(float value) const
 
 void ConstantFolder::make_constant(float3 value) const
 {
-  VLOG(1) << "Folding " << node->name << "::" << output->name() << " to constant " << value << ".";
+  VLOG(1) << "Folding " << node->get_name() << "::" << output->name() << " to constant " << value
+          << ".";
 
-  foreach (ShaderInput *sock, output->links) {
+  foreach (ShaderInput *sock, output->get_links()) {
     sock->set(value);
   }
 
@@ -110,13 +111,13 @@ void ConstantFolder::bypass(ShaderOutput *new_output) const
 {
   assert(new_output);
 
-  VLOG(1) << "Folding " << node->name << "::" << output->name() << " to socket "
-          << new_output->parent->name << "::" << new_output->name() << ".";
+  VLOG(1) << "Folding " << node->get_name() << "::" << output->name() << " to socket "
+          << new_output->get_parent()->get_name() << "::" << new_output->name() << ".";
 
   /* Remove all outgoing links from socket and connect them to new_output instead.
    * The graph->relink method affects node inputs, so it's not safe to use in constant
    * folding if the node has multiple outputs and will thus be folded multiple times. */
-  vector<ShaderInput *> outputs = output->links;
+  vector<ShaderInput *> outputs = output->get_links();
 
   graph->disconnect(output);
 
@@ -129,7 +130,7 @@ void ConstantFolder::discard() const
 {
   assert(output->type() == SocketType::CLOSURE);
 
-  VLOG(1) << "Discarding closure " << node->name << ".";
+  VLOG(1) << "Discarding closure " << node->get_name() << ".";
 
   graph->disconnect(output);
 }
@@ -138,8 +139,8 @@ void ConstantFolder::bypass_or_discard(ShaderInput *input) const
 {
   assert(input->type() == SocketType::CLOSURE);
 
-  if (input->link) {
-    bypass(input->link);
+  if (input->get_link()) {
+    bypass(input->get_link());
   }
   else {
     discard();
@@ -151,24 +152,24 @@ bool ConstantFolder::try_bypass_or_make_constant(ShaderInput *input, bool clamp)
   if (input->type() != output->type()) {
     return false;
   }
-  else if (!input->link) {
+  else if (!input->get_link()) {
     if (input->type() == SocketType::FLOAT) {
-      make_constant_clamp(node->get_float(input->socket_type), clamp);
+      make_constant_clamp(node->get_float(input->get_socket_type()), clamp);
       return true;
     }
     else if (SocketType::is_float3(input->type())) {
-      make_constant_clamp(node->get_float3(input->socket_type), clamp);
+      make_constant_clamp(node->get_float3(input->get_socket_type()), clamp);
       return true;
     }
   }
   else if (!clamp) {
-    bypass(input->link);
+    bypass(input->get_link());
     return true;
   }
   else {
     /* disconnect other inputs if we can't fully bypass due to clamp */
-    foreach (ShaderInput *other, node->inputs) {
-      if (other != input && other->link) {
+    foreach (ShaderInput *other, node->get_inputs()) {
+      if (other != input && other->get_link()) {
         graph->disconnect(other);
       }
     }
@@ -179,12 +180,12 @@ bool ConstantFolder::try_bypass_or_make_constant(ShaderInput *input, bool clamp)
 
 bool ConstantFolder::is_zero(ShaderInput *input) const
 {
-  if (!input->link) {
+  if (!input->get_link()) {
     if (input->type() == SocketType::FLOAT) {
-      return node->get_float(input->socket_type) == 0.0f;
+      return node->get_float(input->get_socket_type()) == 0.0f;
     }
     else if (SocketType::is_float3(input->type())) {
-      return node->get_float3(input->socket_type) == make_float3(0.0f, 0.0f, 0.0f);
+      return node->get_float3(input->get_socket_type()) == make_float3(0.0f, 0.0f, 0.0f);
     }
   }
 
@@ -193,12 +194,12 @@ bool ConstantFolder::is_zero(ShaderInput *input) const
 
 bool ConstantFolder::is_one(ShaderInput *input) const
 {
-  if (!input->link) {
+  if (!input->get_link()) {
     if (input->type() == SocketType::FLOAT) {
-      return node->get_float(input->socket_type) == 1.0f;
+      return node->get_float(input->get_socket_type()) == 1.0f;
     }
     else if (SocketType::is_float3(input->type())) {
-      return node->get_float3(input->socket_type) == make_float3(1.0f, 1.0f, 1.0f);
+      return node->get_float3(input->get_socket_type()) == make_float3(1.0f, 1.0f, 1.0f);
     }
   }
 
@@ -213,9 +214,9 @@ void ConstantFolder::fold_mix(NodeMix type, bool clamp) const
   ShaderInput *color1_in = node->input("Color1");
   ShaderInput *color2_in = node->input("Color2");
 
-  float fac = saturate(node->get_float(fac_in->socket_type));
-  bool fac_is_zero = !fac_in->link && fac == 0.0f;
-  bool fac_is_one = !fac_in->link && fac == 1.0f;
+  float fac = saturate(node->get_float(fac_in->get_socket_type()));
+  bool fac_is_zero = !fac_in->get_link() && fac == 0.0f;
+  bool fac_is_one = !fac_in->get_link() && fac == 1.0f;
 
   /* remove no-op node when factor is 0.0 */
   if (fac_is_zero) {
@@ -230,15 +231,15 @@ void ConstantFolder::fold_mix(NodeMix type, bool clamp) const
   switch (type) {
     case NODE_MIX_BLEND:
       /* remove useless mix colors nodes */
-      if (color1_in->link && color2_in->link) {
-        if (color1_in->link == color2_in->link) {
+      if (color1_in->get_link() && color2_in->get_link()) {
+        if (color1_in->get_link() == color2_in->get_link()) {
           try_bypass_or_make_constant(color1_in, clamp);
           break;
         }
       }
-      else if (!color1_in->link && !color2_in->link) {
-        float3 color1 = node->get_float3(color1_in->socket_type);
-        float3 color2 = node->get_float3(color2_in->socket_type);
+      else if (!color1_in->get_link() && !color2_in->get_link()) {
+        float3 color1 = node->get_float3(color1_in->get_socket_type());
+        float3 color2 = node->get_float3(color2_in->get_socket_type());
         if (color1 == color2) {
           try_bypass_or_make_constant(color1_in, clamp);
           break;
@@ -266,7 +267,8 @@ void ConstantFolder::fold_mix(NodeMix type, bool clamp) const
         try_bypass_or_make_constant(color1_in, clamp);
       }
       /* X - X (fac 1) == 0 */
-      else if (color1_in->link && color1_in->link == color2_in->link && fac_is_one) {
+      else if (color1_in->get_link() && color1_in->get_link() == color2_in->get_link() &&
+               fac_is_one) {
         make_zero();
       }
       break;

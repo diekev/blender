@@ -22,6 +22,7 @@
 
 #include "kernel/kernel_types.h"
 
+#include "util/util_api.h"
 #include "util/util_list.h"
 #include "util/util_map.h"
 #include "util/util_param.h"
@@ -85,15 +86,15 @@ class ShaderInput {
 
   ustring name()
   {
-    return socket_type.ui_name;
+    return socket_type.get_ui_name();
   }
   int flags()
   {
-    return socket_type.flags;
+    return socket_type.get_flags();
   }
   SocketType::Type type()
   {
-    return socket_type.type;
+    return socket_type.get_type();
   }
 
   void set(float f)
@@ -107,10 +108,16 @@ class ShaderInput {
 
   void disconnect();
 
+  const SocketType &get_socket_type()
+  {
+    return socket_type;
+  }
+
+ protected:
   const SocketType &socket_type;
-  ShaderNode *parent;
-  ShaderOutput *link;
-  int stack_offset; /* for SVM compiler */
+  GET(ShaderNode *, parent)
+  GET(ShaderOutput *, link)
+  GET(int, stack_offset) /* for SVM compiler */
 };
 
 /* Output
@@ -126,19 +133,25 @@ class ShaderOutput {
 
   ustring name()
   {
-    return socket_type.ui_name;
+    return socket_type.get_ui_name();
   }
   SocketType::Type type()
   {
-    return socket_type.type;
+    return socket_type.get_type();
   }
 
   void disconnect();
 
+  bool is_linked() const
+  {
+    return !links.empty();
+  }
+
+ protected:
   const SocketType &socket_type;
-  ShaderNode *parent;
-  vector<ShaderInput *> links;
-  int stack_offset; /* for SVM compiler */
+  GET(ShaderNode *, parent)
+  GET(vector<ShaderInput *>, links)
+  GET(int, stack_offset) /* for SVM compiler */
 };
 
 /* Node
@@ -147,6 +160,14 @@ class ShaderOutput {
  * base class for all node types. */
 
 class ShaderNode : public Node {
+  GET(vector<ShaderInput *>, inputs)
+  GET(vector<ShaderOutput *>, outputs)
+
+  GET_SET(int, id)      /* index in graph node array */
+  GET(ShaderBump, bump) /* for bump mapping utility */
+
+  GET(ShaderNodeSpecialType, special_type) /* special node type */
+
  public:
   explicit ShaderNode(const NodeType *type);
   virtual ~ShaderNode();
@@ -220,13 +241,6 @@ class ShaderNode : public Node {
   {
     return false;
   }
-  vector<ShaderInput *> inputs;
-  vector<ShaderOutput *> outputs;
-
-  int id;          /* index in graph node array */
-  ShaderBump bump; /* for bump mapping utility */
-
-  ShaderNodeSpecialType special_type; /* special node type */
 
   /* ** Selective nodes compilation ** */
 
@@ -300,7 +314,7 @@ class ShaderNodeIDComparator {
  public:
   bool operator()(const ShaderNode *n1, const ShaderNode *n2) const
   {
-    return n1->id < n2->id;
+    return n1->get_id() < n2->get_id();
   }
 };
 
@@ -313,13 +327,13 @@ typedef map<ShaderNode *, ShaderNode *, ShaderNodeIDComparator> ShaderNodeMap;
  * bump mapping from displacement, and possibly other things in the future. */
 
 class ShaderGraph : public NodeOwner {
- public:
-  list<ShaderNode *> nodes;
+  GET(list<ShaderNode *>, nodes)
   size_t num_node_ids;
   bool finalized;
   bool simplified;
   string displacement_hash;
 
+ public:
   ShaderGraph();
   ~ShaderGraph();
 

@@ -563,7 +563,7 @@ void BlenderSync::sync_camera(BL::RenderSettings &b_render,
   }
 
   /* sync */
-  Camera *cam = scene->camera;
+  Camera *cam = scene->get_camera();
   blender_camera_sync(cam, &bcam, width, height, viewname, &cscene);
 
   /* dicing camera */
@@ -574,10 +574,10 @@ void BlenderSync::sync_camera(BL::RenderSettings &b_render,
     b_engine.camera_model_matrix(b_ob, bcam.use_spherical_stereo, b_ob_matrix);
     bcam.matrix = get_transform(b_ob_matrix);
 
-    blender_camera_sync(scene->dicing_camera, &bcam, width, height, viewname, &cscene);
+    blender_camera_sync(scene->get_dicing_camera(), &bcam, width, height, viewname, &cscene);
   }
   else {
-    *scene->dicing_camera = *cam;
+    *scene->get_dicing_camera() = *cam;
   }
 }
 
@@ -587,7 +587,7 @@ void BlenderSync::sync_camera_motion(
   if (!b_ob)
     return;
 
-  Camera *cam = scene->camera;
+  Camera *cam = scene->get_camera();
   BL::Array<float, 16> b_ob_matrix;
   b_engine.camera_model_matrix(b_ob, cam->get_use_spherical_stereo(), b_ob_matrix);
   Transform tfm = get_transform(b_ob_matrix);
@@ -868,7 +868,7 @@ void BlenderSync::sync_view(BL::SpaceView3D &b_v3d,
   blender_camera_from_view(&bcam, b_engine, b_scene, b_v3d, b_rv3d, width, height);
   blender_camera_border(&bcam, b_engine, b_render_settings, b_scene, b_v3d, b_rv3d, width, height);
   PointerRNA cscene = RNA_pointer_get(&b_scene.ptr, "cycles");
-  blender_camera_sync(scene->camera, &bcam, width, height, "", &cscene);
+  blender_camera_sync(scene->get_camera(), &bcam, width, height, "", &cscene);
 
   /* dicing camera */
   BL::Object b_ob = BL::Object(RNA_pointer_get(&cscene, "dicing_camera"));
@@ -878,10 +878,10 @@ void BlenderSync::sync_view(BL::SpaceView3D &b_v3d,
     b_engine.camera_model_matrix(b_ob, bcam.use_spherical_stereo, b_ob_matrix);
     bcam.matrix = get_transform(b_ob_matrix);
 
-    blender_camera_sync(scene->dicing_camera, &bcam, width, height, "", &cscene);
+    blender_camera_sync(scene->get_dicing_camera(), &bcam, width, height, "", &cscene);
   }
   else {
-    *scene->dicing_camera = *scene->camera;
+    *scene->get_dicing_camera() = *scene->get_camera();
   }
 }
 
@@ -896,8 +896,8 @@ BufferParams BlenderSync::get_buffer_params(BL::RenderSettings &b_render,
   BufferParams params;
   bool use_border = false;
 
-  params.full_width = width;
-  params.full_height = height;
+  params.set_full_width(width);
+  params.set_full_height(height);
 
   if (b_v3d && b_rv3d && b_rv3d.view_perspective() != BL::RegionView3D::view_perspective_CAMERA)
     use_border = b_v3d.use_render_border();
@@ -907,25 +907,25 @@ BufferParams BlenderSync::get_buffer_params(BL::RenderSettings &b_render,
   if (use_border) {
     /* border render */
     /* the viewport may offset the border outside the view */
-    BoundBox2D border = cam->border.clamp();
-    params.full_x = (int)(border.left * (float)width);
-    params.full_y = (int)(border.bottom * (float)height);
-    params.width = (int)(border.right * (float)width) - params.full_x;
-    params.height = (int)(border.top * (float)height) - params.full_y;
+    BoundBox2D border = cam->get_border().clamp();
+    params.set_full_x((int)(border.left * (float)width));
+    params.set_full_y((int)(border.bottom * (float)height));
+    params.set_width((int)(border.right * (float)width) - params.get_full_x());
+    params.set_height((int)(border.top * (float)height) - params.get_full_y());
 
     /* survive in case border goes out of view or becomes too small */
-    params.width = max(params.width, 1);
-    params.height = max(params.height, 1);
+    params.set_width(max(params.get_width(), 1));
+    params.set_height(max(params.get_height(), 1));
   }
   else {
-    params.width = width;
-    params.height = height;
+    params.set_width(width);
+    params.set_height(height);
   }
 
-  PassType display_pass = update_viewport_display_passes(b_v3d, params.passes);
+  PassType display_pass = update_viewport_display_passes(b_v3d, params.get_passes());
 
   /* Can only denoise the combined image pass */
-  params.denoising_data_pass = display_pass == PASS_COMBINED && use_denoiser;
+  params.set_denoising_data_pass(display_pass == PASS_COMBINED && use_denoiser);
 
   return params;
 }

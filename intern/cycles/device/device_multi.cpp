@@ -262,7 +262,7 @@ class MultiDevice : public Device {
     vector<BVHMulti *> geom_bvhs;
     geom_bvhs.reserve(bvh->geometry.size());
     foreach (Geometry *geom, bvh->geometry) {
-      geom_bvhs.push_back(static_cast<BVHMulti *>(geom->bvh));
+	  geom_bvhs.push_back(static_cast<BVHMulti *>(geom->get_bvh()));
     }
 
     /* Broadcast acceleration structure build to all render devices */
@@ -270,7 +270,7 @@ class MultiDevice : public Device {
     foreach (SubDevice &sub, devices) {
       /* Change geometry BVH pointers to the sub BVH */
       for (size_t k = 0; k < bvh->geometry.size(); ++k) {
-        bvh->geometry[k]->bvh = geom_bvhs[k]->sub_bvhs[i];
+		bvh->geometry[k]->set_bvh(geom_bvhs[k]->sub_bvhs[i]);
       }
 
       if (!bvh_multi->sub_bvhs[i]) {
@@ -298,7 +298,7 @@ class MultiDevice : public Device {
 
     /* Change geomtry BVH pointers back to the multi BVH */
     for (size_t k = 0; k < bvh->geometry.size(); ++k) {
-      bvh->geometry[k]->bvh = geom_bvhs[k];
+	  bvh->geometry[k]->set_bvh(geom_bvhs[k]);
     }
   }
 
@@ -345,7 +345,8 @@ class MultiDevice : public Device {
     SubDevice *owner_sub = island.front();
     foreach (SubDevice *island_sub, island) {
       if (key ? (island_sub->ptr_map.find(key) != island_sub->ptr_map.end()) :
-                (island_sub->device->stats.mem_used < owner_sub->device->stats.mem_used)) {
+                (island_sub->device->stats.get_mem_used() <
+                 owner_sub->device->stats.get_mem_used())) {
         owner_sub = island_sub;
       }
     }
@@ -611,20 +612,20 @@ class MultiDevice : public Device {
 
   void map_tile(Device *sub_device, RenderTile &tile) override
   {
-    if (!tile.buffer) {
+    if (!tile.get_buffer()) {
       return;
     }
 
     foreach (SubDevice &sub, devices) {
       if (sub.device == sub_device) {
-        tile.buffer = find_matching_mem(tile.buffer, sub);
+        tile.get_buffer() = find_matching_mem(tile.get_buffer(), sub);
         return;
       }
     }
 
     foreach (SubDevice &sub, denoising_devices) {
       if (sub.device == sub_device) {
-        tile.buffer = sub.ptr_map[tile.buffer];
+        tile.get_buffer() = sub.ptr_map[tile.get_buffer()];
         return;
       }
     }
@@ -651,15 +652,13 @@ class MultiDevice : public Device {
 
   void map_neighbor_tiles(Device *sub_device, RenderTileNeighbors &neighbors) override
   {
-    for (int i = 0; i < RenderTileNeighbors::SIZE; i++) {
-      RenderTile &tile = neighbors.tiles[i];
-
-      if (!tile.buffers) {
+    foreach (RenderTile &tile, neighbors.get_tiles()) {
+      if (!tile.get_buffers()) {
         continue;
       }
 
-      device_vector<float> &mem = tile.buffers->buffer;
-      tile.buffer = mem.device_pointer;
+      device_vector<float> &mem = tile.get_buffers()->get_buffer();
+      tile.get_buffer() = mem.device_pointer;
 
       if (mem.device == this && matching_rendering_and_denoising_devices) {
         /* Skip unnecessary copies in viewport mode (buffer covers the
@@ -677,15 +676,15 @@ class MultiDevice : public Device {
          * also required for the case where a CPU thread is denoising
          * a tile rendered on the GPU. In that case we have to avoid
          * overwriting the buffer being de-noised by the CPU thread. */
-        if (!tile.buffers->map_neighbor_copied) {
-          tile.buffers->map_neighbor_copied = true;
+        if (!tile.get_buffers()->get_map_neighbor_copied()) {
+          tile.get_buffers()->set_map_neighbor_copied(true);
           mem.copy_from_device();
         }
 
         if (mem.device == this) {
-          /* Can re-use memory if tile is already allocated on the sub device. */
+          /* Can re-use memory if tile.get_is() already allocated on the sub device. */
           map_tile(sub_device, tile);
-          mem.swap_device(sub_device, mem.device_size, tile.buffer);
+          mem.swap_device(sub_device, mem.device_size, tile.get_buffer());
         }
         else {
           mem.swap_device(sub_device, 0, 0);
@@ -693,8 +692,8 @@ class MultiDevice : public Device {
 
         mem.copy_to_device();
 
-        tile.buffer = mem.device_pointer;
-        tile.device_size = mem.device_size;
+        tile.get_buffer() = mem.device_pointer;
+        tile.get_device_size() = mem.device_size;
 
         mem.restore_device();
       }
@@ -703,32 +702,31 @@ class MultiDevice : public Device {
 
   void unmap_neighbor_tiles(Device *sub_device, RenderTileNeighbors &neighbors) override
   {
-    RenderTile &target_tile = neighbors.target;
-    device_vector<float> &mem = target_tile.buffers->buffer;
+    RenderTile &target_tile = neighbors.get_target();
+    device_vector<float> &mem = target_tile.get_buffers()->get_buffer();
 
     if (mem.device == this && matching_rendering_and_denoising_devices) {
       return;
     }
 
     /* Copy denoised result back to the host. */
-    mem.swap_device(sub_device, target_tile.device_size, target_tile.buffer);
+    mem.swap_device(sub_device, target_tile.get_device_size(), target_tile.get_buffer());
     mem.copy_from_device();
     mem.restore_device();
 
     /* Copy denoised result to the original device. */
     mem.copy_to_device();
 
-    for (int i = 0; i < RenderTileNeighbors::SIZE; i++) {
-      RenderTile &tile = neighbors.tiles[i];
-      if (!tile.buffers) {
+    foreach (RenderTile &tile, neighbors.get_tiles()) {
+      if (!tile.get_buffers()) {
         continue;
       }
 
-      device_vector<float> &mem = tile.buffers->buffer;
+      device_vector<float> &mem = tile.get_buffers()->get_buffer();
 
       if (mem.device != sub_device && mem.device != this) {
         /* Free up memory again if it was allocated for the copy above. */
-        mem.swap_device(sub_device, tile.device_size, tile.buffer);
+        mem.swap_device(sub_device, tile.get_device_size(), tile.get_buffer());
         sub_device->mem_free(mem);
         mem.restore_device();
       }
@@ -793,7 +791,7 @@ class MultiDevice : public Device {
 
         sub.device->task_add(subtask);
 
-        if (task.buffers && task.buffers->buffer.device == this) {
+        if (task.buffers && task.buffers->get_buffer().device == this) {
           /* Synchronize access to RenderBuffers, since 'map_neighbor_tiles' is not thread-safe. */
           sub.device->task_wait();
         }

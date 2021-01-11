@@ -20,6 +20,7 @@
 #include <limits.h>
 
 #include "render/buffers.h"
+#include "util/util_api.h"
 #include "util/util_list.h"
 
 CCL_NAMESPACE_BEGIN
@@ -65,8 +66,8 @@ enum TileOrder {
 /* Tile Manager */
 
 class TileManager {
- public:
-  BufferParams params;
+ private:
+  GET(BufferParams, params)
 
   struct State {
     vector<Tile> tiles;
@@ -91,6 +92,20 @@ class TileManager {
   int num_samples;
   int slice_overlap;
 
+  /* ** Sample range rendering. ** */
+
+  /* Start sample in the range. */
+  GET_SET(int, range_start_sample)
+
+  /* Number to samples in the rendering range. */
+  GET_SET(int, range_num_samples)
+
+  /* Schedule tiles for denoising after they've been rendered. */
+  bool schedule_denoising;
+
+  friend class Session;
+
+ public:
   TileManager(bool progressive,
               int num_samples,
               int2 tile_size,
@@ -119,19 +134,8 @@ class TileManager {
   int get_neighbor_index(int index, int neighbor);
   bool check_neighbor_state(int index, Tile::State state);
 
-  /* ** Sample range rendering. ** */
-
-  /* Start sample in the range. */
-  int range_start_sample;
-
-  /* Number to samples in the rendering range. */
-  int range_num_samples;
-
   /* Get number of actual samples to render. */
   int get_num_effective_samples();
-
-  /* Schedule tiles for denoising after they've been rendered. */
-  bool schedule_denoising;
 
  protected:
   void set_tiles();

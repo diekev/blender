@@ -23,6 +23,7 @@
 
 #include "render/attribute.h"
 
+#include "util/util_api.h"
 #include "util/util_boundbox.h"
 #include "util/util_set.h"
 #include "util/util_transform.h"
@@ -51,49 +52,50 @@ class Geometry : public Node {
  public:
   NODE_ABSTRACT_DECLARE
 
+  /* Shaders */
+  NODE_SOCKET_API_ARRAY(array<Node *>, used_shaders)
+
+  /* Motion Blur */
+  NODE_SOCKET_API(uint, motion_steps)
+  NODE_SOCKET_API(bool, use_motion_blur)
+
   enum Type {
     MESH,
     HAIR,
     VOLUME,
   };
 
-  Type geometry_type;
+  GET_READ_ONLY(Type, geometry_type)
 
   /* Attributes */
-  AttributeSet attributes;
-
-  /* Shaders */
-  NODE_SOCKET_API_ARRAY(array<Node *>, used_shaders)
+  GET(AttributeSet, attributes)
 
   /* Transform */
-  BoundBox bounds;
-  bool transform_applied;
-  bool transform_negative_scaled;
-  Transform transform_normal;
-
-  /* Motion Blur */
-  NODE_SOCKET_API(uint, motion_steps)
-  NODE_SOCKET_API(bool, use_motion_blur)
+  GET_SET(BoundBox, bounds)
+  GET_SET(bool, transform_applied)
+  GET_SET(bool, transform_negative_scaled)
+  GET_SET(Transform, transform_normal)
 
   /* Maximum number of motion steps supported (due to Embree). */
   static const uint MAX_MOTION_STEPS = 129;
 
   /* BVH */
-  BVH *bvh;
-  size_t attr_map_offset;
-  size_t prim_offset;
-  size_t optix_prim_offset;
+  GET_SET(BVH *, bvh)
+  GET_SET(size_t, attr_map_offset)
+  GET_SET(size_t, prim_offset)
+  GET_SET(size_t, optix_prim_offset)
 
   /* Shader Properties */
-  bool has_volume;         /* Set in the device_update_flags(). */
-  bool has_surface_bssrdf; /* Set in the device_update_flags(). */
+  GET_SET(bool, has_volume)         /* Set in the device_update_flags(). */
+  GET_SET(bool, has_surface_bssrdf) /* Set in the device_update_flags(). */
 
   /* Update Flags */
-  bool need_update_rebuild;
+  GET_SET(bool, need_update_rebuild)
 
   /* Index into scene->geometry (only valid during update) */
-  size_t index;
+  GET_SET(size_t, index)
 
+ public:
   /* Constructor/Destructor */
   explicit Geometry(const NodeType *node_type, const Type type);
   virtual ~Geometry();
@@ -153,6 +155,11 @@ class Geometry : public Node {
   bool is_hair() const
   {
     return geometry_type == HAIR;
+  }
+
+  bool is_volume() const
+  {
+    return geometry_type == VOLUME;
   }
 
   /* Updates */

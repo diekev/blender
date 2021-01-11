@@ -264,7 +264,7 @@ class BoundBox2D {
     return result;
   }
 
-  BoundBox2D clamp(float mn = 0.0f, float mx = 1.0f)
+  BoundBox2D clamp(float mn = 0.0f, float mx = 1.0f) const
   {
     BoundBox2D result;
 

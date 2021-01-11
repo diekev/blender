@@ -56,15 +56,15 @@ void Coverage::init_path_trace()
   if (kernel_data.film.cryptomatte_passes & CRYPT_ACCURATE) {
     if (kernel_data.film.cryptomatte_passes & CRYPT_OBJECT) {
       coverage_object.clear();
-      coverage_object.resize(tile.w * tile.h);
+      coverage_object.resize(tile.get_w() * tile.get_h());
     }
     if (kernel_data.film.cryptomatte_passes & CRYPT_MATERIAL) {
       coverage_material.clear();
-      coverage_material.resize(tile.w * tile.h);
+      coverage_material.resize(tile.get_w() * tile.get_h());
     }
     if (kernel_data.film.cryptomatte_passes & CRYPT_ASSET) {
       coverage_asset.clear();
-      coverage_asset.resize(tile.w * tile.h);
+      coverage_asset.resize(tile.get_w() * tile.get_h());
     }
   }
 }
@@ -72,7 +72,7 @@ void Coverage::init_path_trace()
 void Coverage::init_pixel(int x, int y)
 {
   if (kernel_data.film.cryptomatte_passes & CRYPT_ACCURATE) {
-    const int pixel_index = tile.w * (y - tile.y) + x - tile.x;
+    const int pixel_index = tile.get_w() * (y - tile.get_y()) + x - tile.get_x();
     if (kernel_data.film.cryptomatte_passes & CRYPT_OBJECT) {
       kg->coverage_object = &coverage_object[pixel_index];
     }
@@ -99,14 +99,14 @@ void Coverage::flatten_buffer(vector<CoverageMap> &coverage, const int pass_offs
 {
   /* Sort the coverage map and write it to the output */
   int pixel_index = 0;
-  int pass_stride = tile.buffers->params.get_passes_size();
-  for (int y = 0; y < tile.h; ++y) {
-    for (int x = 0; x < tile.w; ++x) {
+  int pass_stride = tile.get_buffers()->get_params().get_passes_size();
+  for (int y = 0; y < tile.get_h(); ++y) {
+    for (int x = 0; x < tile.get_w(); ++x) {
       const CoverageMap &pixel = coverage[pixel_index];
       if (!pixel.empty()) {
         /* buffer offset */
-        int index = x + y * tile.stride;
-        float *buffer = (float *)tile.buffer + index * pass_stride;
+        int index = x + y * tile.get_stride();
+        float *buffer = (float *)tile.get_buffer() + index * pass_stride;
 
         /* sort the cryptomatte pixel */
         vector<pair<float, float>> sorted_pixel;
@@ -140,12 +140,12 @@ void Coverage::flatten_buffer(vector<CoverageMap> &coverage, const int pass_offs
 void Coverage::sort_buffer(const int pass_offset)
 {
   /* Sort the coverage map and write it to the output */
-  int pass_stride = tile.buffers->params.get_passes_size();
-  for (int y = 0; y < tile.h; ++y) {
-    for (int x = 0; x < tile.w; ++x) {
+  int pass_stride = tile.get_buffers()->get_params().get_passes_size();
+  for (int y = 0; y < tile.get_h(); ++y) {
+    for (int x = 0; x < tile.get_w(); ++x) {
       /* buffer offset */
-      int index = x + y * tile.stride;
-      float *buffer = (float *)tile.buffer + index * pass_stride;
+      int index = x + y * tile.get_stride();
+      float *buffer = (float *)tile.get_buffer() + index * pass_stride;
       kernel_sort_id_slots(buffer + kernel_data.film.pass_cryptomatte + pass_offset,
                            2 * (kernel_data.film.cryptomatte_depth));
     }

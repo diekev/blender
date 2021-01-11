@@ -90,8 +90,9 @@ class Light : public Node {
 };
 
 class LightManager {
- public:
   bool use_light_visibility;
+
+ public:
   bool need_update;
 
   /* Need to update background (including multiple importance map) */

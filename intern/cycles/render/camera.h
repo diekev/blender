@@ -21,6 +21,7 @@
 
 #include "graph/node.h"
 
+#include "util/util_api.h"
 #include "util/util_array.h"
 #include "util/util_boundbox.h"
 #include "util/util_projection.h"
@@ -76,7 +77,6 @@ class Camera : public Node {
   NODE_SOCKET_API(float, shuttertime)
   NODE_SOCKET_API(MotionPosition, motion_position)
   NODE_SOCKET_API_ARRAY(array<float>, shutter_curve)
-  size_t shutter_table_offset;
 
   /* ** Rolling shutter effect. ** */
   /* Defines rolling shutter effect type. */
@@ -126,7 +126,7 @@ class Camera : public Node {
   NODE_SOCKET_API(float, farclip)
 
   /* screen */
-  BoundBox2D viewplane;
+  GET_READ_ONLY(BoundBox2D, viewplane)
   NODE_SOCKET_API_STRUCT_MEMBER(float, viewplane, left)
   NODE_SOCKET_API_STRUCT_MEMBER(float, viewplane, right)
   NODE_SOCKET_API_STRUCT_MEMBER(float, viewplane, bottom)
@@ -139,13 +139,13 @@ class Camera : public Node {
   NODE_SOCKET_API(float, offscreen_dicing_scale)
 
   /* border */
-  BoundBox2D border;
+  GET_READ_ONLY(BoundBox2D, border)
   NODE_SOCKET_API_STRUCT_MEMBER(float, border, left)
   NODE_SOCKET_API_STRUCT_MEMBER(float, border, right)
   NODE_SOCKET_API_STRUCT_MEMBER(float, border, bottom)
   NODE_SOCKET_API_STRUCT_MEMBER(float, border, top)
 
-  BoundBox2D viewport_camera_border;
+  GET_READ_ONLY(BoundBox2D, viewport_camera_border)
   NODE_SOCKET_API_STRUCT_MEMBER(float, viewport_camera_border, left)
   NODE_SOCKET_API_STRUCT_MEMBER(float, viewport_camera_border, right)
   NODE_SOCKET_API_STRUCT_MEMBER(float, viewport_camera_border, bottom)
@@ -160,15 +160,18 @@ class Camera : public Node {
   NODE_SOCKET_API(float, fov_pre)
   NODE_SOCKET_API(float, fov_post)
 
+ private:
+  size_t shutter_table_offset;
+
   /* computed camera parameters */
   ProjectionTransform screentoworld;
   ProjectionTransform rastertoworld;
   ProjectionTransform ndctoworld;
   Transform cameratoworld;
 
-  ProjectionTransform worldtoraster;
+  GET_READ_ONLY(ProjectionTransform, worldtoraster)
   ProjectionTransform worldtoscreen;
-  ProjectionTransform worldtondc;
+  GET_READ_ONLY(ProjectionTransform, worldtondc)
   Transform worldtocamera;
 
   ProjectionTransform rastertocamera;
@@ -196,7 +199,6 @@ class Camera : public Node {
   KernelCamera kernel_camera;
   array<DecomposedTransform> kernel_camera_motion;
 
- private:
   int width;
   int height;
   int resolution;

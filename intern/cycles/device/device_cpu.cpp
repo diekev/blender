@@ -879,14 +879,7 @@ class CPUDevice : public Device {
 
   bool adaptive_sampling_filter(KernelGlobals *kg, RenderTile &tile, int sample)
   {
-    WorkTile wtile;
-    wtile.x = tile.x;
-    wtile.y = tile.y;
-    wtile.w = tile.w;
-    wtile.h = tile.h;
-    wtile.offset = tile.offset;
-    wtile.stride = tile.stride;
-    wtile.buffer = (float *)tile.buffer;
+    WorkTile wtile = tile.work_tile();
 
     /* For CPU we do adaptive stopping per sample so we can stop earlier, but
      * for combined CPU + GPU rendering we match the GPU and do it per tile
@@ -913,21 +906,22 @@ class CPUDevice : public Device {
 
   void adaptive_sampling_post(const RenderTile &tile, KernelGlobals *kg)
   {
-    float *render_buffer = (float *)tile.buffer;
-    for (int y = tile.y; y < tile.y + tile.h; y++) {
-      for (int x = tile.x; x < tile.x + tile.w; x++) {
-        int index = tile.offset + x + y * tile.stride;
+    float *render_buffer = (float *)tile.get_buffer();
+    for (int y = tile.get_y(); y < tile.get_y() + tile.get_h(); y++) {
+      for (int x = tile.get_x(); x < tile.get_x() + tile.get_w(); x++) {
+        int index = tile.get_offset() + x + y * tile.get_stride();
         ccl_global float *buffer = render_buffer + index * kernel_data.film.pass_stride;
         if (buffer[kernel_data.film.pass_sample_count] < 0.0f) {
           buffer[kernel_data.film.pass_sample_count] = -buffer[kernel_data.film.pass_sample_count];
-          float sample_multiplier = tile.sample / max((float)tile.start_sample + 1.0f,
-                                                      buffer[kernel_data.film.pass_sample_count]);
+          float sample_multiplier = tile.get_sample() /
+                                    max((float)tile.get_start_sample() + 1.0f,
+                                        buffer[kernel_data.film.pass_sample_count]);
           if (sample_multiplier != 1.0f) {
             kernel_adaptive_post_adjust(kg, buffer, sample_multiplier);
           }
         }
         else {
-          kernel_adaptive_post_adjust(kg, buffer, tile.sample / (tile.sample - 1.0f));
+          kernel_adaptive_post_adjust(kg, buffer, tile.get_sample() / (tile.get_sample() - 1.0f));
         }
       }
     }
@@ -937,16 +931,16 @@ class CPUDevice : public Device {
   {
     const bool use_coverage = kernel_data.film.cryptomatte_passes & CRYPT_ACCURATE;
 
-    scoped_timer timer(&tile.buffers->render_time);
+    scoped_timer timer(&tile.get_buffers()->get_render_time());
 
     Coverage coverage(kg, tile);
     if (use_coverage) {
       coverage.init_path_trace();
     }
 
-    float *render_buffer = (float *)tile.buffer;
-    int start_sample = tile.start_sample;
-    int end_sample = tile.start_sample + tile.num_samples;
+    float *render_buffer = (float *)tile.get_buffer();
+    int start_sample = tile.get_start_sample();
+    int end_sample = tile.get_start_sample() + tile.get_num_samples();
 
     /* Needed for Embree. */
     SIMD_SET_FLUSH_TO_ZERO;
@@ -957,41 +951,42 @@ class CPUDevice : public Device {
           break;
       }
 
-      if (tile.stealing_state == RenderTile::CAN_BE_STOLEN && task.get_tile_stolen()) {
-        tile.stealing_state = RenderTile::WAS_STOLEN;
+      if (tile.get_stealing_state() == RenderTile::CAN_BE_STOLEN && task.get_tile_stolen()) {
+        tile.get_stealing_state() = RenderTile::WAS_STOLEN;
         break;
       }
 
-      if (tile.task == RenderTile::PATH_TRACE) {
-        for (int y = tile.y; y < tile.y + tile.h; y++) {
-          for (int x = tile.x; x < tile.x + tile.w; x++) {
+      if (tile.get_task() == RenderTile::PATH_TRACE) {
+        for (int y = tile.get_y(); y < tile.get_y() + tile.get_h(); y++) {
+          for (int x = tile.get_x(); x < tile.get_x() + tile.get_w(); x++) {
             if (use_coverage) {
               coverage.init_pixel(x, y);
             }
-            path_trace_kernel()(kg, render_buffer, sample, x, y, tile.offset, tile.stride);
+            path_trace_kernel()(
+                kg, render_buffer, sample, x, y, tile.get_offset(), tile.get_stride());
           }
         }
       }
       else {
-        for (int y = tile.y; y < tile.y + tile.h; y++) {
-          for (int x = tile.x; x < tile.x + tile.w; x++) {
-            bake_kernel()(kg, render_buffer, sample, x, y, tile.offset, tile.stride);
+        for (int y = tile.get_y(); y < tile.get_y() + tile.get_h(); y++) {
+          for (int x = tile.get_x(); x < tile.get_x() + tile.get_w(); x++) {
+            bake_kernel()(kg, render_buffer, sample, x, y, tile.get_offset(), tile.get_stride());
           }
         }
       }
-      tile.sample = sample + 1;
+      tile.get_sample() = sample + 1;
 
       if (task.adaptive_sampling.use && task.adaptive_sampling.need_filter(sample)) {
         const bool stop = adaptive_sampling_filter(kg, tile, sample);
         if (stop) {
           const int num_progress_samples = end_sample - sample;
-          tile.sample = end_sample;
-          task.update_progress(&tile, tile.w * tile.h * num_progress_samples);
+          tile.get_sample() = end_sample;
+          task.update_progress(&tile, tile.get_w() * tile.get_h() * num_progress_samples);
           break;
         }
       }
 
-      task.update_progress(&tile, tile.w * tile.h);
+      task.update_progress(&tile, tile.get_w() * tile.get_h());
     }
     if (use_coverage) {
       coverage.finalize();
@@ -1117,34 +1112,34 @@ class CPUDevice : public Device {
   {
     if (task.type == DeviceTask::DENOISE_BUFFER) {
       /* Copy pixels from compute device to CPU (no-op for CPU device). */
-      rtile.buffers->buffer.copy_from_device();
+      rtile.get_buffers()->get_buffer().copy_from_device();
 
       denoise_openimagedenoise_buffer(task,
-                                      (float *)rtile.buffer,
-                                      rtile.offset,
-                                      rtile.stride,
-                                      rtile.x,
-                                      rtile.y,
-                                      rtile.w,
-                                      rtile.h,
-                                      1.0f / rtile.sample);
+                                      (float *)rtile.get_buffer(),
+                                      rtile.get_offset(),
+                                      rtile.get_stride(),
+                                      rtile.get_x(),
+                                      rtile.get_y(),
+                                      rtile.get_w(),
+                                      rtile.get_h(),
+                                      1.0f / rtile.get_sample());
 
       /* todo: it may be possible to avoid this copy, but we have to ensure that
        * when other code copies data from the device it doesn't overwrite the
        * denoiser buffers. */
-      rtile.buffers->buffer.copy_to_device();
+      rtile.get_buffers()->get_buffer().copy_to_device();
     }
     else {
       /* Per-tile denoising. */
-      rtile.sample = rtile.start_sample + rtile.num_samples;
-      const float scale = 1.0f / rtile.sample;
-      const float invscale = rtile.sample;
+      rtile.get_sample() = rtile.get_start_sample() + rtile.get_num_samples();
+      const float scale = 1.0f / rtile.get_sample();
+      const float invscale = rtile.get_sample();
       const size_t pass_stride = task.pass_stride;
 
       /* Map neighboring tiles into one buffer for denoising. */
       RenderTileNeighbors neighbors(rtile);
       task.map_neighbor_tiles(neighbors, this);
-      RenderTile &center_tile = neighbors.tiles[RenderTileNeighbors::CENTER];
+      RenderTile &center_tile = neighbors.get_tiles()[RenderTileNeighbors::CENTER];
       rtile = center_tile;
 
       /* Calculate size of the tile to denoise (including overlap). The overlap
@@ -1156,19 +1151,18 @@ class CPUDevice : public Device {
       /* Adjacent tiles are in separate memory regions, copy into single buffer. */
       array<float> merged(rect_size.x * rect_size.y * task.pass_stride);
 
-      for (int i = 0; i < RenderTileNeighbors::SIZE; i++) {
-        RenderTile &ntile = neighbors.tiles[i];
-        if (!ntile.buffer) {
+      foreach (RenderTile &ntile, neighbors.get_tiles()) {
+        if (!ntile.get_buffer()) {
           continue;
         }
 
-        const int xmin = max(ntile.x, rect.x);
-        const int ymin = max(ntile.y, rect.y);
-        const int xmax = min(ntile.x + ntile.w, rect.z);
-        const int ymax = min(ntile.y + ntile.h, rect.w);
+        const int xmin = max(ntile.get_x(), rect.x);
+        const int ymin = max(ntile.get_y(), rect.y);
+        const int xmax = min(ntile.get_x() + ntile.get_w(), rect.z);
+        const int ymax = min(ntile.get_y() + ntile.get_h(), rect.w);
 
-        const size_t tile_offset = ntile.offset + xmin + ymin * ntile.stride;
-        const float *tile_buffer = (float *)ntile.buffer + tile_offset * pass_stride;
+        const size_t tile_offset = ntile.get_offset() + xmin + ymin * ntile.get_stride();
+        const float *tile_buffer = (float *)ntile.get_buffer() + tile_offset * pass_stride;
 
         const size_t merged_stride = rect_size.x;
         const size_t merged_offset = (xmin - rect.x) + (ymin - rect.y) * merged_stride;
@@ -1178,7 +1172,7 @@ class CPUDevice : public Device {
           for (int x = 0; x < pass_stride * (xmax - xmin); x++) {
             merged_buffer[x] = tile_buffer[x] * scale;
           }
-          tile_buffer += ntile.stride * pass_stride;
+          tile_buffer += ntile.get_stride() * pass_stride;
           merged_buffer += merged_stride * pass_stride;
         }
       }
@@ -1188,15 +1182,15 @@ class CPUDevice : public Device {
           task, merged.data(), 0, rect_size.x, 0, 0, rect_size.x, rect_size.y, 1.0f);
 
       /* Copy back result from merged buffer. */
-      RenderTile &ntile = neighbors.target;
-      if (ntile.buffer) {
-        const int xmin = max(ntile.x, rect.x);
-        const int ymin = max(ntile.y, rect.y);
-        const int xmax = min(ntile.x + ntile.w, rect.z);
-        const int ymax = min(ntile.y + ntile.h, rect.w);
+      RenderTile &ntile = neighbors.get_target();
+      if (ntile.get_buffer()) {
+        const int xmin = max(ntile.get_x(), rect.x);
+        const int ymin = max(ntile.get_y(), rect.y);
+        const int xmax = min(ntile.get_x() + ntile.get_w(), rect.z);
+        const int ymax = min(ntile.get_y() + ntile.get_h(), rect.w);
 
-        const size_t tile_offset = ntile.offset + xmin + ymin * ntile.stride;
-        float *tile_buffer = (float *)ntile.buffer + tile_offset * pass_stride;
+        const size_t tile_offset = ntile.get_offset() + xmin + ymin * ntile.get_stride();
+        float *tile_buffer = (float *)ntile.get_buffer() + tile_offset * pass_stride;
 
         const size_t merged_stride = rect_size.x;
         const size_t merged_offset = (xmin - rect.x) + (ymin - rect.y) * merged_stride;
@@ -1208,7 +1202,7 @@ class CPUDevice : public Device {
             tile_buffer[x + 1] = merged_buffer[x + 1] * invscale;
             tile_buffer[x + 2] = merged_buffer[x + 2] * invscale;
           }
-          tile_buffer += ntile.stride * pass_stride;
+          tile_buffer += ntile.get_stride() * pass_stride;
           merged_buffer += merged_stride * pass_stride;
         }
       }
@@ -1221,7 +1215,7 @@ class CPUDevice : public Device {
   {
     ProfilingHelper profiling(denoising.profiler, PROFILING_DENOISING);
 
-    tile.sample = tile.start_sample + tile.num_samples;
+    tile.get_sample() = tile.get_start_sample() + tile.get_num_samples();
 
     denoising.functions.construct_transform = function_bind(
         &CPUDevice::denoising_construct_transform, this, &denoising);
@@ -1241,8 +1235,8 @@ class CPUDevice : public Device {
     denoising.functions.detect_outliers = function_bind(
         &CPUDevice::denoising_detect_outliers, this, _1, _2, _3, _4, &denoising);
 
-    denoising.filter_area = make_int4(tile.x, tile.y, tile.w, tile.h);
-    denoising.render_buffer.samples = tile.sample;
+    denoising.filter_area = make_int4(tile.get_x(), tile.get_y(), tile.get_w(), tile.get_h());
+    denoising.render_buffer.samples = tile.get_sample();
     denoising.buffer.gpu_temporary_mem = false;
 
     denoising.run_denoising(tile);
@@ -1292,7 +1286,7 @@ class CPUDevice : public Device {
 
     RenderTile tile;
     while (task.acquire_tile(this, tile, tile_types)) {
-      if (tile.task == RenderTile::PATH_TRACE) {
+      if (tile.get_task() == RenderTile::PATH_TRACE) {
         if (use_split_kernel) {
           device_only_memory<uchar> void_buffer(this, "void_buffer");
           split_kernel->path_trace(task, tile, kgbuffer, void_buffer);
@@ -1301,10 +1295,10 @@ class CPUDevice : public Device {
           render(task, tile, kg);
         }
       }
-      else if (tile.task == RenderTile::BAKE) {
+      else if (tile.get_task() == RenderTile::BAKE) {
         render(task, tile, kg);
       }
-      else if (tile.task == RenderTile::DENOISE) {
+      else if (tile.get_task() == RenderTile::DENOISE) {
         if (task.denoising.type == DENOISER_OPENIMAGEDENOISE) {
           denoise_openimagedenoise(task, tile);
         }
@@ -1315,7 +1309,7 @@ class CPUDevice : public Device {
           }
           denoise_nlm(*denoising, tile);
         }
-        task.update_progress(&tile, tile.w * tile.h);
+        task.update_progress(&tile, tile.get_w() * tile.get_h());
       }
 
       task.release_tile(tile);
@@ -1341,18 +1335,7 @@ class CPUDevice : public Device {
 
   void thread_denoise(DeviceTask &task)
   {
-    RenderTile tile;
-    tile.x = task.x;
-    tile.y = task.y;
-    tile.w = task.w;
-    tile.h = task.h;
-    tile.buffer = task.buffer;
-    tile.sample = task.sample + task.num_samples;
-    tile.num_samples = task.num_samples;
-    tile.start_sample = task.sample;
-    tile.offset = task.offset;
-    tile.stride = task.stride;
-    tile.buffers = task.buffers;
+    RenderTile tile = RenderTile::from_device_task(task, true);
 
     if (task.denoising.type == DENOISER_OPENIMAGEDENOISE) {
       denoise_openimagedenoise(task, tile);
@@ -1369,7 +1352,7 @@ class CPUDevice : public Device {
       profiler.remove_state(&denoising_profiler_state);
     }
 
-    task.update_progress(&tile, tile.w * tile.h);
+    task.update_progress(&tile, tile.get_w() * tile.get_h());
   }
 
   void thread_film_convert(DeviceTask &task)
@@ -1584,20 +1567,20 @@ bool CPUSplitKernel::enqueue_split_kernel_data_init(const KernelDimensions &dim,
                                  (void *)split_data.device_pointer,
                                  num_global_elements,
                                  (char *)ray_state.device_pointer,
-                                 rtile.start_sample,
-                                 rtile.start_sample + rtile.num_samples,
-                                 rtile.x,
-                                 rtile.y,
-                                 rtile.w,
-                                 rtile.h,
-                                 rtile.offset,
-                                 rtile.stride,
+                                 rtile.get_start_sample(),
+                                 rtile.get_start_sample() + rtile.get_num_samples(),
+                                 rtile.get_x(),
+                                 rtile.get_y(),
+                                 rtile.get_w(),
+                                 rtile.get_h(),
+                                 rtile.get_offset(),
+                                 rtile.get_stride(),
                                  (int *)queue_index.device_pointer,
                                  dim.global_size[0] * dim.global_size[1],
                                  (char *)use_queues_flags.device_pointer,
                                  (uint *)work_pool_wgs.device_pointer,
-                                 rtile.num_samples,
-                                 (float *)rtile.buffer);
+                                 rtile.get_num_samples(),
+                                 (float *)rtile.get_buffer());
     }
   }
 

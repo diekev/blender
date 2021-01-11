@@ -53,12 +53,10 @@ class Object : public Node {
 
   NODE_SOCKET_API(Geometry *, geometry)
   NODE_SOCKET_API(Transform, tfm)
-  BoundBox bounds;
   NODE_SOCKET_API(uint, random_id)
   NODE_SOCKET_API(int, pass_id)
   NODE_SOCKET_API(float3, color)
   NODE_SOCKET_API(ustring, asset_name)
-  vector<ParamValue> attributes;
   NODE_SOCKET_API(uint, visibility)
   NODE_SOCKET_API_ARRAY(array<Transform>, motion)
   NODE_SOCKET_API(bool, hide_on_missing_motion)
@@ -71,6 +69,9 @@ class Object : public Node {
 
   NODE_SOCKET_API(ParticleSystem *, particle_system);
   NODE_SOCKET_API(int, particle_index);
+
+  GET_READ_ONLY(BoundBox, bounds)
+  GET_SET(vector<ParamValue>, attributes)
 
   Object();
   ~Object();

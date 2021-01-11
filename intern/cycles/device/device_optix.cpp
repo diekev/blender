@@ -28,6 +28,7 @@
 #  include "render/object.h"
 #  include "render/scene.h"
 #  include "util/util_debug.h"
+#  include "util/util_foreach.h"
 #  include "util/util_logging.h"
 #  include "util/util_md5.h"
 #  include "util/util_path.h"
@@ -704,14 +705,14 @@ class OptiXDevice : public CUDADevice {
 
       RenderTile tile;
       while (task.acquire_tile(this, tile, task.tile_types)) {
-        if (tile.task == RenderTile::PATH_TRACE)
+        if (tile.get_task() == RenderTile::PATH_TRACE)
           launch_render(task, tile, thread_index);
-        else if (tile.task == RenderTile::BAKE) {
+        else if (tile.get_task() == RenderTile::BAKE) {
           // Perform baking using CUDA, since it is not currently implemented in OptiX
           device_vector<WorkTile> work_tiles(this, "work_tiles", MEM_READ_ONLY);
           CUDADevice::render(task, tile, work_tiles);
         }
-        else if (tile.task == RenderTile::DENOISE)
+        else if (tile.get_task() == RenderTile::DENOISE)
           launch_denoise(task, tile);
         task.release_tile(tile);
         if (task.get_cancel() && !task.need_finish_queue)
@@ -725,18 +726,7 @@ class OptiXDevice : public CUDADevice {
     }
     else if (task.type == DeviceTask::DENOISE_BUFFER) {
       // Set up a single tile that covers the whole task and denoise it
-      RenderTile tile;
-      tile.x = task.x;
-      tile.y = task.y;
-      tile.w = task.w;
-      tile.h = task.h;
-      tile.buffer = task.buffer;
-      tile.num_samples = task.num_samples;
-      tile.start_sample = task.sample;
-      tile.offset = task.offset;
-      tile.stride = task.stride;
-      tile.buffers = task.buffers;
-
+      RenderTile tile = RenderTile::from_device_task(task, false);
       launch_denoise(task, tile);
     }
   }
@@ -746,18 +736,11 @@ class OptiXDevice : public CUDADevice {
     assert(thread_index < launch_params.data_size);
 
     // Keep track of total render time of this tile
-    const scoped_timer timer(&rtile.buffers->render_time);
+    const scoped_timer timer(&rtile.get_buffers()->get_render_time());
 
-    WorkTile wtile;
-    wtile.x = rtile.x;
-    wtile.y = rtile.y;
-    wtile.w = rtile.w;
-    wtile.h = rtile.h;
-    wtile.offset = rtile.offset;
-    wtile.stride = rtile.stride;
-    wtile.buffer = (float *)rtile.buffer;
+    WorkTile wtile = rtile.work_tile();
 
-    const int end_sample = rtile.start_sample + rtile.num_samples;
+    const int end_sample = rtile.get_start_sample() + rtile.get_num_samples();
     // Keep this number reasonable to avoid running into TDRs
     int step_samples = (info.display_device ? 8 : 32);
     if (task.adaptive_sampling.use) {
@@ -770,7 +753,7 @@ class OptiXDevice : public CUDADevice {
 
     const CUDAContextScope scope(cuContext);
 
-    for (int sample = rtile.start_sample; sample < end_sample; sample += step_samples) {
+    for (int sample = rtile.get_start_sample(); sample < end_sample; sample += step_samples) {
       // Copy work tile information to device
       wtile.num_samples = min(step_samples, end_sample - sample);
       wtile.start_sample = sample;
@@ -815,7 +798,7 @@ class OptiXDevice : public CUDADevice {
       check_result_cuda(cuStreamSynchronize(cuda_stream[thread_index]));
 
       // Update current sample, so it is displayed correctly
-      rtile.sample = wtile.start_sample + wtile.num_samples;
+      rtile.get_sample() = wtile.start_sample + wtile.num_samples;
       // Update task progress after the kernel completed rendering
       task.update_progress(&rtile, wtile.w * wtile.h * wtile.num_samples);
 
@@ -828,14 +811,14 @@ class OptiXDevice : public CUDADevice {
       device_ptr d_wtile_ptr = launch_params_ptr + offsetof(KernelParams, tile);
       adaptive_sampling_post(rtile, &wtile, d_wtile_ptr, cuda_stream[thread_index]);
       check_result_cuda(cuStreamSynchronize(cuda_stream[thread_index]));
-      task.update_progress(&rtile, rtile.w * rtile.h * wtile.num_samples);
+      task.update_progress(&rtile, rtile.get_w() * rtile.get_h() * wtile.num_samples);
     }
   }
 
   bool launch_denoise(DeviceTask &task, RenderTile &rtile)
   {
     // Update current sample (for display and NLM denoising task)
-    rtile.sample = rtile.start_sample + rtile.num_samples;
+    rtile.get_sample() = rtile.get_start_sample() + rtile.get_num_samples();
 
     // Make CUDA context current now, since it is used for both denoising tasks
     const CUDAContextScope scope(cuContext);
@@ -849,8 +832,8 @@ class OptiXDevice : public CUDADevice {
       //   6 7 8  9
       RenderTileNeighbors neighbors(rtile);
       task.map_neighbor_tiles(neighbors, this);
-      RenderTile &center_tile = neighbors.tiles[RenderTileNeighbors::CENTER];
-      RenderTile &target_tile = neighbors.target;
+      RenderTile &center_tile = neighbors.get_tiles()[RenderTileNeighbors::CENTER];
+      RenderTile &target_tile = neighbors.get_target();
       rtile = center_tile;  // Tile may have been modified by mapping code
 
       // Calculate size of the tile to denoise (including overlap)
@@ -861,11 +844,13 @@ class OptiXDevice : public CUDADevice {
       int4 clip_rect = neighbors.bounds();
       rect = rect_clip(rect, clip_rect);
       int2 rect_size = make_int2(rect.z - rect.x, rect.w - rect.y);
-      int2 overlap_offset = make_int2(rtile.x - rect.x, rtile.y - rect.y);
+      int2 overlap_offset = make_int2(rtile.get_x() - rect.x, rtile.get_y() - rect.y);
 
       // Calculate byte offsets and strides
       int pixel_stride = task.pass_stride * (int)sizeof(float);
-      int pixel_offset = (rtile.offset + rtile.x + rtile.y * rtile.stride) * pixel_stride;
+      int pixel_offset = (rtile.get_offset() + rtile.get_x() +
+                          rtile.get_y() * rtile.get_stride()) *
+                         pixel_stride;
       const int pass_offset[3] = {
           (task.pass_denoising_data + DENOISING_PASS_COLOR) * (int)sizeof(float),
           (task.pass_denoising_data + DENOISING_PASS_ALBEDO) * (int)sizeof(float),
@@ -873,24 +858,24 @@ class OptiXDevice : public CUDADevice {
 
       // Start with the current tile pointer offset
       int input_stride = pixel_stride;
-      device_ptr input_ptr = rtile.buffer + pixel_offset;
+      device_ptr input_ptr = rtile.get_buffer() + pixel_offset;
 
       // Copy tile data into a common buffer if necessary
       device_only_memory<float> input(this, "denoiser input");
       device_vector<TileInfo> tile_info_mem(this, "denoiser tile info", MEM_READ_WRITE);
 
       bool contiguous_memory = true;
-      for (int i = 0; i < RenderTileNeighbors::SIZE; i++) {
-        if (neighbors.tiles[i].buffer && neighbors.tiles[i].buffer != rtile.buffer) {
+      foreach (RenderTile &ntile, neighbors.get_tiles()) {
+        if (ntile.get_buffer() && ntile.get_buffer() != rtile.get_buffer()) {
           contiguous_memory = false;
         }
       }
 
       if (contiguous_memory) {
         // Tiles are in continous memory, so can just subtract overlap offset
-        input_ptr -= (overlap_offset.x + overlap_offset.y * rtile.stride) * pixel_stride;
+        input_ptr -= (overlap_offset.x + overlap_offset.y * rtile.get_stride()) * pixel_stride;
         // Stride covers the whole width of the image and not just a single tile
-        input_stride *= rtile.stride;
+        input_stride *= rtile.get_stride();
       }
       else {
         // Adjacent tiles are in separate memory regions, so need to copy them into a single one
@@ -901,19 +886,7 @@ class OptiXDevice : public CUDADevice {
         input_stride *= rect_size.x;
 
         TileInfo *tile_info = tile_info_mem.alloc(1);
-        for (int i = 0; i < RenderTileNeighbors::SIZE; i++) {
-          tile_info->offsets[i] = neighbors.tiles[i].offset;
-          tile_info->strides[i] = neighbors.tiles[i].stride;
-          tile_info->buffers[i] = neighbors.tiles[i].buffer;
-        }
-        tile_info->x[0] = neighbors.tiles[3].x;
-        tile_info->x[1] = neighbors.tiles[4].x;
-        tile_info->x[2] = neighbors.tiles[5].x;
-        tile_info->x[3] = neighbors.tiles[5].x + neighbors.tiles[5].w;
-        tile_info->y[0] = neighbors.tiles[1].y;
-        tile_info->y[1] = neighbors.tiles[4].y;
-        tile_info->y[2] = neighbors.tiles[7].y;
-        tile_info->y[3] = neighbors.tiles[7].y + neighbors.tiles[7].h;
+        neighbors.fill_tile_info(tile_info);
         tile_info_mem.copy_to_device();
 
         void *args[] = {
@@ -933,7 +906,7 @@ class OptiXDevice : public CUDADevice {
                             &task.pass_stride,
                             const_cast<int *>(pass_offset),
                             &task.denoising.input_passes,
-                            &rtile.sample};
+                            &rtile.get_sample()};
       launch_filter_kernel(
           "kernel_cuda_filter_convert_to_rgb", rect_size.x, rect_size.y, input_args);
 
@@ -1022,10 +995,10 @@ class OptiXDevice : public CUDADevice {
       int2 output_offset = overlap_offset;
       overlap_offset = make_int2(0, 0);  // Not supported by denoiser API, so apply manually
 #  else
-      output_layers[0].data = target_tile.buffer + pixel_offset;
-      output_layers[0].width = target_tile.w;
-      output_layers[0].height = target_tile.h;
-      output_layers[0].rowStrideInBytes = target_tile.stride * pixel_stride;
+      output_layers[0].data = target_tile.get_buffer() + pixel_offset;
+      output_layers[0].width = target_tile.get_w();
+      output_layers[0].height = target_tile.get_h();
+      output_layers[0].rowStrideInBytes = target_tile.get_stride() * pixel_stride;
       output_layers[0].pixelStrideInBytes = pixel_stride;
 #  endif
       output_layers[0].format = OPTIX_PIXEL_FORMAT_FLOAT3;
@@ -1047,21 +1020,23 @@ class OptiXDevice : public CUDADevice {
 
 #  if OPTIX_DENOISER_NO_PIXEL_STRIDE
       void *output_args[] = {&input_ptr,
-                             &target_tile.buffer,
+                             &target_tile.get_buffer(),
                              &output_offset.x,
                              &output_offset.y,
                              &rect_size.x,
                              &rect_size.y,
-                             &target_tile.x,
-                             &target_tile.y,
-                             &target_tile.w,
-                             &target_tile.h,
-                             &target_tile.offset,
-                             &target_tile.stride,
+                             &target_tile.get_x(),
+                             &target_tile.get_y(),
+                             &target_tile.get_w(),
+                             &target_tile.get_h(),
+                             &target_tile.get_offset(),
+                             &target_tile.get_stride(),
                              &task.pass_stride,
-                             &rtile.sample};
-      launch_filter_kernel(
-          "kernel_cuda_filter_convert_from_rgb", target_tile.w, target_tile.h, output_args);
+                             &rtile.get_sample()};
+      launch_filter_kernel("kernel_cuda_filter_convert_from_rgb",
+                           target_tile.get_w(),
+                           target_tile.get_h(),
+                           output_args);
 #  endif
 
       check_result_cuda_ret(cuStreamSynchronize(0));
@@ -1075,7 +1050,7 @@ class OptiXDevice : public CUDADevice {
     }
 
     // Update task progress after the denoiser completed processing
-    task.update_progress(&rtile, rtile.w * rtile.h);
+    task.update_progress(&rtile, rtile.get_w() * rtile.get_h());
 
     return true;
   }
@@ -1275,7 +1250,7 @@ class OptiXDevice : public CUDADevice {
 
       // Build bottom level acceleration structures (BLAS)
       Geometry *const geom = bvh->geometry[0];
-      if (geom->geometry_type == Geometry::HAIR) {
+	  if (geom->is_hair()) {
         // Build BLAS for curve primitives
         Hair *const hair = static_cast<Hair *const>(geom);
         if (hair->num_curves() == 0) {
@@ -1285,7 +1260,7 @@ class OptiXDevice : public CUDADevice {
         const size_t num_segments = hair->num_segments();
 
         size_t num_motion_steps = 1;
-        Attribute *motion_keys = hair->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
+        Attribute *motion_keys = hair->get_attributes().find(ATTR_STD_MOTION_VERTEX_POSITION);
         if (motion_blur && hair->get_use_motion_blur() && motion_keys) {
           num_motion_steps = hair->get_motion_steps();
         }
@@ -1427,7 +1402,7 @@ class OptiXDevice : public CUDADevice {
           build_input.aabbArray.strideInBytes = sizeof(OptixAabb);
           build_input.aabbArray.flags = &build_flags;
           build_input.aabbArray.numSbtRecords = 1;
-          build_input.aabbArray.primitiveIndexOffset = hair->optix_prim_offset;
+          build_input.aabbArray.primitiveIndexOffset = hair->get_optix_prim_offset();
 #  else
           build_input.customPrimitiveArray.aabbBuffers = (CUdeviceptr *)aabb_ptrs.data();
           build_input.customPrimitiveArray.numPrimitives = num_segments;
@@ -1442,7 +1417,7 @@ class OptiXDevice : public CUDADevice {
           progress.set_error("Failed to build OptiX acceleration structure");
         }
       }
-      else if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
+      else if (geom->is_mesh() || geom->is_volume()) {
         // Build BLAS for triangle primitives
         Mesh *const mesh = static_cast<Mesh *const>(geom);
         if (mesh->num_triangles() == 0) {
@@ -1452,7 +1427,7 @@ class OptiXDevice : public CUDADevice {
         const size_t num_verts = mesh->get_verts().size();
 
         size_t num_motion_steps = 1;
-        Attribute *motion_keys = mesh->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
+        Attribute *motion_keys = mesh->get_attributes().find(ATTR_STD_MOTION_VERTEX_POSITION);
         if (motion_blur && mesh->get_use_motion_blur() && motion_keys) {
           num_motion_steps = mesh->get_motion_steps();
         }
@@ -1505,7 +1480,7 @@ class OptiXDevice : public CUDADevice {
         // buffers for that purpose. OptiX does not allow this to be zero though, so just pass in
         // one and rely on that having the same meaning in this case.
         build_input.triangleArray.numSbtRecords = 1;
-        build_input.triangleArray.primitiveIndexOffset = mesh->optix_prim_offset;
+        build_input.triangleArray.primitiveIndexOffset = mesh->get_optix_prim_offset();
 
         if (!build_optix_bvh(bvh_optix, operation, build_input, num_motion_steps)) {
           progress.set_error("Failed to build OptiX acceleration structure");
@@ -1564,17 +1539,17 @@ class OptiXDevice : public CUDADevice {
         if (!ob->is_traceable())
           continue;
 
-        BVHOptiX *const blas = static_cast<BVHOptiX *>(ob->get_geometry()->bvh);
+		BVHOptiX *const blas = static_cast<BVHOptiX *>(ob->get_geometry()->get_bvh());
         OptixTraversableHandle handle = blas->traversable_handle;
 
 #  if OPTIX_ABI_VERSION < 41
         OptixAabb &aabb = aabbs[num_instances];
-        aabb.minX = ob->bounds.min.x;
-        aabb.minY = ob->bounds.min.y;
-        aabb.minZ = ob->bounds.min.z;
-        aabb.maxX = ob->bounds.max.x;
-        aabb.maxY = ob->bounds.max.y;
-        aabb.maxZ = ob->bounds.max.z;
+		aabb.minX = ob->get_bounds().min.x;
+		aabb.minY = ob->get_bounds().min.y;
+		aabb.minZ = ob->get_bounds().min.z;
+		aabb.maxX = ob->get_bounds().max.x;
+		aabb.maxY = ob->get_bounds().max.y;
+		aabb.maxZ = ob->get_bounds().max.z;
 #  endif
 
         OptixInstance &instance = instances[num_instances++];
@@ -1591,12 +1566,12 @@ class OptiXDevice : public CUDADevice {
         // Have to have at least one bit in the mask, or else instance would always be culled
         instance.visibilityMask = 1;
 
-        if (ob->get_geometry()->has_volume) {
+		if (ob->get_geometry()->get_has_volume()) {
           // Volumes have a special bit set in the visibility mask so a trace can mask only volumes
           instance.visibilityMask |= 2;
         }
 
-        if (ob->get_geometry()->geometry_type == Geometry::HAIR) {
+		if (ob->get_geometry()->is_hair()) {
           // Same applies to curves (so they can be skipped in local trace calls)
           instance.visibilityMask |= 4;
 

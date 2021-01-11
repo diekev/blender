@@ -157,20 +157,22 @@ void BVHBuild::add_reference_curves(BoundBox &root, BoundBox &center, Hair *hair
 {
   const Attribute *curve_attr_mP = NULL;
   if (hair->has_motion_blur()) {
-    curve_attr_mP = hair->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
+    curve_attr_mP = hair->get_attributes().find(ATTR_STD_MOTION_VERTEX_POSITION);
   }
 
-  const PrimitiveType primitive_type =
-      (curve_attr_mP != NULL) ?
-          ((hair->curve_shape == CURVE_RIBBON) ? PRIMITIVE_MOTION_CURVE_RIBBON :
-                                                 PRIMITIVE_MOTION_CURVE_THICK) :
-          ((hair->curve_shape == CURVE_RIBBON) ? PRIMITIVE_CURVE_RIBBON : PRIMITIVE_CURVE_THICK);
+  const PrimitiveType primitive_type = (curve_attr_mP != NULL) ?
+                                           ((hair->get_curve_shape() == CURVE_RIBBON) ?
+                                                PRIMITIVE_MOTION_CURVE_RIBBON :
+                                                PRIMITIVE_MOTION_CURVE_THICK) :
+                                           ((hair->get_curve_shape() == CURVE_RIBBON) ?
+                                                PRIMITIVE_CURVE_RIBBON :
+                                                PRIMITIVE_CURVE_THICK);
 
   const size_t num_curves = hair->num_curves();
   for (uint j = 0; j < num_curves; j++) {
     const Hair::Curve curve = hair->get_curve(j);
     const float *curve_radius = &hair->get_curve_radius()[0];
-    for (int k = 0; k < curve.num_keys - 1; k++) {
+    for (int k = 0; k < curve.get_num_keys() - 1; k++) {
       if (curve_attr_mP == NULL) {
         /* Really simple logic for static hair. */
         BoundBox bounds = BoundBox::empty;
@@ -270,11 +272,11 @@ void BVHBuild::add_reference_curves(BoundBox &root, BoundBox &center, Hair *hair
 
 void BVHBuild::add_reference_geometry(BoundBox &root, BoundBox &center, Geometry *geom, int i)
 {
-  if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
+  if (geom->is_mesh() || geom->is_volume()) {
     Mesh *mesh = static_cast<Mesh *>(geom);
     add_reference_triangles(root, center, mesh, i);
   }
-  else if (geom->geometry_type == Geometry::HAIR) {
+  else if (geom->is_hair()) {
     Hair *hair = static_cast<Hair *>(geom);
     add_reference_curves(root, center, hair, i);
   }
@@ -282,9 +284,10 @@ void BVHBuild::add_reference_geometry(BoundBox &root, BoundBox &center, Geometry
 
 void BVHBuild::add_reference_object(BoundBox &root, BoundBox &center, Object *ob, int i)
 {
-  references.push_back(BVHReference(ob->bounds, -1, i, 0));
-  root.grow(ob->bounds);
-  center.grow(ob->bounds.center2());
+  const BoundBox &bounds = ob->get_bounds();
+  references.push_back(BVHReference(bounds, -1, i, 0));
+  root.grow(bounds);
+  center.grow(bounds.center2());
 }
 
 static size_t count_curve_segments(Hair *hair)
@@ -292,18 +295,18 @@ static size_t count_curve_segments(Hair *hair)
   size_t num = 0, num_curves = hair->num_curves();
 
   for (size_t i = 0; i < num_curves; i++)
-    num += hair->get_curve(i).num_keys - 1;
+    num += hair->get_curve(i).get_num_keys() - 1;
 
   return num;
 }
 
 static size_t count_primitives(Geometry *geom)
 {
-  if (geom->geometry_type == Geometry::MESH || geom->geometry_type == Geometry::VOLUME) {
+  if (geom->is_mesh() || geom->is_volume()) {
     Mesh *mesh = static_cast<Mesh *>(geom);
     return mesh->num_triangles();
   }
-  else if (geom->geometry_type == Geometry::HAIR) {
+  else if (geom->is_hair()) {
     Hair *hair = static_cast<Hair *>(geom);
     return count_curve_segments(hair);
   }
