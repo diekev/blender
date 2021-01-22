@@ -1923,18 +1923,19 @@ void CUDADevice::render(DeviceTask &task, RenderTile &rtile, device_vector<WorkT
   }
 
   uint step_samples = divide_up(min_blocks * num_threads_per_block, wtile->w * wtile->h);
-  if (task.adaptive_sampling.use) {
-    step_samples = task.adaptive_sampling.align_static_samples(step_samples);
-  }
 
   /* Render all samples. */
   int start_sample = rtile.get_start_sample();
   int end_sample = rtile.get_start_sample() + rtile.get_num_samples();
 
-  for (int sample = start_sample; sample < end_sample; sample += step_samples) {
+  for (int sample = start_sample; sample < end_sample;) {
     /* Setup and copy work tile to device. */
     wtile->start_sample = sample;
-    wtile->num_samples = min(step_samples, end_sample - sample);
+    wtile->num_samples = step_samples;
+    if (task.adaptive_sampling.use) {
+      wtile->num_samples = task.adaptive_sampling.align_samples(sample, step_samples);
+    }
+    wtile->num_samples = min(wtile->num_samples, end_sample - sample);
     work_tiles.copy_to_device();
 
     CUdeviceptr d_work_tiles = (CUdeviceptr)work_tiles.device_pointer;
@@ -1956,8 +1957,9 @@ void CUDADevice::render(DeviceTask &task, RenderTile &rtile, device_vector<WorkT
     cuda_assert(cuCtxSynchronize());
 
     /* Update progress. */
-    rtile.get_sample() = sample + wtile->num_samples;
-    task.update_progress(&rtile, rtile.get_w() * rtile.get_h() * wtile->num_samples);
+    sample += wtile->num_samples;
+	rtile.set_sample(sample);
+	task.update_progress(&rtile, rtile.get_w() * rtile.get_h() * wtile->num_samples);
 
     if (task.get_cancel()) {
       if (task.need_finish_queue == false)
