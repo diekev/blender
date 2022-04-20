@@ -784,6 +784,8 @@ static StructRNA *rna_Space_register(Main *bmain,
   st->rna_ext.free = free;
   RNA_struct_blender_type_set(st->rna_ext.srna, st);
 
+  st->spaceid = SPACE_CUSTOM;
+
   BKE_spacetype_register(st);
 
   /* update while blender is running */
