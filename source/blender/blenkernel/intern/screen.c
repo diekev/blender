@@ -361,6 +361,16 @@ SpaceType *BKE_spacetype_from_id(int spaceid)
   return NULL;
 }
 
+SpaceType *BKE_spacetype_from_idname(const char *idname)
+{
+  LISTBASE_FOREACH (SpaceType *, st, &spacetypes) {
+    if (STREQ(st->idname, idname)) {
+      return st;
+    }
+  }
+  return NULL;
+}
+
 ARegionType *BKE_regiontype_from_id_or_first(const SpaceType *st, int regionid)
 {
   LISTBASE_FOREACH (ARegionType *, art, &st->regiontypes) {
@@ -398,7 +408,7 @@ void BKE_spacetype_set_idname_ex(SpaceType *st, int spaceid, const char *idname)
 void BKE_spacetype_register(SpaceType *st)
 {
   /* sanity check */
-  SpaceType *stype = BKE_spacetype_from_id(st->spaceid);
+  SpaceType *stype = BKE_spacetype_from_idname(st->idname);
   if (stype) {
     printf("error: redefinition of spacetype %s\n", stype->name);
     spacetype_free(stype);
