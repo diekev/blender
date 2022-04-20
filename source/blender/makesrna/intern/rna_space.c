@@ -715,6 +715,86 @@ static void rna_Space_bool_from_region_flag_update_by_type(bContext *C,
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Custom Space Registration
+ * \{ */
+
+static void rna_Space_unregister(Main *UNUSED(bmain), StructRNA *type)
+{
+  SpaceType *st = RNA_struct_blender_type_get(type);
+
+  if (!st) {
+    return;
+  }
+
+  RNA_struct_free_extension(type, &st->rna_ext);
+  RNA_struct_free(&BLENDER_RNA, type);
+
+  // WM_menutype_freelink(mt);
+
+  /* update while blender is running */
+  WM_main_add_notifier(NC_WINDOW, NULL);
+}
+
+static StructRNA *rna_Space_register(Main *bmain,
+                                     ReportList *reports,
+                                     void *data,
+                                     const char *identifier,
+                                     StructValidateFunc validate,
+                                     StructCallbackFunc call,
+                                     StructFreeFunc free)
+{
+  SpaceType *st, dummyst = {NULL};
+  SpaceLink dummyspace = {NULL};
+  PointerRNA dummystr;
+  // int have_function[0];
+
+  /* setup dummy space & space type to store static properties in */
+  // dummyspace.type = &dummyst;
+  RNA_pointer_create(NULL, &RNA_Space, &dummyspace, &dummystr);
+
+  /* validate the python class */
+  if (validate(&dummystr, data, NULL /*have_function*/) != 0) {
+    return NULL;
+  }
+
+  if (strlen(identifier) >= sizeof(dummyst.idname)) {
+    BKE_reportf(reports,
+                RPT_ERROR,
+                "Registering space class: '%s' is too long, maximum length is %d",
+                identifier,
+                (int)sizeof(dummyst.idname));
+    return NULL;
+  }
+
+  /* check if we have registered this space type before, and remove it */
+  st = BKE_spacetype_from_idname(dummyst.idname);
+  if (st && st->rna_ext.srna) {
+    rna_Space_unregister(bmain, st->rna_ext.srna);
+  }
+  if (!RNA_struct_available_or_report(reports, dummyst.idname)) {
+    return NULL;
+  }
+
+  st = MEM_callocN(sizeof(SpaceType), "python space type");
+  memcpy(st, &dummyst, sizeof(dummyst));
+
+  st->rna_ext.srna = RNA_def_struct_ptr(&BLENDER_RNA, st->idname, &RNA_Space);
+  st->rna_ext.data = data;
+  st->rna_ext.call = call;
+  st->rna_ext.free = free;
+  RNA_struct_blender_type_set(st->rna_ext.srna, st);
+
+  BKE_spacetype_register(st);
+
+  /* update while blender is running */
+  WM_main_add_notifier(NC_WINDOW, NULL);
+
+  return st->rna_ext.srna;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Region Flag Access (Typed Callbacks)
  * \{ */
 
@@ -3352,6 +3432,7 @@ static void rna_def_space(BlenderRNA *brna)
   srna = RNA_def_struct(brna, "Space", NULL);
   RNA_def_struct_sdna(srna, "SpaceLink");
   RNA_def_struct_ui_text(srna, "Space", "Space data for a screen area");
+  RNA_def_struct_register_funcs(srna, "rna_Space_register", "rna_Space_unregister", NULL);
   RNA_def_struct_refine_func(srna, "rna_Space_refine");
 
   prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
@@ -3371,6 +3452,8 @@ static void rna_def_space(BlenderRNA *brna)
   RNA_def_property_update(prop, NC_SPACE | ND_SPACE_TIME, "rna_Space_view2d_sync_update");
 
   rna_def_space_generic_show_region_toggles(srna, (1 << RGN_TYPE_HEADER));
+
+  /* Registration. */
 }
 
 /* for all spaces that use a mask */

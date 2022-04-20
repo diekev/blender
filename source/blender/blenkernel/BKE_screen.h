@@ -117,6 +117,8 @@ typedef struct SpaceType {
   /* default keymaps to add */
   int keymapflag;
 
+  /* RNA integration */
+  ExtensionRNA rna_ext;
 } SpaceType;
 
 /* region types are also defined using spacetypes_init, via a callback */
