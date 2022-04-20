@@ -990,7 +990,7 @@ void ED_spacetype_file(void)
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype file");
   ARegionType *art;
 
-  st->spaceid = SPACE_FILE;
+  BKE_spacetype_set_idname(st, SPACE_FILE);
   strncpy(st->name, "File", BKE_ST_MAXNAME);
 
   st->create = file_create;

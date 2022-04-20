@@ -1022,7 +1022,7 @@ void ED_spacetype_image(void)
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype image");
   ARegionType *art;
 
-  st->spaceid = SPACE_IMAGE;
+  BKE_spacetype_set_idname(st, SPACE_IMAGE);
   strncpy(st->name, "Image", BKE_ST_MAXNAME);
 
   st->create = image_create;

@@ -135,7 +135,7 @@ void ED_spacetype_statusbar(void)
   SpaceType *st = MEM_callocN(sizeof(*st), "spacetype statusbar");
   ARegionType *art;
 
-  st->spaceid = SPACE_STATUSBAR;
+  BKE_spacetype_set_idname(st, SPACE_STATUSBAR);
   strncpy(st->name, "Status Bar", BKE_ST_MAXNAME);
 
   st->create = statusbar_create;

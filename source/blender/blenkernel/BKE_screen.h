@@ -62,9 +62,10 @@ typedef struct wmSpaceTypeListenerParams {
 typedef struct SpaceType {
   struct SpaceType *next, *prev;
 
-  char name[BKE_ST_MAXNAME]; /* for menus */
-  int spaceid;               /* unique space identifier */
-  int iconid;                /* icon lookup for menus */
+  char name[BKE_ST_MAXNAME];   /* for menus */
+  char idname[BKE_ST_MAXNAME]; /* unique string identifier */
+  int spaceid;                 /* unique space identifier */
+  int iconid;                  /* icon lookup for menus */
 
   /* Initial allocation, after this WM will call init() too. Some editors need
    * area and scene data (e.g. frame range) to set their initial scrolling. */
@@ -387,6 +388,13 @@ const struct ListBase *BKE_spacetypes_list(void);
 void BKE_spacetype_register(struct SpaceType *st);
 bool BKE_spacetype_exists(int spaceid);
 void BKE_spacetypes_free(void); /* only for quitting blender */
+
+/* For registration. spaceid should be SPACE_CUSTOM for custom space types. */
+void BKE_spacetype_set_idname_ex(struct SpaceType *st, int spaceid, const char *idname);
+
+/* For registering builtin space types. The idname will be the string for the spaceid enumeration.
+ */
+#define BKE_spacetype_set_idname(st, spaceid) BKE_spacetype_set_idname_ex(st, spaceid, #spaceid)
 
 /* Space-data. */
 

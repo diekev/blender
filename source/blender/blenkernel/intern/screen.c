@@ -34,6 +34,7 @@
 #include "BLI_math_vector.h"
 #include "BLI_mempool.h"
 #include "BLI_rect.h"
+#include "BLI_string.h"
 #include "BLI_utildefines.h"
 
 #include "BLT_translation.h"
@@ -386,6 +387,12 @@ ARegionType *BKE_regiontype_from_id(const SpaceType *st, int regionid)
 const ListBase *BKE_spacetypes_list(void)
 {
   return &spacetypes;
+}
+
+void BKE_spacetype_set_idname_ex(SpaceType *st, int spaceid, const char *idname)
+{
+  st->spaceid = spaceid;
+  BLI_strncpy(st->idname, idname, sizeof(st->idname));
 }
 
 void BKE_spacetype_register(SpaceType *st)

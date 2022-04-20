@@ -401,7 +401,7 @@ void ED_spacetype_text(void)
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype text");
   ARegionType *art;
 
-  st->spaceid = SPACE_TEXT;
+  BKE_spacetype_set_idname(st, SPACE_TEXT);
   strncpy(st->name, "Text", BKE_ST_MAXNAME);
 
   st->create = text_create;

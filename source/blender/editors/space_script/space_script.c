@@ -151,7 +151,7 @@ void ED_spacetype_script(void)
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype script");
   ARegionType *art;
 
-  st->spaceid = SPACE_SCRIPT;
+  BKE_spacetype_set_idname(st, SPACE_SCRIPT);
   strncpy(st->name, "Script", BKE_ST_MAXNAME);
 
   st->create = script_create;

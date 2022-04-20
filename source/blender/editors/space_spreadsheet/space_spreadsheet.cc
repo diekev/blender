@@ -618,7 +618,7 @@ void ED_spacetype_spreadsheet()
   SpaceType *st = MEM_cnew<SpaceType>("spacetype spreadsheet");
   ARegionType *art;
 
-  st->spaceid = SPACE_SPREADSHEET;
+  BKE_spacetype_set_idname(st, SPACE_SPREADSHEET);
   strncpy(st->name, "Spreadsheet", BKE_ST_MAXNAME);
 
   st->create = spreadsheet_create;

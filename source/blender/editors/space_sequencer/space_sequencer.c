@@ -1009,7 +1009,7 @@ void ED_spacetype_sequencer(void)
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype sequencer");
   ARegionType *art;
 
-  st->spaceid = SPACE_SEQ;
+  BKE_spacetype_set_idname(st, SPACE_SEQ);
   strncpy(st->name, "Sequencer", BKE_ST_MAXNAME);
 
   st->create = sequencer_create;
