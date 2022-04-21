@@ -38,6 +38,7 @@ struct MovieClipScopes;
 struct Scopes;
 struct Script;
 struct SpaceGraph;
+struct SpaceType;
 struct Text;
 struct bDopeSheet;
 struct bGPdata;
@@ -80,6 +81,7 @@ typedef struct SpaceLink {
   char spacetype;
   char link_flag;
   char _pad0[6];
+  struct SpaceType *type;
 } SpaceLink;
 
 /** #SpaceLink.link_flag */
@@ -112,6 +114,7 @@ typedef struct SpaceInfo {
   char spacetype;
   char link_flag;
   char _pad0[6];
+  struct SpaceType *type;
   /* End 'SpaceLink' header. */
 
   char rpt_mask;
@@ -141,6 +144,7 @@ typedef struct SpaceProperties {
   char spacetype;
   char link_flag;
   char _pad0[6];
+  struct SpaceType *type;
   /* End 'SpaceLink' header. */
 
   /** Deprecated, copied to region. */
@@ -261,6 +265,7 @@ typedef struct SpaceOutliner {
   char spacetype;
   char link_flag;
   char _pad0[6];
+  struct SpaceType *type;
   /* End 'SpaceLink' header. */
 
   /** Deprecated, copied to region. */
@@ -439,6 +444,7 @@ typedef struct SpaceGraph {
   char spacetype;
   char link_flag;
   char _pad0[6];
+  struct SpaceType *type;
   /* End 'SpaceLink' header. */
 
   /** Deprecated, copied to region. */
@@ -542,6 +548,7 @@ typedef struct SpaceNla {
   char spacetype;
   char link_flag;
   char _pad0[6];
+  struct SpaceType *type;
   /* End 'SpaceLink' header. */
 
   /** This uses the same settings as autosnap for Action Editor. */
@@ -629,6 +636,7 @@ typedef struct SpaceSeq {
   char spacetype;
   char link_flag;
   char _pad0[6];
+  struct SpaceType *type;
   /* End 'SpaceLink' header. */
 
   /** Deprecated, copied to region. */
@@ -869,6 +877,7 @@ typedef struct SpaceFile {
   char spacetype;
   char link_flag;
   char _pad0[6];
+  struct SpaceType *type;
   /* End 'SpaceLink' header. */
 
   /** Is this a File Browser or an Asset Browser? */
@@ -1185,6 +1194,7 @@ typedef struct SpaceImage {
   char spacetype;
   char link_flag;
   char _pad0[6];
+  struct SpaceType *type;
   /* End 'SpaceLink' header. */
 
   struct Image *image;
@@ -1373,6 +1383,7 @@ typedef struct SpaceText {
   char spacetype;
   char link_flag;
   char _pad0[6];
+  struct SpaceType *type;
   /* End 'SpaceLink' header. */
 
   struct Text *text;
@@ -1472,6 +1483,7 @@ typedef struct SpaceScript {
   char spacetype;
   char link_flag;
   char _pad0[6];
+  struct SpaceType *type;
   /* End 'SpaceLink' header. */
 
   struct Script *script;
@@ -1523,6 +1535,7 @@ typedef struct SpaceNode {
   char spacetype;
   char link_flag;
   char _pad0[6];
+  struct SpaceType *type;
   /* End 'SpaceLink' header. */
 
   /** Deprecated, copied to region. */
@@ -1652,6 +1665,7 @@ typedef struct SpaceConsole {
   char spacetype;
   char link_flag;
   char _pad0[6];
+  struct SpaceType *type;
   /* End 'SpaceLink' header. */
 
   /* space vars */
@@ -1684,6 +1698,7 @@ typedef struct SpaceUserPref {
   char spacetype;
   char link_flag;
   char _pad0[6];
+  struct SpaceType *type;
   /* End 'SpaceLink' header. */
 
   char _pad1[7];
@@ -1706,6 +1721,7 @@ typedef struct SpaceClip {
   char spacetype;
   char link_flag;
   char _pad0[6];
+  struct SpaceType *type;
   /* End 'SpaceLink' header. */
 
   char _pad1[4];
@@ -1822,6 +1838,7 @@ typedef struct SpaceTopBar {
   char spacetype;
   char link_flag;
   char _pad0[6];
+  struct SpaceType *type;
   /* End 'SpaceLink' header. */
 } SpaceTopBar;
 
@@ -1838,6 +1855,7 @@ typedef struct SpaceStatusBar {
   char spacetype;
   char link_flag;
   char _pad0[6];
+  struct SpaceType *type;
   /* End 'SpaceLink' header. */
 } SpaceStatusBar;
 
@@ -1907,6 +1925,7 @@ typedef struct SpaceSpreadsheet {
   char spacetype;
   char link_flag;
   char _pad0[6];
+  struct SpaceType *type;
   /* End 'SpaceLink' header. */
 
   /* List of #SpreadsheetColumn. */

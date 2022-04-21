@@ -5511,6 +5511,90 @@ static int space_type_set_or_cycle_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
+typedef struct SpaceTypeAddItemCallbackData {
+  EnumPropertyItem *items;
+  int totitem;
+  int totcustom;
+} SpaceTypeAddItemCallbackData;
+
+static void add_item_for_space_type_cb(const SpaceType *spacetype, void *data)
+{
+  SpaceTypeAddItemCallbackData *cb_data = (SpaceTypeAddItemCallbackData *)(data);
+
+  if (cb_data->totcustom == 0) {
+    EnumPropertyItem md_item;
+    md_item.value = 0;
+    md_item.identifier = "";
+    md_item.icon = 0;
+    md_item.name = "Custom";
+    md_item.description = "";
+
+    RNA_enum_item_add(&cb_data->items, &cb_data->totitem, &md_item);
+  }
+
+  /* TODO: move icon and description to ModifierTypeInfo. */
+  EnumPropertyItem md_item;
+  md_item.value = cb_data->totitem;
+  md_item.description = NULL;
+  md_item.name = spacetype->name;
+  md_item.identifier = spacetype->idname;
+  md_item.icon = ICON_NONE;  // TODO(space_type) spacetype->icon;
+
+  RNA_enum_item_add(&cb_data->items, &cb_data->totitem, &md_item);
+  cb_data->totcustom += 1;
+}
+
+static const EnumPropertyItem *space_type_add_itemf(bContext *UNUSED(C),
+                                                    PointerRNA *UNUSED(ptr),
+                                                    PropertyRNA *UNUSED(prop),
+                                                    bool *r_free)
+{
+  EnumPropertyItem *items = NULL;
+  int totitem = 0;
+
+  const EnumPropertyItem *group_item = NULL;
+  /* Starts at 1 to skip SPACE_EMPTY. */
+  for (int a = 1; rna_enum_space_type_items[a].identifier; a++) {
+    const EnumPropertyItem *md_item = &rna_enum_space_type_items[a];
+
+    EnumPropertyItem md_item_;
+
+    if (md_item->identifier[0]) {
+      const SpaceType *space_type = BKE_spacetype_from_id(md_item->value);
+
+      md_item_.description = md_item->description;
+      md_item_.name = md_item->name;
+      md_item_.identifier = space_type->idname;
+      md_item_.icon = md_item->icon;
+    }
+    else {
+      group_item = md_item;
+      continue;
+    }
+
+    if (group_item) {
+      RNA_enum_item_add(&items, &totitem, group_item);
+      group_item = NULL;
+    }
+
+    md_item_.value = totitem;
+    RNA_enum_item_add(&items, &totitem, &md_item_);
+  }
+
+  SpaceTypeAddItemCallbackData callback_data;
+  callback_data.items = items;
+  callback_data.totitem = totitem;
+  callback_data.totcustom = 0;
+  BKE_spacetype_foreach_custom_type(add_item_for_space_type_cb, &callback_data);
+  items = callback_data.items;
+  totitem = callback_data.totitem;
+
+  RNA_enum_item_end(&items, &totitem);
+  *r_free = true;
+
+  return items;
+}
+
 static void SCREEN_OT_space_type_set_or_cycle(wmOperatorType *ot)
 {
   /* identifiers */
@@ -5524,7 +5608,9 @@ static void SCREEN_OT_space_type_set_or_cycle(wmOperatorType *ot)
 
   ot->flag = 0;
 
-  RNA_def_enum(ot->srna, "space_type", rna_enum_space_type_items, SPACE_EMPTY, "Type", "");
+  PropertyRNA *prop = RNA_def_enum(
+      ot->srna, "space_type", rna_enum_space_type_items, SPACE_EMPTY, "Type", "");
+  RNA_def_enum_funcs(prop, space_type_add_itemf);
 }
 
 /** \} */

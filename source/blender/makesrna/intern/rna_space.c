@@ -718,6 +718,26 @@ static void rna_Space_bool_from_region_flag_update_by_type(bContext *C,
 /** \name Custom Space Registration
  * \{ */
 
+static SpaceLink *rna_CustomSpaceType_create(const ScrArea *area, const Scene *scene)
+{
+  ARegion *region;
+  SpaceLink *space = MEM_callocN(sizeof(SpaceLink), __func__);
+
+  /* header */
+  region = MEM_callocN(sizeof(ARegion), "header for custom space type");
+
+  BLI_addtail(&space->regionbase, region);
+  region->regiontype = RGN_TYPE_HEADER;
+  region->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM : RGN_ALIGN_TOP;
+
+  return space;
+}
+
+static void rna_CustomSpaceType_header_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
+{
+  ED_region_header_init(region);
+}
+
 static void rna_Space_unregister(Main *UNUSED(bmain), StructRNA *type)
 {
   SpaceType *st = RNA_struct_blender_type_get(type);
@@ -749,7 +769,7 @@ static StructRNA *rna_Space_register(Main *bmain,
   // int have_function[0];
 
   /* setup dummy space & space type to store static properties in */
-  // dummyspace.type = &dummyst;
+  dummyspace.type = &dummyst;
   RNA_pointer_create(NULL, &RNA_Space, &dummyspace, &dummystr);
 
   /* validate the python class */
@@ -784,7 +804,23 @@ static StructRNA *rna_Space_register(Main *bmain,
   st->rna_ext.free = free;
   RNA_struct_blender_type_set(st->rna_ext.srna, st);
 
+  /* Default properties and callbacks. */
   st->spaceid = SPACE_CUSTOM;
+  st->create = rna_CustomSpaceType_create;
+
+  ARegionType *art;
+
+  /* regions: header */
+  art = MEM_callocN(sizeof(ARegionType), "spacetype clip region");
+  art->regionid = RGN_TYPE_HEADER;
+  art->prefsizey = HEADERY;
+  art->keymapflag = ED_KEYMAP_FRAMES | ED_KEYMAP_UI | ED_KEYMAP_VIEW2D | ED_KEYMAP_HEADER;
+
+  art->init = rna_CustomSpaceType_header_region_init;
+  art->draw = ED_region_header;
+  //  art->listener = clip_header_region_listener;
+
+  BLI_addhead(&st->regiontypes, art);
 
   BKE_spacetype_register(st);
 
@@ -3456,6 +3492,16 @@ static void rna_def_space(BlenderRNA *brna)
   rna_def_space_generic_show_region_toggles(srna, (1 << RGN_TYPE_HEADER));
 
   /* Registration. */
+  prop = RNA_def_property(srna, "bl_idname", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, NULL, "type->idname");
+  RNA_def_property_flag(prop, PROP_REGISTER);
+  RNA_def_property_ui_text(prop, "Space Type ID Name", "Unique name for the SpaceType");
+
+  prop = RNA_def_property(srna, "bl_label", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, NULL, "type->name");
+  RNA_def_property_flag(prop, PROP_REGISTER);
+  RNA_def_property_ui_text(
+      prop, "Space Type Label", "Label to display for the SpaceType in the UI");
 }
 
 /* for all spaces that use a mask */

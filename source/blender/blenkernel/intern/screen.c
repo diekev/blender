@@ -353,6 +353,23 @@ void BKE_spacetypes_free(void)
 
 SpaceType *BKE_spacetype_from_id(int spaceid)
 {
+  if (spaceid >= SPACE_CUSTOM) {
+    spaceid -= SPACE_CUSTOM;
+    LISTBASE_FOREACH (SpaceType *, st, &spacetypes) {
+      if (st->spaceid != SPACE_CUSTOM) {
+        continue;
+      }
+
+      if (spaceid == 0) {
+        fprintf(stderr, "BKE_spacetype_from_id %s\n", st->idname);
+        return st;
+      }
+
+      spaceid--;
+    }
+    return NULL;
+  }
+
   LISTBASE_FOREACH (SpaceType *, st, &spacetypes) {
     if (st->spaceid == spaceid) {
       return st;
@@ -369,6 +386,16 @@ SpaceType *BKE_spacetype_from_idname(const char *idname)
     }
   }
   return NULL;
+}
+
+void BKE_spacetype_foreach_custom_type(void (*callback)(const SpaceType *spacetype, void *data),
+                                       void *callback_data)
+{
+  LISTBASE_FOREACH (SpaceType *, st, &spacetypes) {
+    if (st->spaceid == SPACE_CUSTOM) {
+      callback(st, callback_data);
+    }
+  }
 }
 
 ARegionType *BKE_regiontype_from_id_or_first(const SpaceType *st, int regionid)
@@ -414,6 +441,8 @@ void BKE_spacetype_register(SpaceType *st)
     spacetype_free(stype);
     MEM_freeN(stype);
   }
+
+  fprintf(stderr, "Register : %s\n", st->idname);
 
   BLI_addtail(&spacetypes, st);
 }

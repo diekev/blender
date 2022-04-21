@@ -399,6 +399,9 @@ void BKE_spacetype_set_idname_ex(struct SpaceType *st, int spaceid, const char *
  */
 #define BKE_spacetype_set_idname(st, spaceid) BKE_spacetype_set_idname_ex(st, spaceid, #spaceid)
 
+void BKE_spacetype_foreach_custom_type(void (*callback)(const SpaceType *spacetype, void *data),
+                                       void *callback_data);
+
 /* Space-data. */
 
 void BKE_spacedata_freelist(ListBase *lb);

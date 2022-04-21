@@ -16,6 +16,8 @@
 #include "DNA_screen_types.h"
 #include "DNA_workspace_types.h"
 
+#include "BKE_screen.h"
+
 #include "ED_info.h"
 
 const EnumPropertyItem rna_enum_region_type_items[] = {
@@ -167,6 +169,38 @@ static void rna_Area_type_update(bContext *C, PointerRNA *ptr)
   }
 }
 
+typedef struct SpaceTypeAddItemCallbackData {
+  EnumPropertyItem *items;
+  int totitem;
+  int totcustom;
+} SpaceTypeAddItemCallbackData;
+
+static void add_item_for_space_type_cb(const SpaceType *spacetype, void *data)
+{
+  SpaceTypeAddItemCallbackData *cb_data = (SpaceTypeAddItemCallbackData *)(data);
+
+  if (cb_data->totcustom == 0) {
+    EnumPropertyItem md_item;
+    md_item.value = 0;
+    md_item.identifier = "";
+    md_item.icon = 0;
+    md_item.name = "Custom";
+    md_item.description = "";
+
+    RNA_enum_item_add(&cb_data->items, &cb_data->totitem, &md_item);
+  }
+
+  EnumPropertyItem md_item;
+  md_item.value = (SPACE_CUSTOM + cb_data->totcustom) << 16;
+  md_item.description = NULL;
+  md_item.name = spacetype->name;
+  md_item.identifier = spacetype->idname;
+  md_item.icon = ICON_NONE;  // TODO(space_type) spacetype->icon;
+
+  RNA_enum_item_add(&cb_data->items, &cb_data->totitem, &md_item);
+  cb_data->totcustom += 1;
+}
+
 static const EnumPropertyItem *rna_Area_ui_type_itemf(bContext *C,
                                                       PointerRNA *ptr,
                                                       PropertyRNA *UNUSED(prop),
@@ -199,6 +233,15 @@ static const EnumPropertyItem *rna_Area_ui_type_itemf(bContext *C,
       item[totitem_prev++].value = item_from->value << 16;
     }
   }
+
+  SpaceTypeAddItemCallbackData callback_data;
+  callback_data.items = item;
+  callback_data.totitem = totitem;
+  callback_data.totcustom = 0;
+  BKE_spacetype_foreach_custom_type(add_item_for_space_type_cb, &callback_data);
+  item = callback_data.items;
+  totitem = callback_data.totitem;
+
   RNA_enum_item_end(&item, &totitem);
   *r_free = true;
 
