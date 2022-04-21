@@ -339,8 +339,8 @@ typedef struct uiListType {
 typedef struct HeaderType {
   struct HeaderType *next, *prev;
 
-  char idname[BKE_ST_MAXNAME]; /* unique name */
-  int space_type;
+  char idname[BKE_ST_MAXNAME];     /* unique name */
+  char space_type[BKE_ST_MAXNAME]; /* idname of the SpaceType */
   int region_type;
 
   bool (*poll)(const struct bContext *C, struct HeaderType *ht);
@@ -393,11 +393,7 @@ bool BKE_spacetype_exists(int spaceid);
 void BKE_spacetypes_free(void); /* only for quitting blender */
 
 /* For registration. spaceid should be SPACE_CUSTOM for custom space types. */
-void BKE_spacetype_set_idname_ex(struct SpaceType *st, int spaceid, const char *idname);
-
-/* For registering builtin space types. The idname will be the string for the spaceid enumeration.
- */
-#define BKE_spacetype_set_idname(st, spaceid) BKE_spacetype_set_idname_ex(st, spaceid, #spaceid)
+void BKE_spacetype_set_idname(struct SpaceType *st, int spaceid, const char *idname);
 
 void BKE_spacetype_foreach_custom_type(void (*callback)(const SpaceType *spacetype, void *data),
                                        void *callback_data);

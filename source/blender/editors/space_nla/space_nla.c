@@ -568,7 +568,7 @@ void ED_spacetype_nla(void)
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype nla");
   ARegionType *art;
 
-  BKE_spacetype_set_idname(st, SPACE_NLA);
+  BKE_spacetype_set_idname(st, SPACE_NLA, "NLA_EDITOR");
   strncpy(st->name, "NLA", BKE_ST_MAXNAME);
 
   st->create = nla_create;

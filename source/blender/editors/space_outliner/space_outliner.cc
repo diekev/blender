@@ -447,7 +447,7 @@ void ED_spacetype_outliner(void)
   SpaceType *st = MEM_cnew<SpaceType>("spacetype time");
   ARegionType *art;
 
-  BKE_spacetype_set_idname(st, SPACE_OUTLINER);
+  BKE_spacetype_set_idname(st, SPACE_OUTLINER, "OUTLINER");
   strncpy(st->name, "Outliner", BKE_ST_MAXNAME);
 
   st->create = outliner_create;

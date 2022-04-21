@@ -1961,7 +1961,7 @@ void ED_spacetype_view3d(void)
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype view3d");
   ARegionType *art;
 
-  BKE_spacetype_set_idname(st, SPACE_VIEW3D);
+  BKE_spacetype_set_idname(st, SPACE_VIEW3D, "VIEW_3D");
   strncpy(st->name, "View3D", BKE_ST_MAXNAME);
 
   st->create = view3d_create;

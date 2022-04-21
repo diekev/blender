@@ -810,7 +810,7 @@ void ED_spacetype_ipo(void)
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype ipo");
   ARegionType *art;
 
-  BKE_spacetype_set_idname(st, SPACE_GRAPH);
+  BKE_spacetype_set_idname(st, SPACE_GRAPH, "GRAPH_EDITOR");
   strncpy(st->name, "Graph", BKE_ST_MAXNAME);
 
   st->create = graph_create;

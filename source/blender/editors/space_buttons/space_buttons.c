@@ -910,7 +910,7 @@ void ED_spacetype_buttons(void)
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype buttons");
   ARegionType *art;
 
-  BKE_spacetype_set_idname(st, SPACE_PROPERTIES);
+  BKE_spacetype_set_idname(st, SPACE_PROPERTIES, "PROPERTIES");
   strncpy(st->name, "Buttons", BKE_ST_MAXNAME);
 
   st->create = buttons_create;

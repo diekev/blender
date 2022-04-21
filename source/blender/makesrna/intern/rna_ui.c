@@ -86,6 +86,30 @@ static ARegionType *region_type_find(ReportList *reports, int space_type, int re
   return art;
 }
 
+static ARegionType *region_type_find_idname(ReportList *reports,
+                                            const char *space_type,
+                                            int region_type)
+{
+  SpaceType *st;
+  ARegionType *art;
+
+  st = BKE_spacetype_from_idname(space_type);
+
+  for (art = (st) ? st->regiontypes.first : NULL; art; art = art->next) {
+    if (art->regionid == region_type) {
+      break;
+    }
+  }
+
+  /* region type not found? abort */
+  if (art == NULL) {
+    BKE_report(reports, RPT_ERROR, "Region not found in space type");
+    return NULL;
+  }
+
+  return art;
+}
+
 /* Panel */
 
 static bool panel_poll(const bContext *C, PanelType *pt)
@@ -758,7 +782,7 @@ static void rna_Header_unregister(Main *UNUSED(bmain), StructRNA *type)
   if (!ht) {
     return;
   }
-  if (!(art = region_type_find(NULL, ht->space_type, ht->region_type))) {
+  if (!(art = region_type_find_idname(NULL, ht->space_type, ht->region_type))) {
     return;
   }
 
@@ -804,7 +828,7 @@ static StructRNA *rna_Header_register(Main *bmain,
     return NULL;
   }
 
-  if (!(art = region_type_find(reports, dummyht.space_type, dummyht.region_type))) {
+  if (!(art = region_type_find_idname(reports, dummyht.space_type, dummyht.region_type))) {
     return NULL;
   }
 
@@ -1731,9 +1755,9 @@ static void rna_def_header(BlenderRNA *brna)
                            "class name is \"OBJECT_HT_hello\", and bl_idname is not set by the "
                            "script, then bl_idname = \"OBJECT_HT_hello\"");
 
-  prop = RNA_def_property(srna, "bl_space_type", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_sdna(prop, NULL, "type->space_type");
-  RNA_def_property_enum_items(prop, rna_enum_space_type_items);
+  prop = RNA_def_property(srna, "bl_space_type", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, NULL, "type->space_type");
+  // RNA_def_property_enum_items(prop, rna_enum_space_type_items);
   RNA_def_property_flag(prop, PROP_REGISTER);
   RNA_def_property_ui_text(
       prop, "Space Type", "The space where the header is going to be used in");

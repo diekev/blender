@@ -426,7 +426,7 @@ const ListBase *BKE_spacetypes_list(void)
   return &spacetypes;
 }
 
-void BKE_spacetype_set_idname_ex(SpaceType *st, int spaceid, const char *idname)
+void BKE_spacetype_set_idname(SpaceType *st, int spaceid, const char *idname)
 {
   st->spaceid = spaceid;
   BLI_strncpy(st->idname, idname, sizeof(st->idname));

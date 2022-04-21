@@ -284,7 +284,7 @@ void ED_spacetype_console(void)
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype console");
   ARegionType *art;
 
-  BKE_spacetype_set_idname(st, SPACE_CONSOLE);
+  BKE_spacetype_set_idname(st, SPACE_CONSOLE, "CONSOLE");
   strncpy(st->name, "Console", BKE_ST_MAXNAME);
 
   st->create = console_create;

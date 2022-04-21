@@ -1321,7 +1321,7 @@ void ED_spacetype_clip(void)
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype clip");
   ARegionType *art;
 
-  BKE_spacetype_set_idname(st, SPACE_CLIP);
+  BKE_spacetype_set_idname(st, SPACE_CLIP, "CLIP_EDITOR");
   strncpy(st->name, "Clip", BKE_ST_MAXNAME);
 
   st->create = clip_create;

@@ -988,7 +988,7 @@ void ED_spacetype_node()
   SpaceType *st = MEM_cnew<SpaceType>("spacetype node");
   ARegionType *art;
 
-  BKE_spacetype_set_idname(st, SPACE_NODE);
+  BKE_spacetype_set_idname(st, SPACE_NODE, "NODE_EDITOR");
   strncpy(st->name, "Node", BKE_ST_MAXNAME);
 
   st->create = node_create;
