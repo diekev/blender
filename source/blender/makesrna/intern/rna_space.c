@@ -612,6 +612,10 @@ static StructRNA *rna_Space_refine(struct PointerRNA *ptr)
     case SPACE_TOPBAR:
     case SPACE_STATUSBAR:
       break;
+
+      /* TODO */
+    case SPACE_CUSTOM:
+      break;
   }
 
   return &RNA_Space;
@@ -718,7 +722,8 @@ static void rna_Space_bool_from_region_flag_update_by_type(bContext *C,
 /** \name Custom Space Registration
  * \{ */
 
-static SpaceLink *rna_CustomSpaceType_create(const ScrArea *area, const Scene *scene)
+static SpaceLink *rna_CustomSpaceType_create(const ScrArea *UNUSED(area),
+                                             const Scene *UNUSED(scene))
 {
   ARegion *region;
   SpaceLink *space = MEM_callocN(sizeof(SpaceLink), __func__);
