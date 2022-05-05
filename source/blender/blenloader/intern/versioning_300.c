@@ -2735,6 +2735,13 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
       }
     }
     FOREACH_NODETREE_END;
+
+    LISTBASE_FOREACH (bNodeTree *, ntree, &bmain->nodetrees) {
+      if (ntree->type == NTREE_GEOMETRY) {
+        version_node_input_socket_name(
+            ntree, GEO_NODE_SUBDIVISION_SURFACE, "Crease", "Edge Crease");
+      }
+    }
   }
 
   if (!MAIN_VERSION_ATLEAST(bmain, 302, 13)) {
@@ -3017,5 +3024,15 @@ void blo_do_versions_300(FileData *fd, Library *UNUSED(lib), Main *bmain)
       }
     }
     FOREACH_NODETREE_END;
+
+    /* Initialize brush curves sculpt settings. */
+    LISTBASE_FOREACH (Brush *, brush, &bmain->brushes) {
+      if (brush->ob_mode != OB_MODE_SCULPT_CURVES) {
+        continue;
+      }
+      if (brush->curves_sculpt_settings->points_per_curve == 0) {
+        brush->curves_sculpt_settings->points_per_curve = 8;
+      }
+    }
   }
 }
