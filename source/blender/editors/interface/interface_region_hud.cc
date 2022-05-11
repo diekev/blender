@@ -119,7 +119,7 @@ static void hud_panel_operator_redo_draw(const bContext *C, Panel *panel)
   uiTemplateOperatorRedoProperties(col, C);
 }
 
-static void hud_panels_register(ARegionType *art, int space_type, int region_type)
+static void hud_panels_register(ARegionType *art, const char *space_type, int region_type)
 {
   PanelType *pt = MEM_cnew<PanelType>(__func__);
   strcpy(pt->idname, "OPERATOR_PT_redo");
@@ -128,7 +128,7 @@ static void hud_panels_register(ARegionType *art, int space_type, int region_typ
   pt->draw_header = hud_panel_operator_redo_draw_header;
   pt->draw = hud_panel_operator_redo_draw;
   pt->poll = hud_panel_operator_redo_poll;
-  pt->space_type = space_type;
+  BLI_strncpy(pt->space_type, space_type, sizeof(pt->space_type));
   pt->region_type = region_type;
   pt->flag |= PANEL_TYPE_DEFAULT_CLOSED;
   BLI_addtail(&art->paneltypes, pt);
@@ -212,7 +212,7 @@ static void hud_region_draw(const bContext *C, ARegion *region)
   }
 }
 
-ARegionType *ED_area_type_hud(int space_type)
+ARegionType *ED_area_type_hud(const char *space_type)
 {
   ARegionType *art = MEM_cnew<ARegionType>(__func__);
   art->regionid = RGN_TYPE_HUD;

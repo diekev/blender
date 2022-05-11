@@ -681,7 +681,7 @@ ARegion *ED_area_find_region_xy_visual(const ScrArea *area, int regiontype, cons
 
 /* interface_region_hud.c */
 
-struct ARegionType *ED_area_type_hud(int space_type);
+struct ARegionType *ED_area_type_hud(const char *space_type);
 void ED_area_type_hud_clear(struct wmWindowManager *wm, ScrArea *area_keep);
 void ED_area_type_hud_ensure(struct bContext *C, struct ScrArea *area);
 

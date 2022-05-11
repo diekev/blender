@@ -238,6 +238,56 @@ const EnumPropertyItem rna_enum_space_file_browse_mode_items[] = {
         "Edit timings for Cache File data-blocks" \
   }
 
+static void rna_def_space_generic_show_region_toggles(StructRNA *srna, int region_type_mask)
+{
+  PropertyRNA *prop;
+
+#define DEF_SHOW_REGION_PROPERTY(identifier, label, description) \
+  { \
+    prop = RNA_def_property(srna, STRINGIFY(identifier), PROP_BOOLEAN, PROP_NONE); \
+    RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE); \
+    RNA_def_property_boolean_funcs( \
+        prop, STRINGIFY(rna_Space_##identifier##_get), STRINGIFY(rna_Space_##identifier##_set)); \
+    RNA_def_property_ui_text(prop, label, description); \
+    RNA_def_property_update(prop, 0, STRINGIFY(rna_Space_##identifier##_update)); \
+  } \
+  ((void)0)
+
+  if (region_type_mask & (1 << RGN_TYPE_TOOL_HEADER)) {
+    region_type_mask &= ~(1 << RGN_TYPE_TOOL_HEADER);
+    DEF_SHOW_REGION_PROPERTY(show_region_tool_header, "Tool Settings", "");
+  }
+  if (region_type_mask & (1 << RGN_TYPE_HEADER)) {
+    region_type_mask &= ~(1 << RGN_TYPE_HEADER);
+    DEF_SHOW_REGION_PROPERTY(show_region_header, "Header", "");
+  }
+  if (region_type_mask & (1 << RGN_TYPE_FOOTER)) {
+    region_type_mask &= ~(1 << RGN_TYPE_FOOTER);
+    DEF_SHOW_REGION_PROPERTY(show_region_footer, "Footer", "");
+  }
+  if (region_type_mask & (1 << RGN_TYPE_TOOLS)) {
+    region_type_mask &= ~(1 << RGN_TYPE_TOOLS);
+    DEF_SHOW_REGION_PROPERTY(show_region_toolbar, "Toolbar", "");
+  }
+  if (region_type_mask & (1 << RGN_TYPE_TOOL_PROPS)) {
+    region_type_mask &= ~(1 << RGN_TYPE_TOOL_PROPS);
+    DEF_SHOW_REGION_PROPERTY(show_region_tool_props, "Toolbar", "");
+  }
+  if (region_type_mask & (1 << RGN_TYPE_CHANNELS)) {
+    region_type_mask &= ~(1 << RGN_TYPE_CHANNELS);
+    DEF_SHOW_REGION_PROPERTY(show_region_channels, "Channels", "");
+  }
+  if (region_type_mask & (1 << RGN_TYPE_UI)) {
+    region_type_mask &= ~(1 << RGN_TYPE_UI);
+    DEF_SHOW_REGION_PROPERTY(show_region_ui, "Sidebar", "");
+  }
+  if (region_type_mask & (1 << RGN_TYPE_HUD)) {
+    region_type_mask &= ~(1 << RGN_TYPE_HUD);
+    DEF_SHOW_REGION_PROPERTY(show_region_hud, "Adjust Last Operation", "");
+  }
+  BLI_assert(region_type_mask == 0);
+}
+
 #ifndef RNA_RUNTIME
 /* XXX: action-editor is currently for object-level only actions,
  * so show that using object-icon hint */
@@ -735,12 +785,65 @@ static SpaceLink *rna_CustomSpaceType_create(const ScrArea *UNUSED(area),
   region->regiontype = RGN_TYPE_HEADER;
   region->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM : RGN_ALIGN_TOP;
 
+  /* window */
+  region = MEM_callocN(sizeof(ARegion), "main region for custom space type");
+
+  BLI_addtail(&space->regionbase, region);
+  region->regiontype = RGN_TYPE_WINDOW;
+
+  /* properties view */
+  region = MEM_callocN(sizeof(ARegion), "properties for clip");
+
+  BLI_addtail(&space->regionbase, region);
+  region->regiontype = RGN_TYPE_UI;
+  region->alignment = RGN_ALIGN_RIGHT;
+
   return space;
+}
+
+static void rna_CustomSpaceType_keymap(struct wmKeyConfig *keyconf)
+{
+  /* ******** Global hotkeys available for all regions ******** */
+  WM_keymap_ensure(keyconf, "Custom", SPACE_CUSTOM, 0);
+
+  /* ******** Hotkeys available for main region only ******** */
+  WM_keymap_ensure(keyconf, "Custom Editor", SPACE_CLIP, 0);
+  //  keymap->poll = ED_space_clip_tracking_poll;
 }
 
 static void rna_CustomSpaceType_header_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
 {
   ED_region_header_init(region);
+}
+
+static void rna_CustomSpaceType_properties_region_init(wmWindowManager *wm, ARegion *region)
+{
+  wmKeyMap *keymap;
+
+  ED_region_panels_init(wm, region);
+
+  keymap = WM_keymap_ensure(wm->defaultconf, "Custom", SPACE_CUSTOM, 0);
+  WM_event_add_keymap_handler(&region->handlers, keymap);
+}
+
+/* add handlers, stuff you only do once or on area/region changes */
+static void rna_CustomSpaceType_main_region_init(wmWindowManager *wm, ARegion *region)
+{
+  wmKeyMap *keymap;
+
+  /* NOTE: don't use `UI_view2d_region_reinit(&region->v2d, ...)`
+   * since the space clip manages own v2d in #movieclip_main_area_set_view2d */
+
+  /* mask polls mode */
+  //  keymap = WM_keymap_ensure(wm->defaultconf, "Mask Editing", 0, 0);
+  //  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
+
+  /* own keymap */
+  keymap = WM_keymap_ensure(wm->defaultconf, "Custom", SPACE_CUSTOM, 0);
+  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
+
+  keymap = WM_keymap_ensure(wm->defaultconf, "Custom Editor", SPACE_CUSTOM, 0);
+  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
 }
 
 static void rna_Space_unregister(Main *UNUSED(bmain), StructRNA *type)
@@ -812,6 +915,7 @@ static StructRNA *rna_Space_register(Main *bmain,
   /* Default properties and callbacks. */
   st->spaceid = SPACE_CUSTOM;
   st->create = rna_CustomSpaceType_create;
+  st->keymap = rna_CustomSpaceType_keymap;
 
   ARegionType *art;
 
@@ -829,8 +933,32 @@ static StructRNA *rna_Space_register(Main *bmain,
 
   BKE_spacetype_register(st);
 
+  /* regions: main window */
+  art = MEM_callocN(sizeof(ARegionType), "spacetype clip region");
+  art->regionid = RGN_TYPE_WINDOW;
+  art->init = rna_CustomSpaceType_main_region_init;
+  // art->draw = clip_main_region_draw;
+  // art->listener = clip_main_region_listener;
+  art->keymapflag = ED_KEYMAP_GIZMO | ED_KEYMAP_FRAMES | ED_KEYMAP_UI | ED_KEYMAP_GPENCIL;
+
+  BLI_addhead(&st->regiontypes, art);
+
+  /* regions: properties */
+  art = MEM_callocN(sizeof(ARegionType), "spacetype clip region properties");
+  art->regionid = RGN_TYPE_UI;
+  art->prefsizex = UI_SIDEBAR_PANEL_WIDTH;
+  art->keymapflag = ED_KEYMAP_FRAMES | ED_KEYMAP_UI;
+  art->init = rna_CustomSpaceType_properties_region_init;
+  art->draw = ED_region_panels;
+  //  art->listener = clip_properties_region_listener;
+  BLI_addhead(&st->regiontypes, art);
+  // ED_clip_buttons_register(art);
+
   /* update while blender is running */
   WM_main_add_notifier(NC_WINDOW, NULL);
+
+  rna_def_space_generic_show_region_toggles(st->rna_ext.srna,
+                                            ((1 << RGN_TYPE_TOOL_HEADER) | (1 << RGN_TYPE_UI)));
 
   return st->rna_ext.srna;
 }
@@ -3441,57 +3569,6 @@ static struct IDFilterEnumPropertyItem rna_enum_space_file_id_filter_categories[
      "Show other data types"},
     {0, NULL, 0, NULL, NULL},
 };
-
-static void rna_def_space_generic_show_region_toggles(StructRNA *srna, int region_type_mask)
-{
-  PropertyRNA *prop;
-
-#  define DEF_SHOW_REGION_PROPERTY(identifier, label, description) \
-    { \
-      prop = RNA_def_property(srna, STRINGIFY(identifier), PROP_BOOLEAN, PROP_NONE); \
-      RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE); \
-      RNA_def_property_boolean_funcs(prop, \
-                                     STRINGIFY(rna_Space_##identifier##_get), \
-                                     STRINGIFY(rna_Space_##identifier##_set)); \
-      RNA_def_property_ui_text(prop, label, description); \
-      RNA_def_property_update(prop, 0, STRINGIFY(rna_Space_##identifier##_update)); \
-    } \
-    ((void)0)
-
-  if (region_type_mask & (1 << RGN_TYPE_TOOL_HEADER)) {
-    region_type_mask &= ~(1 << RGN_TYPE_TOOL_HEADER);
-    DEF_SHOW_REGION_PROPERTY(show_region_tool_header, "Tool Settings", "");
-  }
-  if (region_type_mask & (1 << RGN_TYPE_HEADER)) {
-    region_type_mask &= ~(1 << RGN_TYPE_HEADER);
-    DEF_SHOW_REGION_PROPERTY(show_region_header, "Header", "");
-  }
-  if (region_type_mask & (1 << RGN_TYPE_FOOTER)) {
-    region_type_mask &= ~(1 << RGN_TYPE_FOOTER);
-    DEF_SHOW_REGION_PROPERTY(show_region_footer, "Footer", "");
-  }
-  if (region_type_mask & (1 << RGN_TYPE_TOOLS)) {
-    region_type_mask &= ~(1 << RGN_TYPE_TOOLS);
-    DEF_SHOW_REGION_PROPERTY(show_region_toolbar, "Toolbar", "");
-  }
-  if (region_type_mask & (1 << RGN_TYPE_TOOL_PROPS)) {
-    region_type_mask &= ~(1 << RGN_TYPE_TOOL_PROPS);
-    DEF_SHOW_REGION_PROPERTY(show_region_tool_props, "Toolbar", "");
-  }
-  if (region_type_mask & (1 << RGN_TYPE_CHANNELS)) {
-    region_type_mask &= ~(1 << RGN_TYPE_CHANNELS);
-    DEF_SHOW_REGION_PROPERTY(show_region_channels, "Channels", "");
-  }
-  if (region_type_mask & (1 << RGN_TYPE_UI)) {
-    region_type_mask &= ~(1 << RGN_TYPE_UI);
-    DEF_SHOW_REGION_PROPERTY(show_region_ui, "Sidebar", "");
-  }
-  if (region_type_mask & (1 << RGN_TYPE_HUD)) {
-    region_type_mask &= ~(1 << RGN_TYPE_HUD);
-    DEF_SHOW_REGION_PROPERTY(show_region_hud, "Adjust Last Operation", "");
-  }
-  BLI_assert(region_type_mask == 0);
-}
 
 static void rna_def_space(BlenderRNA *brna)
 {

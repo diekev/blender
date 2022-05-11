@@ -233,7 +233,7 @@ typedef struct PanelType {
   char parent_id[BKE_ST_MAXNAME]; /* parent idname for sub-panels */
   /** Boolean property identifier of the panel custom data. Used to draw a highlighted border. */
   char active_property[BKE_ST_MAXNAME];
-  short space_type;
+  char space_type[BKE_ST_MAXNAME]; /* idname of the SpaceType */
   short region_type;
   /* For popovers, 0 for default. */
   int ui_units_x;

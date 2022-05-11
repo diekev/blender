@@ -1096,7 +1096,7 @@ void ED_spacetype_sequencer(void)
   BLI_addhead(&st->regiontypes, art);
 
   /* HUD. */
-  art = ED_area_type_hud(st->spaceid);
+  art = ED_area_type_hud(st->idname);
   BLI_addhead(&st->regiontypes, art);
 
   BKE_spacetype_register(st);

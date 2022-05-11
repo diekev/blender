@@ -1299,9 +1299,7 @@ static bool ui_but_event_operator_string_from_panel(const bContext *C,
   IDProperty *prop_panel = IDP_New(
       IDP_GROUP, &group_val, __func__); /* Dummy, name is unimportant. */
   IDP_AddToGroup(prop_panel, IDP_NewString(pt->idname, "name", sizeof(pt->idname)));
-  IDPropertyTemplate space_type_val = {0};
-  space_type_val.i = pt->space_type;
-  IDP_AddToGroup(prop_panel, IDP_New(IDP_INT, &space_type_val, "space_type"));
+  IDP_AddToGroup(prop_panel, IDP_NewString(pt->space_type, "space_type", sizeof(pt->space_type)));
   IDPropertyTemplate region_type_val = {0};
   region_type_val.i = pt->region_type;
   IDP_AddToGroup(prop_panel, IDP_New(IDP_INT, &region_type_val, "region_type"));

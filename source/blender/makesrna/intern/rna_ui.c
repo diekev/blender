@@ -64,31 +64,7 @@ const EnumPropertyItem rna_enum_uilist_layout_type_items[] = {
 
 #  include "WM_api.h"
 
-static ARegionType *region_type_find(ReportList *reports, int space_type, int region_type)
-{
-  SpaceType *st;
-  ARegionType *art;
-
-  st = BKE_spacetype_from_id(space_type);
-
-  for (art = (st) ? st->regiontypes.first : NULL; art; art = art->next) {
-    if (art->regionid == region_type) {
-      break;
-    }
-  }
-
-  /* region type not found? abort */
-  if (art == NULL) {
-    BKE_report(reports, RPT_ERROR, "Region not found in space type");
-    return NULL;
-  }
-
-  return art;
-}
-
-static ARegionType *region_type_find_idname(ReportList *reports,
-                                            const char *space_type,
-                                            int region_type)
+static ARegionType *region_type_find(ReportList *reports, const char *space_type, int region_type)
 {
   SpaceType *st;
   ARegionType *art;
@@ -229,14 +205,14 @@ static void rna_Panel_unregister(Main *bmain, StructRNA *type)
     child_pt->parent = NULL;
   }
 
-  const char space_type = pt->space_type;
+  const char *space_type = pt->space_type;
   BLI_freelistN(&pt->children);
   BLI_freelinkN(&art->paneltypes, pt);
 
   for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
     LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
       LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
-        if (sl->spacetype == space_type) {
+        if (sl->type && STREQ(sl->type->idname, space_type)) {
           ListBase *regionbase = (sl == area->spacedata.first) ? &area->regionbase :
                                                                  &sl->regionbase;
           LISTBASE_FOREACH (ARegion *, region, regionbase) {
@@ -309,16 +285,17 @@ static StructRNA *rna_Panel_register(Main *bmain,
     }
   }
   else {
-    if (dummypt.category[0] != '\0') {
-      if ((1 << dummypt.space_type) & WM_TOOLSYSTEM_SPACE_MASK) {
-        BKE_reportf(reports,
-                    RPT_ERROR,
-                    "Registering panel class: '%s' has category '%s' ",
-                    dummypt.idname,
-                    dummypt.category);
-        return NULL;
-      }
-    }
+    // TODO(kevindietrich)
+    //    if (dummypt.category[0] != '\0') {
+    //      if ((1 << dummypt.space_type) & WM_TOOLSYSTEM_SPACE_MASK) {
+    //        BKE_reportf(reports,
+    //                    RPT_ERROR,
+    //                    "Registering panel class: '%s' has category '%s' ",
+    //                    dummypt.idname,
+    //                    dummypt.category);
+    //        return NULL;
+    //      }
+    //    }
   }
 
   if (!(art = region_type_find(reports, dummypt.space_type, dummypt.region_type))) {
@@ -782,7 +759,7 @@ static void rna_Header_unregister(Main *UNUSED(bmain), StructRNA *type)
   if (!ht) {
     return;
   }
-  if (!(art = region_type_find_idname(NULL, ht->space_type, ht->region_type))) {
+  if (!(art = region_type_find(NULL, ht->space_type, ht->region_type))) {
     return;
   }
 
@@ -828,7 +805,7 @@ static StructRNA *rna_Header_register(Main *bmain,
     return NULL;
   }
 
-  if (!(art = region_type_find_idname(reports, dummyht.space_type, dummyht.region_type))) {
+  if (!(art = region_type_find(reports, dummyht.space_type, dummyht.region_type))) {
     return NULL;
   }
 
@@ -1488,9 +1465,9 @@ static void rna_def_panel(BlenderRNA *brna)
   RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
   RNA_def_property_ui_text(prop, "", "The ID owning the data displayed in the panel, if any");
 
-  prop = RNA_def_property(srna, "bl_space_type", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_sdna(prop, NULL, "type->space_type");
-  RNA_def_property_enum_items(prop, rna_enum_space_type_items);
+  prop = RNA_def_property(srna, "bl_space_type", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, NULL, "type->space_type");
+  // RNA_def_property_enum_items(prop, rna_enum_space_type_items);
   RNA_def_property_flag(prop, PROP_REGISTER);
   RNA_def_property_ui_text(prop, "Space Type", "The space where the panel is going to be used in");
 

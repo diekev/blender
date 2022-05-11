@@ -1406,6 +1406,6 @@ void ED_spacetype_clip(void)
   BLI_addhead(&st->regiontypes, art);
 
   /* regions: hud */
-  art = ED_area_type_hud(st->spaceid);
+  art = ED_area_type_hud(st->idname);
   BLI_addhead(&st->regiontypes, art);
 }
