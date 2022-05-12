@@ -361,7 +361,7 @@ SpaceType *BKE_spacetype_from_id(int spaceid)
       }
 
       if (spaceid == 0) {
-        fprintf(stderr, "BKE_spacetype_from_id %s\n", st->idname);
+        // fprintf(stderr, "BKE_spacetype_from_id %s\n", st->idname);
         return st;
       }
 
@@ -442,7 +442,7 @@ void BKE_spacetype_register(SpaceType *st)
     MEM_freeN(stype);
   }
 
-  fprintf(stderr, "Register : %s\n", st->idname);
+  // fprintf(stderr, "Register : %s\n", st->idname);
 
   BLI_addtail(&spacetypes, st);
 }
