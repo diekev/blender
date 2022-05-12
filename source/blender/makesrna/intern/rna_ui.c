@@ -1467,7 +1467,6 @@ static void rna_def_panel(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "bl_space_type", PROP_STRING, PROP_NONE);
   RNA_def_property_string_sdna(prop, NULL, "type->space_type");
-  // RNA_def_property_enum_items(prop, rna_enum_space_type_items);
   RNA_def_property_flag(prop, PROP_REGISTER);
   RNA_def_property_ui_text(prop, "Space Type", "The space where the panel is going to be used in");
 
@@ -1734,7 +1733,6 @@ static void rna_def_header(BlenderRNA *brna)
 
   prop = RNA_def_property(srna, "bl_space_type", PROP_STRING, PROP_NONE);
   RNA_def_property_string_sdna(prop, NULL, "type->space_type");
-  // RNA_def_property_enum_items(prop, rna_enum_space_type_items);
   RNA_def_property_flag(prop, PROP_REGISTER);
   RNA_def_property_ui_text(
       prop, "Space Type", "The space where the header is going to be used in");

@@ -238,56 +238,6 @@ const EnumPropertyItem rna_enum_space_file_browse_mode_items[] = {
         "Edit timings for Cache File data-blocks" \
   }
 
-static void rna_def_space_generic_show_region_toggles(StructRNA *srna, int region_type_mask)
-{
-  PropertyRNA *prop;
-
-#define DEF_SHOW_REGION_PROPERTY(identifier, label, description) \
-  { \
-    prop = RNA_def_property(srna, STRINGIFY(identifier), PROP_BOOLEAN, PROP_NONE); \
-    RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE); \
-    RNA_def_property_boolean_funcs( \
-        prop, STRINGIFY(rna_Space_##identifier##_get), STRINGIFY(rna_Space_##identifier##_set)); \
-    RNA_def_property_ui_text(prop, label, description); \
-    RNA_def_property_update(prop, 0, STRINGIFY(rna_Space_##identifier##_update)); \
-  } \
-  ((void)0)
-
-  if (region_type_mask & (1 << RGN_TYPE_TOOL_HEADER)) {
-    region_type_mask &= ~(1 << RGN_TYPE_TOOL_HEADER);
-    DEF_SHOW_REGION_PROPERTY(show_region_tool_header, "Tool Settings", "");
-  }
-  if (region_type_mask & (1 << RGN_TYPE_HEADER)) {
-    region_type_mask &= ~(1 << RGN_TYPE_HEADER);
-    DEF_SHOW_REGION_PROPERTY(show_region_header, "Header", "");
-  }
-  if (region_type_mask & (1 << RGN_TYPE_FOOTER)) {
-    region_type_mask &= ~(1 << RGN_TYPE_FOOTER);
-    DEF_SHOW_REGION_PROPERTY(show_region_footer, "Footer", "");
-  }
-  if (region_type_mask & (1 << RGN_TYPE_TOOLS)) {
-    region_type_mask &= ~(1 << RGN_TYPE_TOOLS);
-    DEF_SHOW_REGION_PROPERTY(show_region_toolbar, "Toolbar", "");
-  }
-  if (region_type_mask & (1 << RGN_TYPE_TOOL_PROPS)) {
-    region_type_mask &= ~(1 << RGN_TYPE_TOOL_PROPS);
-    DEF_SHOW_REGION_PROPERTY(show_region_tool_props, "Toolbar", "");
-  }
-  if (region_type_mask & (1 << RGN_TYPE_CHANNELS)) {
-    region_type_mask &= ~(1 << RGN_TYPE_CHANNELS);
-    DEF_SHOW_REGION_PROPERTY(show_region_channels, "Channels", "");
-  }
-  if (region_type_mask & (1 << RGN_TYPE_UI)) {
-    region_type_mask &= ~(1 << RGN_TYPE_UI);
-    DEF_SHOW_REGION_PROPERTY(show_region_ui, "Sidebar", "");
-  }
-  if (region_type_mask & (1 << RGN_TYPE_HUD)) {
-    region_type_mask &= ~(1 << RGN_TYPE_HUD);
-    DEF_SHOW_REGION_PROPERTY(show_region_hud, "Adjust Last Operation", "");
-  }
-  BLI_assert(region_type_mask == 0);
-}
-
 #ifndef RNA_RUNTIME
 /* XXX: action-editor is currently for object-level only actions,
  * so show that using object-icon hint */
@@ -3551,10 +3501,7 @@ static StructRNA *rna_Space_register(Main *bmain,
   /* update while blender is running */
   WM_main_add_notifier(NC_WINDOW, NULL);
 
-  //  rna_def_space_generic_show_region_toggles(st->rna_ext.srna,
-  //                                            ((1 << RGN_TYPE_TOOL_HEADER) | (1 <<
-  //                                            RGN_TYPE_UI)));
-
+  // TODO(kevindietrich) : something similar to rna_def_space_generic_show_region_toggles
   StructRNA *srna = st->rna_ext.srna;
   PropertyRNA *prop;
   prop = RNA_def_property(srna, "show_region_tool_header", PROP_BOOLEAN, PROP_NONE);
@@ -3630,6 +3577,57 @@ static struct IDFilterEnumPropertyItem rna_enum_space_file_id_filter_categories[
     {0, NULL, 0, NULL, NULL},
 };
 
+static void rna_def_space_generic_show_region_toggles(StructRNA *srna, int region_type_mask)
+{
+  PropertyRNA *prop;
+
+#  define DEF_SHOW_REGION_PROPERTY(identifier, label, description) \
+    { \
+      prop = RNA_def_property(srna, STRINGIFY(identifier), PROP_BOOLEAN, PROP_NONE); \
+      RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE); \
+      RNA_def_property_boolean_funcs(prop, \
+                                     STRINGIFY(rna_Space_##identifier##_get), \
+                                     STRINGIFY(rna_Space_##identifier##_set)); \
+      RNA_def_property_ui_text(prop, label, description); \
+      RNA_def_property_update(prop, 0, STRINGIFY(rna_Space_##identifier##_update)); \
+    } \
+    ((void)0)
+
+  if (region_type_mask & (1 << RGN_TYPE_TOOL_HEADER)) {
+    region_type_mask &= ~(1 << RGN_TYPE_TOOL_HEADER);
+    DEF_SHOW_REGION_PROPERTY(show_region_tool_header, "Tool Settings", "");
+  }
+  if (region_type_mask & (1 << RGN_TYPE_HEADER)) {
+    region_type_mask &= ~(1 << RGN_TYPE_HEADER);
+    DEF_SHOW_REGION_PROPERTY(show_region_header, "Header", "");
+  }
+  if (region_type_mask & (1 << RGN_TYPE_FOOTER)) {
+    region_type_mask &= ~(1 << RGN_TYPE_FOOTER);
+    DEF_SHOW_REGION_PROPERTY(show_region_footer, "Footer", "");
+  }
+  if (region_type_mask & (1 << RGN_TYPE_TOOLS)) {
+    region_type_mask &= ~(1 << RGN_TYPE_TOOLS);
+    DEF_SHOW_REGION_PROPERTY(show_region_toolbar, "Toolbar", "");
+  }
+  if (region_type_mask & (1 << RGN_TYPE_TOOL_PROPS)) {
+    region_type_mask &= ~(1 << RGN_TYPE_TOOL_PROPS);
+    DEF_SHOW_REGION_PROPERTY(show_region_tool_props, "Toolbar", "");
+  }
+  if (region_type_mask & (1 << RGN_TYPE_CHANNELS)) {
+    region_type_mask &= ~(1 << RGN_TYPE_CHANNELS);
+    DEF_SHOW_REGION_PROPERTY(show_region_channels, "Channels", "");
+  }
+  if (region_type_mask & (1 << RGN_TYPE_UI)) {
+    region_type_mask &= ~(1 << RGN_TYPE_UI);
+    DEF_SHOW_REGION_PROPERTY(show_region_ui, "Sidebar", "");
+  }
+  if (region_type_mask & (1 << RGN_TYPE_HUD)) {
+    region_type_mask &= ~(1 << RGN_TYPE_HUD);
+    DEF_SHOW_REGION_PROPERTY(show_region_hud, "Adjust Last Operation", "");
+  }
+  BLI_assert(region_type_mask == 0);
+}
+
 static void rna_def_space(BlenderRNA *brna)
 {
   StructRNA *srna;
@@ -3638,8 +3636,8 @@ static void rna_def_space(BlenderRNA *brna)
   srna = RNA_def_struct(brna, "Space", NULL);
   RNA_def_struct_sdna(srna, "SpaceLink");
   RNA_def_struct_ui_text(srna, "Space", "Space data for a screen area");
-  RNA_def_struct_register_funcs(srna, "rna_Space_register", "rna_Space_unregister", NULL);
   RNA_def_struct_refine_func(srna, "rna_Space_refine");
+  RNA_def_struct_register_funcs(srna, "rna_Space_register", "rna_Space_unregister", NULL);
   RNA_def_struct_idprops_func(srna, "rna_Space_idprops");
 
   prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
