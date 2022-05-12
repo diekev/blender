@@ -3360,8 +3360,8 @@ static void rna_CustomSpaceType_properties_region_init(wmWindowManager *wm, AReg
 
   ED_region_panels_init(wm, region);
 
-  keymap = WM_keymap_ensure(wm->defaultconf, "Custom", SPACE_CUSTOM, 0);
-  WM_event_add_keymap_handler(&region->handlers, keymap);
+  //  keymap = WM_keymap_ensure(wm->defaultconf, "Custom", SPACE_CUSTOM, 0);
+  //  WM_event_add_keymap_handler(&region->handlers, keymap);
 }
 
 static void rna_CustomSpaceType_properties_region_draw(const bContext *C, ARegion *region)
@@ -3382,11 +3382,11 @@ static void rna_CustomSpaceType_main_region_init(wmWindowManager *wm, ARegion *r
   //  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
 
   /* own keymap */
-  keymap = WM_keymap_ensure(wm->defaultconf, "Custom", SPACE_CUSTOM, 0);
-  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
+  //  keymap = WM_keymap_ensure(wm->defaultconf, "Custom", SPACE_CUSTOM, 0);
+  //  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
 
-  keymap = WM_keymap_ensure(wm->defaultconf, "Custom Editor", SPACE_CUSTOM, 0);
-  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
+  //  keymap = WM_keymap_ensure(wm->defaultconf, "Custom Editor", SPACE_CUSTOM, 0);
+  //  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
 }
 
 static void rna_Space_unregister(Main *UNUSED(bmain), StructRNA *type)
@@ -3458,7 +3458,7 @@ static StructRNA *rna_Space_register(Main *bmain,
   /* Default properties and callbacks. */
   st->spaceid = SPACE_CUSTOM;
   st->create = rna_CustomSpaceType_create;
-  st->keymap = rna_CustomSpaceType_keymap;
+  // st->keymap = rna_CustomSpaceType_keymap;
 
   ARegionType *art;
 
