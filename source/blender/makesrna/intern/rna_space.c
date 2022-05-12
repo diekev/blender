@@ -622,6 +622,10 @@ static StructRNA *rna_Space_refine(struct PointerRNA *ptr)
 {
   SpaceLink *space = (SpaceLink *)ptr->data;
 
+  if (space->type && space->type->rna_ext.srna) {
+    return space->type->rna_ext.srna;
+  }
+
   switch ((eSpace_Type)space->spacetype) {
     case SPACE_VIEW3D:
       return &RNA_SpaceView3D;
@@ -663,9 +667,8 @@ static StructRNA *rna_Space_refine(struct PointerRNA *ptr)
     case SPACE_STATUSBAR:
       break;
 
-      /* TODO */
     case SPACE_CUSTOM:
-      break;
+      return space->type->rna_ext.srna;
   }
 
   return &RNA_Space;
@@ -769,203 +772,6 @@ static void rna_Space_bool_from_region_flag_update_by_type(bContext *C,
 /** \} */
 
 /* -------------------------------------------------------------------- */
-/** \name Custom Space Registration
- * \{ */
-
-static SpaceLink *rna_CustomSpaceType_create(const ScrArea *UNUSED(area),
-                                             const Scene *UNUSED(scene))
-{
-  ARegion *region;
-  SpaceLink *space = MEM_callocN(sizeof(SpaceLink), __func__);
-
-  /* header */
-  region = MEM_callocN(sizeof(ARegion), "header for custom space type");
-
-  BLI_addtail(&space->regionbase, region);
-  region->regiontype = RGN_TYPE_HEADER;
-  region->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM : RGN_ALIGN_TOP;
-
-  /* window */
-  region = MEM_callocN(sizeof(ARegion), "main region for custom space type");
-
-  BLI_addtail(&space->regionbase, region);
-  region->regiontype = RGN_TYPE_WINDOW;
-
-  /* properties view */
-  region = MEM_callocN(sizeof(ARegion), "properties for clip");
-
-  BLI_addtail(&space->regionbase, region);
-  region->regiontype = RGN_TYPE_UI;
-  region->alignment = RGN_ALIGN_RIGHT;
-
-  return space;
-}
-
-static void rna_CustomSpaceType_keymap(struct wmKeyConfig *keyconf)
-{
-  /* ******** Global hotkeys available for all regions ******** */
-  WM_keymap_ensure(keyconf, "Custom", SPACE_CUSTOM, 0);
-
-  /* ******** Hotkeys available for main region only ******** */
-  WM_keymap_ensure(keyconf, "Custom Editor", SPACE_CLIP, 0);
-  //  keymap->poll = ED_space_clip_tracking_poll;
-}
-
-static void rna_CustomSpaceType_header_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
-{
-  ED_region_header_init(region);
-}
-
-static void rna_CustomSpaceType_properties_region_init(wmWindowManager *wm, ARegion *region)
-{
-  wmKeyMap *keymap;
-
-  ED_region_panels_init(wm, region);
-
-  keymap = WM_keymap_ensure(wm->defaultconf, "Custom", SPACE_CUSTOM, 0);
-  WM_event_add_keymap_handler(&region->handlers, keymap);
-}
-
-/* add handlers, stuff you only do once or on area/region changes */
-static void rna_CustomSpaceType_main_region_init(wmWindowManager *wm, ARegion *region)
-{
-  wmKeyMap *keymap;
-
-  /* NOTE: don't use `UI_view2d_region_reinit(&region->v2d, ...)`
-   * since the space clip manages own v2d in #movieclip_main_area_set_view2d */
-
-  /* mask polls mode */
-  //  keymap = WM_keymap_ensure(wm->defaultconf, "Mask Editing", 0, 0);
-  //  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
-
-  /* own keymap */
-  keymap = WM_keymap_ensure(wm->defaultconf, "Custom", SPACE_CUSTOM, 0);
-  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
-
-  keymap = WM_keymap_ensure(wm->defaultconf, "Custom Editor", SPACE_CUSTOM, 0);
-  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
-}
-
-static void rna_Space_unregister(Main *UNUSED(bmain), StructRNA *type)
-{
-  SpaceType *st = RNA_struct_blender_type_get(type);
-
-  if (!st) {
-    return;
-  }
-
-  RNA_struct_free_extension(type, &st->rna_ext);
-  RNA_struct_free(&BLENDER_RNA, type);
-
-  // WM_menutype_freelink(mt);
-
-  /* update while blender is running */
-  WM_main_add_notifier(NC_WINDOW, NULL);
-}
-
-static StructRNA *rna_Space_register(Main *bmain,
-                                     ReportList *reports,
-                                     void *data,
-                                     const char *identifier,
-                                     StructValidateFunc validate,
-                                     StructCallbackFunc call,
-                                     StructFreeFunc free)
-{
-  SpaceType *st, dummyst = {NULL};
-  SpaceLink dummyspace = {NULL};
-  PointerRNA dummystr;
-  // int have_function[0];
-
-  /* setup dummy space & space type to store static properties in */
-  dummyspace.type = &dummyst;
-  RNA_pointer_create(NULL, &RNA_Space, &dummyspace, &dummystr);
-
-  /* validate the python class */
-  if (validate(&dummystr, data, NULL /*have_function*/) != 0) {
-    return NULL;
-  }
-
-  if (strlen(identifier) >= sizeof(dummyst.idname)) {
-    BKE_reportf(reports,
-                RPT_ERROR,
-                "Registering space class: '%s' is too long, maximum length is %d",
-                identifier,
-                (int)sizeof(dummyst.idname));
-    return NULL;
-  }
-
-  /* check if we have registered this space type before, and remove it */
-  st = BKE_spacetype_from_idname(dummyst.idname);
-  if (st && st->rna_ext.srna) {
-    rna_Space_unregister(bmain, st->rna_ext.srna);
-  }
-  if (!RNA_struct_available_or_report(reports, dummyst.idname)) {
-    return NULL;
-  }
-
-  st = MEM_callocN(sizeof(SpaceType), "python space type");
-  memcpy(st, &dummyst, sizeof(dummyst));
-
-  st->rna_ext.srna = RNA_def_struct_ptr(&BLENDER_RNA, st->idname, &RNA_Space);
-  st->rna_ext.data = data;
-  st->rna_ext.call = call;
-  st->rna_ext.free = free;
-  RNA_struct_blender_type_set(st->rna_ext.srna, st);
-
-  /* Default properties and callbacks. */
-  st->spaceid = SPACE_CUSTOM;
-  st->create = rna_CustomSpaceType_create;
-  st->keymap = rna_CustomSpaceType_keymap;
-
-  ARegionType *art;
-
-  /* regions: header */
-  art = MEM_callocN(sizeof(ARegionType), "spacetype clip region");
-  art->regionid = RGN_TYPE_HEADER;
-  art->prefsizey = HEADERY;
-  art->keymapflag = ED_KEYMAP_FRAMES | ED_KEYMAP_UI | ED_KEYMAP_VIEW2D | ED_KEYMAP_HEADER;
-
-  art->init = rna_CustomSpaceType_header_region_init;
-  art->draw = ED_region_header;
-  //  art->listener = clip_header_region_listener;
-
-  BLI_addhead(&st->regiontypes, art);
-
-  BKE_spacetype_register(st);
-
-  /* regions: main window */
-  art = MEM_callocN(sizeof(ARegionType), "spacetype clip region");
-  art->regionid = RGN_TYPE_WINDOW;
-  art->init = rna_CustomSpaceType_main_region_init;
-  // art->draw = clip_main_region_draw;
-  // art->listener = clip_main_region_listener;
-  art->keymapflag = ED_KEYMAP_GIZMO | ED_KEYMAP_FRAMES | ED_KEYMAP_UI | ED_KEYMAP_GPENCIL;
-
-  BLI_addhead(&st->regiontypes, art);
-
-  /* regions: properties */
-  art = MEM_callocN(sizeof(ARegionType), "spacetype clip region properties");
-  art->regionid = RGN_TYPE_UI;
-  art->prefsizex = UI_SIDEBAR_PANEL_WIDTH;
-  art->keymapflag = ED_KEYMAP_FRAMES | ED_KEYMAP_UI;
-  art->init = rna_CustomSpaceType_properties_region_init;
-  art->draw = ED_region_panels;
-  //  art->listener = clip_properties_region_listener;
-  BLI_addhead(&st->regiontypes, art);
-  // ED_clip_buttons_register(art);
-
-  /* update while blender is running */
-  WM_main_add_notifier(NC_WINDOW, NULL);
-
-  rna_def_space_generic_show_region_toggles(st->rna_ext.srna,
-                                            ((1 << RGN_TYPE_TOOL_HEADER) | (1 << RGN_TYPE_UI)));
-
-  return st->rna_ext.srna;
-}
-
-/** \} */
-
-/* -------------------------------------------------------------------- */
 /** \name Region Flag Access (Typed Callbacks)
  * \{ */
 
@@ -989,6 +795,16 @@ static void rna_Space_show_region_header_set(PointerRNA *ptr, bool value)
   }
   rna_Space_bool_from_region_flag_set_by_type(
       ptr, RGN_TYPE_TOOL_HEADER, RGN_FLAG_HIDDEN, !value_for_tool_header);
+}
+static bool rna_Space_show_region_header_get_ex(PointerRNA *ptr, PropertyRNA *UNUSED(prop))
+{
+  return rna_Space_show_region_header_get(ptr);
+}
+static void rna_Space_show_region_header_set_ex(PointerRNA *ptr,
+                                                PropertyRNA *UNUSED(prop),
+                                                bool value)
+{
+  rna_Space_show_region_header_set(ptr, value);
 }
 static void rna_Space_show_region_header_update(bContext *C, PointerRNA *ptr)
 {
@@ -1023,6 +839,16 @@ static void rna_Space_show_region_tool_header_set(PointerRNA *ptr, bool value)
   rna_Space_bool_from_region_flag_set_by_type(
       ptr, RGN_TYPE_TOOL_HEADER, RGN_FLAG_HIDDEN_BY_USER, !value);
   rna_Space_bool_from_region_flag_set_by_type(ptr, RGN_TYPE_TOOL_HEADER, RGN_FLAG_HIDDEN, !value);
+}
+static bool rna_Space_show_region_tool_header_get_ex(PointerRNA *ptr, PropertyRNA *UNUSED(prop))
+{
+  return rna_Space_show_region_tool_header_get(ptr);
+}
+static void rna_Space_show_region_tool_header_set_ex(PointerRNA *ptr,
+                                                     PropertyRNA *UNUSED(prop),
+                                                     bool value)
+{
+  rna_Space_show_region_tool_header_set(ptr, value);
 }
 static void rna_Space_show_region_tool_header_update(bContext *C, PointerRNA *ptr)
 {
@@ -1078,6 +904,14 @@ static bool rna_Space_show_region_ui_get(PointerRNA *ptr)
 static void rna_Space_show_region_ui_set(PointerRNA *ptr, bool value)
 {
   rna_Space_bool_from_region_flag_set_by_type(ptr, RGN_TYPE_UI, RGN_FLAG_HIDDEN, !value);
+}
+static bool rna_Space_show_region_ui_get_ex(PointerRNA *ptr, PropertyRNA *UNUSED(prop))
+{
+  return rna_Space_show_region_ui_get(ptr);
+}
+static void rna_Space_show_region_ui_set_ex(PointerRNA *ptr, PropertyRNA *UNUSED(prop), bool value)
+{
+  rna_Space_show_region_ui_set(ptr, value);
 }
 static void rna_Space_show_region_ui_update(bContext *C, PointerRNA *ptr)
 {
@@ -3521,6 +3355,232 @@ static int rna_FileAssetSelectParams_catalog_id_length(PointerRNA *UNUSED(ptr))
   return UUID_STRING_LEN - 1;
 }
 
+/* -------------------------------------------------------------------- */
+/** \name Custom Space Registration
+ * \{ */
+
+static SpaceLink *rna_CustomSpaceType_create(const ScrArea *UNUSED(area),
+                                             const Scene *UNUSED(scene))
+{
+  ARegion *region;
+  SpaceLink *space = MEM_callocN(sizeof(SpaceLink), __func__);
+
+  /* header */
+  region = MEM_callocN(sizeof(ARegion), "header for custom space type");
+
+  BLI_addtail(&space->regionbase, region);
+  region->regiontype = RGN_TYPE_HEADER;
+  region->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM : RGN_ALIGN_TOP;
+
+  /* properties view */
+  region = MEM_callocN(sizeof(ARegion), "properties for clip");
+
+  BLI_addtail(&space->regionbase, region);
+  region->regiontype = RGN_TYPE_UI;
+  region->alignment = RGN_ALIGN_RIGHT;
+  region->flag = RGN_FLAG_HIDDEN;
+
+  /* window */
+  region = MEM_callocN(sizeof(ARegion), "main region for custom space type");
+
+  BLI_addtail(&space->regionbase, region);
+  region->regiontype = RGN_TYPE_WINDOW;
+
+  return space;
+}
+
+static void rna_CustomSpaceType_keymap(struct wmKeyConfig *keyconf)
+{
+  /* ******** Global hotkeys available for all regions ******** */
+  WM_keymap_ensure(keyconf, "Custom", SPACE_CUSTOM, 0);
+
+  /* ******** Hotkeys available for main region only ******** */
+  WM_keymap_ensure(keyconf, "Custom Editor", SPACE_CLIP, 0);
+  //  keymap->poll = ED_space_clip_tracking_poll;
+}
+
+static void rna_CustomSpaceType_header_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
+{
+  ED_region_header_init(region);
+}
+
+static void rna_CustomSpaceType_properties_region_init(wmWindowManager *wm, ARegion *region)
+{
+  wmKeyMap *keymap;
+
+  ED_region_panels_init(wm, region);
+
+  keymap = WM_keymap_ensure(wm->defaultconf, "Custom", SPACE_CUSTOM, 0);
+  WM_event_add_keymap_handler(&region->handlers, keymap);
+}
+
+static void rna_CustomSpaceType_properties_region_draw(const bContext *C, ARegion *region)
+{
+  ED_region_panels_ex(C, region, (const char *[]){CTX_data_mode_string(C), NULL});
+}
+
+/* add handlers, stuff you only do once or on area/region changes */
+static void rna_CustomSpaceType_main_region_init(wmWindowManager *wm, ARegion *region)
+{
+  wmKeyMap *keymap;
+
+  /* NOTE: don't use `UI_view2d_region_reinit(&region->v2d, ...)`
+   * since the space clip manages own v2d in #movieclip_main_area_set_view2d */
+
+  /* mask polls mode */
+  //  keymap = WM_keymap_ensure(wm->defaultconf, "Mask Editing", 0, 0);
+  //  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
+
+  /* own keymap */
+  keymap = WM_keymap_ensure(wm->defaultconf, "Custom", SPACE_CUSTOM, 0);
+  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
+
+  keymap = WM_keymap_ensure(wm->defaultconf, "Custom Editor", SPACE_CUSTOM, 0);
+  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
+}
+
+static void rna_Space_unregister(Main *UNUSED(bmain), StructRNA *type)
+{
+  SpaceType *st = RNA_struct_blender_type_get(type);
+
+  if (!st) {
+    return;
+  }
+
+  RNA_struct_free_extension(type, &st->rna_ext);
+  RNA_struct_free(&BLENDER_RNA, type);
+
+  // WM_menutype_freelink(mt);
+
+  /* update while blender is running */
+  WM_main_add_notifier(NC_WINDOW, NULL);
+}
+
+static StructRNA *rna_Space_register(Main *bmain,
+                                     ReportList *reports,
+                                     void *data,
+                                     const char *identifier,
+                                     StructValidateFunc validate,
+                                     StructCallbackFunc call,
+                                     StructFreeFunc free)
+{
+  SpaceType *st, dummyst = {NULL};
+  SpaceLink dummyspace = {NULL};
+  PointerRNA dummystr;
+  // int have_function[0];
+
+  /* setup dummy space & space type to store static properties in */
+  dummyspace.type = &dummyst;
+  RNA_pointer_create(NULL, &RNA_Space, &dummyspace, &dummystr);
+
+  /* validate the python class */
+  if (validate(&dummystr, data, NULL /*have_function*/) != 0) {
+    return NULL;
+  }
+
+  if (strlen(identifier) >= sizeof(dummyst.idname)) {
+    BKE_reportf(reports,
+                RPT_ERROR,
+                "Registering space class: '%s' is too long, maximum length is %d",
+                identifier,
+                (int)sizeof(dummyst.idname));
+    return NULL;
+  }
+
+  /* check if we have registered this space type before, and remove it */
+  st = BKE_spacetype_from_idname(dummyst.idname);
+  if (st && st->rna_ext.srna) {
+    rna_Space_unregister(bmain, st->rna_ext.srna);
+  }
+  if (!RNA_struct_available_or_report(reports, dummyst.idname)) {
+    return NULL;
+  }
+
+  st = MEM_callocN(sizeof(SpaceType), "python space type");
+  memcpy(st, &dummyst, sizeof(dummyst));
+
+  st->rna_ext.srna = RNA_def_struct_ptr(&BLENDER_RNA, st->idname, &RNA_Space);
+  st->rna_ext.data = data;
+  st->rna_ext.call = call;
+  st->rna_ext.free = free;
+  RNA_struct_blender_type_set(st->rna_ext.srna, st);
+
+  /* Default properties and callbacks. */
+  st->spaceid = SPACE_CUSTOM;
+  st->create = rna_CustomSpaceType_create;
+  st->keymap = rna_CustomSpaceType_keymap;
+
+  ARegionType *art;
+
+  /* regions: header */
+  art = MEM_callocN(sizeof(ARegionType), "spacetype clip region");
+  art->regionid = RGN_TYPE_HEADER;
+  art->prefsizey = HEADERY;
+  art->keymapflag = ED_KEYMAP_FRAMES | ED_KEYMAP_UI | ED_KEYMAP_VIEW2D | ED_KEYMAP_HEADER;
+
+  art->init = rna_CustomSpaceType_header_region_init;
+  art->draw = ED_region_header;
+  //  art->listener = clip_header_region_listener;
+
+  BLI_addhead(&st->regiontypes, art);
+
+  BKE_spacetype_register(st);
+
+  /* regions: main window */
+  art = MEM_callocN(sizeof(ARegionType), "spacetype clip region");
+  art->regionid = RGN_TYPE_WINDOW;
+  art->init = rna_CustomSpaceType_main_region_init;
+  art->draw = ED_region_window_draw;
+  // art->listener = clip_main_region_listener;
+  art->keymapflag = ED_KEYMAP_GIZMO | ED_KEYMAP_FRAMES | ED_KEYMAP_UI | ED_KEYMAP_GPENCIL;
+
+  BLI_addhead(&st->regiontypes, art);
+
+  /* regions: properties */
+  art = MEM_callocN(sizeof(ARegionType), "spacetype clip region properties");
+  art->regionid = RGN_TYPE_UI;
+  art->prefsizex = UI_SIDEBAR_PANEL_WIDTH;
+  art->keymapflag = ED_KEYMAP_FRAMES | ED_KEYMAP_UI;
+  art->init = rna_CustomSpaceType_properties_region_init;
+  art->draw = rna_CustomSpaceType_properties_region_draw;
+  art->layout = ED_region_panels_layout;
+  //  art->listener = clip_properties_region_listener;
+  BLI_addhead(&st->regiontypes, art);
+  // ED_clip_buttons_register(art);
+
+  /* update while blender is running */
+  WM_main_add_notifier(NC_WINDOW, NULL);
+
+  //  rna_def_space_generic_show_region_toggles(st->rna_ext.srna,
+  //                                            ((1 << RGN_TYPE_TOOL_HEADER) | (1 <<
+  //                                            RGN_TYPE_UI)));
+
+  StructRNA *srna = st->rna_ext.srna;
+  PropertyRNA *prop;
+  prop = RNA_def_property(srna, "show_region_tool_header", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
+  RNA_def_property_boolean_funcs_runtime(
+      prop, rna_Space_show_region_tool_header_get_ex, rna_Space_show_region_tool_header_set_ex);
+  RNA_def_property_ui_text(prop, "Header", "");
+  RNA_def_property_update_runtime(prop, rna_Space_show_region_tool_header_update);
+  prop = RNA_def_property(srna, "show_region_ui", PROP_BOOLEAN, PROP_NONE);
+  RNA_def_property_flag(prop, PROP_CONTEXT_UPDATE);
+  RNA_def_property_boolean_funcs_runtime(
+      prop, rna_Space_show_region_ui_get_ex, rna_Space_show_region_ui_set_ex);
+  RNA_def_property_ui_text(prop, "Sidebar", "");
+  RNA_def_property_update_runtime(prop, rna_Space_show_region_ui_update);
+
+  return st->rna_ext.srna;
+}
+
+static IDProperty **rna_Space_idprops(PointerRNA *ptr)
+{
+  SpaceLink *space = (SpaceLink *)ptr->data;
+  return &space->id_properties;
+}
+
+/** \} */
+
 #else
 
 static const EnumPropertyItem dt_uv_items[] = {
@@ -3580,6 +3640,7 @@ static void rna_def_space(BlenderRNA *brna)
   RNA_def_struct_ui_text(srna, "Space", "Space data for a screen area");
   RNA_def_struct_register_funcs(srna, "rna_Space_register", "rna_Space_unregister", NULL);
   RNA_def_struct_refine_func(srna, "rna_Space_refine");
+  RNA_def_struct_idprops_func(srna, "rna_Space_idprops");
 
   prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "spacetype");

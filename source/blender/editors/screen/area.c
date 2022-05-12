@@ -2504,6 +2504,7 @@ void ED_area_newspace(bContext *C, ScrArea *area, int type, const bool skip_regi
         /* Don't get scene from context here which may depend on space-data. */
         Scene *scene = WM_window_get_active_scene(win);
         sl = st->create(area, scene);
+        sl->type = st;
         BLI_addhead(&area->spacedata, sl);
 
         /* swap regions */
@@ -3416,6 +3417,14 @@ int ED_area_headersize(void)
 int ED_area_footersize(void)
 {
   return ED_area_headersize();
+}
+
+void ED_region_window_draw(const bContext *C, ARegion *region)
+{
+  UI_ThemeClearColor(TH_BACK);
+  /* callback */
+  ED_region_draw_cb_draw(C, region, REGION_DRAW_PRE_VIEW);
+  ED_region_draw_cb_draw(C, region, REGION_DRAW_POST_VIEW);
 }
 
 int ED_area_global_size_y(const ScrArea *area)
