@@ -715,7 +715,7 @@ static bool cloth_from_object(
   int i = 0;
   MVert *mvert = NULL;
   ClothVertex *verts = NULL;
-  float(*shapekey_rest)[3] = NULL;
+  const float(*shapekey_rest)[3] = NULL;
   const float tnull[3] = {0, 0, 0};
 
   /* If we have a clothObject, free it. */
@@ -1127,7 +1127,7 @@ static void cloth_update_springs(ClothModifierData *clmd)
       spring->lin_stiffness = (v1->bend_stiff + v2->bend_stiff) / 2.0f;
     }
     else if (spring->type == CLOTH_SPRING_TYPE_GOAL) {
-      /* Warning: Appending NEW goal springs does not work
+      /* WARNING: Appending NEW goal springs does not work
        * because implicit solver would need reset! */
 
       /* Activate / Deactivate existing springs */
