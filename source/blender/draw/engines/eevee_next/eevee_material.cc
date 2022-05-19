@@ -75,11 +75,11 @@ MaterialModule::MaterialModule(Instance &inst) : inst_(inst)
   {
     bNodeTree *ntree = ntreeAddTree(nullptr, "Shader Nodetree", ntreeType_Shader->idname);
 
-    diffuse_mat_ = (::Material *)BKE_id_new_nomain(ID_MA, "EEVEE default diffuse");
-    diffuse_mat_->nodetree = ntree;
-    diffuse_mat_->use_nodes = true;
+    diffuse_mat = (::Material *)BKE_id_new_nomain(ID_MA, "EEVEE default diffuse");
+    diffuse_mat->nodetree = ntree;
+    diffuse_mat->use_nodes = true;
     /* To use the forward pipeline. */
-    diffuse_mat_->blend_method = MA_BM_BLEND;
+    diffuse_mat->blend_method = MA_BM_BLEND;
 
     bNode *bsdf = nodeAddStaticNode(nullptr, ntree, SH_NODE_BSDF_DIFFUSE);
     bNodeSocket *base_color = nodeFindSocket(bsdf, SOCK_IN, "Color");
@@ -98,11 +98,11 @@ MaterialModule::MaterialModule(Instance &inst) : inst_(inst)
   {
     bNodeTree *ntree = ntreeAddTree(nullptr, "Shader Nodetree", ntreeType_Shader->idname);
 
-    glossy_mat_ = (::Material *)BKE_id_new_nomain(ID_MA, "EEVEE default metal");
-    glossy_mat_->nodetree = ntree;
-    glossy_mat_->use_nodes = true;
+    glossy_mat = (::Material *)BKE_id_new_nomain(ID_MA, "EEVEE default metal");
+    glossy_mat->nodetree = ntree;
+    glossy_mat->use_nodes = true;
     /* To use the forward pipeline. */
-    glossy_mat_->blend_method = MA_BM_BLEND;
+    glossy_mat->blend_method = MA_BM_BLEND;
 
     bNode *bsdf = nodeAddStaticNode(nullptr, ntree, SH_NODE_BSDF_GLOSSY);
     bNodeSocket *base_color = nodeFindSocket(bsdf, SOCK_IN, "Color");
@@ -149,14 +149,14 @@ MaterialModule::~MaterialModule()
   for (Material *mat : material_map_.values()) {
     delete mat;
   }
-  BKE_id_free(nullptr, glossy_mat_);
-  BKE_id_free(nullptr, diffuse_mat_);
+  BKE_id_free(nullptr, glossy_mat);
+  BKE_id_free(nullptr, diffuse_mat);
   BKE_id_free(nullptr, error_mat_);
 }
 
 void MaterialModule::begin_sync()
 {
-  queued_shaders_count_ = 0;
+  queued_shaders_count = 0;
 
   for (Material *mat : material_map_.values()) {
     mat->init = false;
@@ -180,7 +180,7 @@ MaterialPass MaterialModule::material_pass_get(::Material *blender_mat,
     case GPU_MAT_SUCCESS:
       break;
     case GPU_MAT_QUEUED:
-      queued_shaders_count_++;
+      queued_shaders_count++;
       blender_mat = (geometry_type == MAT_GEOM_VOLUME) ? BKE_material_default_volume() :
                                                          BKE_material_default_surface();
       matpass.gpumat = inst_.shaders.material_shader_get(
@@ -232,17 +232,21 @@ MaterialPass MaterialModule::material_pass_get(::Material *blender_mat,
   return matpass;
 }
 
-Material &MaterialModule::material_sync(::Material *blender_mat, eMaterialGeometry geometry_type)
+Material &MaterialModule::material_sync(::Material *blender_mat,
+                                        eMaterialGeometry geometry_type,
+                                        bool has_motion)
 {
   eMaterialPipeline surface_pipe = (blender_mat->blend_method == MA_BM_BLEND) ? MAT_PIPE_FORWARD :
                                                                                 MAT_PIPE_DEFERRED;
   eMaterialPipeline prepass_pipe = (blender_mat->blend_method == MA_BM_BLEND) ?
-                                       MAT_PIPE_FORWARD_PREPASS :
-                                       MAT_PIPE_DEFERRED_PREPASS;
+                                       (has_motion ? MAT_PIPE_FORWARD_PREPASS_VELOCITY :
+                                                     MAT_PIPE_FORWARD_PREPASS) :
+                                       (has_motion ? MAT_PIPE_DEFERRED_PREPASS_VELOCITY :
+                                                     MAT_PIPE_DEFERRED_PREPASS);
 
-  /* Test */
+  /* TEST until we have defered pipeline up and running. */
   surface_pipe = MAT_PIPE_FORWARD;
-  prepass_pipe = MAT_PIPE_FORWARD_PREPASS;
+  prepass_pipe = has_motion ? MAT_PIPE_FORWARD_PREPASS_VELOCITY : MAT_PIPE_FORWARD_PREPASS;
 
   MaterialKey material_key(blender_mat, geometry_type, surface_pipe);
 
@@ -288,7 +292,7 @@ Material &MaterialModule::material_sync(::Material *blender_mat, eMaterialGeomet
 
 /* Returned Material references are valid until the next call to this function or
  * material_get(). */
-MaterialArray &MaterialModule::material_array_get(Object *ob)
+MaterialArray &MaterialModule::material_array_get(Object *ob, bool has_motion)
 {
   material_array_.materials.clear();
   material_array_.gpu_materials.clear();
@@ -297,7 +301,7 @@ MaterialArray &MaterialModule::material_array_get(Object *ob)
 
   for (auto i : IndexRange(materials_len)) {
     ::Material *blender_mat = material_from_slot(ob, i);
-    Material &mat = material_sync(blender_mat, to_material_geometry(ob));
+    Material &mat = material_sync(blender_mat, to_material_geometry(ob), has_motion);
     material_array_.materials.append(&mat);
     material_array_.gpu_materials.append(mat.shading.gpumat);
   }
@@ -306,10 +310,13 @@ MaterialArray &MaterialModule::material_array_get(Object *ob)
 
 /* Returned Material references are valid until the next call to this function or
  * material_array_get(). */
-Material &MaterialModule::material_get(Object *ob, int mat_nr, eMaterialGeometry geometry_type)
+Material &MaterialModule::material_get(Object *ob,
+                                       bool has_motion,
+                                       int mat_nr,
+                                       eMaterialGeometry geometry_type)
 {
   ::Material *blender_mat = material_from_slot(ob, mat_nr);
-  Material &mat = material_sync(blender_mat, geometry_type);
+  Material &mat = material_sync(blender_mat, geometry_type, has_motion);
   return mat;
 }
 
