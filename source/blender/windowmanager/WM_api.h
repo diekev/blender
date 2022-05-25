@@ -781,13 +781,18 @@ void WM_operator_properties_filesel(struct wmOperatorType *ot,
  */
 void WM_operator_properties_id_lookup_set_from_id(PointerRNA *ptr, const ID *id);
 /**
- * Tries to find an ID in \a bmain. There needs to be either a "name" string or "session_uuid" int
+ * Tries to find an ID in \a bmain. There needs to be either a "session_uuid" int or "name" string
  * property defined and set. The former has priority. See #WM_operator_properties_id_lookup() for a
  * helper to add the properties.
  */
 struct ID *WM_operator_properties_id_lookup_from_name_or_session_uuid(struct Main *bmain,
-                                                                      const struct wmOperator *op,
+                                                                      PointerRNA *ptr,
                                                                       enum ID_Type type);
+/**
+ * Check if either the "session_uuid" or "name" property is set inside \a ptr. If this is the case
+ * the ID can be looked up by #WM_operator_properties_id_lookup_from_name_or_session_uuid().
+ */
+bool WM_operator_properties_id_lookup_is_set(PointerRNA *ptr);
 /**
  * Adds "name" and "session_uuid" properties so the caller can tell the operator which ID to act
  * on. See #WM_operator_properties_id_lookup_from_name_or_session_uuid(). Both properties will be
