@@ -1607,8 +1607,13 @@ static void keyboard_handle_keymap(
     return;
   }
 
-  input->xkb_state = xkb_state_new(keymap);
-
+  struct xkb_state *xkb_state_next = xkb_state_new(keymap);
+  if (xkb_state_next) {
+    if (input->xkb_state) {
+      xkb_state_unref(input->xkb_state);
+    }
+    input->xkb_state = xkb_state_next;
+  }
   xkb_keymap_unref(keymap);
 }
 
@@ -2677,6 +2682,14 @@ GHOST_TSuccess GHOST_SystemWayland::setCursorVisibility(bool visible)
 
 bool GHOST_SystemWayland::supportsCursorWarp()
 {
+  /* WAYLAND doesn't support setting the cursor position directly,
+   * this is an intentional choice, forcing us to use a software cursor in this case. */
+  return false;
+}
+
+bool GHOST_SystemWayland::supportsWindowPosition()
+{
+  /* WAYLAND doesn't support accessing the window position. */
   return false;
 }
 
