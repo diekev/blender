@@ -108,7 +108,7 @@ typedef struct LineartEdgeSegment {
 
 typedef struct LineartShadowEdge {
   struct LineartShadowEdge *next, *prev;
-  /* Two end points in framebuffer coordinates viewed from the light source. */
+  /* Two end points in frame-buffer coordinates viewed from the light source. */
   double fbc1[4], fbc2[4];
   double g1[3], g2[3];
   bool orig1, orig2;
@@ -129,11 +129,11 @@ typedef struct LineartShadowSegment {
   /* eLineartShadowSegmentFlag */
   int flag;
   /* The point after which a property of the segment is changed. e.g. shadow mask/target_ref etc.
-   * Coordinates in NDC during shadow caluclation but transformed to global linear before cutting
+   * Coordinates in NDC during shadow calculation but transformed to global linear before cutting
    * onto edges during the loading stage of the "actual" rendering. */
   double ratio;
   /* Left and right pos, because when casting shadows at some point there will be
-   * non-continuous cuts, see #lineart_shadow_edge_cut for detailed explaination. */
+   * non-continuous cuts, see #lineart_shadow_edge_cut for detailed explanation. */
   double fbc1[4], fbc2[4];
   /* Global position. */
   double g1[4], g2[4];
@@ -276,7 +276,7 @@ typedef struct LineartData {
    * calculation is finished. */
   LineartStaticMemPool *shadow_data_pool;
 
-  /* Storing shadow edge eln, array, and cuts for shadow information, so it's avaliable when line
+  /* Storing shadow edge eln, array, and cuts for shadow information, so it's available when line
    * art runs the second time for occlusion. Either a reference to LineartCache::shadow_data_pool
    * (shadow stage) or a reference to LineartData::render_data_pool (final stage). */
   LineartStaticMemPool *edge_data_pool;
@@ -549,7 +549,7 @@ typedef struct LineartBoundingArea {
   uint32_t max_triangle_count;
   uint32_t line_count;
   uint32_t max_line_count;
-  uint32_t user_count;
+  uint32_t insider_triangle_count;
 
   /* Use array for speeding up multiple accesses. */
   struct LineartTriangle **linked_triangles;
@@ -746,8 +746,8 @@ BLI_INLINE int lineart_line_isec_2d_ignore_line2pos(const double a1[2],
                                                     double *r_a_ratio)
 {
   /* The define here is used to check how vector or slope method handles boundary cases. The result
-   * of lim(div->0) and lim(k->0) could both produce some unwanted flickers in line art, the
-   * influence of which is still not fully understood, so keep the switch there for futher
+   * of `lim(div->0)` and `lim(k->0)` could both produce some unwanted flickers in line art, the
+   * influence of which is still not fully understood, so keep the switch there for further
    * investigations. */
 #define USE_VECTOR_LINE_INTERSECTION_IGN
 #ifdef USE_VECTOR_LINE_INTERSECTION_IGN
@@ -845,7 +845,7 @@ void MOD_lineart_chain_split_for_fixed_occlusion(LineartData *ld);
  * implemented yet.
  */
 void MOD_lineart_chain_connect(LineartData *ld);
-void MOD_lineart_chain_discard_short(LineartData *ld, float threshold);
+void MOD_lineart_chain_discard_unused(LineartData *ld, float threshold, uint8_t max_occlusion);
 void MOD_lineart_chain_clip_at_border(LineartData *ld);
 /**
  * This should always be the last stage!, see the end of

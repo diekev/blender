@@ -1,10 +1,12 @@
+/* SPDX-License-Identifier: Apache-2.0
+ * Copyright 2021-2022 Intel Corporation */
+
 #pragma once
 
 /* Some macro magic to generate templates for kernel arguments.
-   The resulting oneapi_call() template allows to call a SYCL/C++ kernel
-   with typed arguments by only giving it a void **args as given by Cycles.
-   The template will automatically cast from void* to the expectd type.
-   */
+ * The resulting oneapi_call() template allows to call a SYCL/C++ kernel
+ * with typed arguments by only giving it a void `**args` as given by Cycles.
+ * The template will automatically cast from void* to the expected type. */
 
 /* When expanded by the preprocessor, the generated templates will look like this example: */
 #if 0

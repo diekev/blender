@@ -328,8 +328,8 @@ bool oneapi_enqueue_kernel(KernelContext *kernel_context,
     int num_states = *((int *)(args[0]));
     /* Round up to the next work-group. */
     size_t groups_count = (num_states + local_size - 1) / local_size;
-    /* NOTE(@nsirgien): As for now non-uniform workgroups don't work on most oneAPI devices, we
-     * extend work size to fit uniformity requirements. */
+    /* NOTE(@nsirgien): As for now non-uniform work-groups don't work on most oneAPI devices,
+     * we extend work size to fit uniformity requirements. */
     global_size = groups_count * local_size;
 
 #  ifdef WITH_ONEAPI_SYCL_HOST_ENABLED
@@ -862,6 +862,9 @@ void oneapi_iterate_devices(OneAPIDeviceIteratorCallback cb, void *user_ptr)
         device.get_platform().get_info<sycl::info::platform::name>();
     std::string name = device.get_info<sycl::info::device::name>();
     std::string id = "ONEAPI_" + platform_name + "_" + name;
+    if (device.has(sycl::aspect::ext_intel_pci_address)) {
+      id.append("_" + device.get_info<sycl::info::device::ext_intel_pci_address>());
+    }
     (cb)(id.c_str(), name.c_str(), num, user_ptr);
     num++;
   }
