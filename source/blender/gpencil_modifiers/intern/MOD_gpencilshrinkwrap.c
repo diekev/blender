@@ -225,7 +225,7 @@ static void updateDepsgraph(GpencilModifierData *md,
           ctx->node, &mmd->aux_target->id, DAG_EVAL_NEED_SHRINKWRAP_BOUNDARY);
     }
   }
-  DEG_add_modifier_to_transform_relation(ctx->node, "Shrinkwrap Modifier");
+  DEG_add_depends_on_transform_relation(ctx->node, "Shrinkwrap Modifier");
 }
 
 static void foreachIDLink(GpencilModifierData *md, Object *ob, IDWalkFunc walk, void *userData)
@@ -307,7 +307,7 @@ static void panelRegister(ARegionType *region_type)
 }
 
 GpencilModifierTypeInfo modifierType_Gpencil_Shrinkwrap = {
-    /* name */ "Shrinkwrap",
+    /* name */ N_("Shrinkwrap"),
     /* structName */ "ShrinkwrapGpencilModifierData",
     /* structSize */ sizeof(ShrinkwrapGpencilModifierData),
     /* type */ eGpencilModifierTypeType_Gpencil,

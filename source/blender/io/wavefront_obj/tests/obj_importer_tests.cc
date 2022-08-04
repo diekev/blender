@@ -61,6 +61,7 @@ class obj_importer_test : public BlendfileLoadingBaseTest {
     params.up_axis = IO_AXIS_Y;
     params.validate_meshes = true;
     params.import_vertex_groups = false;
+    params.relative_paths = true;
 
     std::string obj_path = blender::tests::flags_test_asset_dir() + "/io_tests/obj/" + path;
     strncpy(params.filepath, obj_path.c_str(), FILE_MAX - 1);
@@ -289,7 +290,7 @@ TEST_F(obj_importer_test, import_nurbs_mesh)
 {
   Expectation expect[] = {
       {"OBCube", OB_MESH, 8, 12, 6, 24, float3(1, 1, -1), float3(-1, 1, 1)},
-      {"OBTorus Knot",
+      {"OBTorus_Knot",
        OB_MESH,
        108,
        108,
@@ -307,7 +308,7 @@ TEST_F(obj_importer_test, import_materials)
       {"OBCube", OB_MESH, 8, 12, 6, 24, float3(1, 1, -1), float3(-1, 1, 1)},
       {"OBmaterials", OB_MESH, 8, 12, 6, 24, float3(-1, -1, 1), float3(1, -1, -1)},
   };
-  import_and_check("materials.obj", expect, std::size(expect), 4, 1);
+  import_and_check("materials.obj", expect, std::size(expect), 4, 8);
 }
 
 TEST_F(obj_importer_test, import_cubes_with_textures_rel)
