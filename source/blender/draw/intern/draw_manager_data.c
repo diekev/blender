@@ -47,8 +47,8 @@
 /**
  * IMPORTANT:
  * In order to be able to write to the same print buffer sequentially, we add a barrier to allow
- * multiple shader calls writting to the same buffer.
- * However, this adds explicit synchronisation events which might change the rest of the
+ * multiple shader calls writing to the same buffer.
+ * However, this adds explicit synchronization events which might change the rest of the
  * application behavior and hide some bugs. If you know you are using shader debug print in only
  * one shader pass, you can comment this out to remove the aforementioned barrier.
  */
@@ -662,7 +662,7 @@ static void drw_call_obinfos_init(DRWObjectInfos *ob_infos, Object *ob)
   drw_call_calc_orco(ob, ob_infos->orcotexfac);
   /* Random float value. */
   uint random = (DST.dupli_source) ?
-                    DST.dupli_source->random_id :
+                     DST.dupli_source->random_id :
                      /* TODO(fclem): this is rather costly to do at runtime. Maybe we can
                       * put it in ob->runtime and make depsgraph ensure it is up to date. */
                      BLI_hash_int_2d(BLI_hash_string(ob->id.name + 2), 0);
@@ -1532,7 +1532,7 @@ static void drw_shgroup_init(DRWShadingGroup *shgroup, GPUShader *shader)
     drw_shgroup_uniform_create_ex(
         shgroup, debug_print_location, DRW_UNIFORM_STORAGE_BLOCK, buf, 0, 0, 1);
 #  ifndef DISABLE_DEBUG_SHADER_PRINT_BARRIER
-    /* Add a barrier to allow multiple shader writting to the same buffer. */
+    /* Add a barrier to allow multiple shader writing to the same buffer. */
     DRW_shgroup_barrier(shgroup, GPU_BARRIER_SHADER_STORAGE);
 #  endif
   }
