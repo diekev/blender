@@ -82,12 +82,12 @@ void paintface_flush_flags(bContext *C,
       me_orig->mpoly[i].flag = me->mpoly[i].flag;
     }
     if (flush_hidden) {
-      const VArray<bool> hide_face_me = attributes_me.lookup_or_default<bool>(
+      const VArray<bool> hide_poly_me = attributes_me.lookup_or_default<bool>(
           ".hide_poly", ATTR_DOMAIN_FACE, false);
-      bke::SpanAttributeWriter<bool> hide_face_orig =
+      bke::SpanAttributeWriter<bool> hide_poly_orig =
           attributes_orig.lookup_or_add_for_write_only_span<bool>(".hide_poly", ATTR_DOMAIN_FACE);
-      hide_face_me.materialize(hide_face_orig.span);
-      hide_face_orig.finish();
+      hide_poly_me.materialize(hide_poly_orig.span);
+      hide_poly_orig.finish();
     }
 
     /* Mesh polys => Final derived polys */
@@ -103,17 +103,17 @@ void paintface_flush_flags(bContext *C,
           polys[i].flag = mp_orig->flag;
         }
       }
-      const VArray<bool> hide_face_orig = attributes_orig.lookup_or_default<bool>(
+      const VArray<bool> hide_poly_orig = attributes_orig.lookup_or_default<bool>(
           ".hide_poly", ATTR_DOMAIN_FACE, false);
-      bke::SpanAttributeWriter<bool> hide_face_eval =
+      bke::SpanAttributeWriter<bool> hide_poly_eval =
           attributes_eval.lookup_or_add_for_write_only_span<bool>(".hide_poly", ATTR_DOMAIN_FACE);
       for (const int i : IndexRange(me_eval->totpoly)) {
-        const int orig_face_index = index_array[i];
-        if (orig_face_index != ORIGINDEX_NONE) {
-          hide_face_eval.span[i] = hide_face_orig[orig_face_index];
+        const int orig_poly_index = index_array[i];
+        if (orig_poly_index != ORIGINDEX_NONE) {
+          hide_poly_eval.span[i] = hide_poly_orig[orig_poly_index];
         }
       }
-      hide_face_eval.finish();
+      hide_poly_eval.finish();
 
       updated = true;
     }
@@ -633,10 +633,10 @@ void paintvert_hide(bContext *C, Object *ob, const bool unselected)
   bke::MutableAttributeAccessor attributes = bke::mesh_attributes_for_write(*me);
   bke::SpanAttributeWriter<bool> hide_vert = attributes.lookup_or_add_for_write_span<bool>(
       ".hide_vert", ATTR_DOMAIN_POINT);
-  MutableSpan<MVert> vertices(me->mvert, me->totvert);
+  MutableSpan<MVert> verts(me->mvert, me->totvert);
 
-  for (const int i : vertices.index_range()) {
-    MVert &vert = vertices[i];
+  for (const int i : verts.index_range()) {
+    MVert &vert = verts[i];
     if (!hide_vert.span[i]) {
       if (((vert.flag & SELECT) == 0) == unselected) {
         hide_vert.span[i] = true;
@@ -666,10 +666,10 @@ void paintvert_reveal(bContext *C, Object *ob, const bool select)
   bke::MutableAttributeAccessor attributes = bke::mesh_attributes_for_write(*me);
   const VArray<bool> hide_vert = attributes.lookup_or_default<bool>(
       ".hide_vert", ATTR_DOMAIN_POINT, false);
-  MutableSpan<MVert> vertices(me->mvert, me->totvert);
+  MutableSpan<MVert> verts(me->mvert, me->totvert);
 
-  for (const int i : vertices.index_range()) {
-    MVert &vert = vertices[i];
+  for (const int i : verts.index_range()) {
+    MVert &vert = verts[i];
     if (hide_vert[i]) {
       SET_FLAG_FROM_TEST(vert.flag, select, SELECT);
     }
