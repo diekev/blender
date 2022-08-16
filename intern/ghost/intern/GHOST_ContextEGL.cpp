@@ -151,10 +151,6 @@ static bool egl_chk(bool result,
 #  define EGL_CHK(x) egl_chk(x)
 #endif
 
-#ifdef WITH_GL_ANGLE
-HMODULE GHOST_ContextEGL::s_d3dcompiler = nullptr;
-#endif
-
 EGLContext GHOST_ContextEGL::s_gl_sharedContext = EGL_NO_CONTEXT;
 EGLint GHOST_ContextEGL::s_gl_sharedCount = 0;
 
@@ -333,33 +329,40 @@ GHOST_TSuccess GHOST_ContextEGL::initializeDrawingContext()
   }
   m_stereoVisual = false; /* It doesn't matter what the Window wants. */
 
-#ifdef WITH_GL_ANGLE
-  /* `d3dcompiler_XX.dll` needs to be loaded before ANGLE will work. */
-  if (s_d3dcompiler == nullptr) {
-    s_d3dcompiler = LoadLibrary(D3DCOMPILER);
-
-    WIN32_CHK(s_d3dcompiler != nullptr);
-
-    if (s_d3dcompiler == nullptr) {
-      fprintf(stderr, "LoadLibrary(\"" D3DCOMPILER "\") failed!\n");
-      return GHOST_kFailure;
-    }
-  }
-#endif
-
   EGLDisplay prev_display = eglGetCurrentDisplay();
   EGLSurface prev_draw = eglGetCurrentSurface(EGL_DRAW);
   EGLSurface prev_read = eglGetCurrentSurface(EGL_READ);
   EGLContext prev_context = eglGetCurrentContext();
 
-  EGLint egl_major, egl_minor;
+  EGLint egl_major = 0, egl_minor = 0;
 
   if (!EGL_CHK((m_display = ::eglGetDisplay(m_nativeDisplay)) != EGL_NO_DISPLAY)) {
     goto error;
   }
 
-  if (!EGL_CHK(::eglInitialize(m_display, &egl_major, &egl_minor))) {
-    goto error;
+  if (!EGL_CHK(::eglInitialize(m_display, &egl_major, &egl_minor)) ||
+      (egl_major == 0 && egl_minor == 0)) {
+    /* We failed to create a regular render window, retry and see if we can create a headless
+     * render context. */
+    ::eglTerminate(m_display);
+
+    const char *egl_extension_st = eglQueryString(EGL_NO_DISPLAY, EGL_EXTENSIONS);
+    assert(egl_extension_st != nullptr);
+    assert(strstr(egl_extension_st, "EGL_MESA_platform_surfaceless") != nullptr);
+    if (egl_extension_st == nullptr ||
+        strstr(egl_extension_st, "EGL_MESA_platform_surfaceless") == nullptr) {
+      goto error;
+    }
+
+    m_display = eglGetPlatformDisplayEXT(
+        EGL_PLATFORM_SURFACELESS_MESA, EGL_DEFAULT_DISPLAY, nullptr);
+
+    if (!EGL_CHK(::eglInitialize(m_display, &egl_major, &egl_minor))) {
+      goto error;
+    }
+    /* Because the first eglInitialize will print an error to the terminal, print a "success"
+     * message here to let the user know that we successfully recovered from the error. */
+    fprintf(stderr, "\nManaged to successfully fallback to surfaceless EGL rendering!\n\n");
   }
 #ifdef WITH_GHOST_DEBUG
   fprintf(stderr, "EGL Version %d.%d\n", egl_major, egl_minor);
