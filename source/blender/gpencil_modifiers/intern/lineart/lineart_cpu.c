@@ -4092,7 +4092,6 @@ static bool lineart_bounding_area_triangle_intersect(LineartData *fb,
  * (#LineartBoundingArea) for intersection lines. When splitting the tile into 4 children and
  * re-linking triangles into the child tiles, intersections are inhibited so we don't get
  * duplicated intersection lines.
- *
  */
 static void lineart_bounding_area_link_triangle(LineartData *ld,
                                                 LineartBoundingArea *root_ba,
@@ -5228,7 +5227,7 @@ static void lineart_gpencil_generate(LineartCache *cache,
     }
     if (shaodow_selection) {
       if (ec->shadow_mask_bits != LRT_SHADOW_MASK_UNDEFINED) {
-        /* TODO(Yiming): Give a behavior option for how to display undefined shadow info. */
+        /* TODO(@Yiming): Give a behavior option for how to display undefined shadow info. */
         if ((shaodow_selection == LRT_SHADOW_FILTER_ILLUMINATED &&
              (!(ec->shadow_mask_bits & LRT_SHADOW_MASK_ILLUMINATED)))) {
           continue;
