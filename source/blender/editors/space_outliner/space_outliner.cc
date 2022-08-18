@@ -16,7 +16,7 @@
 
 #include "BKE_context.h"
 #include "BKE_lib_remap.h"
-#include "BKE_outliner_treehash.h"
+#include "BKE_outliner_treehash.hh"
 #include "BKE_screen.h"
 
 #include "ED_screen.h"
@@ -191,7 +191,7 @@ static void outliner_main_region_listener(const wmRegionListenerParams *params)
       }
       break;
     case NC_ID:
-      if (ELEM(wmn->action, NA_RENAME, NA_ADDED)) {
+      if (ELEM(wmn->action, NA_RENAME, NA_ADDED, NA_REMOVED)) {
         ED_region_tag_redraw(region);
       }
       break;
