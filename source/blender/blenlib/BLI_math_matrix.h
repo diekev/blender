@@ -454,8 +454,20 @@ void rescale_m4(float mat[4][4], const float scale[3]);
  */
 void transform_pivot_set_m4(float mat[4][4], const float pivot[3]);
 
+/**
+ * \param rot: A 3x3 rotation matrix, normalized never negative.
+ */
 void mat4_to_rot(float rot[3][3], const float wmat[4][4]);
+
+/**
+ * \param rot: A 3x3 rotation matrix, normalized never negative.
+ * \param size: The scale, negative if `mat3` is negative.
+ */
 void mat3_to_rot_size(float rot[3][3], float size[3], const float mat3[3][3]);
+/**
+ * \param rot: A 3x3 rotation matrix, normalized never negative.
+ * \param size: The scale, negative if `mat3` is negative.
+ */
 void mat4_to_loc_rot_size(float loc[3], float rot[3][3], float size[3], const float wmat[4][4]);
 void mat4_to_loc_quat(float loc[3], float quat[4], const float wmat[4][4]);
 void mat4_decompose(float loc[3], float quat[4], float size[3], const float wmat[4][4]);
@@ -528,7 +540,18 @@ void interp_m3_m3m3(float R[3][3], const float A[3][3], const float B[3][3], flo
  */
 void interp_m4_m4m4(float R[4][4], const float A[4][4], const float B[4][4], float t);
 
+/**
+ * Return true when the matrices determinant is less than zero.
+ *
+ * \note This is often used to check if a matrix flips content in 3D space,
+ * where transforming geometry (for example) would flip the direction of polygon normals
+ * from pointing outside a closed volume, to pointing inside (or the reverse).
+ *
+ * When the matrix is constructed from location, rotation & scale
+ * as matrix will be negative when it has an odd number of negative scales.
+ */
 bool is_negative_m3(const float mat[3][3]);
+/** A version of #is_negative_m3 that takes a 4x4 matrix. */
 bool is_negative_m4(const float mat[4][4]);
 
 bool is_zero_m3(const float mat[3][3]);

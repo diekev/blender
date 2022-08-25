@@ -113,7 +113,6 @@ void copy_m4_m3(float m1[4][4], const float m2[3][3]) /* no clear */
   m1[2][1] = m2[2][1];
   m1[2][2] = m2[2][2];
 
-  /*  Reevan's Bugfix */
   m1[0][3] = 0.0f;
   m1[1][3] = 0.0f;
   m1[2][3] = 0.0f;
@@ -2240,12 +2239,6 @@ void mat4_to_loc_quat(float loc[3], float quat[4], const float wmat[4][4])
   copy_m3_m4(mat3, wmat);
   normalize_m3_m3(mat3_n, mat3);
 
-  /* So scale doesn't interfere with rotation T24291. */
-  /* FIXME: this is a workaround for negative matrix not working for rotation conversion. */
-  if (is_negative_m3(mat3)) {
-    negate_m3(mat3_n);
-  }
-
   mat3_normalized_to_quat(quat, mat3_n);
   copy_v3_v3(loc, wmat[3]);
 }
@@ -2254,7 +2247,7 @@ void mat4_decompose(float loc[3], float quat[4], float size[3], const float wmat
 {
   float rot[3][3];
   mat4_to_loc_rot_size(loc, rot, size, wmat);
-  mat3_normalized_to_quat(quat, rot);
+  mat3_normalized_to_quat_fast(quat, rot);
 }
 
 /**
@@ -2393,8 +2386,8 @@ void blend_m3_m3m3(float out[3][3],
   mat3_to_rot_size(drot, dscale, dst);
   mat3_to_rot_size(srot, sscale, src);
 
-  mat3_normalized_to_quat(dquat, drot);
-  mat3_normalized_to_quat(squat, srot);
+  mat3_normalized_to_quat_fast(dquat, drot);
+  mat3_normalized_to_quat_fast(squat, srot);
 
   /* do blending */
   interp_qt_qtqt(fquat, dquat, squat, srcweight);
@@ -2419,8 +2412,8 @@ void blend_m4_m4m4(float out[4][4],
   mat4_to_loc_rot_size(dloc, drot, dscale, dst);
   mat4_to_loc_rot_size(sloc, srot, sscale, src);
 
-  mat3_normalized_to_quat(dquat, drot);
-  mat3_normalized_to_quat(squat, srot);
+  mat3_normalized_to_quat_fast(dquat, drot);
+  mat3_normalized_to_quat_fast(squat, srot);
 
   /* do blending */
   interp_v3_v3v3(floc, dloc, sloc, srcweight);
@@ -2456,11 +2449,11 @@ void interp_m3_m3m3(float R[3][3], const float A[3][3], const float B[3][3], con
    * Note that a flip of two axes is just a rotation of 180 degrees around the third axis, and
    * three flipped axes are just an 180 degree rotation + a single axis flip. It is thus sufficient
    * to solve this problem for single axis flips. */
-  if (determinant_m3_array(U_A) < 0) {
+  if (is_negative_m3(U_A)) {
     mul_m3_fl(U_A, -1.0f);
     mul_m3_fl(P_A, -1.0f);
   }
-  if (determinant_m3_array(U_B) < 0) {
+  if (is_negative_m3(U_B)) {
     mul_m3_fl(U_B, -1.0f);
     mul_m3_fl(P_B, -1.0f);
   }
@@ -2501,16 +2494,14 @@ void interp_m4_m4m4(float R[4][4], const float A[4][4], const float B[4][4], con
 
 bool is_negative_m3(const float mat[3][3])
 {
-  float vec[3];
-  cross_v3_v3v3(vec, mat[0], mat[1]);
-  return (dot_v3v3(vec, mat[2]) < 0.0f);
+  return determinant_m3_array(mat) < 0.0f;
 }
 
 bool is_negative_m4(const float mat[4][4])
 {
-  float vec[3];
-  cross_v3_v3v3(vec, mat[0], mat[1]);
-  return (dot_v3v3(vec, mat[2]) < 0.0f);
+  /* Don't use #determinant_m4 as only the 3x3 components are needed
+   * when the matrix is used as a transformation to represent location/scale/rotation. */
+  return determinant_m4_mat3_array(mat) < 0.0f;
 }
 
 bool is_zero_m3(const float mat[3][3])

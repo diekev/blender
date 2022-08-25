@@ -34,6 +34,7 @@ from bpy.app.translations import (
     pgettext_iface as iface_,
 )
 
+
 class ImagePaintPanel:
     bl_space_type = 'IMAGE_EDITOR'
     bl_region_type = 'UI'
@@ -290,6 +291,10 @@ class IMAGE_MT_uvs_transform(Menu):
         layout.separator()
 
         layout.operator("transform.shear")
+
+        layout.separator()
+
+        layout.operator("uv.randomize_uv_transform")
 
 
 class IMAGE_MT_uvs_snap(Menu):
