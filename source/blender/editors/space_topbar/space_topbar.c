@@ -288,7 +288,7 @@ void ED_spacetype_topbar(void)
   ARegionType *art;
 
   BKE_spacetype_set_idname(st, SPACE_TOPBAR, "TOPBAR");
-  strncpy(st->name, "Top Bar", BKE_ST_MAXNAME);
+  STRNCPY(st->name, "Top Bar");
 
   st->create = topbar_create;
   st->free = topbar_free;

@@ -992,7 +992,7 @@ void ED_spacetype_file(void)
   ARegionType *art;
 
   BKE_spacetype_set_idname(st, SPACE_FILE, "FILE_BROWSER");
-  strncpy(st->name, "File", BKE_ST_MAXNAME);
+  STRNCPY(st->name, "File");
 
   st->create = file_create;
   st->free = file_free;

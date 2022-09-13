@@ -136,7 +136,7 @@ void ED_spacetype_statusbar(void)
   ARegionType *art;
 
   BKE_spacetype_set_idname(st, SPACE_STATUSBAR, "STATUSBAR");
-  strncpy(st->name, "Status Bar", BKE_ST_MAXNAME);
+  STRNCPY(st->name, "Status Bar");
 
   st->create = statusbar_create;
   st->free = statusbar_free;

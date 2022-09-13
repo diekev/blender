@@ -189,7 +189,7 @@ void ED_spacetype_userpref(void)
   ARegionType *art;
 
   BKE_spacetype_set_idname(st, SPACE_USERPREF, "PREFERENCES");
-  strncpy(st->name, "Userpref", BKE_ST_MAXNAME);
+  STRNCPY(st->name, "Userpref");
 
   st->create = userpref_create;
   st->free = userpref_free;

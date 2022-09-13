@@ -810,7 +810,7 @@ void ED_spacetype_ipo(void)
   ARegionType *art;
 
   BKE_spacetype_set_idname(st, SPACE_GRAPH, "GRAPH_EDITOR");
-  strncpy(st->name, "Graph", BKE_ST_MAXNAME);
+  STRNCPY(st->name, "Graph");
 
   st->create = graph_create;
   st->free = graph_free;

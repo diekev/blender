@@ -1021,7 +1021,7 @@ void ED_spacetype_node()
   ARegionType *art;
 
   BKE_spacetype_set_idname(st, SPACE_NODE, "NODE_EDITOR");
-  strncpy(st->name, "Node", BKE_ST_MAXNAME);
+  STRNCPY(st->name, "Node");
 
   st->create = node_create;
   st->free = node_free;

@@ -840,7 +840,7 @@ void ED_spacetype_action(void)
   ARegionType *art;
 
   BKE_spacetype_set_idname(st, SPACE_ACTION, "DOPESHEET_EDITOR");
-  strncpy(st->name, "Action", BKE_ST_MAXNAME);
+  STRNCPY(st->name, "Action");
 
   st->create = action_create;
   st->free = action_free;

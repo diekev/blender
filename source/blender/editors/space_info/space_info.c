@@ -254,7 +254,7 @@ void ED_spacetype_info(void)
   ARegionType *art;
 
   BKE_spacetype_set_idname(st, SPACE_INFO, "INFO");
-  strncpy(st->name, "Info", BKE_ST_MAXNAME);
+  STRNCPY(st->name, "Info");
 
   st->create = info_create;
   st->free = info_free;

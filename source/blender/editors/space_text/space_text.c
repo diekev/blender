@@ -403,7 +403,7 @@ void ED_spacetype_text(void)
   ARegionType *art;
 
   BKE_spacetype_set_idname(st, SPACE_TEXT, "TEXT_EDITOR");
-  strncpy(st->name, "Text", BKE_ST_MAXNAME);
+  STRNCPY(st->name, "Text");
 
   st->create = text_create;
   st->free = text_free;
