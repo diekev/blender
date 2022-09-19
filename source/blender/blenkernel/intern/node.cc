@@ -4702,6 +4702,7 @@ static void registerGeometryNodes()
   register_node_type_geo_curve_trim();
   register_node_type_geo_deform_curves_on_surface();
   register_node_type_geo_delete_geometry();
+  register_node_type_geo_distribute_points_in_volume();
   register_node_type_geo_distribute_points_on_faces();
   register_node_type_geo_dual_mesh();
   register_node_type_geo_duplicate_elements();
@@ -4748,6 +4749,7 @@ static void registerGeometryNodes()
   register_node_type_geo_material_replace();
   register_node_type_geo_material_selection();
   register_node_type_geo_merge_by_distance();
+  register_node_type_geo_mesh_face_set_boundaries();
   register_node_type_geo_mesh_primitive_circle();
   register_node_type_geo_mesh_primitive_cone();
   register_node_type_geo_mesh_primitive_cube();
