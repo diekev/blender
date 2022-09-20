@@ -1044,10 +1044,10 @@ struct GeometryNodesLazyFunctionGraphBuilder {
       if (link->is_muted()) {
         continue;
       }
-      const bNodeSocket &to_bsocket = *link->tosock;
-      if (!to_bsocket.is_available()) {
+      if (!link->is_available()) {
         continue;
       }
+      const bNodeSocket &to_bsocket = *link->tosock;
       const CPPType *to_type = get_socket_cpp_type(to_bsocket);
       if (to_type == nullptr) {
         continue;
@@ -1258,7 +1258,7 @@ const GeometryNodesLazyFunctionGraphInfo *ensure_geometry_nodes_lazy_function_gr
     const bNodeTree &btree)
 {
   btree.ensure_topology_cache();
-  if (btree.has_link_cycle()) {
+  if (btree.has_available_link_cycle()) {
     return nullptr;
   }
 
@@ -1371,9 +1371,10 @@ GeometryNodesLazyFunctionGraphInfo::~GeometryNodesLazyFunctionGraphInfo()
   }
 }
 
-static void add_thread_id_debug_message(const GeometryNodesLazyFunctionGraphInfo &lf_graph_info,
-                                        const lf::FunctionNode &node,
-                                        const lf::Context &context)
+[[maybe_unused]] static void add_thread_id_debug_message(
+    const GeometryNodesLazyFunctionGraphInfo &lf_graph_info,
+    const lf::FunctionNode &node,
+    const lf::Context &context)
 {
   static std::atomic<int> thread_id_source = 0;
   static thread_local const int thread_id = thread_id_source.fetch_add(1);
