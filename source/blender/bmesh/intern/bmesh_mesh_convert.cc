@@ -1279,7 +1279,7 @@ void BM_mesh_bm_to_me_for_eval(BMesh *bm, Mesh *me, const CustomData_MeshMasks *
     mv->flag = BM_vert_flag_to_mflag(eve);
     if (BM_elem_flag_test(eve, BM_ELEM_HIDDEN)) {
       if (!hide_vert_attribute) {
-        hide_vert_attribute = mesh_attributes.lookup_or_add_for_write_only_span<bool>(
+        hide_vert_attribute = mesh_attributes.lookup_or_add_for_write_span<bool>(
             ".hide_vert", ATTR_DOMAIN_POINT);
       }
       hide_vert_attribute.span[i] = true;
@@ -1301,8 +1301,8 @@ void BM_mesh_bm_to_me_for_eval(BMesh *bm, Mesh *me, const CustomData_MeshMasks *
     med->flag = BM_edge_flag_to_mflag(eed);
     if (BM_elem_flag_test(eed, BM_ELEM_HIDDEN)) {
       if (!hide_edge_attribute) {
-        hide_edge_attribute = mesh_attributes.lookup_or_add_for_write_only_span<bool>(
-            ".hide_edge", ATTR_DOMAIN_EDGE);
+        hide_edge_attribute = mesh_attributes.lookup_or_add_for_write_span<bool>(".hide_edge",
+                                                                                 ATTR_DOMAIN_EDGE);
       }
       hide_edge_attribute.span[i] = true;
     }
@@ -1337,8 +1337,8 @@ void BM_mesh_bm_to_me_for_eval(BMesh *bm, Mesh *me, const CustomData_MeshMasks *
     mp->flag = BM_face_flag_to_mflag(efa);
     if (BM_elem_flag_test(efa, BM_ELEM_HIDDEN)) {
       if (!hide_poly_attribute) {
-        hide_poly_attribute = mesh_attributes.lookup_or_add_for_write_only_span<bool>(
-            ".hide_poly", ATTR_DOMAIN_FACE);
+        hide_poly_attribute = mesh_attributes.lookup_or_add_for_write_span<bool>(".hide_poly",
+                                                                                 ATTR_DOMAIN_FACE);
       }
       hide_poly_attribute.span[i] = true;
     }
@@ -1346,7 +1346,7 @@ void BM_mesh_bm_to_me_for_eval(BMesh *bm, Mesh *me, const CustomData_MeshMasks *
     mp->loopstart = j;
     if (efa->mat_nr != 0) {
       if (!material_index_attribute) {
-        material_index_attribute = mesh_attributes.lookup_or_add_for_write_only_span<int>(
+        material_index_attribute = mesh_attributes.lookup_or_add_for_write_span<int>(
             "material_index", ATTR_DOMAIN_FACE);
       }
       material_index_attribute.span[i] = efa->mat_nr;
@@ -1368,21 +1368,12 @@ void BM_mesh_bm_to_me_for_eval(BMesh *bm, Mesh *me, const CustomData_MeshMasks *
   }
   bm->elem_index_dirty &= ~(BM_FACE | BM_LOOP);
 
-  if (material_index_attribute) {
-    material_index_attribute.finish();
-  }
-
   assert_bmesh_has_no_mesh_only_attributes(*bm);
 
-  if (hide_vert_attribute) {
-    hide_vert_attribute.finish();
-  }
-  if (hide_edge_attribute) {
-    hide_edge_attribute.finish();
-  }
-  if (hide_poly_attribute) {
-    hide_poly_attribute.finish();
-  }
+  material_index_attribute.finish();
+  hide_vert_attribute.finish();
+  hide_edge_attribute.finish();
+  hide_poly_attribute.finish();
 
   me->cd_flag = BM_mesh_cd_flag_from_bmesh(bm);
 }
