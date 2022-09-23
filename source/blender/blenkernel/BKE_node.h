@@ -960,8 +960,8 @@ void nodeLabel(const struct bNodeTree *ntree, const struct bNode *node, char *la
  */
 const char *nodeSocketLabel(const struct bNodeSocket *sock);
 
-bool nodeGroupPoll(struct bNodeTree *nodetree,
-                   struct bNodeTree *grouptree,
+bool nodeGroupPoll(const struct bNodeTree *nodetree,
+                   const struct bNodeTree *grouptree,
                    const char **r_disabled_hint);
 
 /**
@@ -1480,7 +1480,7 @@ struct TexResult;
 #define GEO_NODE_ROTATE_INSTANCES 1122
 #define GEO_NODE_SPLIT_EDGES 1123
 #define GEO_NODE_MESH_TO_CURVE 1124
-#define GEO_NODE_TRANSFER_ATTRIBUTE 1125
+#define GEO_NODE_TRANSFER_ATTRIBUTE_DEPRECATED 1125
 #define GEO_NODE_SUBDIVISION_SURFACE 1126
 #define GEO_NODE_CURVE_ENDPOINT_SELECTION 1127
 #define GEO_NODE_RAYCAST 1128
@@ -1527,6 +1527,10 @@ struct TexResult;
 #define GEO_NODE_EDGE_PATHS_TO_SELECTION 1170
 #define GEO_NODE_MESH_FACE_SET_BOUNDARIES 1171
 #define GEO_NODE_DISTRIBUTE_POINTS_IN_VOLUME 1172
+#define GEO_NODE_SELF_OBJECT 1173
+#define GEO_NODE_SAMPLE_INDEX 1174
+#define GEO_NODE_SAMPLE_NEAREST 1175
+#define GEO_NODE_SAMPLE_NEAREST_SURFACE 1176
 
 /** \} */
 

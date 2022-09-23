@@ -301,7 +301,7 @@ void OVERLAY_edit_uv_cache_init(OVERLAY_Data *vedata)
     srgb_to_linearrgb_v4(selected_color, selected_color);
 
     DRWShadingGroup *grp = DRW_shgroup_create(sh, psl->edit_uv_tiled_image_borders_ps);
-    DRW_shgroup_uniform_vec4_copy(grp, "color", theme_color);
+    DRW_shgroup_uniform_vec4_copy(grp, "ucolor", theme_color);
     const float3 offset = {0.0f, 0.0f, 0.0f};
     DRW_shgroup_uniform_vec3_copy(grp, "offset", offset);
 

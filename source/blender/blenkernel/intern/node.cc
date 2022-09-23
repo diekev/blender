@@ -2178,7 +2178,7 @@ bNode *nodeAddNode(const struct bContext *C, bNodeTree *ntree, const char *idnam
 
   BKE_ntree_update_tag_node_new(ntree, node);
 
-  if (node->type == GEO_NODE_INPUT_SCENE_TIME) {
+  if (ELEM(node->type, GEO_NODE_INPUT_SCENE_TIME, GEO_NODE_SELF_OBJECT)) {
     DEG_relations_tag_update(CTX_data_main(C));
   }
 
@@ -3021,7 +3021,7 @@ void nodeRemoveNode(Main *bmain, bNodeTree *ntree, bNode *node, bool do_id_user)
 
   /* Also update relations for the scene time node, which causes a dependency
    * on time that users expect to be removed when the node is removed. */
-  if (node_has_id || node->type == GEO_NODE_INPUT_SCENE_TIME) {
+  if (node_has_id || ELEM(node->type, GEO_NODE_INPUT_SCENE_TIME, GEO_NODE_SELF_OBJECT)) {
     if (bmain != nullptr) {
       DEG_relations_tag_update(bmain);
     }
@@ -4800,10 +4800,14 @@ static void registerGeometryNodes()
   register_node_type_geo_realize_instances();
   register_node_type_geo_remove_attribute();
   register_node_type_geo_rotate_instances();
+  register_node_type_geo_sample_index();
+  register_node_type_geo_sample_nearest_surface();
+  register_node_type_geo_sample_nearest();
   register_node_type_geo_scale_elements();
   register_node_type_geo_scale_instances();
   register_node_type_geo_separate_components();
   register_node_type_geo_separate_geometry();
+  register_node_type_geo_self_object();
   register_node_type_geo_set_curve_handles();
   register_node_type_geo_set_curve_radius();
   register_node_type_geo_set_curve_tilt();
@@ -4820,7 +4824,6 @@ static void registerGeometryNodes()
   register_node_type_geo_string_to_curves();
   register_node_type_geo_subdivision_surface();
   register_node_type_geo_switch();
-  register_node_type_geo_transfer_attribute();
   register_node_type_geo_transform();
   register_node_type_geo_translate_instances();
   register_node_type_geo_triangulate();
