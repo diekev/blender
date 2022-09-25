@@ -2553,12 +2553,10 @@ static bool sculpt_attr_update(Object *ob, SculptAttribute *attr)
 
     if (cdata) {
       int layer_index = CustomData_get_named_layer_index(cdata, attr->proptype, attr->name);
+      bad = layer_index == -1;
 
-      if (layer_index != -1 && attr->data_for_bmesh) {
+      if (ss->bm) {
         attr->bmesh_cd_offset = cdata->layers[layer_index].offset;
-      }
-      else {
-        bad = true;
       }
     }
   }
@@ -2640,7 +2638,10 @@ SculptAttribute *BKE_sculpt_attribute_get(struct Object *ob,
   SculptAttribute *attr = sculpt_get_cached_layer(ss, domain, proptype, name);
 
   if (attr) {
-    sculpt_attr_update(ob, attr);
+    if (sculpt_attr_update(ob, attr)) {
+      sculpt_attribute_update_refs(ob);
+    }
+
     return attr;
   }
 

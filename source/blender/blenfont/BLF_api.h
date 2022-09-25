@@ -69,7 +69,7 @@ void BLF_metrics_attach(int fontid, unsigned char *mem, int mem_size);
 
 void BLF_aspect(int fontid, float x, float y, float z);
 void BLF_position(int fontid, float x, float y, float z);
-void BLF_size(int fontid, float size, int dpi);
+void BLF_size(int fontid, float size);
 
 /* Goal: small but useful color API. */
 
@@ -290,20 +290,11 @@ void BLF_dir_free(char **dirs, int count) ATTR_NONNULL();
  *
  * \note called from a thread, so it bypasses the normal BLF_* api (which isn't thread-safe).
  */
-void BLF_thumb_preview(const char *filepath,
-                       const char **draw_str,
-                       const char **i18n_draw_str,
-                       unsigned char draw_str_lines,
-                       const float font_color[4],
-                       int font_size,
-                       unsigned char *buf,
-                       int w,
-                       int h,
-                       int channels) ATTR_NONNULL();
+bool BLF_thumb_preview(const char *filename, unsigned char *buf, int w, int h, int channels)
+    ATTR_NONNULL();
 
 /* blf_default.c */
 
-void BLF_default_dpi(int dpi);
 void BLF_default_size(float size);
 void BLF_default_set(int fontid);
 /**
