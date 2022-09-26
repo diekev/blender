@@ -158,8 +158,8 @@ static bool wm_window_timer(const bContext *C);
 
 void wm_get_screensize(int *r_width, int *r_height)
 {
-  unsigned int uiwidth;
-  unsigned int uiheight;
+  uint uiwidth;
+  uint uiheight;
 
   GHOST_GetMainDisplayDimensions(g_system, &uiwidth, &uiheight);
   *r_width = uiwidth;
@@ -168,8 +168,8 @@ void wm_get_screensize(int *r_width, int *r_height)
 
 void wm_get_desktopsize(int *r_width, int *r_height)
 {
-  unsigned int uiwidth;
-  unsigned int uiheight;
+  uint uiwidth;
+  uint uiheight;
 
   GHOST_GetAllDisplayDimensions(g_system, &uiwidth, &uiheight);
   *r_width = uiwidth;
@@ -1628,7 +1628,7 @@ wmTimer *WM_event_add_timer(wmWindowManager *wm, wmWindow *win, int event_type, 
 
 wmTimer *WM_event_add_timer_notifier(wmWindowManager *wm,
                                      wmWindow *win,
-                                     unsigned int type,
+                                     uint type,
                                      double timestep)
 {
   wmTimer *wt = MEM_callocN(sizeof(wmTimer), "window timer");
@@ -2006,11 +2006,13 @@ void WM_init_native_pixels(bool do_it)
 /** \name Cursor API
  * \{ */
 
-void WM_init_tablet_api(void)
+void WM_init_input_devices(void)
 {
   if (UNLIKELY(!g_system)) {
     return;
   }
+
+  GHOST_SetMultitouchGestures(g_system, (U.uiflag & USER_NO_MULTITOUCH_GESTURES) == 0);
 
   switch (U.tablet_api) {
     case USER_TABLET_NATIVE:

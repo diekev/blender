@@ -336,7 +336,7 @@ static void try_convert_single_object(Object &curves_ob,
 
       HairKey &key = hair_keys[key_i];
       copy_v3_v3(key.co, key_pos_ha);
-      key.time = 100.0f * key_i / (float)(hair_keys.size() - 1);
+      key.time = 100.0f * key_i / float(hair_keys.size() - 1);
     }
   }
 
@@ -714,13 +714,13 @@ static void CURVES_OT_snap_curves_to_surface(wmOperatorType *ot)
   ot->flag = OPTYPE_UNDO | OPTYPE_REGISTER;
 
   static const EnumPropertyItem attach_mode_items[] = {
-      {static_cast<int>(AttachMode::Nearest),
+      {int(AttachMode::Nearest),
        "NEAREST",
        0,
        "Nearest",
        "Find the closest point on the surface for the root point of every curve and move the root "
        "there"},
-      {static_cast<int>(AttachMode::Deform),
+      {int(AttachMode::Deform),
        "DEFORM",
        0,
        "Deform",
@@ -732,7 +732,7 @@ static void CURVES_OT_snap_curves_to_surface(wmOperatorType *ot)
   RNA_def_enum(ot->srna,
                "attach_mode",
                attach_mode_items,
-               static_cast<int>(AttachMode::Nearest),
+               int(AttachMode::Nearest),
                "Attach Mode",
                "How to find the point on the surface to attach to");
 }
