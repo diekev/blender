@@ -25,6 +25,7 @@ struct ID;
 struct IDRemapper;
 struct LibraryForeachIDData;
 struct ListBase;
+struct Main;
 struct Menu;
 struct Panel;
 struct Scene;
@@ -392,6 +393,7 @@ struct ARegionType *BKE_regiontype_from_id_or_first(const struct SpaceType *st, 
 struct ARegionType *BKE_regiontype_from_id(const struct SpaceType *st, int regionid);
 const struct ListBase *BKE_spacetypes_list(void);
 void BKE_spacetype_register(struct SpaceType *st);
+void BKE_spacetype_unregister(struct Main *bmain, struct SpaceType *st);
 bool BKE_spacetype_exists(int spaceid);
 void BKE_spacetypes_free(void); /* only for quitting blender */
 

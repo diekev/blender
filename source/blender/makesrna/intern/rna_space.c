@@ -3478,7 +3478,7 @@ static void rna_CustomSpaceType_main_region_init(wmWindowManager *wm,
   WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
 }
 
-static void rna_Space_unregister(Main *UNUSED(bmain), StructRNA *type)
+static void rna_Space_unregister(Main *bmain, StructRNA *type)
 {
   SpaceType *st = RNA_struct_blender_type_get(type);
 
@@ -3489,7 +3489,7 @@ static void rna_Space_unregister(Main *UNUSED(bmain), StructRNA *type)
   RNA_struct_free_extension(type, &st->rna_ext);
   RNA_struct_free(&BLENDER_RNA, type);
 
-  // WM_menutype_freelink(mt);
+  BKE_spacetype_unregister(bmain, st);
 
   /* update while blender is running */
   WM_main_add_notifier(NC_WINDOW, NULL);

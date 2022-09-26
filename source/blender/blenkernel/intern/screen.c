@@ -45,6 +45,7 @@
 #include "BKE_idtype.h"
 #include "BKE_lib_id.h"
 #include "BKE_lib_query.h"
+#include "BKE_main.h"
 #include "BKE_node.h"
 #include "BKE_screen.h"
 #include "BKE_workspace.h"
@@ -541,6 +542,22 @@ void BKE_spacetype_register(SpaceType *st)
   // fprintf(stderr, "Register : %s\n", st->idname);
 
   BLI_addtail(&spacetypes, st);
+}
+
+void BKE_spacetype_unregister(struct Main *bmain, struct SpaceType *st)
+{
+  for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
+    LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+      LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+        if (sl->type == st) {
+          sl->type = NULL;
+        }
+      }
+    }
+  }
+
+  BLI_remlink(&spacetypes, st);
+  MEM_freeN(st);
 }
 
 bool BKE_spacetype_exists(int spaceid)
