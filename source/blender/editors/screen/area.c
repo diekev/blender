@@ -3437,6 +3437,7 @@ void ED_region_window_draw(const bContext *C, ARegion *region)
   UI_ThemeClearColor(TH_BACK);
   /* callback */
   ED_region_draw_cb_draw(C, region, REGION_DRAW_PRE_VIEW);
+  ED_region_panels_draw(C, region);
   ED_region_draw_cb_draw(C, region, REGION_DRAW_POST_VIEW);
 }
 

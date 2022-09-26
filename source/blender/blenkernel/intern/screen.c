@@ -451,6 +451,14 @@ bool BKE_spacetype_exists(int spaceid)
   return BKE_spacetype_from_id(spaceid) != NULL;
 }
 
+ARegionType *BKE_spacetype_add_region_type(SpaceType *st, int region_id, const char *name)
+{
+  ARegionType *art = MEM_callocN(sizeof(ARegionType), name);
+  art->regionid = region_id;
+  BLI_addhead(&st->regiontypes, art);
+  return art;
+}
+
 /* ***************** Space handling ********************** */
 
 void BKE_spacedata_freelist(ListBase *lb)
@@ -610,6 +618,14 @@ void BKE_spacedata_id_unref(struct ScrArea *area, struct SpaceLink *sl, struct I
   if (spacedata_id_remap_cb) {
     spacedata_id_remap_cb(area, sl, id, NULL);
   }
+}
+
+ARegion *BKE_spacedata_add_region(struct SpaceLink *space, int region_type, const char *name)
+{
+  ARegion *region = MEM_callocN(sizeof(ARegion), name);
+  region->regiontype = region_type;
+  BLI_addtail(&space->regionbase, region);
+  return region;
 }
 
 /**

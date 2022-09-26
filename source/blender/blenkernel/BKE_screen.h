@@ -117,6 +117,9 @@ typedef struct SpaceType {
   /** Default key-maps to add. */
   int keymapflag;
 
+  /** Registration flags, to select what regions to create. */
+  int flag;
+
   /* RNA integration */
   ExtensionRNA rna_ext;
 } SpaceType;
@@ -398,6 +401,9 @@ void BKE_spacetype_set_idname(struct SpaceType *st, int spaceid, const char *idn
 void BKE_spacetype_foreach_custom_type(void (*callback)(const SpaceType *spacetype, void *data),
                                        void *callback_data);
 
+struct ARegionType *BKE_spacetype_add_region_type(struct SpaceType *st,
+                                                  int region_id,
+                                                  const char *name);
 /* Space-data. */
 
 void BKE_spacedata_freelist(ListBase *lb);
@@ -429,6 +435,10 @@ void BKE_spacedata_callback_id_remap_set(void (*func)(
  * Currently unused!
  */
 void BKE_spacedata_id_unref(struct ScrArea *area, struct SpaceLink *sl, struct ID *id);
+
+struct ARegion *BKE_spacedata_add_region(struct SpaceLink *space,
+                                         int region_type,
+                                         const char *name);
 
 /* Area/regions. */
 
