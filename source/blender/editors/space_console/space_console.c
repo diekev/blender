@@ -21,6 +21,7 @@
 
 #include "RNA_access.h"
 #include "RNA_path.h"
+#include "RNA_prototypes.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -326,5 +327,5 @@ void ED_spacetype_console(void)
 
   BLI_addhead(&st->regiontypes, art);
 
-  BKE_spacetype_register(st);
+  BKE_spacetype_register_builtin(st, &RNA_SpaceConsole);
 }

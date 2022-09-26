@@ -328,5 +328,5 @@ void ED_spacetype_topbar(void)
   recent_files_menu_register();
   undo_history_menu_register();
 
-  BKE_spacetype_register(st);
+  BKE_spacetype_register_builtin(st, NULL);
 }

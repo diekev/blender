@@ -289,5 +289,5 @@ void ED_spacetype_info(void)
 
   BLI_addhead(&st->regiontypes, art);
 
-  BKE_spacetype_register(st);
+  BKE_spacetype_register_builtin(st, &RNA_SpaceInfo);
 }

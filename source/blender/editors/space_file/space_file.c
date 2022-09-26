@@ -1073,7 +1073,7 @@ void ED_spacetype_file(void)
   BLI_addhead(&st->regiontypes, art);
   file_tool_props_region_panels_register(art);
 
-  BKE_spacetype_register(st);
+  BKE_spacetype_register_builtin(st, &RNA_SpaceFileBrowser);
 }
 
 void ED_file_init(void)

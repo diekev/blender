@@ -24,6 +24,7 @@
 #include "DEG_depsgraph_query.h"
 
 #include "RNA_access.h"
+#include "RNA_prototypes.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -697,5 +698,5 @@ void ED_spacetype_spreadsheet()
   blender::ed::spreadsheet::spreadsheet_data_set_region_panels_register(*art);
   BLI_addhead(&st->regiontypes, art);
 
-  BKE_spacetype_register(st);
+  BKE_spacetype_register_builtin(st, &RNA_SpaceSpreadsheet);
 }

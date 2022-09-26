@@ -50,6 +50,7 @@
 #include "UI_view2d.h"
 
 #include "RNA_access.h"
+#include "RNA_prototypes.h"
 
 #include "clip_intern.h" /* own include */
 
@@ -1323,7 +1324,7 @@ void ED_spacetype_clip(void)
 
   BLI_addhead(&st->regiontypes, art);
 
-  BKE_spacetype_register(st);
+  BKE_spacetype_register_builtin(st, &RNA_SpaceClipEditor);
 
   /* channels */
   art = MEM_callocN(sizeof(ARegionType), "spacetype clip channels region");

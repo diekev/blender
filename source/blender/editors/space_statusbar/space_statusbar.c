@@ -160,5 +160,5 @@ void ED_spacetype_statusbar(void)
   art->message_subscribe = statusbar_header_region_message_subscribe;
   BLI_addhead(&st->regiontypes, art);
 
-  BKE_spacetype_register(st);
+  BKE_spacetype_register_builtin(st, NULL);
 }

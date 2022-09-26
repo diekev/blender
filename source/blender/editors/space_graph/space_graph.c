@@ -879,5 +879,5 @@ void ED_spacetype_ipo(void)
   art = ED_area_type_hud(st->idname);
   BLI_addhead(&st->regiontypes, art);
 
-  BKE_spacetype_register(st);
+  BKE_spacetype_register_builtin(st, &RNA_SpaceGraphEditor);
 }

@@ -544,6 +544,12 @@ void BKE_spacetype_register(SpaceType *st)
   BLI_addtail(&spacetypes, st);
 }
 
+void BKE_spacetype_register_builtin(struct SpaceType *st, struct StructRNA *srna)
+{
+  BKE_spacetype_register(st);
+  st->rna_ext.srna = srna;
+}
+
 void BKE_spacetype_unregister(struct Main *bmain, struct SpaceType *st)
 {
   for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
@@ -585,6 +591,17 @@ SpaceLink *BKE_spacetype_area_spacelink_add(const SpaceType *space_type,
   area->regionbase = space_link->regionbase;
   BLI_listbase_clear(&space_link->regionbase);
   return space_link;
+}
+
+SpaceType *BKE_spacetype_from_srna(const StructRNA *srna)
+{
+  LISTBASE_FOREACH (SpaceType *, space_type, &spacetypes) {
+    if (space_type->rna_ext.srna == srna) {
+      return space_type;
+    }
+  }
+
+  return NULL;
 }
 
 /* ***************** Space handling ********************** */

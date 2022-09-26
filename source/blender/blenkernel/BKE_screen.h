@@ -392,7 +392,13 @@ struct SpaceType *BKE_spacetype_from_idname(const char *idname);
 struct ARegionType *BKE_regiontype_from_id_or_first(const struct SpaceType *st, int regionid);
 struct ARegionType *BKE_regiontype_from_id(const struct SpaceType *st, int regionid);
 const struct ListBase *BKE_spacetypes_list(void);
+
+/** Generic register function, used for registering a #SpaceType from the RNA. */
 void BKE_spacetype_register(struct SpaceType *st);
+
+/** Registration function for builtin types. This will set the srna on the SpaceType. */
+void BKE_spacetype_register_builtin(struct SpaceType *st, struct StructRNA *srna);
+
 void BKE_spacetype_unregister(struct Main *bmain, struct SpaceType *st);
 bool BKE_spacetype_exists(int spaceid);
 void BKE_spacetypes_free(void); /* only for quitting blender */
@@ -416,6 +422,13 @@ int BKE_spaceid_from_space_idname(const char *space_idname);
 struct SpaceLink *BKE_spacetype_area_spacelink_add(const struct SpaceType *space_type,
                                                    struct ScrArea *area,
                                                    const struct Scene *scene);
+
+/**
+ * Return the #SpaceType based on its srna. This is mostly used for setting
+ * draw handlers from Python.
+ * This is essentially the reverse of #rna_Space_refine.
+ */
+struct SpaceType *BKE_spacetype_from_srna(const struct StructRNA *srna);
 
 /* Space-data. */
 

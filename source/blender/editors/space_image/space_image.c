@@ -52,6 +52,8 @@
 
 #include "DRW_engine.h"
 
+#include "RNA_prototypes.h"
+
 #include "image_intern.h"
 
 /**************************** common state *****************************/
@@ -1117,5 +1119,5 @@ void ED_spacetype_image(void)
   art = ED_area_type_hud(st->idname);
   BLI_addhead(&st->regiontypes, art);
 
-  BKE_spacetype_register(st);
+  BKE_spacetype_register_builtin(st, &RNA_SpaceImageEditor);
 }

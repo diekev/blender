@@ -31,6 +31,7 @@
 
 #include "RNA_access.h"
 #include "RNA_path.h"
+#include "RNA_prototypes.h"
 
 #include "text_format.h"
 #include "text_intern.h" /* own include */
@@ -457,7 +458,7 @@ void ED_spacetype_text(void)
   art->draw = text_header_region_draw;
   BLI_addhead(&st->regiontypes, art);
 
-  BKE_spacetype_register(st);
+  BKE_spacetype_register_builtin(st, &RNA_SpaceTextEditor);
 
   /* register formatters */
   ED_text_format_register_py();

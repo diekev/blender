@@ -42,6 +42,8 @@
 #include "ED_space_api.h"
 #include "ED_time_scrub_ui.h"
 
+#include "RNA_prototypes.h"
+
 #include "action_intern.h" /* own include */
 
 /* ******************** default callbacks for action space ***************** */
@@ -910,5 +912,5 @@ void ED_spacetype_action(void)
   art = ED_area_type_hud(st->idname);
   BLI_addhead(&st->regiontypes, art);
 
-  BKE_spacetype_register(st);
+  BKE_spacetype_register_builtin(st, &RNA_SpaceDopeSheetEditor);
 }

@@ -2071,5 +2071,5 @@ void ED_spacetype_view3d(void)
   art->regionid = RGN_TYPE_XR;
   BLI_addhead(&st->regiontypes, art);
 
-  BKE_spacetype_register(st);
+  BKE_spacetype_register_builtin(st, &RNA_SpaceView3D);
 }

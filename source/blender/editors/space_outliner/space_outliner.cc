@@ -484,5 +484,5 @@ void ED_spacetype_outliner(void)
   art->listener = outliner_header_region_listener;
   BLI_addhead(&st->regiontypes, art);
 
-  BKE_spacetype_register(st);
+  BKE_spacetype_register_builtin(st, &RNA_SpaceOutliner);
 }
