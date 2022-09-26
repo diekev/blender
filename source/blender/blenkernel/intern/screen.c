@@ -609,7 +609,7 @@ SpaceType *BKE_spacetype_from_srna(const StructRNA *srna)
 void BKE_spacedata_freelist(ListBase *lb)
 {
   LISTBASE_FOREACH (SpaceLink *, sl, lb) {
-    SpaceType *st = BKE_spacetype_from_id(sl->spacetype);
+    SpaceType *st = sl->type;
 
     /* free regions for pushed spaces */
     LISTBASE_FOREACH (ARegion *, region, &sl->regionbase) {
@@ -699,7 +699,7 @@ void BKE_spacedata_copylist(ListBase *lb_dst, ListBase *lb_src)
   BLI_listbase_clear(lb_dst); /* to be sure */
 
   LISTBASE_FOREACH (SpaceLink *, sl, lb_src) {
-    SpaceType *st = BKE_spacetype_from_id(sl->spacetype);
+    SpaceType *st = sl->type;
 
     if (st && st->duplicate) {
       SpaceLink *slnew = st->duplicate(sl);
