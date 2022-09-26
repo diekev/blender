@@ -206,8 +206,6 @@ static void rna_Panel_unregister(Main *bmain, StructRNA *type)
   }
 
   const char *space_type = pt->space_type;
-  BLI_freelistN(&pt->children);
-  BLI_freelinkN(&art->paneltypes, pt);
 
   for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
     LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
@@ -229,6 +227,10 @@ static void rna_Panel_unregister(Main *bmain, StructRNA *type)
       }
     }
   }
+
+  /* As #Panel.space_type is a string, wait until the panel was removed until we free it. */
+  BLI_freelistN(&pt->children);
+  BLI_freelinkN(&art->paneltypes, pt);
 
   /* update while blender is running */
   WM_main_add_notifier(NC_WINDOW, NULL);
