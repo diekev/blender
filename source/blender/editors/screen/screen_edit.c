@@ -547,6 +547,7 @@ void screen_area_spacelink_add(Scene *scene, ScrArea *area, eSpace_Type space_ty
 {
   SpaceType *stype = BKE_spacetype_from_id(space_type);
   SpaceLink *slink = stype->create(area, scene);
+  slink->type = stype;
 
   area->regionbase = slink->regionbase;
 

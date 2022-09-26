@@ -155,6 +155,7 @@ static void do_version_area_change_space_to_space_action(ScrArea *area, const Sc
 {
   SpaceType *stype = BKE_spacetype_from_id(SPACE_ACTION);
   SpaceAction *saction = (SpaceAction *)stype->create(area, scene);
+  saction->type = stype;
   ARegion *region_channels;
 
   /* Properly free current regions */

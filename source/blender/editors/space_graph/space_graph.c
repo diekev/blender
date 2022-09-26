@@ -166,7 +166,7 @@ static SpaceLink *graph_duplicate(SpaceLink *sl)
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void graph_main_region_init(wmWindowManager *wm, ARegion *region)
+static void graph_main_region_init(wmWindowManager *wm, SpaceType *UNUSED(st), ARegion *region)
 {
   wmKeyMap *keymap;
 
@@ -316,7 +316,7 @@ static void graph_main_region_draw_overlay(const bContext *C, ARegion *region)
   }
 }
 
-static void graph_channel_region_init(wmWindowManager *wm, ARegion *region)
+static void graph_channel_region_init(wmWindowManager *wm, SpaceType *UNUSED(st), ARegion *region)
 {
   wmKeyMap *keymap;
 
@@ -364,7 +364,9 @@ static void graph_channel_region_draw(const bContext *C, ARegion *region)
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void graph_header_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
+static void graph_header_region_init(wmWindowManager *UNUSED(wm),
+                                     SpaceType *UNUSED(st),
+                                     ARegion *region)
 {
   ED_region_header_init(region);
 }
@@ -375,11 +377,11 @@ static void graph_header_region_draw(const bContext *C, ARegion *region)
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void graph_buttons_region_init(wmWindowManager *wm, ARegion *region)
+static void graph_buttons_region_init(wmWindowManager *wm, SpaceType *st, ARegion *region)
 {
   wmKeyMap *keymap;
 
-  ED_region_panels_init(wm, region);
+  ED_region_panels_init(wm, st, region);
 
   keymap = WM_keymap_ensure(wm->defaultconf, "Graph Editor Generic", SPACE_GRAPH, 0);
   WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);

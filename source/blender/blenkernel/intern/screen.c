@@ -1944,6 +1944,7 @@ void BKE_screen_area_blend_read_lib(BlendLibReader *reader, ID *parent_id, ScrAr
   memset(&area->runtime, 0x0, sizeof(area->runtime));
 
   LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+    sl->type = BKE_spacetype_from_id(sl->spacetype);
     switch (sl->spacetype) {
       case SPACE_VIEW3D: {
         View3D *v3d = (View3D *)sl;

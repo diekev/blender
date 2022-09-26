@@ -150,7 +150,7 @@ typedef struct ARegionType {
   int regionid; /* unique identifier within this space, defines RGN_TYPE_xxxx */
 
   /* add handlers, stuff you only do once or on area/region type/size changes */
-  void (*init)(struct wmWindowManager *wm, struct ARegion *region);
+  void (*init)(struct wmWindowManager *wm, struct SpaceType *st, struct ARegion *region);
   /* exit is called when the region is hidden or removed */
   void (*exit)(struct wmWindowManager *wm, struct ARegion *region);
   /* draw entirely, view changes should be handled here */

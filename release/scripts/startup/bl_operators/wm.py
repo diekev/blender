@@ -500,6 +500,7 @@ class WM_OT_context_toggle(Operator):
             base = import_module(self.module)
 
         if context_path_validate(base, data_path) is Ellipsis:
+            print("Cannot validate the context path", flush=True)
             return {'PASS_THROUGH'}
 
         exec("base.%s = not (base.%s)" % (data_path, data_path))

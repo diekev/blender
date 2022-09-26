@@ -82,7 +82,7 @@ static SpaceLink *topbar_duplicate(SpaceLink *sl)
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void topbar_main_region_init(wmWindowManager *wm, ARegion *region)
+static void topbar_main_region_init(wmWindowManager *wm, SpaceType *UNUSED(st), ARegion *region)
 {
   wmKeyMap *keymap;
 
@@ -105,7 +105,9 @@ static void topbar_keymap(struct wmKeyConfig *UNUSED(keyconf))
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void topbar_header_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
+static void topbar_header_region_init(wmWindowManager *UNUSED(wm),
+                                      SpaceType *UNUSED(st),
+                                      ARegion *region)
 {
   if (RGN_ALIGN_ENUM_FROM_MASK(region->alignment) == RGN_ALIGN_RIGHT) {
     region->flag |= RGN_FLAG_DYNAMIC_SIZE;

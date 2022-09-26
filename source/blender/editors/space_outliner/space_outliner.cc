@@ -44,7 +44,7 @@ SpaceOutliner_Runtime::SpaceOutliner_Runtime(const SpaceOutliner_Runtime & /*oth
 {
 }
 
-static void outliner_main_region_init(wmWindowManager *wm, ARegion *region)
+static void outliner_main_region_init(wmWindowManager *wm, SpaceType *UNUSED(st), ARegion *region)
 {
   ListBase *lb;
   wmKeyMap *keymap;
@@ -274,7 +274,9 @@ static void outliner_main_region_message_subscribe(const wmRegionMessageSubscrib
 /* ************************ header outliner area region *********************** */
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void outliner_header_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
+static void outliner_header_region_init(wmWindowManager *UNUSED(wm),
+                                        SpaceType *UNUSED(st),
+                                        ARegion *region)
 {
   ED_region_header_init(region);
 }

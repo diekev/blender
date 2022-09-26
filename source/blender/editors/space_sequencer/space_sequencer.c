@@ -502,7 +502,7 @@ static void sequencer_gizmos(void)
 
 /* *********************** sequencer (main) region ************************ */
 /* Add handlers, stuff you only do once or on area/region changes. */
-static void sequencer_main_region_init(wmWindowManager *wm, ARegion *region)
+static void sequencer_main_region_init(wmWindowManager *wm, SpaceType *UNUSED(st), ARegion *region)
 {
   wmKeyMap *keymap;
   ListBase *lb;
@@ -723,7 +723,9 @@ static void sequencer_main_region_message_subscribe(const wmRegionMessageSubscri
 
 /* *********************** header region ************************ */
 /* Add handlers, stuff you only do once or on area/region changes. */
-static void sequencer_header_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
+static void sequencer_header_region_init(wmWindowManager *UNUSED(wm),
+                                         SpaceType *UNUSED(st),
+                                         ARegion *region)
 {
   ED_region_header_init(region);
 }
@@ -735,12 +737,12 @@ static void sequencer_header_region_draw(const bContext *C, ARegion *region)
 
 /* *********************** toolbar region ************************ */
 /* Add handlers, stuff you only do once or on area/region changes. */
-static void sequencer_tools_region_init(wmWindowManager *wm, ARegion *region)
+static void sequencer_tools_region_init(wmWindowManager *wm, SpaceType *st, ARegion *region)
 {
   wmKeyMap *keymap;
 
   region->v2d.scroll = V2D_SCROLL_RIGHT | V2D_SCROLL_VERTICAL_HIDE;
-  ED_region_panels_init(wm, region);
+  ED_region_panels_init(wm, st, region);
 
   keymap = WM_keymap_ensure(wm->defaultconf, "SequencerCommon", SPACE_SEQ, 0);
   WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
@@ -751,7 +753,9 @@ static void sequencer_tools_region_draw(const bContext *C, ARegion *region)
   ED_region_panels(C, region);
 }
 /* *********************** preview region ************************ */
-static void sequencer_preview_region_init(wmWindowManager *wm, ARegion *region)
+static void sequencer_preview_region_init(wmWindowManager *wm,
+                                          SpaceType *UNUSED(st),
+                                          ARegion *region)
 {
   wmKeyMap *keymap;
 
@@ -914,7 +918,7 @@ static void sequencer_preview_region_listener(const wmRegionListenerParams *para
 /* *********************** buttons region ************************ */
 
 /* Add handlers, stuff you only do once or on area/region changes. */
-static void sequencer_buttons_region_init(wmWindowManager *wm, ARegion *region)
+static void sequencer_buttons_region_init(wmWindowManager *wm, SpaceType *st, ARegion *region)
 {
   wmKeyMap *keymap;
 
@@ -922,7 +926,7 @@ static void sequencer_buttons_region_init(wmWindowManager *wm, ARegion *region)
   WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
 
   UI_panel_category_active_set_default(region, "Strip");
-  ED_region_panels_init(wm, region);
+  ED_region_panels_init(wm, st, region);
 }
 
 static void sequencer_buttons_region_draw(const bContext *C, ARegion *region)
@@ -974,7 +978,9 @@ static void sequencer_id_remap(ScrArea *UNUSED(area),
 /* ************************************* */
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void sequencer_channel_region_init(wmWindowManager *wm, ARegion *region)
+static void sequencer_channel_region_init(wmWindowManager *wm,
+                                          SpaceType *UNUSED(st),
+                                          ARegion *region)
 {
   wmKeyMap *keymap;
 

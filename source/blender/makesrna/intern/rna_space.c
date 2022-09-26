@@ -3444,19 +3444,22 @@ static void rna_CustomSpaceType_keymap(struct wmKeyConfig *keyconf)
   //  keymap->poll = ED_space_clip_tracking_poll;
 }
 
-static void rna_CustomSpaceType_header_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
+static void rna_CustomSpaceType_header_region_init(wmWindowManager *UNUSED(wm),
+                                                   SpaceType *UNUSED(st),
+                                                   ARegion *region)
 {
   ED_region_header_init(region);
 }
 
-static void rna_CustomSpaceType_properties_region_init(wmWindowManager *wm, ARegion *region)
+static void rna_CustomSpaceType_properties_region_init(wmWindowManager *wm,
+                                                       SpaceType *st,
+                                                       ARegion *region)
 {
-  wmKeyMap *keymap;
+  ED_region_panels_init(wm, st, region);
 
-  ED_region_panels_init(wm, region);
-
-  //  keymap = WM_keymap_ensure(wm->defaultconf, "Custom", SPACE_CUSTOM, 0);
-  //  WM_event_add_keymap_handler(&region->handlers, keymap);
+  /* own keymap */
+  wmKeyMap *keymap = WM_keymap_ensure_idname(wm->defaultconf, st->name, st->idname, 0);
+  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
 }
 
 static void rna_CustomSpaceType_properties_region_draw(const bContext *C, ARegion *region)
@@ -3464,25 +3467,15 @@ static void rna_CustomSpaceType_properties_region_draw(const bContext *C, ARegio
   ED_region_panels_ex(C, region, (const char *[]){CTX_data_mode_string(C), NULL});
 }
 
-/* add handlers, stuff you only do once or on area/region changes */
-static void rna_CustomSpaceType_main_region_init(wmWindowManager *wm, ARegion *region)
+static void rna_CustomSpaceType_main_region_init(wmWindowManager *wm,
+                                                 SpaceType *st,
+                                                 ARegion *region)
 {
-  ED_region_panels_init(wm, region);
-  wmKeyMap *keymap;
-
-  /* NOTE: don't use `UI_view2d_region_reinit(&region->v2d, ...)`
-   * since the space clip manages own v2d in #movieclip_main_area_set_view2d */
-
-  /* mask polls mode */
-  //  keymap = WM_keymap_ensure(wm->defaultconf, "Mask Editing", 0, 0);
-  //  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
+  ED_region_panels_init(wm, st, region);
 
   /* own keymap */
-  //  keymap = WM_keymap_ensure(wm->defaultconf, "Custom", SPACE_CUSTOM, 0);
-  //  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
-
-  //  keymap = WM_keymap_ensure(wm->defaultconf, "Custom Editor", SPACE_CUSTOM, 0);
-  //  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
+  wmKeyMap *keymap = WM_keymap_ensure_idname(wm->defaultconf, st->name, st->idname, 0);
+  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
 }
 
 static void rna_Space_unregister(Main *UNUSED(bmain), StructRNA *type)

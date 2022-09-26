@@ -176,7 +176,9 @@ static void spreadsheet_id_remap(ScrArea *UNUSED(area),
   }
 }
 
-static void spreadsheet_main_region_init(wmWindowManager *wm, ARegion *region)
+static void spreadsheet_main_region_init(wmWindowManager *wm,
+                                         SpaceType *UNUSED(st),
+                                         ARegion *region)
 {
   region->v2d.scroll = V2D_SCROLL_RIGHT | V2D_SCROLL_BOTTOM;
   region->v2d.align = V2D_ALIGN_NO_NEG_X | V2D_ALIGN_NO_POS_Y;
@@ -468,7 +470,9 @@ static void spreadsheet_main_region_listener(const wmRegionListenerParams *param
   }
 }
 
-static void spreadsheet_header_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
+static void spreadsheet_header_region_init(wmWindowManager *UNUSED(wm),
+                                           SpaceType *UNUSED(st),
+                                           ARegion *region)
 {
   ED_region_header_init(region);
 }
@@ -516,7 +520,9 @@ static void spreadsheet_header_region_listener(const wmRegionListenerParams *par
   }
 }
 
-static void spreadsheet_footer_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
+static void spreadsheet_footer_region_init(wmWindowManager *UNUSED(wm),
+                                           SpaceType *UNUSED(st),
+                                           ARegion *region)
 {
   ED_region_header_init(region);
 }
@@ -595,10 +601,10 @@ static void spreadsheet_dataset_region_draw(const bContext *C, ARegion *region)
   ED_region_panels(C, region);
 }
 
-static void spreadsheet_sidebar_init(wmWindowManager *wm, ARegion *region)
+static void spreadsheet_sidebar_init(wmWindowManager *wm, SpaceType *st, ARegion *region)
 {
   UI_panel_category_active_set_default(region, "Filters");
-  ED_region_panels_init(wm, region);
+  ED_region_panels_init(wm, st, region);
 
   wmKeyMap *keymap = WM_keymap_ensure(
       wm->defaultconf, "Spreadsheet Generic", SPACE_SPREADSHEET, 0);

@@ -585,7 +585,7 @@ static void image_main_region_set_view2d(SpaceImage *sima, ARegion *region)
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void image_main_region_init(wmWindowManager *wm, ARegion *region)
+static void image_main_region_init(wmWindowManager *wm, SpaceType *UNUSED(st), ARegion *region)
 {
   wmKeyMap *keymap;
 
@@ -762,12 +762,12 @@ static void image_main_region_listener(const wmRegionListenerParams *params)
 /* *********************** buttons region ************************ */
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void image_buttons_region_init(wmWindowManager *wm, ARegion *region)
+static void image_buttons_region_init(wmWindowManager *wm, SpaceType *st, ARegion *region)
 {
   wmKeyMap *keymap;
 
   region->v2d.scroll = V2D_SCROLL_RIGHT | V2D_SCROLL_VERTICAL_HIDE;
-  ED_region_panels_init(wm, region);
+  ED_region_panels_init(wm, st, region);
 
   keymap = WM_keymap_ensure(wm->defaultconf, "Image Generic", SPACE_IMAGE, 0);
   WM_event_add_keymap_handler(&region->handlers, keymap);
@@ -876,12 +876,12 @@ static void image_buttons_region_listener(const wmRegionListenerParams *params)
 /* *********************** scopes region ************************ */
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void image_tools_region_init(wmWindowManager *wm, ARegion *region)
+static void image_tools_region_init(wmWindowManager *wm, SpaceType *st, ARegion *region)
 {
   wmKeyMap *keymap;
 
   region->v2d.scroll = V2D_SCROLL_RIGHT | V2D_SCROLL_VERTICAL_HIDE;
-  ED_region_panels_init(wm, region);
+  ED_region_panels_init(wm, st, region);
 
   keymap = WM_keymap_ensure(wm->defaultconf, "Image Generic", SPACE_IMAGE, 0);
   WM_event_add_keymap_handler(&region->handlers, keymap);
@@ -933,7 +933,9 @@ static void image_tools_region_listener(const wmRegionListenerParams *params)
 /************************* header region **************************/
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void image_header_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
+static void image_header_region_init(wmWindowManager *UNUSED(wm),
+                                     SpaceType *UNUSED(st),
+                                     ARegion *region)
 {
   ED_region_header_init(region);
 }
