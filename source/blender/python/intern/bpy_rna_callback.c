@@ -194,60 +194,6 @@ PyObject *pyrna_callback_remove(BPy_StructRNA *self, PyObject *args)
 }
 #endif
 
-/* reverse of rna_Space_refine() */
-static eSpace_Type rna_Space_refine_reverse(StructRNA *srna)
-{
-  if (srna == &RNA_SpaceView3D) {
-    return SPACE_VIEW3D;
-  }
-  if (srna == &RNA_SpaceGraphEditor) {
-    return SPACE_GRAPH;
-  }
-  if (srna == &RNA_SpaceOutliner) {
-    return SPACE_OUTLINER;
-  }
-  if (srna == &RNA_SpaceProperties) {
-    return SPACE_PROPERTIES;
-  }
-  if (srna == &RNA_SpaceFileBrowser) {
-    return SPACE_FILE;
-  }
-  if (srna == &RNA_SpaceImageEditor) {
-    return SPACE_IMAGE;
-  }
-  if (srna == &RNA_SpaceInfo) {
-    return SPACE_INFO;
-  }
-  if (srna == &RNA_SpaceSequenceEditor) {
-    return SPACE_SEQ;
-  }
-  if (srna == &RNA_SpaceTextEditor) {
-    return SPACE_TEXT;
-  }
-  if (srna == &RNA_SpaceDopeSheetEditor) {
-    return SPACE_ACTION;
-  }
-  if (srna == &RNA_SpaceNLA) {
-    return SPACE_NLA;
-  }
-  if (srna == &RNA_SpaceNodeEditor) {
-    return SPACE_NODE;
-  }
-  if (srna == &RNA_SpaceConsole) {
-    return SPACE_CONSOLE;
-  }
-  if (srna == &RNA_SpacePreferences) {
-    return SPACE_USERPREF;
-  }
-  if (srna == &RNA_SpaceClipEditor) {
-    return SPACE_CLIP;
-  }
-  if (srna == &RNA_SpaceSpreadsheet) {
-    return SPACE_SPREADSHEET;
-  }
-  return SPACE_EMPTY;
-}
-
 static void cb_rna_capsule_destructor(PyObject *capsule)
 {
   PyObject *args = PyCapsule_GetContext(capsule);
@@ -328,13 +274,11 @@ PyObject *pyrna_callback_classmethod_add(PyObject *UNUSED(self), PyObject *args)
       return NULL;
     }
 
-    const eSpace_Type spaceid = rna_Space_refine_reverse(srna);
-    if (spaceid == SPACE_EMPTY) {
+    SpaceType *st = BKE_spacetype_from_srna(srna);
+    if (st == NULL) {
       PyErr_Format(PyExc_TypeError, "unknown space type '%.200s'", RNA_struct_identifier(srna));
       return NULL;
     }
-
-    SpaceType *st = BKE_spacetype_from_id(spaceid);
     ARegionType *art = BKE_regiontype_from_id(st, params.region_type_enum.value);
     if (art == NULL) {
       PyErr_Format(
@@ -415,8 +359,8 @@ PyObject *pyrna_callback_classmethod_remove(PyObject *UNUSED(self), PyObject *ar
       return NULL;
     }
 
-    const eSpace_Type spaceid = rna_Space_refine_reverse(srna);
-    if (spaceid == SPACE_EMPTY) {
+    SpaceType *st = BKE_spacetype_from_srna(srna);
+    if (st == NULL) {
       PyErr_Format(PyExc_TypeError,
                    "%s: unknown space type '%.200s'",
                    error_prefix,
@@ -424,7 +368,6 @@ PyObject *pyrna_callback_classmethod_remove(PyObject *UNUSED(self), PyObject *ar
       return NULL;
     }
 
-    SpaceType *st = BKE_spacetype_from_id(spaceid);
     ARegionType *art = BKE_regiontype_from_id(st, params.region_type_enum.value);
     if (art == NULL) {
       PyErr_Format(PyExc_TypeError,
