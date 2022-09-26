@@ -2508,18 +2508,15 @@ void ED_area_newspace(bContext *C, ScrArea *area, int type, const bool skip_regi
     else {
       /* new space */
       if (st) {
-        /* Don't get scene from context here which may depend on space-data. */
-        Scene *scene = WM_window_get_active_scene(win);
-        sl = st->create(area, scene);
-        sl->type = st;
-        BLI_addhead(&area->spacedata, sl);
-
-        /* swap regions */
+        /* Swap regions. Do it now as #BKE_spacetype_area_spacelink_add will modify
+         * `area.regionbase`. */
         if (slold) {
           slold->regionbase = area->regionbase;
         }
-        area->regionbase = sl->regionbase;
-        BLI_listbase_clear(&sl->regionbase);
+
+        /* Don't get scene from context here which may depend on space-data. */
+        Scene *scene = WM_window_get_active_scene(win);
+        sl = BKE_spacetype_area_spacelink_add(st, area, scene);
       }
     }
 

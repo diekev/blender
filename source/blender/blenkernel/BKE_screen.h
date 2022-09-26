@@ -410,6 +410,13 @@ struct ARegionType *BKE_spacetype_add_region_type(struct SpaceType *st,
 const char *BKE_spacetype_idname_from_spaceid(int spaceid);
 int BKE_spaceid_from_space_idname(const char *space_idname);
 
+/** Encapsulation for #SpaceType.create. This will add the newly created #SpaceLink to the #ScrArea
+ * spacedata list, and set the #ScrArea region base to be that of the newly created #SpaceLink.
+ */
+struct SpaceLink *BKE_spacetype_area_spacelink_add(const struct SpaceType *space_type,
+                                                   struct ScrArea *area,
+                                                   const struct Scene *scene);
+
 /* Space-data. */
 
 void BKE_spacedata_freelist(ListBase *lb);

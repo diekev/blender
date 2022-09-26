@@ -573,6 +573,20 @@ ARegionType *BKE_spacetype_add_region_type(SpaceType *st, int region_id, const c
   return art;
 }
 
+SpaceLink *BKE_spacetype_area_spacelink_add(const SpaceType *space_type,
+                                            ScrArea *area,
+                                            const Scene *scene)
+{
+  SpaceLink *space_link = space_type->create(area, scene);
+  /* #SpaceLink.type cannot be const as the RNA generation for members used for registration will
+   * fail. */
+  space_link->type = (SpaceType *)space_type;
+  BLI_addhead(&area->spacedata, space_link);
+  area->regionbase = space_link->regionbase;
+  BLI_listbase_clear(&space_link->regionbase);
+  return space_link;
+}
+
 /* ***************** Space handling ********************** */
 
 void BKE_spacedata_freelist(ListBase *lb)

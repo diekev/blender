@@ -546,13 +546,7 @@ bool screen_area_close(struct bContext *C, bScreen *screen, ScrArea *area)
 void screen_area_spacelink_add(Scene *scene, ScrArea *area, eSpace_Type space_type)
 {
   SpaceType *stype = BKE_spacetype_from_id(space_type);
-  SpaceLink *slink = stype->create(area, scene);
-  slink->type = stype;
-
-  area->regionbase = slink->regionbase;
-
-  BLI_addhead(&area->spacedata, slink);
-  BLI_listbase_clear(&slink->regionbase);
+  BKE_spacetype_area_spacelink_add(stype, area, scene);
 }
 
 /* ****************** EXPORTED API TO OTHER MODULES *************************** */
