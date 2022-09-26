@@ -471,6 +471,7 @@ typedef struct wmKeyMap {
   /** Global editor keymaps, or for more per space/region. */
   char idname[64];
   /** Same IDs as in DNA_space_types.h. */
+  char space_idname[64];
   short spaceid;
   /** See above. */
   short regionid;

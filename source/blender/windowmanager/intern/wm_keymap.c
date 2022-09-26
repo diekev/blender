@@ -362,11 +362,15 @@ void WM_keyconfig_set_active(wmWindowManager *wm, const char *idname)
  * List of keymap items for one editor, mode, modal operator.
  * \{ */
 
-static wmKeyMap *wm_keymap_new(const char *idname, int spaceid, int regionid)
+static wmKeyMap *wm_keymap_new_idname(const char *idname,
+                                      const char *space_idname,
+                                      int spaceid,
+                                      int regionid)
 {
   wmKeyMap *km = MEM_callocN(sizeof(struct wmKeyMap), "keymap list");
 
   BLI_strncpy(km->idname, idname, KMAP_MAX_NAME);
+  BLI_strncpy(km->space_idname, space_idname, KMAP_MAX_NAME);
   km->spaceid = spaceid;
   km->regionid = regionid;
 
@@ -377,6 +381,12 @@ static wmKeyMap *wm_keymap_new(const char *idname, int spaceid, int regionid)
     }
   }
   return km;
+}
+
+static wmKeyMap *wm_keymap_new(const char *idname, int spaceid, int regionid)
+{
+  const char *space_idname = BKE_spacetype_idname_from_spaceid(spaceid);
+  return wm_keymap_new_idname(idname, space_idname, spaceid, regionid);
 }
 
 static wmKeyMap *wm_keymap_copy(wmKeyMap *keymap)
@@ -820,7 +830,26 @@ static void wm_keymap_diff_update(ListBase *lb,
  * - Gets freed in wm.c
  * \{ */
 
-wmKeyMap *WM_keymap_list_find(ListBase *lb, const char *idname, int spaceid, int regionid)
+wmKeyMap *WM_keymap_list_find_idname(ListBase *lb,
+                                     const char *idname,
+                                     const char *space_idname,
+                                     int regionid)
+{
+  LISTBASE_FOREACH (wmKeyMap *, km, lb) {
+    if (STREQLEN(km->space_idname, space_idname, 64) && km->regionid == regionid) {
+      if (STREQLEN(idname, km->idname, KMAP_MAX_NAME)) {
+        return km;
+      }
+    }
+  }
+
+  return NULL;
+}
+
+static wmKeyMap *WM_keymap_list_find_spaceid(ListBase *lb,
+                                             const char *idname,
+                                             int spaceid,
+                                             int regionid)
 {
   LISTBASE_FOREACH (wmKeyMap *, km, lb) {
     if (km->spaceid == spaceid && km->regionid == regionid) {
@@ -831,6 +860,18 @@ wmKeyMap *WM_keymap_list_find(ListBase *lb, const char *idname, int spaceid, int
   }
 
   return NULL;
+}
+
+wmKeyMap *WM_keymap_list_find(ListBase *lb, const char *idname, int spaceid, int regionid)
+{
+  const char *space_idname = BKE_spacetype_idname_from_spaceid(spaceid);
+  wmKeyMap *km = WM_keymap_list_find_spaceid(lb, idname, spaceid, regionid);
+
+  if (km) {
+    return km;
+  }
+
+  return WM_keymap_list_find_idname(lb, idname, space_idname, regionid);
 }
 
 wmKeyMap *WM_keymap_list_find_spaceid_or_empty(ListBase *lb,
@@ -849,18 +890,28 @@ wmKeyMap *WM_keymap_list_find_spaceid_or_empty(ListBase *lb,
   return NULL;
 }
 
-wmKeyMap *WM_keymap_ensure(wmKeyConfig *keyconf, const char *idname, int spaceid, int regionid)
+wmKeyMap *WM_keymap_ensure_idname(wmKeyConfig *keyconf,
+                                  const char *idname,
+                                  const char *space_idname,
+                                  int regionid)
 {
-  wmKeyMap *km = WM_keymap_list_find(&keyconf->keymaps, idname, spaceid, regionid);
+  wmKeyMap *km = WM_keymap_list_find_idname(&keyconf->keymaps, idname, space_idname, regionid);
 
   if (km == NULL) {
-    km = wm_keymap_new(idname, spaceid, regionid);
+    const int spaceid = BKE_spaceid_from_space_idname(space_idname);
+    km = wm_keymap_new_idname(idname, space_idname, spaceid, regionid);
     BLI_addtail(&keyconf->keymaps, km);
 
     WM_keyconfig_update_tag(km, NULL);
   }
 
   return km;
+}
+
+wmKeyMap *WM_keymap_ensure(wmKeyConfig *keyconf, const char *idname, int spaceid, int regionid)
+{
+  const char *space_idname = BKE_spacetype_idname_from_spaceid(spaceid);
+  return WM_keymap_ensure_idname(keyconf, idname, space_idname, regionid);
 }
 
 wmKeyMap *WM_keymap_find_all(wmWindowManager *wm, const char *idname, int spaceid, int regionid)

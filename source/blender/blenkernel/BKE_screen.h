@@ -404,6 +404,10 @@ void BKE_spacetype_foreach_custom_type(void (*callback)(const SpaceType *spacety
 struct ARegionType *BKE_spacetype_add_region_type(struct SpaceType *st,
                                                   int region_id,
                                                   const char *name);
+
+const char *BKE_spacetype_idname_from_spaceid(int spaceid);
+int BKE_spaceid_from_space_idname(const char *space_idname);
+
 /* Space-data. */
 
 void BKE_spacedata_freelist(ListBase *lb);
