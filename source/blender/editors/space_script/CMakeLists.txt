@@ -4,11 +4,15 @@ set(INC
   ../include
   ../../blenkernel
   ../../blenlib
+  ../../blenloader
   ../../gpu
   ../../makesdna
   ../../makesrna
   ../../windowmanager
   ../../../../intern/guardedalloc
+
+  # dna_type_offsets.h
+  ${CMAKE_CURRENT_BINARY_DIR}/../../makesdna/intern
 )
 
 
