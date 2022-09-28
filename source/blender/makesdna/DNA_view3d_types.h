@@ -263,6 +263,7 @@ typedef struct View3D {
   struct SpaceType *type;
   /** Equivalent to datablocks ID properties. */
   struct IDProperty *id_properties;
+  char space_idname[64];
   /* End 'SpaceLink' header. */
 
   float viewquat[4] DNA_DEPRECATED;

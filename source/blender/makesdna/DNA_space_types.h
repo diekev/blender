@@ -91,6 +91,7 @@ typedef struct SpaceLink {
   struct SpaceType *type;
   /** Equivalent to datablocks ID properties. */
   struct IDProperty *id_properties;
+  char space_idname[64];
 } SpaceLink;
 
 /** #SpaceLink.link_flag */
@@ -126,6 +127,7 @@ typedef struct SpaceInfo {
   struct SpaceType *type;
   /** Equivalent to datablocks ID properties. */
   struct IDProperty *id_properties;
+  char space_idname[64];
   /* End 'SpaceLink' header. */
 
   char rpt_mask;
@@ -158,6 +160,7 @@ typedef struct SpaceProperties {
   struct SpaceType *type;
   /** Equivalent to datablocks ID properties. */
   struct IDProperty *id_properties;
+  char space_idname[64];
   /* End 'SpaceLink' header. */
 
   /** Deprecated, copied to region. */
@@ -278,6 +281,7 @@ typedef struct SpaceOutliner {
   struct SpaceType *type;
   /** Equivalent to datablocks ID properties. */
   struct IDProperty *id_properties;
+  char space_idname[64];
   /* End 'SpaceLink' header. */
 
   /** Deprecated, copied to region. */
@@ -457,6 +461,7 @@ typedef struct SpaceGraph {
   struct SpaceType *type;
   /** Equivalent to datablocks ID properties. */
   struct IDProperty *id_properties;
+  char space_idname[64];
   /* End 'SpaceLink' header. */
 
   /** Deprecated, copied to region. */
@@ -563,6 +568,7 @@ typedef struct SpaceNla {
   struct SpaceType *type;
   /** Equivalent to datablocks ID properties. */
   struct IDProperty *id_properties;
+  char space_idname[64];
   /* End 'SpaceLink' header. */
 
   /** This uses the same settings as autosnap for Action Editor. */
@@ -652,6 +658,7 @@ typedef struct SpaceSeq {
   char _pad0[6];
   struct SpaceType *type;
   struct IDProperty *id_properties;
+  char space_idname[64];
   /* End 'SpaceLink' header. */
 
   /** Deprecated, copied to region. */
@@ -895,6 +902,7 @@ typedef struct SpaceFile {
   char _pad0[6];
   struct SpaceType *type;
   struct IDProperty *id_properties;
+  char space_idname[64];
   /* End 'SpaceLink' header. */
 
   /** Is this a File Browser or an Asset Browser? */
@@ -1215,6 +1223,7 @@ typedef struct SpaceImage {
   char _pad0[6];
   struct SpaceType *type;
   struct IDProperty *id_properties;
+  char space_idname[64];
   /* End 'SpaceLink' header. */
 
   struct Image *image;
@@ -1414,6 +1423,7 @@ typedef struct SpaceText {
   char _pad0[6];
   struct SpaceType *type;
   struct IDProperty *id_properties;
+  char space_idname[64];
   /* End 'SpaceLink' header. */
 
   struct Text *text;
@@ -1515,6 +1525,7 @@ typedef struct SpaceScript {
   char _pad0[6];
   struct SpaceType *type;
   struct IDProperty *id_properties;
+  char space_idname[64];
   /* End 'SpaceLink' header. */
 
   struct Script *script;
@@ -1568,6 +1579,7 @@ typedef struct SpaceNode {
   char _pad0[6];
   struct SpaceType *type;
   struct IDProperty *id_properties;
+  char space_idname[64];
   /* End 'SpaceLink' header. */
 
   /** Deprecated, copied to region. */
@@ -1699,6 +1711,7 @@ typedef struct SpaceConsole {
   char _pad0[6];
   struct SpaceType *type;
   struct IDProperty *id_properties;
+  char space_idname[64];
   /* End 'SpaceLink' header. */
 
   /* space vars */
@@ -1733,6 +1746,7 @@ typedef struct SpaceUserPref {
   char _pad0[6];
   struct SpaceType *type;
   struct IDProperty *id_properties;
+  char space_idname[64];
   /* End 'SpaceLink' header. */
 
   char _pad1[7];
@@ -1757,6 +1771,7 @@ typedef struct SpaceClip {
   char _pad0[6];
   struct SpaceType *type;
   struct IDProperty *id_properties;
+  char space_idname[64];
   /* End 'SpaceLink' header. */
 
   char _pad1[4];
@@ -1875,6 +1890,7 @@ typedef struct SpaceTopBar {
   char _pad0[6];
   struct SpaceType *type;
   struct IDProperty *id_properties;
+  char space_idname[64];
   /* End 'SpaceLink' header. */
 } SpaceTopBar;
 
@@ -1893,6 +1909,7 @@ typedef struct SpaceStatusBar {
   char _pad0[6];
   struct SpaceType *type;
   struct IDProperty *id_properties;
+  char space_idname[64];
   /* End 'SpaceLink' header. */
 } SpaceStatusBar;
 
@@ -1964,6 +1981,7 @@ typedef struct SpaceSpreadsheet {
   char _pad0[6];
   struct SpaceType *type;
   struct IDProperty *id_properties;
+  char space_idname[64];
   /* End 'SpaceLink' header. */
 
   /* List of #SpreadsheetColumn. */

@@ -826,6 +826,7 @@ typedef struct SpaceAction {
   struct SpaceType *type;
   /** Equivalent to datablocks ID properties. */
   struct IDProperty *id_properties;
+  char space_idname[64];
   /* End 'SpaceLink' header. */
 
   /** Copied to region. */

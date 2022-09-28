@@ -395,10 +395,9 @@ SpaceType *BKE_spacetype_from_idname(const char *idname)
   return NULL;
 }
 
-#if 0
 static SpaceType undefined_space_type = {};
 
-static SpaceType *space_type_ensure(SpaceLink *space)
+static SpaceType *spacetype_fome_space(SpaceLink *space)
 {
   if (space->type && space->type != &undefined_space_type) {
     return space->type;
@@ -420,7 +419,29 @@ static SpaceType *space_type_ensure(SpaceLink *space)
 
   return &undefined_space_type;
 }
-#endif
+
+static void spacelink_set_spacetype(SpaceLink *space_link, SpaceType *space_type)
+{
+  if (space_type == NULL || space_type == &undefined_space_type) {
+    space_link->type = &undefined_space_type;
+    if (space_link->spacetype != SPACE_CUSTOM) {
+      space_link->spacetype = SPACE_EMPTY;
+      space_link->space_idname[0] = '\0';
+    }
+    return;
+  }
+
+  space_link->type = space_type;
+  space_link->spacetype = space_type->spaceid;
+  STRNCPY(space_link->space_idname, space_type->idname);
+}
+
+static SpaceType *spacetype_ensure(SpaceLink *space)
+{
+  SpaceType *space_type = spacetype_fome_space(space);
+  spacelink_set_spacetype(space, space_type);
+  return space_type;
+}
 
 void BKE_spacetype_foreach_custom_type(void (*callback)(const SpaceType *spacetype, void *data),
                                        void *callback_data)
@@ -621,7 +642,7 @@ SpaceLink *BKE_spacetype_area_spacelink_add(const SpaceType *space_type,
   SpaceLink *space_link = space_type->create(area, scene);
   /* #SpaceLink.type cannot be const as the RNA generation for members used for registration will
    * fail. */
-  space_link->type = (SpaceType *)space_type;
+  spacelink_set_spacetype(space_link, (SpaceType *)space_type);
   BLI_addhead(&area->spacedata, space_link);
   area->regionbase = space_link->regionbase;
   BLI_listbase_clear(&space_link->regionbase);
@@ -1401,8 +1422,8 @@ static void write_area(BlendWriter *writer, ScrArea *area)
       IDP_BlendWrite(writer, sl->id_properties);
     }
 
-    SpaceType *space_type = BKE_spacetype_from_id(sl->spacetype);
-    if (space_type && space_type->blend_write) {
+    SpaceType *space_type = sl->type;
+    if (space_type->blend_write) {
       space_type->blend_write(writer, sl);
     }
   }
@@ -1582,8 +1603,8 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
     BLO_read_data_address(reader, &sl->id_properties);
     IDP_BlendDataRead(reader, &sl->id_properties);
 
-    SpaceType *space_type = BKE_spacetype_from_id(sl->spacetype);
-    if (space_type && space_type->blend_read_data) {
+    SpaceType *space_type = spacetype_ensure(sl);
+    if (space_type->blend_read_data) {
       space_type->blend_read_data(reader, sl);
     }
   }
@@ -1628,9 +1649,9 @@ void BKE_screen_area_blend_read_lib(BlendLibReader *reader, ID *parent_id, ScrAr
   memset(&area->runtime, 0x0, sizeof(area->runtime));
 
   LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
-    SpaceType *space_type = BKE_spacetype_from_id(sl->spacetype);
+    SpaceType *space_type = spacetype_ensure(sl);
 
-    if (space_type && space_type->blend_read_lib) {
+    if (space_type->blend_read_lib) {
       space_type->blend_read_lib(reader, parent_id, sl);
     }
 
