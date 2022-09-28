@@ -3436,16 +3436,6 @@ static SpaceLink *rna_CustomSpaceType_create(const ScrArea *area, const Scene *U
   return space;
 }
 
-static void rna_CustomSpaceType_keymap(struct wmKeyConfig *keyconf)
-{
-  /* ******** Global hotkeys available for all regions ******** */
-  WM_keymap_ensure(keyconf, "Custom", SPACE_CUSTOM, 0);
-
-  /* ******** Hotkeys available for main region only ******** */
-  WM_keymap_ensure(keyconf, "Custom Editor", SPACE_CLIP, 0);
-  //  keymap->poll = ED_space_clip_tracking_poll;
-}
-
 static void rna_CustomSpaceType_header_region_init(wmWindowManager *UNUSED(wm),
                                                    SpaceType *UNUSED(st),
                                                    ARegion *region)
@@ -3596,7 +3586,6 @@ static StructRNA *rna_Space_register(Main *bmain,
   /* Default properties and callbacks. */
   st->spaceid = SPACE_CUSTOM;
   st->create = rna_CustomSpaceType_create;
-  // st->keymap = rna_CustomSpaceType_keymap;
 
   BKE_spacetype_register(st);
 
