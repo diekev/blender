@@ -666,6 +666,11 @@ void BKE_spacedata_freelist(ListBase *lb)
 
     BLI_freelistN(&sl->regionbase);
 
+    if (sl->id_properties) {
+      IDP_FreeProperty(sl->id_properties);
+      sl->id_properties = NULL;
+    }
+
     if (st && st->free) {
       st->free(sl);
     }
