@@ -438,17 +438,7 @@ static void rna_Region_unregister(Main *bmain, StructRNA *type)
   RNA_struct_free_extension(type, &art->rna_ext);
   RNA_struct_free(&BLENDER_RNA, type);
 
-  for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
-    LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
-      LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
-        if (region->type == art) {
-          region->type = NULL;
-        }
-      }
-    }
-  }
-
-  BLI_freelinkN(&st->regiontypes, art);
+  BKE_regiontype_unregister(bmain, st, art);
 
   /* update while blender is running */
   WM_main_add_notifier(NC_WINDOW, NULL);
@@ -620,10 +610,11 @@ static StructRNA *rna_Region_register(Main *bmain,
   art->rna_ext.free = free;
   RNA_struct_blender_type_set(art->rna_ext.srna, art);
 
-  /* Initialize some defaults. */
   if (dummyart.regionid != RGN_TYPE_HUD) {
+    /* Initialize some defaults. */
     init_default_region_type(art);
 
+    /* Keep the defaults if not overriden. */
     art->init = (have_function[0]) ? region_init : art->init;
     art->exit = (have_function[1]) ? region_exit : art->exit;
     art->draw = (have_function[2]) ? region_draw : art->draw;

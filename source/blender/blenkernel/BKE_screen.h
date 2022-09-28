@@ -422,6 +422,8 @@ struct ARegionType *BKE_regiontype_from_id_or_first(const struct SpaceType *st, 
 struct ARegionType *BKE_regiontype_from_id(const struct SpaceType *st, int regionid);
 const struct ListBase *BKE_spacetypes_list(void);
 
+void BKE_regiontype_unregister(struct Main *bmain, struct SpaceType *st, struct ARegionType *art);
+
 /** Generic register function, used for registering a #SpaceType from the RNA. */
 void BKE_spacetype_register(struct SpaceType *st);
 

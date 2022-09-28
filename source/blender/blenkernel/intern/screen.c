@@ -480,6 +480,30 @@ ARegionType *BKE_regiontype_from_id(const SpaceType *st, int regionid)
   return NULL;
 }
 
+static void area_unset_regiontype(ScrArea *area, ARegionType *art)
+{
+  LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
+    if (region->type == art) {
+      region->type = NULL;
+    }
+  }
+}
+
+void BKE_regiontype_unregister(Main *bmain, SpaceType *st, ARegionType *art)
+{
+  for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
+    LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+      area_unset_regiontype(area, art);
+    }
+    ScrAreaMap *area_map = AREAMAP_FROM_SCREEN(screen);
+    LISTBASE_FOREACH (ScrArea *, area, &area_map->areabase) {
+      area_unset_regiontype(area, art);
+    }
+  }
+
+  BLI_freelinkN(&st->regiontypes, art);
+}
+
 const ListBase *BKE_spacetypes_list(void)
 {
   return &spacetypes;
