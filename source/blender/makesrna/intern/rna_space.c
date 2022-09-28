@@ -579,51 +579,6 @@ static StructRNA *rna_Space_refine(struct PointerRNA *ptr)
     return space->type->rna_ext.srna;
   }
 
-  switch ((eSpace_Type)space->spacetype) {
-    case SPACE_VIEW3D:
-      return &RNA_SpaceView3D;
-    case SPACE_GRAPH:
-      return &RNA_SpaceGraphEditor;
-    case SPACE_OUTLINER:
-      return &RNA_SpaceOutliner;
-    case SPACE_PROPERTIES:
-      return &RNA_SpaceProperties;
-    case SPACE_FILE:
-      return &RNA_SpaceFileBrowser;
-    case SPACE_IMAGE:
-      return &RNA_SpaceImageEditor;
-    case SPACE_INFO:
-      return &RNA_SpaceInfo;
-    case SPACE_SEQ:
-      return &RNA_SpaceSequenceEditor;
-    case SPACE_TEXT:
-      return &RNA_SpaceTextEditor;
-    case SPACE_ACTION:
-      return &RNA_SpaceDopeSheetEditor;
-    case SPACE_NLA:
-      return &RNA_SpaceNLA;
-    case SPACE_NODE:
-      return &RNA_SpaceNodeEditor;
-    case SPACE_CONSOLE:
-      return &RNA_SpaceConsole;
-    case SPACE_USERPREF:
-      return &RNA_SpacePreferences;
-    case SPACE_CLIP:
-      return &RNA_SpaceClipEditor;
-    case SPACE_SPREADSHEET:
-      return &RNA_SpaceSpreadsheet;
-
-      /* Currently no type info. */
-    case SPACE_SCRIPT:
-    case SPACE_EMPTY:
-    case SPACE_TOPBAR:
-    case SPACE_STATUSBAR:
-      break;
-
-    case SPACE_CUSTOM:
-      return space->type->rna_ext.srna;
-  }
-
   return &RNA_Space;
 }
 
