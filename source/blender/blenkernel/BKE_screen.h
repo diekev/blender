@@ -459,6 +459,9 @@ struct SpaceLink *BKE_spacetype_area_spacelink_add(const struct SpaceType *space
  */
 struct SpaceType *BKE_spacetype_from_srna(const struct StructRNA *srna);
 
+/* Default #SpaceType.blend_write callback for custom editors. */
+void BKE_spacetype_blend_write_custom(struct BlendWriter *writer, struct SpaceLink *sl);
+
 /* Space-data. */
 
 void BKE_spacedata_freelist(ListBase *lb);

@@ -3508,6 +3508,7 @@ static StructRNA *rna_Space_register(Main *bmain,
   /* Default properties and callbacks. */
   st->spaceid = SPACE_CUSTOM;
   st->create = rna_CustomSpaceType_create;
+  st->blend_write = BKE_spacetype_blend_write_custom;
 
   BKE_spacetype_register(st);
 

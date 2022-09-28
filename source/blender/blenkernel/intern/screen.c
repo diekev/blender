@@ -662,6 +662,11 @@ SpaceType *BKE_spacetype_from_srna(const StructRNA *srna)
   return NULL;
 }
 
+void BKE_spacetype_blend_write_custom(BlendWriter *writer, SpaceLink *sl)
+{
+  BLO_write_struct(writer, SpaceLink, sl);
+}
+
 /* ***************** Space handling ********************** */
 
 void BKE_spacedata_freelist(ListBase *lb)
