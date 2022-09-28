@@ -3438,40 +3438,6 @@ static SpaceLink *rna_CustomSpaceType_create(const ScrArea *area, const Scene *U
 #  undef SPACETYPE_HAS_REGION
 }
 
-static void rna_CustomSpaceType_header_region_init(wmWindowManager *UNUSED(wm),
-                                                   SpaceType *UNUSED(st),
-                                                   ARegion *region)
-{
-  ED_region_header_init(region);
-}
-
-static void rna_CustomSpaceType_properties_region_init(wmWindowManager *wm,
-                                                       SpaceType *st,
-                                                       ARegion *region)
-{
-  ED_region_panels_init(wm, st, region);
-
-  /* own keymap */
-  wmKeyMap *keymap = WM_keymap_ensure_idname(wm->defaultconf, st->name, st->idname, 0);
-  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
-}
-
-static void rna_CustomSpaceType_properties_region_draw(const bContext *C, ARegion *region)
-{
-  ED_region_panels_ex(C, region, (const char *[]){CTX_data_mode_string(C), NULL});
-}
-
-static void rna_CustomSpaceType_main_region_init(wmWindowManager *wm,
-                                                 SpaceType *st,
-                                                 ARegion *region)
-{
-  ED_region_panels_init(wm, st, region);
-
-  /* own keymap */
-  wmKeyMap *keymap = WM_keymap_ensure_idname(wm->defaultconf, st->name, st->idname, 0);
-  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
-}
-
 static void rna_Space_unregister(Main *bmain, StructRNA *type)
 {
   SpaceType *st = RNA_struct_blender_type_get(type);
