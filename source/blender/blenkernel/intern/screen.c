@@ -1156,7 +1156,7 @@ static void write_area(BlendWriter *writer, ScrArea *area)
     }
 
     SpaceType *space_type = BKE_spacetype_from_id(sl->spacetype);
-    if (space_type->blend_write) {
+    if (space_type && space_type->blend_write) {
       space_type->blend_write(writer, sl);
     }
   }
@@ -1334,7 +1334,7 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
     }
 
     SpaceType *space_type = BKE_spacetype_from_id(sl->spacetype);
-    if (space_type->blend_read_data) {
+    if (space_type && space_type->blend_read_data) {
       space_type->blend_read_data(reader, sl);
     }
   }
@@ -1381,7 +1381,7 @@ void BKE_screen_area_blend_read_lib(BlendLibReader *reader, ID *parent_id, ScrAr
   LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
     SpaceType *space_type = BKE_spacetype_from_id(sl->spacetype);
 
-    if (space_type->blend_read_lib) {
+    if (space_type && space_type->blend_read_lib) {
       space_type->blend_read_lib(reader, parent_id, sl);
     }
   }
