@@ -207,6 +207,13 @@ void BKE_screen_foreach_id_screen_area(LibraryForeachIDData *data, ScrArea *area
         }
         break;
       }
+      case SPACE_CUSTOM: {
+        IDP_foreach_property(sl->id_properties,
+                             IDP_TYPE_FILTER_ID,
+                             BKE_lib_query_idpropertiesForeachIDLink_callback,
+                             data);
+        break;
+      }
       default:
         break;
     }
@@ -1363,6 +1370,10 @@ static void write_area(BlendWriter *writer, ScrArea *area)
       write_region(writer, region, sl->spacetype);
     }
 
+    if (sl->id_properties) {
+      IDP_BlendWrite(writer, sl->id_properties);
+    }
+
     SpaceType *space_type = BKE_spacetype_from_id(sl->spacetype);
     if (space_type && space_type->blend_write) {
       space_type->blend_write(writer, sl);
@@ -1540,6 +1551,9 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
     LISTBASE_FOREACH (ARegion *, region, &sl->regionbase) {
       direct_link_region(reader, region, sl->spacetype);
     }
+
+    BLO_read_data_address(reader, &sl->id_properties);
+    IDP_BlendDataRead(reader, &sl->id_properties);
 
     SpaceType *space_type = BKE_spacetype_from_id(sl->spacetype);
     if (space_type && space_type->blend_read_data) {
