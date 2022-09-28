@@ -431,9 +431,11 @@ static void spacelink_set_spacetype(SpaceLink *space_link, SpaceType *space_type
     return;
   }
 
-  space_link->type = space_type;
-  space_link->spacetype = space_type->spaceid;
-  STRNCPY(space_link->space_idname, space_type->idname);
+  if (space_link->type != space_type) {
+    space_link->type = space_type;
+    space_link->spacetype = space_type->spaceid;
+    STRNCPY(space_link->space_idname, space_type->idname);
+  }
 }
 
 static SpaceType *spacetype_ensure(SpaceLink *space)
