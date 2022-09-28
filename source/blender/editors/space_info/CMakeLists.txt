@@ -40,5 +40,7 @@ set(LIB
 
 blender_add_lib(bf_editor_space_info "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
 
+# dna_type_offsets.h
+add_dependencies(bf_editor_space_info bf_dna)
 # RNA_prototypes.h
 add_dependencies(bf_editor_space_info bf_rna)
