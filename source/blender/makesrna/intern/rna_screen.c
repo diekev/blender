@@ -422,7 +422,7 @@ static StructRNA *rna_Region_refine(PointerRNA *ptr)
   return (region->type && region->type->rna_ext.srna) ? region->type->rna_ext.srna : &RNA_Region;
 }
 
-static void rna_Region_unregister(Main *UNUSED(bmain), StructRNA *type)
+static void rna_Region_unregister(Main *bmain, StructRNA *type)
 {
   ARegionType *art = RNA_struct_blender_type_get(type);
 
@@ -435,10 +435,20 @@ static void rna_Region_unregister(Main *UNUSED(bmain), StructRNA *type)
     return;
   }
 
-  BLI_freelinkN(&st->regiontypes, art);
-
   RNA_struct_free_extension(type, &art->rna_ext);
   RNA_struct_free(&BLENDER_RNA, type);
+
+  for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
+    LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+      LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
+        if (region->type == art) {
+          region->type = NULL;
+        }
+      }
+    }
+  }
+
+  BLI_freelinkN(&st->regiontypes, art);
 
   /* update while blender is running */
   WM_main_add_notifier(NC_WINDOW, NULL);
