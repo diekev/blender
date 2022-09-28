@@ -786,7 +786,7 @@ static void movieclip_main_area_set_view2d(const bContext *C, ARegion *region)
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void clip_main_region_init(wmWindowManager *wm, SpaceType *UNUSED(st), ARegion *region)
+static void clip_main_region_init(wmWindowManager *wm, ARegion *region)
 {
   wmKeyMap *keymap;
 
@@ -939,7 +939,7 @@ static void clip_main_region_listener(const wmRegionListenerParams *params)
 
 /****************** preview region ******************/
 
-static void clip_preview_region_init(wmWindowManager *wm, SpaceType *UNUSED(st), ARegion *region)
+static void clip_preview_region_init(wmWindowManager *wm, ARegion *region)
 {
   wmKeyMap *keymap;
 
@@ -1066,7 +1066,7 @@ static void clip_preview_region_listener(const wmRegionListenerParams *UNUSED(pa
 
 /****************** channels region ******************/
 
-static void clip_channels_region_init(wmWindowManager *wm, SpaceType *UNUSED(st), ARegion *region)
+static void clip_channels_region_init(wmWindowManager *wm, ARegion *region)
 {
   wmKeyMap *keymap;
 
@@ -1108,9 +1108,7 @@ static void clip_channels_region_listener(const wmRegionListenerParams *UNUSED(p
 /****************** header region ******************/
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void clip_header_region_init(wmWindowManager *UNUSED(wm),
-                                    SpaceType *UNUSED(st),
-                                    ARegion *region)
+static void clip_header_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
 {
   ED_region_header_init(region);
 }
@@ -1145,11 +1143,11 @@ static void clip_header_region_listener(const wmRegionListenerParams *params)
 /****************** tools region ******************/
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void clip_tools_region_init(wmWindowManager *wm, SpaceType *st, ARegion *region)
+static void clip_tools_region_init(wmWindowManager *wm, ARegion *region)
 {
   wmKeyMap *keymap;
 
-  ED_region_panels_init(wm, st, region);
+  ED_region_panels_init(wm, region);
 
   keymap = WM_keymap_ensure(wm->defaultconf, "Clip", SPACE_CLIP, 0);
   WM_event_add_keymap_handler(&region->handlers, keymap);
@@ -1195,11 +1193,11 @@ static void clip_props_region_listener(const wmRegionListenerParams *params)
 /****************** properties region ******************/
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void clip_properties_region_init(wmWindowManager *wm, SpaceType *st, ARegion *region)
+static void clip_properties_region_init(wmWindowManager *wm, ARegion *region)
 {
   wmKeyMap *keymap;
 
-  ED_region_panels_init(wm, st, region);
+  ED_region_panels_init(wm, region);
 
   keymap = WM_keymap_ensure(wm->defaultconf, "Clip", SPACE_CLIP, 0);
   WM_event_add_keymap_handler(&region->handlers, keymap);

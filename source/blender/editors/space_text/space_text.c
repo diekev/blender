@@ -246,7 +246,7 @@ static int /*eContextResult*/ text_context(const bContext *C,
 /********************* main region ********************/
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void text_main_region_init(wmWindowManager *wm, SpaceType *UNUSED(st), ARegion *region)
+static void text_main_region_init(wmWindowManager *wm, ARegion *region)
 {
   wmKeyMap *keymap;
   ListBase *lb;
@@ -348,9 +348,7 @@ static void text_dropboxes(void)
 /****************** header region ******************/
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void text_header_region_init(wmWindowManager *UNUSED(wm),
-                                    SpaceType *UNUSED(st),
-                                    ARegion *region)
+static void text_header_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
 {
   ED_region_header_init(region);
 }
@@ -363,12 +361,12 @@ static void text_header_region_draw(const bContext *C, ARegion *region)
 /****************** properties region ******************/
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void text_properties_region_init(wmWindowManager *wm, SpaceType *st, ARegion *region)
+static void text_properties_region_init(wmWindowManager *wm, ARegion *region)
 {
   wmKeyMap *keymap;
 
   region->v2d.scroll = V2D_SCROLL_RIGHT | V2D_SCROLL_VERTICAL_HIDE;
-  ED_region_panels_init(wm, st, region);
+  ED_region_panels_init(wm, region);
 
   /* own keymaps */
   keymap = WM_keymap_ensure(wm->defaultconf, "Text Generic", SPACE_TEXT, 0);

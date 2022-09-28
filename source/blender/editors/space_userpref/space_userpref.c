@@ -98,7 +98,7 @@ static SpaceLink *userpref_duplicate(SpaceLink *sl)
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void userpref_main_region_init(wmWindowManager *wm, SpaceType *st, ARegion *region)
+static void userpref_main_region_init(wmWindowManager *wm, ARegion *region)
 {
   /* do not use here, the properties changed in user-preferences do a system-wide refresh,
    * then scroller jumps back */
@@ -106,7 +106,7 @@ static void userpref_main_region_init(wmWindowManager *wm, SpaceType *st, ARegio
 
   region->v2d.scroll = V2D_SCROLL_RIGHT | V2D_SCROLL_VERTICAL_HIDE;
 
-  ED_region_panels_init(wm, st, region);
+  ED_region_panels_init(wm, region);
 }
 
 static void userpref_main_region_layout(const bContext *C, ARegion *region)
@@ -140,9 +140,7 @@ static void userpref_keymap(struct wmKeyConfig *UNUSED(keyconf))
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void userpref_header_region_init(wmWindowManager *UNUSED(wm),
-                                        SpaceType *UNUSED(st),
-                                        ARegion *region)
+static void userpref_header_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
 {
   ED_region_header_init(region);
 }
@@ -153,11 +151,11 @@ static void userpref_header_region_draw(const bContext *C, ARegion *region)
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void userpref_navigation_region_init(wmWindowManager *wm, SpaceType *st, ARegion *region)
+static void userpref_navigation_region_init(wmWindowManager *wm, ARegion *region)
 {
   region->v2d.scroll = V2D_SCROLL_RIGHT | V2D_SCROLL_VERTICAL_HIDE;
 
-  ED_region_panels_init(wm, st, region);
+  ED_region_panels_init(wm, region);
 }
 
 static void userpref_navigation_region_draw(const bContext *C, ARegion *region)
@@ -166,9 +164,9 @@ static void userpref_navigation_region_draw(const bContext *C, ARegion *region)
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void userpref_execute_region_init(wmWindowManager *wm, SpaceType *st, ARegion *region)
+static void userpref_execute_region_init(wmWindowManager *wm, ARegion *region)
 {
-  ED_region_panels_init(wm, st, region);
+  ED_region_panels_init(wm, region);
   region->v2d.keepzoom |= V2D_LOCKZOOM_X | V2D_LOCKZOOM_Y;
 }
 

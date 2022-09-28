@@ -92,7 +92,7 @@ static SpaceLink *info_duplicate(SpaceLink *sl)
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void info_main_region_init(wmWindowManager *wm, SpaceType *UNUSED(st), ARegion *region)
+static void info_main_region_init(wmWindowManager *wm, ARegion *region)
 {
   wmKeyMap *keymap;
 
@@ -175,9 +175,7 @@ static void info_keymap(struct wmKeyConfig *keyconf)
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void info_header_region_init(wmWindowManager *UNUSED(wm),
-                                    SpaceType *UNUSED(st),
-                                    ARegion *region)
+static void info_header_region_init(wmWindowManager *UNUSED(wm), ARegion *region)
 {
   ED_region_header_init(region);
 }

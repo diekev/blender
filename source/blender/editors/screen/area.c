@@ -1882,7 +1882,7 @@ void ED_area_update_region_sizes(wmWindowManager *wm, wmWindow *win, ScrArea *ar
 
     /* region size may have changed, init does necessary adjustments */
     if (region->type->init) {
-      region->type->init(wm, area->type, region);
+      region->type->init(wm, region);
     }
 
     /* Some AZones use View2D data which is only updated in region init, so call that first! */
@@ -1952,7 +1952,7 @@ void ED_area_init(wmWindowManager *wm, wmWindow *win, ScrArea *area)
       ed_default_handlers(wm, area, region, &region->handlers, region->type->keymapflag);
       /* own handlers */
       if (region->type->init) {
-        region->type->init(wm, area->type, region);
+        region->type->init(wm, region);
       }
     }
     else {
@@ -3149,7 +3149,7 @@ void ED_region_panels(const bContext *C, ARegion *region)
   ED_region_panels_draw(C, region);
 }
 
-void ED_region_panels_init(wmWindowManager *wm, SpaceType *UNUSED(st), ARegion *region)
+void ED_region_panels_init(wmWindowManager *wm, ARegion *region)
 {
   UI_view2d_region_reinit(&region->v2d, V2D_COMMONVIEW_PANELS_UI, region->winx, region->winy);
 

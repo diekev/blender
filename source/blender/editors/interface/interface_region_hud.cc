@@ -140,9 +140,9 @@ static void hud_panels_register(ARegionType *art, const char *space_type, int re
 /** \name Callbacks for Floating Region
  * \{ */
 
-static void hud_region_init(wmWindowManager *wm, SpaceType *st, ARegion *region)
+static void hud_region_init(wmWindowManager *wm, ARegion *region)
 {
-  ED_region_panels_init(wm, st, region);
+  ED_region_panels_init(wm, region);
 
   /* Reset zoom from panels init because we don't want zoom allowed for redo panel. */
   region->v2d.maxzoom = 1.0f;

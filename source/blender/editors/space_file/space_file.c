@@ -499,7 +499,7 @@ static void file_listener(const wmSpaceTypeListenerParams *listener_params)
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void file_main_region_init(wmWindowManager *wm, SpaceType *UNUSED(st), ARegion *region)
+static void file_main_region_init(wmWindowManager *wm, ARegion *region)
 {
   wmKeyMap *keymap;
 
@@ -714,12 +714,12 @@ static void file_keymap(struct wmKeyConfig *keyconf)
   WM_keymap_ensure(keyconf, "File Browser Buttons", SPACE_FILE, 0);
 }
 
-static void file_tools_region_init(wmWindowManager *wm, SpaceType *st, ARegion *region)
+static void file_tools_region_init(wmWindowManager *wm, ARegion *region)
 {
   wmKeyMap *keymap;
 
   region->v2d.scroll = V2D_SCROLL_RIGHT | V2D_SCROLL_VERTICAL_HIDE;
-  ED_region_panels_init(wm, st, region);
+  ED_region_panels_init(wm, region);
 
   /* own keymaps */
   keymap = WM_keymap_ensure(wm->defaultconf, "File Browser", SPACE_FILE, 0);
@@ -766,7 +766,7 @@ static void file_tool_props_region_listener(const wmRegionListenerParams *listen
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void file_header_region_init(wmWindowManager *wm, SpaceType *UNUSED(st), ARegion *region)
+static void file_header_region_init(wmWindowManager *wm, ARegion *region)
 {
   wmKeyMap *keymap;
 
@@ -782,11 +782,11 @@ static void file_header_region_draw(const bContext *C, ARegion *region)
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void file_ui_region_init(wmWindowManager *wm, SpaceType *st, ARegion *region)
+static void file_ui_region_init(wmWindowManager *wm, ARegion *region)
 {
   wmKeyMap *keymap;
 
-  ED_region_panels_init(wm, st, region);
+  ED_region_panels_init(wm, region);
   region->v2d.keepzoom |= V2D_LOCKZOOM_X | V2D_LOCKZOOM_Y;
 
   /* own keymap */
@@ -802,11 +802,11 @@ static void file_ui_region_draw(const bContext *C, ARegion *region)
   ED_region_panels(C, region);
 }
 
-static void file_execution_region_init(wmWindowManager *wm, SpaceType *st, ARegion *region)
+static void file_execution_region_init(wmWindowManager *wm, ARegion *region)
 {
   wmKeyMap *keymap;
 
-  ED_region_panels_init(wm, st, region);
+  ED_region_panels_init(wm, region);
   region->v2d.keepzoom |= V2D_LOCKZOOM_X | V2D_LOCKZOOM_Y;
 
   /* own keymap */

@@ -366,7 +366,7 @@ static SpaceLink *view3d_duplicate(SpaceLink *sl)
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void view3d_main_region_init(wmWindowManager *wm, SpaceType *UNUSED(st), ARegion *region)
+static void view3d_main_region_init(wmWindowManager *wm, ARegion *region)
 {
   ListBase *lb;
   wmKeyMap *keymap;
@@ -1463,7 +1463,7 @@ static void view3d_main_region_cursor(wmWindow *win, ScrArea *area, ARegion *reg
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void view3d_header_region_init(wmWindowManager *wm, SpaceType *UNUSED(st), ARegion *region)
+static void view3d_header_region_init(wmWindowManager *wm, ARegion *region)
 {
   wmKeyMap *keymap = WM_keymap_ensure(wm->defaultconf, "3D View Generic", SPACE_VIEW3D, 0);
 
@@ -1570,11 +1570,11 @@ static void view3d_header_region_message_subscribe(const wmRegionMessageSubscrib
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void view3d_buttons_region_init(wmWindowManager *wm, SpaceType *st, ARegion *region)
+static void view3d_buttons_region_init(wmWindowManager *wm, ARegion *region)
 {
   wmKeyMap *keymap;
 
-  ED_region_panels_init(wm, st, region);
+  ED_region_panels_init(wm, region);
 
   keymap = WM_keymap_ensure(wm->defaultconf, "3D View Generic", SPACE_VIEW3D, 0);
   WM_event_add_keymap_handler(&region->handlers, keymap);
@@ -1800,11 +1800,11 @@ static void view3d_buttons_region_listener(const wmRegionListenerParams *params)
 }
 
 /* add handlers, stuff you only do once or on area/region changes */
-static void view3d_tools_region_init(wmWindowManager *wm, SpaceType *st, ARegion *region)
+static void view3d_tools_region_init(wmWindowManager *wm, ARegion *region)
 {
   wmKeyMap *keymap;
 
-  ED_region_panels_init(wm, st, region);
+  ED_region_panels_init(wm, region);
 
   keymap = WM_keymap_ensure(wm->defaultconf, "3D View Generic", SPACE_VIEW3D, 0);
   WM_event_add_keymap_handler(&region->handlers, keymap);

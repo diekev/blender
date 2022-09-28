@@ -356,9 +356,7 @@ static const char *rna_Screen_statusbar_info_get(struct bScreen *UNUSED(screen),
 
 /* Region registration */
 
-static void region_init(struct wmWindowManager *wm,
-                        struct SpaceType *UNUSED(st),
-                        struct ARegion *region)
+static void region_init(struct wmWindowManager *wm, struct ARegion *region)
 {
   ExtensionRNA *ext_rna = &region->type->rna_ext;
 
@@ -446,22 +444,13 @@ static void rna_Region_unregister(Main *UNUSED(bmain), StructRNA *type)
   WM_main_add_notifier(NC_WINDOW, NULL);
 }
 
-static void region_window_init(wmWindowManager *wm, SpaceType *st, ARegion *region)
-{
-  ED_region_panels_init(wm, st, region);
-
-  /* own keymap */
-  wmKeyMap *keymap = WM_keymap_ensure_idname(wm->defaultconf, st->name, st->idname, 0);
-  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
-}
-
 static void region_properties_draw(const bContext *C, ARegion *region)
 {
   /* TODO: figure out how to set contexts. */
   ED_region_panels_ex(C, region, (const char *[]){CTX_data_mode_string(C), NULL});
 }
 
-static void region_header_init(wmWindowManager *UNUSED(wm), SpaceType *UNUSED(st), ARegion *region)
+static void region_header_init(wmWindowManager *UNUSED(wm), ARegion *region)
 {
   ED_region_header_init(region);
 }
@@ -473,7 +462,7 @@ static void init_default_region_type(ARegionType *art)
 
   switch (art->regionid) {
     case RGN_TYPE_WINDOW: {
-      art->init = region_window_init;
+      art->init = ED_region_panels_init;
       art->draw = ED_region_window_draw;
       art->keymapflag = ED_KEYMAP_GIZMO | ED_KEYMAP_FRAMES | ED_KEYMAP_UI | ED_KEYMAP_GPENCIL;
       break;
@@ -495,7 +484,7 @@ static void init_default_region_type(ARegionType *art)
       break;
     }
     case RGN_TYPE_UI: {
-      art->init = region_window_init;
+      art->init = ED_region_panels_init;
       art->draw = region_properties_draw;
       art->prefsizex = UI_SIDEBAR_PANEL_WIDTH;
       art->keymapflag = ED_KEYMAP_FRAMES | ED_KEYMAP_UI;
@@ -651,7 +640,7 @@ static void rna_Region_default_init(wmWindowManager *wm, ARegion *region)
     case RGN_TYPE_HUD:
       break;
     default:
-      ED_region_panels_init(wm, NULL, region);
+      ED_region_panels_init(wm, region);
       break;
   }
 }
