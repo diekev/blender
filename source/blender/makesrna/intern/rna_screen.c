@@ -638,6 +638,29 @@ static StructRNA *rna_Region_register(Main *bmain,
   return art->rna_ext.srna;
 }
 
+static void rna_Region_default_init(wmWindowManager *wm, ARegion *region)
+{
+  switch (region->regiontype) {
+    case RGN_TYPE_HEADER:
+    case RGN_TYPE_FOOTER:
+    case RGN_TYPE_TOOL_HEADER:
+    case RGN_TYPE_TOOLS:
+    case RGN_TYPE_TOOL_PROPS:
+      ED_region_header_init(region);
+      break;
+    case RGN_TYPE_HUD:
+      break;
+    default:
+      ED_region_panels_init(wm, NULL, region);
+      break;
+  }
+}
+
+static void rna_Region_add_keymap(ARegion *region, wmKeyMap *keymap)
+{
+  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
+}
+
 #else
 
 /* Area.spaces */
@@ -898,6 +921,21 @@ static void rna_def_region(BlenderRNA *brna)
 
   RNA_def_function(srna, "tag_redraw", "ED_region_tag_redraw");
 
+  func = RNA_def_function(srna, "default_init", "rna_Region_default_init");
+  RNA_def_function_flag(func, FUNC_NO_SELF);
+  RNA_def_function_ui_description(func,
+                                  "Default initialization function for Regions, this should be "
+                                  "called by custom regions in their init() override");
+  parm = RNA_def_pointer(func, "window_manager", "WindowManager", "", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_pointer(func, "region", "Region", "", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+
+  func = RNA_def_function(srna, "add_keymap", "rna_Region_add_keymap");
+  RNA_def_function_ui_description(func, "Add a keymap to this region");
+  parm = RNA_def_pointer(func, "keymap", "KeyMap", "", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+
   /* Registration. */
 
   prop = RNA_def_property(srna, "bl_idname", PROP_STRING, PROP_NONE);
@@ -920,7 +958,10 @@ static void rna_def_region(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Region Type", "The type of region");
 
   func = RNA_def_function(srna, "init", NULL);
-  RNA_def_function_ui_description(func, "Initialize handlers for this region, and custom data");
+  RNA_def_function_ui_description(
+      func,
+      "Can be used to initialize handlers for this region. If not set, a default function will be "
+      "called. If set, make sure to call Region.default_init()");
   RNA_def_function_flag(func, FUNC_REGISTER_OPTIONAL | FUNC_ALLOW_WRITE);
   parm = RNA_def_pointer(func, "window_manager", "WindowManager", "", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
