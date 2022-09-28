@@ -165,6 +165,15 @@ typedef struct wmRegionMessageSubscribeParams {
 typedef struct ARegionType {
   struct ARegionType *next, *prev;
 
+  /* Unique string identifier for this region. Used for registering regions for custom SpaceTypes.
+   */
+  char idname[64];
+
+  /* Identifier for the SpaceType this region is added to. Used for registering regions for custom
+   * SpaceTypes.
+   */
+  char space_type[64];
+
   int regionid; /* unique identifier within this space, defines RGN_TYPE_xxxx */
 
   /* add handlers, stuff you only do once or on area/region type/size changes */
@@ -237,6 +246,9 @@ typedef struct ARegionType {
   bool clip_gizmo_events_by_ui;
   /* call cursor function on each move event */
   short event_cursor;
+
+  /* RNA integration. */
+  ExtensionRNA rna_ext;
 } ARegionType;
 
 /* panel types */

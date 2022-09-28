@@ -575,6 +575,7 @@ ARegionType *BKE_spacetype_add_region_type(SpaceType *st, int region_id, const c
 {
   ARegionType *art = MEM_callocN(sizeof(ARegionType), name);
   art->regionid = region_id;
+  st->flag |= (1 << region_id);
   BLI_addhead(&st->regiontypes, art);
   return art;
 }

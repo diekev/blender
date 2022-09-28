@@ -53,6 +53,7 @@ const EnumPropertyItem rna_enum_region_type_items[] = {
 
 #  include "DEG_depsgraph.h"
 
+#  include "UI_interface.h"
 #  include "UI_view2d.h"
 
 #  ifdef WITH_PYTHON
@@ -353,6 +354,290 @@ static const char *rna_Screen_statusbar_info_get(struct bScreen *UNUSED(screen),
   return ED_info_statusbar_string(bmain, CTX_data_scene(C), CTX_data_view_layer(C));
 }
 
+/* Region registration */
+
+static void region_init(struct wmWindowManager *wm,
+                        struct SpaceType *UNUSED(st),
+                        struct ARegion *region)
+{
+  ExtensionRNA *ext_rna = &region->type->rna_ext;
+
+  PointerRNA ptr;
+  RNA_pointer_create(NULL, ext_rna->srna, region, &ptr);
+
+  /* RNA_struct_find_function(&ptr, "init"); */
+  extern FunctionRNA rna_Region_init_func;
+  FunctionRNA *func = &rna_Region_init_func;
+
+  ParameterList list;
+  RNA_parameter_list_create(&list, &ptr, func);
+  RNA_parameter_set_lookup(&list, "window_manager", &wm);
+
+  ext_rna->call(NULL, &ptr, func, &list);
+
+  RNA_parameter_list_free(&list);
+}
+
+static void region_exit(struct wmWindowManager *wm, struct ARegion *region)
+{
+  ExtensionRNA *ext_rna = &region->type->rna_ext;
+
+  PointerRNA ptr;
+  RNA_pointer_create(NULL, ext_rna->srna, region, &ptr);
+
+  /* RNA_struct_find_function(&ptr, "exit"); */
+  extern FunctionRNA rna_Region_exit_func;
+  FunctionRNA *func = &rna_Region_exit_func;
+
+  ParameterList list;
+  RNA_parameter_list_create(&list, &ptr, func);
+  RNA_parameter_set_lookup(&list, "window_manager", &wm);
+
+  ext_rna->call(NULL, &ptr, func, &list);
+
+  RNA_parameter_list_free(&list);
+}
+
+static void region_draw(const struct bContext *C, struct ARegion *region)
+{
+  ExtensionRNA *ext_rna = &region->type->rna_ext;
+
+  PointerRNA ptr;
+  RNA_pointer_create(NULL, ext_rna->srna, region, &ptr);
+
+  /* RNA_struct_find_function(&ptr, "draw"); */
+  extern FunctionRNA rna_Region_draw_func;
+  FunctionRNA *func = &rna_Region_draw_func;
+
+  ParameterList list;
+  RNA_parameter_list_create(&list, &ptr, func);
+  RNA_parameter_set_lookup(&list, "context", &C);
+
+  ext_rna->call(NULL, &ptr, func, &list);
+
+  RNA_parameter_list_free(&list);
+}
+
+static StructRNA *rna_Region_refine(PointerRNA *ptr)
+{
+  ARegion *region = (ARegion *)ptr->data;
+  return (region->type && region->type->rna_ext.srna) ? region->type->rna_ext.srna : &RNA_Region;
+}
+
+static void rna_Region_unregister(Main *UNUSED(bmain), StructRNA *type)
+{
+  ARegionType *art = RNA_struct_blender_type_get(type);
+
+  if (!art) {
+    return;
+  }
+
+  SpaceType *st = BKE_spacetype_from_idname(art->space_type);
+  if (!st) {
+    return;
+  }
+
+  BLI_freelinkN(&st->regiontypes, art);
+
+  RNA_struct_free_extension(type, &art->rna_ext);
+  RNA_struct_free(&BLENDER_RNA, type);
+
+  /* update while blender is running */
+  WM_main_add_notifier(NC_WINDOW, NULL);
+}
+
+static void region_window_init(wmWindowManager *wm, SpaceType *st, ARegion *region)
+{
+  ED_region_panels_init(wm, st, region);
+
+  /* own keymap */
+  wmKeyMap *keymap = WM_keymap_ensure_idname(wm->defaultconf, st->name, st->idname, 0);
+  WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
+}
+
+static void region_properties_draw(const bContext *C, ARegion *region)
+{
+  /* TODO: figure out how to set contexts. */
+  ED_region_panels_ex(C, region, (const char *[]){CTX_data_mode_string(C), NULL});
+}
+
+static void region_header_init(wmWindowManager *UNUSED(wm), SpaceType *UNUSED(st), ARegion *region)
+{
+  ED_region_header_init(region);
+}
+
+static void init_default_region_type(ARegionType *art)
+{
+  /* All custom regions use a panels layout. */
+  art->layout = ED_region_panels_layout;
+
+  switch (art->regionid) {
+    case RGN_TYPE_WINDOW: {
+      art->init = region_window_init;
+      art->draw = ED_region_window_draw;
+      art->keymapflag = ED_KEYMAP_GIZMO | ED_KEYMAP_FRAMES | ED_KEYMAP_UI | ED_KEYMAP_GPENCIL;
+      break;
+    }
+    case RGN_TYPE_HEADER: {
+      art->init = region_header_init;
+      art->draw = ED_region_header;
+      art->prefsizey = HEADERY;
+      art->layout = NULL;
+      art->keymapflag = ED_KEYMAP_FRAMES | ED_KEYMAP_UI | ED_KEYMAP_VIEW2D | ED_KEYMAP_HEADER;
+      break;
+    }
+    case RGN_TYPE_FOOTER: {
+      art->init = region_header_init;
+      art->draw = ED_region_header;
+      art->layout = NULL;
+      art->prefsizey = HEADERY;
+      art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_VIEW2D | ED_KEYMAP_FOOTER;
+      break;
+    }
+    case RGN_TYPE_UI: {
+      art->init = region_window_init;
+      art->draw = region_properties_draw;
+      art->prefsizex = UI_SIDEBAR_PANEL_WIDTH;
+      art->keymapflag = ED_KEYMAP_FRAMES | ED_KEYMAP_UI;
+      break;
+    }
+    case RGN_TYPE_NAV_BAR: {
+      art->init = ED_region_panels_init;
+      art->draw = ED_region_panels;
+      art->prefsizex = UI_NAVIGATION_REGION_WIDTH;
+      art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_NAVBAR;
+      break;
+    }
+    case RGN_TYPE_EXECUTE: {
+      art->init = ED_region_panels_init;
+      art->draw = ED_region_panels;
+      art->prefsizex = UI_NAVIGATION_REGION_WIDTH;
+      art->keymapflag = ED_KEYMAP_UI;
+      break;
+    }
+    case RGN_TYPE_TOOLS:
+    case RGN_TYPE_TOOL_PROPS: {
+      art->init = ED_region_panels_init;
+      art->draw = ED_region_panels;
+      art->prefsizex = 240;
+      art->prefsizey = 60;
+      art->keymapflag = ED_KEYMAP_UI;
+      break;
+    }
+    case RGN_TYPE_TOOL_HEADER: {
+      art->init = region_header_init;
+      art->draw = ED_region_header;
+      art->layout = NULL;
+      art->prefsizey = HEADERY;
+      art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_VIEW2D | ED_KEYMAP_FRAMES | ED_KEYMAP_HEADER;
+      break;
+    }
+    default: {
+      art->init = ED_region_panels_init;
+      art->draw = ED_region_panels;
+      break;
+    }
+  }
+}
+
+static StructRNA *rna_Region_register(Main *bmain,
+                                      ReportList *reports,
+                                      void *data,
+                                      const char *identifier,
+                                      StructValidateFunc validate,
+                                      StructCallbackFunc call,
+                                      StructFreeFunc free)
+{
+  ARegionType dummyart = {NULL};
+  ARegion dummyregion = {NULL};
+  PointerRNA dummyptr;
+  int have_function[3];
+
+  /* setup dummy region & region type to store static properties in */
+  dummyregion.type = &dummyart;
+  RNA_pointer_create(NULL, &RNA_Region, &dummyregion, &dummyptr);
+
+  /* validate the python class */
+  if (validate(&dummyptr, data, have_function) != 0) {
+    return NULL;
+  }
+
+  if (strlen(identifier) >= sizeof(dummyart.idname)) {
+    BKE_reportf(reports,
+                RPT_ERROR,
+                "Registering region class: '%s' is too long, maximum length is %d",
+                identifier,
+                (int)sizeof(dummyart.idname));
+    return NULL;
+  }
+
+  SpaceType *st = BKE_spacetype_from_idname(dummyart.space_type);
+
+  if (!st) {
+    BKE_reportf(reports,
+                RPT_ERROR,
+                "Registering region class: SpaceType '%s' is unknown for region '%s'",
+                dummyart.space_type,
+                identifier);
+    return NULL;
+  }
+
+  if (st->spaceid != SPACE_CUSTOM) {
+    BKE_reportf(reports,
+                RPT_ERROR,
+                "Registering region class: SpaceType '%s' is not a custom space, cannot register "
+                "regions for builtin spaces",
+                dummyart.space_type);
+    return NULL;
+  }
+
+  /* check if we have registered this region type before, and remove it */
+  LISTBASE_FOREACH (ARegionType *, art, &st->regiontypes) {
+    if (STREQ(art->idname, dummyart.idname)) {
+      rna_Region_unregister(bmain, art->rna_ext.srna);
+      break;
+    }
+  }
+
+  /* create a new region type */
+  ARegionType *art;
+  if (dummyart.regionid == RGN_TYPE_HUD) {
+    art = ED_area_type_hud(st->idname);
+    BLI_addhead(&st->regiontypes, art);
+  }
+  else {
+    art = BKE_spacetype_add_region_type(st, dummyart.regionid, "python region");
+  }
+
+  /* Skip prev and next pointers! BKE_spacetype_add_region_type modifies them, we don't want to
+   * reset them. */
+  memcpy((char *)(art) + sizeof(void *) * 2,
+         (char *)(&dummyart) + sizeof(void *) * 2,
+         sizeof(dummyart) - sizeof(void *) * 2);
+
+  art->rna_ext.srna = RNA_def_struct_ptr(&BLENDER_RNA, art->idname, &RNA_Region);
+  art->rna_ext.data = data;
+  art->rna_ext.call = call;
+  art->rna_ext.free = free;
+  RNA_struct_blender_type_set(art->rna_ext.srna, art);
+
+  /* Initialize some defaults. */
+  if (dummyart.regionid != RGN_TYPE_HUD) {
+    init_default_region_type(art);
+
+    art->init = (have_function[0]) ? region_init : art->init;
+    art->exit = (have_function[1]) ? region_exit : art->exit;
+    art->draw = (have_function[2]) ? region_draw : art->draw;
+  }
+
+  rna_SpaceType_def_show_region_props(st, art->regionid);
+
+  /* update while blender is running */
+  WM_main_add_notifier(NC_WINDOW, NULL);
+
+  return art->rna_ext.srna;
+}
+
 #else
 
 /* Area.spaces */
@@ -534,6 +819,8 @@ static void rna_def_region(BlenderRNA *brna)
 {
   StructRNA *srna;
   PropertyRNA *prop;
+  FunctionRNA *func;
+  PropertyRNA *parm;
 
   static const EnumPropertyItem alignment_types[] = {
       {RGN_ALIGN_NONE, "NONE", 0, "None", "Don't use any fixed alignment, fill available space"},
@@ -559,6 +846,8 @@ static void rna_def_region(BlenderRNA *brna)
   srna = RNA_def_struct(brna, "Region", NULL);
   RNA_def_struct_ui_text(srna, "Region", "Region in a subdivided screen area");
   RNA_def_struct_sdna(srna, "ARegion");
+  RNA_def_struct_refine_func(srna, "rna_Region_refine");
+  RNA_def_struct_register_funcs(srna, "rna_Region_register", "rna_Region_unregister", NULL);
 
   prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "regiontype");
@@ -608,6 +897,45 @@ static void rna_def_region(BlenderRNA *brna)
   RNA_def_property_pointer_funcs(prop, "rna_Region_data_get", NULL, NULL, NULL);
 
   RNA_def_function(srna, "tag_redraw", "ED_region_tag_redraw");
+
+  /* Registration. */
+
+  prop = RNA_def_property(srna, "bl_idname", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, NULL, "type->idname");
+  RNA_def_property_flag(prop, PROP_REGISTER);
+  RNA_def_property_ui_text(
+      prop, "Space Type", "The space where the region is going to be used in");
+
+  prop = RNA_def_property(srna, "bl_space_type", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, NULL, "type->space_type");
+  RNA_def_property_flag(prop, PROP_REGISTER);
+  RNA_def_property_ui_text(
+      prop, "Space Type", "The space where the region is going to be used in");
+
+  prop = RNA_def_property(srna, "bl_region_type", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "type->regionid");
+  RNA_def_property_enum_default(prop, RGN_TYPE_HEADER);
+  RNA_def_property_enum_items(prop, rna_enum_region_type_items);
+  RNA_def_property_flag(prop, PROP_REGISTER);
+  RNA_def_property_ui_text(prop, "Region Type", "The type of region");
+
+  func = RNA_def_function(srna, "init", NULL);
+  RNA_def_function_ui_description(func, "Initialize handlers for this region, and custom data");
+  RNA_def_function_flag(func, FUNC_REGISTER_OPTIONAL | FUNC_ALLOW_WRITE);
+  parm = RNA_def_pointer(func, "window_manager", "WindowManager", "", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+
+  func = RNA_def_function(srna, "exit", NULL);
+  RNA_def_function_ui_description(func, "Called when the region is hidden or removed");
+  RNA_def_function_flag(func, FUNC_REGISTER_OPTIONAL | FUNC_ALLOW_WRITE);
+  parm = RNA_def_pointer(func, "window_manager", "WindowManager", "", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+
+  func = RNA_def_function(srna, "draw", NULL);
+  RNA_def_function_ui_description(func, "Called when the region is hidden or removed");
+  RNA_def_function_flag(func, FUNC_REGISTER_OPTIONAL);
+  parm = RNA_def_pointer(func, "context", "Context", "", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
 }
 
 static void rna_def_screen(BlenderRNA *brna)

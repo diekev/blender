@@ -30,6 +30,7 @@ struct Main;
 struct Object;
 struct ReportList;
 struct SDNA;
+struct SpaceType;
 struct ViewLayer;
 
 /* Data structures used during define */
@@ -409,6 +410,8 @@ bool rna_GPencil_datablocks_obdata_poll(struct PointerRNA *ptr, const struct Poi
 char *rna_TextureSlot_path(const struct PointerRNA *ptr);
 char *rna_Node_ImageUser_path(const struct PointerRNA *ptr);
 char *rna_CameraBackgroundImage_image_or_movieclip_user_path(const struct PointerRNA *ptr);
+
+void rna_SpaceType_def_show_region_props(struct SpaceType *st, int region_id);
 
 /* Set U.is_dirty and redraw. */
 

@@ -3383,9 +3383,10 @@ static SpaceLink *rna_CustomSpaceType_create(const ScrArea *area, const Scene *U
 
   ARegion *region;
 
-  /* Every space has a header. */
-  region = BKE_spacedata_add_region(space, RGN_TYPE_HEADER, "Header for Custom Editor");
-  region->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM : RGN_ALIGN_TOP;
+  if (SPACETYPE_HAS_REGION(st, RGN_TYPE_UI)) {
+    region = BKE_spacedata_add_region(space, RGN_TYPE_HEADER, "Header for Custom Editor");
+    region->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM : RGN_ALIGN_TOP;
+  }
 
   if (SPACETYPE_HAS_REGION(st, RGN_TYPE_UI)) {
     region = BKE_spacedata_add_region(space, RGN_TYPE_UI, "Properties for Custom Editor");
@@ -3428,8 +3429,9 @@ static SpaceLink *rna_CustomSpaceType_create(const ScrArea *area, const Scene *U
     region->flag = RGN_FLAG_HIDDEN | RGN_FLAG_HIDDEN_BY_USER;
   }
 
-  /* Every space has a window. */
-  region = BKE_spacedata_add_region(space, RGN_TYPE_WINDOW, "Window for Custom Editor");
+  if (SPACETYPE_HAS_REGION(st, RGN_TYPE_WINDOW)) {
+    region = BKE_spacedata_add_region(space, RGN_TYPE_WINDOW, "Window for Custom Editor");
+  }
 
   return space;
 }
@@ -3495,105 +3497,8 @@ static void rna_Space_unregister(Main *bmain, StructRNA *type)
   WM_main_add_notifier(NC_WINDOW, NULL);
 }
 
-static void rna_spacetype_setup_regions(SpaceType *st)
-{
-  ARegionType *art;
-
-  /* Every space has a window. */
-  art = BKE_spacetype_add_region_type(st, RGN_TYPE_WINDOW, "Custom Editor Window Region");
-  art->init = rna_CustomSpaceType_main_region_init;
-  art->draw = ED_region_window_draw;
-  art->layout = ED_region_panels_layout;
-  // art->listener = clip_main_region_listener;
-  art->keymapflag = ED_KEYMAP_GIZMO | ED_KEYMAP_FRAMES | ED_KEYMAP_UI | ED_KEYMAP_GPENCIL;
-
-  /* Every space has a header. */
-  art = BKE_spacetype_add_region_type(st, RGN_TYPE_HEADER, "Custom Editor Header Region");
-  art->prefsizey = HEADERY;
-  art->keymapflag = ED_KEYMAP_FRAMES | ED_KEYMAP_UI | ED_KEYMAP_VIEW2D | ED_KEYMAP_HEADER;
-  art->init = rna_CustomSpaceType_header_region_init;
-  art->draw = ED_region_header;
-  //  art->listener = clip_header_region_listener;
-
-  if (SPACETYPE_HAS_REGION(st, RGN_TYPE_FOOTER)) {
-    art = BKE_spacetype_add_region_type(st, RGN_TYPE_FOOTER, "Custom Editor Header Region");
-    art->prefsizey = HEADERY;
-    art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_VIEW2D | ED_KEYMAP_FOOTER;
-    art->init = rna_CustomSpaceType_header_region_init;
-    art->draw = ED_region_header;
-    //  art->listener = clip_header_region_listener;
-  }
-
-  if (SPACETYPE_HAS_REGION(st, RGN_TYPE_UI)) {
-    art = BKE_spacetype_add_region_type(st, RGN_TYPE_UI, "Custom Editor UI Region");
-    art->prefsizex = UI_SIDEBAR_PANEL_WIDTH;
-    art->keymapflag = ED_KEYMAP_FRAMES | ED_KEYMAP_UI;
-    art->init = rna_CustomSpaceType_properties_region_init;
-    art->draw = rna_CustomSpaceType_properties_region_draw;
-    art->layout = ED_region_panels_layout;
-    //  art->listener = clip_properties_region_listener;
-    // ED_clip_buttons_register(art);
-  }
-
-  if (SPACETYPE_HAS_REGION(st, RGN_TYPE_NAV_BAR)) {
-    art = BKE_spacetype_add_region_type(st, RGN_TYPE_NAV_BAR, "Custom Editor Nav Bar Region");
-    art->prefsizex = UI_NAVIGATION_REGION_WIDTH;
-    art->init = ED_region_panels_init;
-    art->draw = ED_region_panels;
-    art->layout = ED_region_panels_layout;
-    // art->listener = userpref_navigation_region_listener;
-    art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_NAVBAR;
-  }
-
-  if (SPACETYPE_HAS_REGION(st, RGN_TYPE_EXECUTE)) {
-    art = BKE_spacetype_add_region_type(st, RGN_TYPE_EXECUTE, "Custom Editor Execute Region");
-    art->prefsizex = UI_NAVIGATION_REGION_WIDTH;
-    art->init = ED_region_panels_init;
-    art->draw = ED_region_panels;
-    art->layout = ED_region_panels_layout;
-    // art->listener = userpref_navigation_region_listener;
-    art->keymapflag = ED_KEYMAP_UI;
-  }
-
-  if (SPACETYPE_HAS_REGION(st, RGN_TYPE_TOOLS)) {
-    art = BKE_spacetype_add_region_type(st, RGN_TYPE_TOOLS, "Custom Editor Tools Region");
-    art->prefsizex = 240;
-    art->prefsizey = 60;
-    art->init = ED_region_panels_init;
-    art->draw = ED_region_panels;
-    art->layout = ED_region_panels_layout;
-    // art->listener = userpref_navigation_region_listener;
-    art->keymapflag = ED_KEYMAP_UI;
-  }
-
-  if (SPACETYPE_HAS_REGION(st, RGN_TYPE_TOOL_PROPS)) {
-    art = BKE_spacetype_add_region_type(st, RGN_TYPE_TOOL_PROPS, "Custom Editor Tools Region");
-    art->prefsizex = 240;
-    art->prefsizey = 60;
-    art->init = ED_region_panels_init;
-    art->draw = ED_region_panels;
-    art->layout = ED_region_panels_layout;
-    // art->listener = userpref_navigation_region_listener;
-    art->keymapflag = ED_KEYMAP_UI;
-  }
-
-  if (SPACETYPE_HAS_REGION(st, RGN_TYPE_TOOL_HEADER)) {
-    art = BKE_spacetype_add_region_type(
-        st, RGN_TYPE_TOOL_HEADER, "Custom Editor Tool Header Region");
-    art->prefsizey = HEADERY;
-    art->init = rna_CustomSpaceType_header_region_init;
-    art->draw = ED_region_header;
-    art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_VIEW2D | ED_KEYMAP_FRAMES | ED_KEYMAP_HEADER;
-  }
-
-  if (SPACETYPE_HAS_REGION(st, RGN_TYPE_HUD)) {
-    art = ED_area_type_hud(st->idname);
-    BLI_addhead(&st->regiontypes, art);
-  }
-}
-
 /* This is based on #rna_def_space_generic_show_region_toggles. */
-static void rna_space_def_show_region_props(SpaceType *st)
+void rna_SpaceType_def_show_region_props(SpaceType *st, int region_id)
 {
   StructRNA *srna = st->rna_ext.srna;
   PropertyRNA *prop;
@@ -3609,34 +3514,30 @@ static void rna_space_def_show_region_props(SpaceType *st)
     } \
     ((void)0)
 
-  DEF_SHOW_REGION_PROPERTY(show_region_header, "Header", "");
-
-  if (SPACETYPE_HAS_REGION(st, RGN_TYPE_UI)) {
-    DEF_SHOW_REGION_PROPERTY(show_region_ui, "Sidebar", "");
-  }
-
-  if (SPACETYPE_HAS_REGION(st, RGN_TYPE_FOOTER)) {
-    DEF_SHOW_REGION_PROPERTY(show_region_footer, "Footer", "");
-  }
-
-  if (SPACETYPE_HAS_REGION(st, RGN_TYPE_TOOLS)) {
-    DEF_SHOW_REGION_PROPERTY(show_region_toolbar, "Toolbar", "");
-  }
-
-  if (SPACETYPE_HAS_REGION(st, RGN_TYPE_TOOL_PROPS)) {
-    DEF_SHOW_REGION_PROPERTY(show_region_tool_props, "Tool Properties", "");
-  }
-
-  if (SPACETYPE_HAS_REGION(st, RGN_TYPE_FOOTER)) {
-    DEF_SHOW_REGION_PROPERTY(show_region_footer, "Footer", "");
-  }
-
-  if (SPACETYPE_HAS_REGION(st, RGN_TYPE_HUD)) {
-    DEF_SHOW_REGION_PROPERTY(show_region_hud, "Hud", "");
-  }
-
-  if (SPACETYPE_HAS_REGION(st, RGN_TYPE_TOOL_HEADER)) {
-    DEF_SHOW_REGION_PROPERTY(show_region_tool_header, "Tool Header", "");
+  switch (region_id) {
+    case RGN_TYPE_HEADER:
+      DEF_SHOW_REGION_PROPERTY(show_region_header, "Header", "");
+      break;
+    case RGN_TYPE_UI:
+      DEF_SHOW_REGION_PROPERTY(show_region_ui, "Sidebar", "");
+      break;
+    case RGN_TYPE_FOOTER:
+      DEF_SHOW_REGION_PROPERTY(show_region_footer, "Footer", "");
+      break;
+    case RGN_TYPE_TOOLS:
+      DEF_SHOW_REGION_PROPERTY(show_region_toolbar, "Toolbar", "");
+      break;
+    case RGN_TYPE_TOOL_PROPS:
+      DEF_SHOW_REGION_PROPERTY(show_region_tool_props, "Tool Properties", "");
+      break;
+    case RGN_TYPE_HUD:
+      DEF_SHOW_REGION_PROPERTY(show_region_hud, "Hud", "");
+      break;
+    case RGN_TYPE_TOOL_HEADER:
+      DEF_SHOW_REGION_PROPERTY(show_region_tool_header, "Tool Header", "");
+      break;
+    default:
+      break;
   }
 #  undef DEF_SHOW_REGION_PROPERTY
 }
@@ -3698,12 +3599,6 @@ static StructRNA *rna_Space_register(Main *bmain,
   // st->keymap = rna_CustomSpaceType_keymap;
 
   BKE_spacetype_register(st);
-
-  /* Setup regions. */
-  rna_spacetype_setup_regions(st);
-
-  /* Properties to toggle regions. */
-  rna_space_def_show_region_props(st);
 
   /* update while blender is running */
   WM_main_add_notifier(NC_WINDOW, NULL);
@@ -3860,48 +3755,6 @@ static void rna_def_space(BlenderRNA *brna)
   RNA_def_property_flag(prop, PROP_REGISTER);
   RNA_def_property_ui_text(
       prop, "Space Type Label", "Label to display for the SpaceType in the UI");
-
-  prop = RNA_def_property(srna, "bl_use_navigation_bar", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
-  RNA_def_property_boolean_sdna(prop, NULL, "type->flag", (1 << RGN_TYPE_NAV_BAR));
-  RNA_def_property_ui_text(
-      prop, "Use Navigation Bar", "Add a navigation bar region to the space type");
-
-  prop = RNA_def_property(srna, "bl_use_footer", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
-  RNA_def_property_boolean_sdna(prop, NULL, "type->flag", (1 << RGN_TYPE_FOOTER));
-  RNA_def_property_ui_text(prop, "Use Footer", "Add a footer region to the space type");
-
-  prop = RNA_def_property(srna, "bl_use_ui", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
-  RNA_def_property_boolean_sdna(prop, NULL, "type->flag", (1 << RGN_TYPE_UI));
-  RNA_def_property_ui_text(prop, "Use UI", "Add a UI region to the space type");
-
-  prop = RNA_def_property(srna, "bl_use_toolbar", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
-  RNA_def_property_boolean_sdna(prop, NULL, "type->flag", (1 << RGN_TYPE_TOOLS));
-  RNA_def_property_ui_text(prop, "Use Tool Bar", "Add a tool bar region to the space type");
-
-  prop = RNA_def_property(srna, "bl_use_tool_properties", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
-  RNA_def_property_boolean_sdna(prop, NULL, "type->flag", (1 << RGN_TYPE_TOOL_PROPS));
-  RNA_def_property_ui_text(
-      prop, "Use Tool Properties", "Add a tool properties region to the space type");
-
-  prop = RNA_def_property(srna, "bl_use_execute", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
-  RNA_def_property_boolean_sdna(prop, NULL, "type->flag", (1 << RGN_TYPE_EXECUTE));
-  RNA_def_property_ui_text(prop, "Use Execute", "Add an execution region to the space type");
-
-  prop = RNA_def_property(srna, "bl_use_hud", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
-  RNA_def_property_boolean_sdna(prop, NULL, "type->flag", (1 << RGN_TYPE_HUD));
-  RNA_def_property_ui_text(prop, "Use Hud", "Add a hud region to the space type");
-
-  prop = RNA_def_property(srna, "bl_use_tool_header", PROP_BOOLEAN, PROP_NONE);
-  RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
-  RNA_def_property_boolean_sdna(prop, NULL, "type->flag", (1 << RGN_TYPE_TOOL_HEADER));
-  RNA_def_property_ui_text(prop, "Use Hud", "Add a hud region to the space type");
 }
 
 /* for all spaces that use a mask */
