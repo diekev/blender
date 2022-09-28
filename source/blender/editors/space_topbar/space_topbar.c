@@ -294,7 +294,7 @@ void ED_spacetype_topbar(void)
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype topbar");
   ARegionType *art;
 
-  BKE_spacetype_set_idname(st, SPACE_TOPBAR, "TOPBAR");
+  st->spaceid = SPACE_TOPBAR;
   STRNCPY(st->name, "Top Bar");
 
   st->create = topbar_create;

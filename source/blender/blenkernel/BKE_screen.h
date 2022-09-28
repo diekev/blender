@@ -432,9 +432,6 @@ void BKE_spacetype_unregister(struct Main *bmain, struct SpaceType *st);
 bool BKE_spacetype_exists(int spaceid);
 void BKE_spacetypes_free(void); /* only for quitting blender */
 
-/* For registration. spaceid should be SPACE_CUSTOM for custom space types. */
-void BKE_spacetype_set_idname(struct SpaceType *st, int spaceid, const char *idname);
-
 void BKE_spacetype_foreach_custom_type(void (*callback)(const SpaceType *spacetype, void *data),
                                        void *callback_data);
 

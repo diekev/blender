@@ -422,7 +422,7 @@ void ED_spacetype_text(void)
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype text");
   ARegionType *art;
 
-  BKE_spacetype_set_idname(st, SPACE_TEXT, "TEXT_EDITOR");
+  st->spaceid = SPACE_TEXT;
   STRNCPY(st->name, "Text");
 
   st->create = text_create;

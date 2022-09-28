@@ -172,7 +172,7 @@ void ED_spacetype_script(void)
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype script");
   ARegionType *art;
 
-  BKE_spacetype_set_idname(st, SPACE_SCRIPT, "SCRIPT");
+  st->spaceid = SPACE_SCRIPT;
   STRNCPY(st->name, "Script");
 
   st->create = script_create;

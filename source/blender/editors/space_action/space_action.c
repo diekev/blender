@@ -867,7 +867,7 @@ void ED_spacetype_action(void)
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype action");
   ARegionType *art;
 
-  BKE_spacetype_set_idname(st, SPACE_ACTION, "DOPESHEET_EDITOR");
+  st->spaceid = SPACE_ACTION;
   STRNCPY(st->name, "Action");
 
   st->create = action_create;

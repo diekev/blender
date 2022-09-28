@@ -1077,7 +1077,7 @@ void ED_spacetype_image(void)
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype image");
   ARegionType *art;
 
-  BKE_spacetype_set_idname(st, SPACE_IMAGE, "IMAGE_EDITOR");
+  st->spaceid = SPACE_IMAGE;
   STRNCPY(st->name, "Image");
 
   st->create = image_create;

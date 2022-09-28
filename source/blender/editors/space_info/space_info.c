@@ -260,7 +260,7 @@ void ED_spacetype_info(void)
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype info");
   ARegionType *art;
 
-  BKE_spacetype_set_idname(st, SPACE_INFO, "INFO");
+  st->spaceid = SPACE_INFO;
   STRNCPY(st->name, "Info");
 
   st->create = info_create;

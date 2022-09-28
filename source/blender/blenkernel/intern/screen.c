@@ -483,8 +483,6 @@ const ListBase *BKE_spacetypes_list(void)
   return &spacetypes;
 }
 
-static const char *spacetypes_idnames[SPACE_TYPE_NUM];
-
 const char *BKE_spacetype_idname_from_spaceid(int spaceid)
 {
 #define MATCH_SPACE_TYPE(space_type, space_name) \
@@ -569,21 +567,7 @@ int BKE_spaceid_from_space_idname(const char *idname)
 
 #undef MATCH_SPACE_TYPE
 
-  //  for (int i = 0; i < SPACE_TYPE_NUM - 1; i++) {
-  //    if (STREQLEN(idname, spacetypes_idnames[i], 64)) {
-  //      return i;
-  //    }
-  //  }
-
   return SPACE_CUSTOM;
-}
-
-void BKE_spacetype_set_idname(SpaceType *st, int spaceid, const char *idname)
-{
-  spacetypes_idnames[SPACE_EMPTY] = "EMPTY";
-  spacetypes_idnames[spaceid] = idname;
-  st->spaceid = spaceid;
-  BLI_strncpy(st->idname, idname, sizeof(st->idname));
 }
 
 void BKE_spacetype_register(SpaceType *st)
@@ -605,6 +589,7 @@ void BKE_spacetype_register_builtin(struct SpaceType *st, struct StructRNA *srna
 {
   BKE_spacetype_register(st);
   st->rna_ext.srna = srna;
+  BLI_strncpy(st->idname, BKE_spacetype_idname_from_spaceid(st->spaceid), sizeof(st->idname));
 }
 
 void BKE_spacetype_unregister(struct Main *bmain, struct SpaceType *st)

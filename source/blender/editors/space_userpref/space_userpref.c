@@ -196,7 +196,7 @@ void ED_spacetype_userpref(void)
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype userpref");
   ARegionType *art;
 
-  BKE_spacetype_set_idname(st, SPACE_USERPREF, "PREFERENCES");
+  st->spaceid = SPACE_USERPREF;
   STRNCPY(st->name, "Userpref");
 
   st->create = userpref_create;

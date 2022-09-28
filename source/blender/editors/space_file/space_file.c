@@ -1039,7 +1039,7 @@ void ED_spacetype_file(void)
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype file");
   ARegionType *art;
 
-  BKE_spacetype_set_idname(st, SPACE_FILE, "FILE_BROWSER");
+  st->spaceid = SPACE_FILE;
   STRNCPY(st->name, "File");
 
   st->create = file_create;
