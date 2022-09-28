@@ -1587,10 +1587,12 @@ void BKE_screen_area_blend_read_lib(BlendLibReader *reader, ID *parent_id, ScrAr
   memset(&area->runtime, 0x0, sizeof(area->runtime));
 
   LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
-    sl->type = BKE_spacetype_from_id(sl->spacetype);
+    SpaceType *space_type = BKE_spacetype_from_id(sl->spacetype);
 
-    if (sl->type->blend_read_lib) {
-      sl->type->blend_read_lib(reader, parent_id, sl);
+    if (space_type->blend_read_lib) {
+      space_type->blend_read_lib(reader, parent_id, sl);
     }
+
+    sl->type = space_type;
   }
 }

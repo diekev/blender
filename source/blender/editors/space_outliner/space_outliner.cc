@@ -450,7 +450,7 @@ static void outliner_blend_read_data(BlendDataReader *reader, SpaceLink *sl)
    * was not unique */
   TreeStore *ts = static_cast<TreeStore *>(
       BLO_read_get_new_data_address_no_us(reader, space_outliner->treestore));
-  space_outliner->treestore = NULL;
+  space_outliner->treestore = nullptr;
   if (ts) {
     TreeStoreElem *elems = static_cast<TreeStoreElem *>(
         BLO_read_get_new_data_address_no_us(reader, ts->data));
@@ -467,8 +467,8 @@ static void outliner_blend_read_data(BlendDataReader *reader, SpaceLink *sl)
     /* we only saved what was used */
     space_outliner->storeflag |= SO_TREESTORE_CLEANUP; /* at first draw */
   }
-  space_outliner->tree.first = space_outliner->tree.last = NULL;
-  space_outliner->runtime = NULL;
+  space_outliner->tree.first = space_outliner->tree.last = nullptr;
+  space_outliner->runtime = nullptr;
 }
 
 static void outliner_blend_read_lib(BlendLibReader *reader, ID *UNUSED(parent_id), SpaceLink *sl)
@@ -481,7 +481,7 @@ static void outliner_blend_read_lib(BlendLibReader *reader, ID *UNUSED(parent_id
 
     BLI_mempool_iternew(space_outliner->treestore, &iter);
     while ((tselem = static_cast<TreeStoreElem *>(BLI_mempool_iterstep(&iter)))) {
-      BLO_read_id_address(reader, NULL, &tselem->id);
+      BLO_read_id_address(reader, nullptr, &tselem->id);
     }
     /* rebuild hash table, because it depends on ids too */
     space_outliner->storeflag |= SO_TREESTORE_REBUILD;
@@ -534,7 +534,7 @@ static void write_space_outliner(BlendWriter *writer, const SpaceOutliner *space
     }
     else {
       SpaceOutliner space_outliner_flat = *space_outliner;
-      space_outliner_flat.treestore = NULL;
+      space_outliner_flat.treestore = nullptr;
       BLO_write_struct_at_address(writer, SpaceOutliner, space_outliner, &space_outliner_flat);
     }
   }

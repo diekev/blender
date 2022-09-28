@@ -620,7 +620,7 @@ static void spreadsheet_blend_read_data(BlendDataReader *reader, SpaceLink *sl)
 {
   SpaceSpreadsheet *sspreadsheet = (SpaceSpreadsheet *)sl;
 
-  sspreadsheet->runtime = NULL;
+  sspreadsheet->runtime = nullptr;
   BLO_read_list(reader, &sspreadsheet->row_filters);
   LISTBASE_FOREACH (SpreadsheetRowFilter *, row_filter, &sspreadsheet->row_filters) {
     BLO_read_data_address(reader, &row_filter->value_string);
