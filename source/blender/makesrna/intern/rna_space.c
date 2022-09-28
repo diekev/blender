@@ -3375,9 +3375,10 @@ static int rna_FileAssetSelectParams_catalog_id_length(PointerRNA *UNUSED(ptr))
 /** \name Custom Space Registration
  * \{ */
 
-#  define SPACETYPE_HAS_REGION(space, region) (((space->flag) & (1 << region)) != 0)
 static SpaceLink *rna_CustomSpaceType_create(const ScrArea *area, const Scene *UNUSED(scene))
 {
+#  define SPACETYPE_HAS_REGION(space, region) (((space->flag) & (1 << region)) != 0)
+
   SpaceType *st = area->type;
   SpaceLink *space = MEM_callocN(sizeof(SpaceLink), __func__);
 
@@ -3434,6 +3435,7 @@ static SpaceLink *rna_CustomSpaceType_create(const ScrArea *area, const Scene *U
   }
 
   return space;
+#  undef SPACETYPE_HAS_REGION
 }
 
 static void rna_CustomSpaceType_header_region_init(wmWindowManager *UNUSED(wm),
@@ -3531,7 +3533,6 @@ void rna_SpaceType_def_show_region_props(SpaceType *st, int region_id)
   }
 #  undef DEF_SHOW_REGION_PROPERTY
 }
-#  undef SPACETYPE_HAS_REGION
 
 static StructRNA *rna_Space_register(Main *bmain,
                                      ReportList *reports,
