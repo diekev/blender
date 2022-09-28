@@ -208,10 +208,12 @@ void BKE_screen_foreach_id_screen_area(LibraryForeachIDData *data, ScrArea *area
         break;
       }
       case SPACE_CUSTOM: {
-        IDP_foreach_property(sl->id_properties,
-                             IDP_TYPE_FILTER_ID,
-                             BKE_lib_query_idpropertiesForeachIDLink_callback,
-                             data);
+        BKE_LIB_FOREACHID_PROCESS_FUNCTION_CALL(
+            data,
+            IDP_foreach_property(sl->id_properties,
+                                 IDP_TYPE_FILTER_ID,
+                                 BKE_lib_query_idpropertiesForeachIDLink_callback,
+                                 data));
         break;
       }
       default:
@@ -1415,6 +1417,8 @@ static void write_area(BlendWriter *writer, ScrArea *area)
       write_region(writer, region, sl->spacetype);
     }
 
+    /* Write ID Properties -- and copy this comment EXACTLY for easy finding
+     * of library blocks that implement this. */
     if (sl->id_properties) {
       IDP_BlendWrite(writer, sl->id_properties);
     }
@@ -1647,6 +1651,8 @@ void BKE_screen_area_blend_read_lib(BlendLibReader *reader, ID *parent_id, ScrAr
 
   LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
     SpaceType *space_type = spacetype_ensure(sl);
+
+    IDP_BlendReadLib(reader, parent_id->lib, sl->id_properties);
 
     if (space_type->blend_read_lib) {
       space_type->blend_read_lib(reader, parent_id, sl);
