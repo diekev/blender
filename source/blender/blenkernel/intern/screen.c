@@ -395,6 +395,33 @@ SpaceType *BKE_spacetype_from_idname(const char *idname)
   return NULL;
 }
 
+#if 0
+static SpaceType undefined_space_type = {};
+
+static SpaceType *space_type_ensure(SpaceLink *space)
+{
+  if (space->type && space->type != &undefined_space_type) {
+    return space->type;
+  }
+
+  if (space->spacetype == SPACE_CUSTOM) {
+    SpaceType *space_type = BKE_spacetype_from_idname(space->space_idname);
+    if (space_type) {
+      return space_type;
+    }
+
+    return &undefined_space_type;
+  }
+
+  SpaceType *space_type = BKE_spacetype_from_id(space->spacetype);
+  if (space_type) {
+    return space_type;
+  }
+
+  return &undefined_space_type;
+}
+#endif
+
 void BKE_spacetype_foreach_custom_type(void (*callback)(const SpaceType *spacetype, void *data),
                                        void *callback_data)
 {
