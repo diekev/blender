@@ -43,7 +43,5 @@ endif()
 
 blender_add_lib(bf_editor_space_buttons "${SRC}" "${INC}" "${INC_SYS}" "${LIB}")
 
-# dna_type_offsets.h
-add_dependencies(bf_editor_space_buttons bf_dna)
 # RNA_prototypes.h
 add_dependencies(bf_editor_space_buttons bf_rna)
