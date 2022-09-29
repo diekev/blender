@@ -134,6 +134,8 @@ static void do_draw_face_sets_brush_task_cb_ex(void *__restrict userdata,
       data->ob, ss, ss->cache->automasking, &automask_data, data->nodes[n]);
 
   BKE_pbvh_vertex_iter_begin (ss->pbvh, data->nodes[n], vd, PBVH_ITER_UNIQUE) {
+    SCULPT_automasking_node_update(ss, &automask_data, &vd);
+
     if (BKE_pbvh_type(ss->pbvh) == PBVH_FACES) {
       MeshElemMap *vert_map = &ss->pmap[vd.index];
       for (int j = 0; j < ss->pmap[vd.index].count; j++) {
@@ -245,6 +247,12 @@ void SCULPT_do_draw_face_sets_brush(Sculpt *sd, Object *ob, PBVHNode **nodes, in
 {
   SculptSession *ss = ob->sculpt;
   Brush *brush = BKE_paint_brush(&sd->paint);
+
+  if (ss->pbvh) {
+    Mesh *mesh = BKE_mesh_from_object(ob);
+    BKE_pbvh_face_sets_color_set(
+        ss->pbvh, mesh->face_sets_color_seed, mesh->face_sets_color_default);
+  }
 
   BKE_curvemapping_init(brush->curve);
 
