@@ -285,6 +285,16 @@ static void screen_blend_read_lib(BlendLibReader *reader, ID *id)
   }
 }
 
+static void screen_blend_read_expand(BlendExpander *expander, ID *id)
+{
+  bScreen *screen = (bScreen *)id;
+  LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+    LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+      IDP_BlendReadExpand(expander, sl->id_properties);
+    }
+  }
+}
+
 IDTypeInfo IDType_ID_SCR = {
     .id_code = ID_SCR,
     .id_filter = FILTER_ID_SCR,
@@ -309,7 +319,7 @@ IDTypeInfo IDType_ID_SCR = {
     /* Cannot be used yet, because #direct_link_screen has a return value. */
     .blend_read_data = NULL,
     .blend_read_lib = screen_blend_read_lib,
-    .blend_read_expand = NULL,
+    .blend_read_expand = screen_blend_read_expand,
 
     .blend_read_undo_preserve = NULL,
 
@@ -1613,13 +1623,15 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
   }
 
   LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+    sl->type = NULL;
+
     BLO_read_list(reader, &(sl->regionbase));
 
     /* if we do not have the spacetype registered we cannot
      * free it, so don't allocate any new memory for such spacetypes. */
-    if (!BKE_spacetype_exists(sl->spacetype)) {
-      sl->spacetype = SPACE_EMPTY;
-    }
+    //    if (!BKE_spacetype_exists(sl->spacetype)) {
+    //      sl->spacetype = SPACE_EMPTY;
+    //    }
 
     LISTBASE_FOREACH (ARegion *, region, &sl->regionbase) {
       direct_link_region(reader, region, sl->spacetype);
