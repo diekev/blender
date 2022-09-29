@@ -817,13 +817,22 @@ static void rna_def_view2d_api(StructRNA *srna)
 static void rna_def_view2d(BlenderRNA *brna)
 {
   StructRNA *srna;
-  /* PropertyRNA *prop; */
+  PropertyRNA *prop;
 
   srna = RNA_def_struct(brna, "View2D", NULL);
   RNA_def_struct_ui_text(srna, "View2D", "Scroll and zoom for a 2D region");
   RNA_def_struct_sdna(srna, "View2D");
 
   /* TODO: more View2D properties could be exposed here (read-only). */
+  prop = RNA_def_property(srna, "draw_rect", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_float_sdna(prop, NULL, "tot.xmin");
+  RNA_def_property_array(prop, 4);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+
+  prop = RNA_def_property(srna, "visible_rect", PROP_FLOAT, PROP_NONE);
+  RNA_def_property_float_sdna(prop, NULL, "cur.xmin");
+  RNA_def_property_array(prop, 4);
+  RNA_def_property_clear_flag(prop, PROP_EDITABLE);
 
   rna_def_view2d_api(srna);
 }
