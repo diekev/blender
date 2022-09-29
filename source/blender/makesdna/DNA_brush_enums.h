@@ -89,6 +89,10 @@ typedef enum eGPDbrush_Flag {
   GP_BRUSH_TRIM_STROKE = (1 << 16),
   /* Post process convert to outline stroke */
   GP_BRUSH_OUTLINE_STROKE = (1 << 17),
+  /* Collide with stroke. */
+  GP_BRUSH_FILL_STROKE_COLLIDE = (1 << 18),
+  /* Extend lines only close if collide. */
+  GP_BRUSH_FILL_COLLIDE_ONLY = (1 << 19),
 } eGPDbrush_Flag;
 
 typedef enum eGPDbrush_Flag2 {
@@ -326,6 +330,18 @@ typedef enum eAutomasking_flag {
   BRUSH_AUTOMASKING_FACE_SETS = (1 << 1),
   BRUSH_AUTOMASKING_BOUNDARY_EDGES = (1 << 2),
   BRUSH_AUTOMASKING_BOUNDARY_FACE_SETS = (1 << 3),
+  BRUSH_AUTOMASKING_CAVITY_NORMAL = (1 << 4),
+
+  /* Note: normal and inverted are mutually exclusive,
+   * inverted has priority if both bits are set.
+   */
+  BRUSH_AUTOMASKING_CAVITY_INVERTED = (1 << 5),
+  BRUSH_AUTOMASKING_CAVITY_ALL = (1 << 4) | (1 << 5),
+  BRUSH_AUTOMASKING_CAVITY_USE_CURVE = (1 << 6),
+  /* (1 << 7) - unused. */
+  BRUSH_AUTOMASKING_BRUSH_NORMAL = (1 << 8),
+  BRUSH_AUTOMASKING_VIEW_NORMAL = (1 << 9),
+  BRUSH_AUTOMASKING_VIEW_OCCLUSION = (1 << 10),
 } eAutomasking_flag;
 
 typedef enum ePaintBrush_flag {
