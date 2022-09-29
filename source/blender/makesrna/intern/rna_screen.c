@@ -19,6 +19,7 @@
 #include "BKE_screen.h"
 
 #include "ED_info.h"
+#include "ED_space_api.h"
 
 const EnumPropertyItem rna_enum_region_type_items[] = {
     {RGN_TYPE_WINDOW, "WINDOW", 0, "Window", ""},
@@ -651,6 +652,24 @@ static void rna_Region_add_keymap(ARegion *region, wmKeyMap *keymap)
   WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
 }
 
+static void rna_Region_theme_clear_color(ARegion *region)
+{
+  switch (region->regiontype) {
+    case RGN_TYPE_HEADER:
+    case RGN_TYPE_TOOL_HEADER:
+      UI_ThemeClearColor(TH_HEADER);
+      break;
+    default:
+      UI_ThemeClearColor(TH_BACK);
+      break;
+  }
+}
+
+static void rna_Region_draw_handlers(ARegion *region, bContext *C, int draw_mode)
+{
+  ED_region_draw_cb_draw(C, region, draw_mode);
+}
+
 #else
 
 /* Area.spaces */
@@ -933,6 +952,54 @@ static void rna_def_region(BlenderRNA *brna)
   func = RNA_def_function(srna, "add_keymap", "rna_Region_add_keymap");
   RNA_def_function_ui_description(func, "Add a keymap to this region");
   parm = RNA_def_pointer(func, "keymap", "KeyMap", "", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+
+  func = RNA_def_function(srna, "draw_grid", "ED_region_grid_draw");
+  parm = RNA_def_float(
+      func, "zoomx", 1.0f, 0.0f, 100.0f, "Zoom X", "Zoom along the X axis", 0.0f, 100.0f);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_float(
+      func, "zoomy", 1.0f, 0.0f, 100.0f, "Zoom Y", "Zoom along the Y axis", 0.0f, 100.0f);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_float(func,
+                       "x",
+                       1.0f,
+                       0.0f,
+                       100.0f,
+                       "Center X",
+                       "Center of the grid along the X axis",
+                       0.0f,
+                       100.0f);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_float(func,
+                       "y",
+                       1.0f,
+                       0.0f,
+                       100.0f,
+                       "Center Y",
+                       "Center of the grid along the X axis",
+                       0.0f,
+                       100.0f);
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+
+  func = RNA_def_function(srna, "theme_clear_color", "rna_Region_theme_clear_color");
+  RNA_def_function_ui_description(func, "Clear the region with its respective theme color");
+
+  static const EnumPropertyItem region_draw_mode_items[] = {
+      {REGION_DRAW_POST_PIXEL, "POST_PIXEL", 0, "Post Pixel", ""},
+      {REGION_DRAW_POST_VIEW, "POST_VIEW", 0, "Post View", ""},
+      {REGION_DRAW_PRE_VIEW, "PRE_VIEW", 0, "Pre View", ""},
+      {REGION_DRAW_BACKDROP, "BACKDROP", 0, "Backdrop", ""},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  func = RNA_def_function(srna, "draw_handlers", "rna_Region_draw_handlers");
+  RNA_def_function_ui_description(
+      func, "Call the various handlers set in the space via `draw_handler_add`");
+  parm = RNA_def_pointer(func, "context", "Context", "", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_enum(
+      func, "draw_mode", region_draw_mode_items, REGION_DRAW_POST_PIXEL, "Draw Mode", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
 
   /* Registration. */
