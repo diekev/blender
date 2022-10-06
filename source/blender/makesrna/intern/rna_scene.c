@@ -2595,8 +2595,8 @@ static const EnumPropertyItem *rna_TransformOrientation_impl_itemf(Scene *scene,
 
   if (include_default) {
     tmp.identifier = "DEFAULT";
-    tmp.name = "Default";
-    tmp.description = "Use the scene orientation";
+    tmp.name = N_("Default");
+    tmp.description = N_("Use the scene orientation");
     tmp.value = V3D_ORIENT_DEFAULT;
     tmp.icon = ICON_OBJECT_ORIGIN;
     RNA_enum_item_add(&item, &totitem, &tmp);
@@ -4617,6 +4617,7 @@ void rna_def_view_layer_common(BlenderRNA *brna, StructRNA *srna, const bool sce
   prop = RNA_def_property(srna, "use_pass_object_index", PROP_BOOLEAN, PROP_NONE);
   RNA_def_property_boolean_sdna(prop, NULL, "passflag", SCE_PASS_INDEXOB);
   RNA_def_property_ui_text(prop, "Object Index", "Deliver object index pass");
+  RNA_def_property_translation_context(prop, BLT_I18NCONTEXT_ID_SCENE);
   if (scene) {
     RNA_def_property_update(prop, NC_SCENE | ND_RENDER_OPTIONS, "rna_ViewLayer_pass_update");
   }
