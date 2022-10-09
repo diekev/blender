@@ -777,13 +777,11 @@ static void init_default_region_type(ARegionType *art)
 
   switch (art->regionid) {
     case RGN_TYPE_WINDOW: {
-      art->init = ED_region_panels_init;
       art->draw = ED_region_window_draw;
       art->keymapflag = ED_KEYMAP_GIZMO | ED_KEYMAP_FRAMES | ED_KEYMAP_UI | ED_KEYMAP_GPENCIL;
       break;
     }
     case RGN_TYPE_HEADER: {
-      art->init = region_header_init;
       art->draw = ED_region_header;
       art->prefsizey = HEADERY;
       art->layout = NULL;
@@ -791,7 +789,6 @@ static void init_default_region_type(ARegionType *art)
       break;
     }
     case RGN_TYPE_FOOTER: {
-      art->init = region_header_init;
       art->draw = ED_region_header;
       art->layout = NULL;
       art->prefsizey = HEADERY;
@@ -799,21 +796,18 @@ static void init_default_region_type(ARegionType *art)
       break;
     }
     case RGN_TYPE_UI: {
-      art->init = ED_region_panels_init;
       art->draw = region_properties_draw;
       art->prefsizex = UI_SIDEBAR_PANEL_WIDTH;
       art->keymapflag = ED_KEYMAP_FRAMES | ED_KEYMAP_UI;
       break;
     }
     case RGN_TYPE_NAV_BAR: {
-      art->init = ED_region_panels_init;
       art->draw = ED_region_panels;
       art->prefsizex = UI_NAVIGATION_REGION_WIDTH;
       art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_NAVBAR;
       break;
     }
     case RGN_TYPE_EXECUTE: {
-      art->init = ED_region_panels_init;
       art->draw = ED_region_panels;
       art->prefsizex = UI_NAVIGATION_REGION_WIDTH;
       art->keymapflag = ED_KEYMAP_UI;
@@ -821,7 +815,6 @@ static void init_default_region_type(ARegionType *art)
     }
     case RGN_TYPE_TOOLS:
     case RGN_TYPE_TOOL_PROPS: {
-      art->init = ED_region_panels_init;
       art->draw = ED_region_panels;
       art->prefsizex = 240;
       art->prefsizey = 60;
@@ -829,7 +822,6 @@ static void init_default_region_type(ARegionType *art)
       break;
     }
     case RGN_TYPE_TOOL_HEADER: {
-      art->init = region_header_init;
       art->draw = ED_region_header;
       art->layout = NULL;
       art->prefsizey = HEADERY;
@@ -837,7 +829,6 @@ static void init_default_region_type(ARegionType *art)
       break;
     }
     default: {
-      art->init = ED_region_panels_init;
       art->draw = ED_region_panels;
       break;
     }
@@ -930,7 +921,7 @@ static StructRNA *rna_Region_register(Main *bmain,
     init_default_region_type(art);
 
     /* Keep the defaults if not overriden. */
-    art->init = (have_function[0]) ? region_init : art->init;
+    art->init = (have_function[0]) ? region_init : NULL;
     art->exit = (have_function[1]) ? region_exit : art->exit;
     art->draw = (have_function[2]) ? region_draw : art->draw;
   }
@@ -941,24 +932,6 @@ static StructRNA *rna_Region_register(Main *bmain,
   WM_main_add_notifier(NC_WINDOW, NULL);
 
   return art->rna_ext.srna;
-}
-
-static void rna_Region_default_init(wmWindowManager *wm, ARegion *region)
-{
-  switch (region->regiontype) {
-    case RGN_TYPE_HEADER:
-    case RGN_TYPE_FOOTER:
-    case RGN_TYPE_TOOL_HEADER:
-    case RGN_TYPE_TOOLS:
-    case RGN_TYPE_TOOL_PROPS:
-      ED_region_header_init(region);
-      break;
-    case RGN_TYPE_HUD:
-      break;
-    default:
-      ED_region_panels_init(wm, region);
-      break;
-  }
 }
 
 static void rna_Region_add_keymap(ARegion *region, wmKeyMap *keymap)
@@ -1245,11 +1218,18 @@ static void rna_def_region(BlenderRNA *brna)
 
   RNA_def_function(srna, "tag_redraw", "ED_region_tag_redraw");
 
-  func = RNA_def_function(srna, "default_init", "rna_Region_default_init");
+  func = RNA_def_function(srna, "header_init", "ED_region_header_init");
   RNA_def_function_flag(func, FUNC_NO_SELF);
-  RNA_def_function_ui_description(func,
-                                  "Default initialization function for Regions, this should be "
-                                  "called by custom regions in their init() override");
+  RNA_def_function_ui_description(func, "Initialization function for header or footer regions");
+  parm = RNA_def_pointer(func, "region", "Region", "", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+
+  func = RNA_def_function(srna, "panels_init", "ED_region_panels_init");
+  RNA_def_function_flag(func, FUNC_NO_SELF);
+  RNA_def_function_ui_description(
+      func,
+      "Initialization function for regions containing panels. This will also add common keymaps "
+      "for interracting with the panels to the region");
   parm = RNA_def_pointer(func, "window_manager", "WindowManager", "", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_pointer(func, "region", "Region", "", "");
@@ -1338,11 +1318,8 @@ static void rna_def_region(BlenderRNA *brna)
   RNA_def_property_ui_text(prop, "Region Type", "The type of region");
 
   func = RNA_def_function(srna, "init", NULL);
-  RNA_def_function_ui_description(
-      func,
-      "Can be used to initialize handlers for this region. If not set, a default function will be "
-      "called. If set, make sure to call Region.default_init()");
-  RNA_def_function_flag(func, FUNC_REGISTER_OPTIONAL | FUNC_ALLOW_WRITE);
+  RNA_def_function_ui_description(func, "Can be used to initialize handlers for this region.");
+  RNA_def_function_flag(func, FUNC_REGISTER | FUNC_ALLOW_WRITE);
   parm = RNA_def_pointer(func, "window_manager", "WindowManager", "", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
 
