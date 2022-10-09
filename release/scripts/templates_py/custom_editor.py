@@ -2,6 +2,9 @@
 # - add icon to the Space definition
 # - figure out how to properly insert and update the space selector
 # - figure out how to set the contexts string for the panels display
+# - transform API (TransInfo.spacetype, TransConvertTypeInfo)
+# - Grease Pencil API
+# - color management
 
 import bpy
 from bpy.types import Space, Region, Menu, Panel, Header
