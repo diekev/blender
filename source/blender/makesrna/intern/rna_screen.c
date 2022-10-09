@@ -21,6 +21,8 @@
 #include "ED_info.h"
 #include "ED_space_api.h"
 
+#include "UI_view2d.h"
+
 const EnumPropertyItem rna_enum_region_type_items[] = {
     {RGN_TYPE_WINDOW, "WINDOW", 0, "Window", ""},
     {RGN_TYPE_HEADER, "HEADER", 0, "Header", ""},
@@ -939,6 +941,11 @@ static void rna_Region_theme_clear_color(ARegion *UNUSED(region), int theme_id)
   UI_ThemeClearColor(theme_id);
 }
 
+static void rna_Region_view2d_init(ARegion *region, int view_type)
+{
+  UI_view2d_region_reinit(&region->v2d, view_type, region->winx, region->winy);
+}
+
 static void rna_Region_draw_handlers(ARegion *region, bContext *C, int draw_mode)
 {
   ED_region_draw_cb_draw(C, region, draw_mode);
@@ -1228,6 +1235,41 @@ static void rna_def_region(BlenderRNA *brna)
   parm = RNA_def_pointer(func, "window_manager", "WindowManager", "", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_pointer(func, "region", "Region", "", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+
+  static const EnumPropertyItem rna_view2d_init_items[] = {
+      {V2D_COMMONVIEW_CUSTOM,
+       "CUSTOM",
+       0,
+       "Custom",
+       "View for regions that have defined all necessary flags"},
+      {V2D_COMMONVIEW_STANDARD, "STANDARD", 0, "Standard", "Default view to set default settings"},
+      {V2D_COMMONVIEW_LIST, "LIST", 0, "List View", "View for list (i.e. Outliner)"},
+      {V2D_COMMONVIEW_STACK,
+       "STACK",
+       0,
+       "Stack View",
+       "View for lists where items are added at the top"},
+      {V2D_COMMONVIEW_HEADER, "HEADER", 0, "Header View", "View for header or footer regions"},
+      {V2D_COMMONVIEW_PANELS_UI,
+       "PANELS_UI",
+       0,
+       "Panels View",
+       "View for regions containing panels"},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  func = RNA_def_function(srna, "view2d_init", "rna_Region_view2d_init");
+  RNA_def_function_flag(func, FUNC_NO_SELF);
+  RNA_def_function_ui_description(func, "Initialization function for header or footer regions");
+  parm = RNA_def_pointer(func, "region", "Region", "", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_enum(func,
+                      "view_type",
+                      rna_view2d_init_items,
+                      V2D_COMMONVIEW_CUSTOM,
+                      "View Type",
+                      "The type of view to initialize");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
 
   func = RNA_def_function(srna, "add_keymap", "rna_Region_add_keymap");
