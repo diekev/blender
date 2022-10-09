@@ -1,0 +1,206 @@
+# TODOs
+# - add icon to the Space definition
+# - figure out how to properly insert and update the space selector
+# - figure out how to set the contexts string for the panels display
+
+import bpy
+from bpy.types import Space, Region, Menu, Panel, Header
+from bpy.props import StringProperty, FloatProperty
+
+# Implementation of custom editors ("Space") from Python
+
+
+# Defines a new editor.
+# Derived from the Space base type, similar to Menu, Operator, Panel, etc.
+class MyCustomEditor(Space):
+    # === Basics ===
+    # Optional identifier string. If not explicitly defined, the python class name is used.
+    bl_idname = 'MY_CUSTOM_EDITOR_TYPE'
+    # Label for nice name display
+    bl_label = 'Custom Editor'
+
+    # === Custom Properties ===
+    # These work just like custom properties in ID data blocks
+    # Extensive information can be found under
+    # https://docs.blender.org/api/current/bpy.props.html
+    my_string_prop: bpy.props.StringProperty()
+    my_float_prop: IntProperty(default=3.1415926)
+
+
+# Add a custom header region for the editor.
+# This is optional.
+class MyCustomEditorHeaderRegion(Region):
+    bl_idname = 'MyCustomEditorHeaderRegion'
+    bl_space_type = 'MY_CUSTOM_EDITOR_TYPE'
+    bl_region_type = 'HEADER'
+
+    # Initialization function, called when the region is created/displayed/ resized.
+    # NOTE: this is not the same as the standard __init__ function in Python, which is
+    #       a purely internal Python method and unknown to the node system!
+    def init(self, _window_manager):
+        # Initialize the region with default settings for headers.
+        # This is similar to Region.view2d_init(self, 'HEADER')
+        Region.header_init(self)
+
+
+# Add a custom window region for the editor.
+# This is optional.
+class MyCustomEditorWindowRegion(Region):
+    bl_idname = 'MyCustomEditorWindowRegion'
+    bl_space_type = 'MY_CUSTOM_EDITOR_TYPE'
+    bl_region_type = 'WINDOW'
+
+    # Initialization function, called when the region is created/displayed/ resized.
+    # NOTE: this is not the same as the standard __init__ function in Python, which is
+    #       a purely internal Python method and unknown to the node system!
+    def init(self, window_manager):
+        # Initialize the region with default settings for panels.
+        Region.panels_init(window_manager, self)
+
+        keymap = get_keymap(window_manager, "MyCustomEditor", "MY_CUSTOM_EDITOR_TYPE", 'WINDOW')
+        if keymap:
+            self.add_keymap(keymap)
+
+
+# Add a custom UI region for the editor.
+# This is optional.
+class MyCustomEditorPropertiesRegion(Region):
+    bl_idname = 'MyCustomEditorPropertiesRegion'
+    bl_space_type = 'MY_CUSTOM_EDITOR_TYPE'
+    bl_region_type = 'UI'
+
+    # Initialization function, called when the region is created/displayed/ resized.
+    # NOTE: this is not the same as the standard __init__ function in Python, which is
+    #       a purely internal Python method and unknown to the node system!
+    def init(self, window_manager):
+        # Initialize the region with default settings for panels.
+        Region.panels_init(window_manager, self)
+
+
+# Add a custom navigation bar region for the editor.
+# This is optional.
+class MyCustomEditorNavigationRegion(Region):
+    bl_idname = 'MyCustomEditorNavigationRegion'
+    bl_space_type = 'MY_CUSTOM_EDITOR_TYPE'
+    bl_region_type = 'NAVIGATION_BAR'
+
+    # Initialization function, called when the region is created/displayed/ resized.
+    # NOTE: this is not the same as the standard __init__ function in Python, which is
+    #       a purely internal Python method and unknown to the node system!
+    def init(self, window_manager):
+        # Initialize the region with default settings for panels.
+        Region.panels_init(window_manager, self)
+
+
+def draw_editor_properties(layout, context):
+    layout = self.layout
+
+    obj = context.object
+
+    row = layout.row()
+    row.label(text="Hello world!", icon='WORLD_DATA')
+
+    row = layout.row()
+    row.label(text="Active object is: " + obj.name)
+    row = layout.row()
+    row.prop(obj, "name")
+
+    row = layout.row()
+    row.operator("mesh.primitive_cube_add")
+
+
+# Panel for displaying the editor's properties in the UI region.
+class HelloWorldPanel(Panel):
+    bl_label = "My Custom Compositor Panel"
+    bl_idname = "COMPOSITEUR_PT_hello"
+    bl_space_type = 'MY_CUSTOM_EDITOR_TYPE'
+    bl_region_type = 'UI'
+    bl_category = "Quelque"
+
+    def draw(self, context):
+        layout = self.layout
+        draw_editor_properties(layout, context)
+
+
+# Panel for displaying the editor's properties in the window region.
+class WindowPanel(Panel):
+    """Creates a Panel in the Object properties window"""
+    bl_label = "Hello World Panel"
+    bl_idname = "COMPOSITEUR_PT_window"
+    bl_space_type = 'MY_CUSTOM_EDITOR_TYPE'
+    bl_region_type = 'WINDOW'
+
+    def draw(self, context):
+        draw_editor_properties(layout, context)
+
+
+# Panel for displaying the editor's properties in the navigation bar region.
+class NavBarPanel(Panel):
+    """Creates a Panel in the Object properties window"""
+    bl_label = "Hello World Navigation Panel"
+    bl_idname = "COMPOSITEUR_PT_navbar"
+    bl_space_type = 'MY_CUSTOM_EDITOR_TYPE'
+    bl_region_type = 'NAVIGATION_BAR'
+
+    def draw(self, context):
+        draw_editor_properties(layout, context)
+
+
+# Menu displayed in the Header.
+class EDITEUR_MT_view(Menu):
+    bl_label = "View"
+
+    def draw(self, context):
+        layout = self.layout
+        sc = context.space_data
+
+        layout.prop(sc, "show_region_ui")
+
+# Header layout.
+class EDITEUR_HT_entete(Header):
+    bl_space_type = 'MY_CUSTOM_EDITOR_TYPE'
+
+    def draw(self, context):
+        layout = self.layout
+
+        layout.template_header()
+        layout.menu("EDITEUR_MT_view")
+
+
+classes = (
+    MyCustomEditor,
+    MyCustomEditorHeaderRegion,
+    MyCustomEditorWindowRegion,
+    MyCustomEditorPropertiesRegion,
+    MyCustomEditorNavigationRegion,
+    EDITEUR_HT_entete,
+    EDITEUR_MT_view,
+    HelloWorldPanel,
+    WindowPanel,
+    NavBarPanel,
+)
+
+def register_keymap():
+    wm = bpy.context.window_manager
+
+    keymap = get_keymap(wm, "Custom Editor", "MY_CUSTOM_EDITOR_TYPE", 'WINDOW')
+    if not keymap:
+        return
+
+    # Add an item for show the UI region when pressing the 'N' key
+    item = keymap.keymap_items.new("wm.context_toggle", type = 'N', value = 'PRESS')
+    item.properties.data_path = 'space_data.show_region_ui'
+
+
+def register():
+    for classe in classes:
+        bpy.utils.register_class(classe)
+
+
+def unregister():
+    for classe in reversed(classes):
+        bpy.utils.unregister_class(classe)
+
+
+if __name__ == "__main__":
+    register()
