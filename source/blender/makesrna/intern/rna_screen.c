@@ -39,6 +39,320 @@ const EnumPropertyItem rna_enum_region_type_items[] = {
     {0, NULL, 0, NULL, NULL},
 };
 
+static const EnumPropertyItem rna_enum_theme_id_items[] = {
+    {TH_REDALERT, "REDALERT", 0, "", ""},
+    {TH_THEMEUI, "THEMEUI", 0, "", ""},
+
+    /* Common colors among spaces. */
+    {TH_BACK, "BACK", 0, "", ""},
+    {TH_BACK_GRAD,
+     "BACK_GRAD",
+     0,
+     "",
+     "Use when the BACK_GRAD them is set is set (the lower, darker color)"},
+    {TH_TEXT, "TEXT", 0, "", ""},
+    {TH_TEXT_HI, "TEXT_HI", 0, "", ""},
+    {TH_TITLE, "TITLE", 0, "", ""},
+    {TH_TAB_ACTIVE, "TAB_ACTIVE", 0, "", ""},
+    {TH_TAB_INACTIVE, "TAB_INACTIVE", 0, "", ""},
+    {TH_TAB_BACK, "TAB_BACK", 0, "", ""},
+    {TH_TAB_OUTLINE, "TAB_OUTLINE", 0, "", ""},
+
+    {TH_HEADER, "HEADER", 0, "", ""},
+    {TH_HEADER_ACTIVE, "HEADER_ACTIVE", 0, "", ""},
+    {TH_HEADER_TEXT, "HEADER_TEXT", 0, "", ""},
+    {TH_HEADER_TEXT_HI, "HEADER_TEXT_HI", 0, "", ""},
+
+    /* panels */
+    {TH_PANEL_HEADER, "PANEL_HEADER", 0, "", ""},
+    {TH_PANEL_BACK, "PANEL_BACK", 0, "", ""},
+    {TH_PANEL_SUB_BACK, "PANEL_SUB_BACK", 0, "", ""},
+
+    {TH_BUTBACK, "BUTBACK", 0, "", ""},
+    {TH_BUTBACK_TEXT, "BUTBACK_TEXT", 0, "", ""},
+    {TH_BUTBACK_TEXT_HI, "BUTBACK_TEXT_HI", 0, "", ""},
+
+    {TH_SHADE1, "SHADE1", 0, "", ""},
+    {TH_SHADE2, "SHADE2", 0, "", ""},
+    {TH_HILITE, "HILITE", 0, "", ""},
+
+    {TH_GRID, "GRID", 0, "", ""},
+    {TH_WIRE, "WIRE", 0, "", ""},
+    {TH_WIRE_INNER, "WIRE_INNER", 0, "", ""},
+    {TH_WIRE_EDIT, "WIRE_EDIT", 0, "", ""},
+    {TH_SELECT, "SELECT", 0, "", ""},
+    {TH_ACTIVE, "ACTIVE", 0, "", ""},
+    {TH_GROUP, "GROUP", 0, "", ""},
+    {TH_GROUP_ACTIVE, "GROUP_ACTIVE", 0, "", ""},
+    {TH_TRANSFORM, "TRANSFORM", 0, "", ""},
+    {TH_VERTEX, "VERTEX", 0, "", ""},
+    {TH_VERTEX_SELECT, "VERTEX_SELECT", 0, "", ""},
+    {TH_VERTEX_ACTIVE, "VERTEX_ACTIVE", 0, "", ""},
+    {TH_VERTEX_UNREFERENCED, "VERTEX_UNREFERENCED", 0, "", ""},
+    {TH_VERTEX_SIZE, "VERTEX_SIZE", 0, "", ""},
+    {TH_OUTLINE_WIDTH, "OUTLINE_WIDTH", 0, "", ""},
+    {TH_OBCENTER_DIA, "OBCENTER_DIA", 0, "", ""},
+    {TH_EDGE, "EDGE", 0, "", ""},
+    {TH_EDGE_SELECT, "EDGE_SELECT", 0, "", ""},
+    {TH_EDGE_SEAM, "EDGE_SEAM", 0, "", ""},
+    {TH_EDGE_FACESEL, "EDGE_FACESEL", 0, "", ""},
+    {TH_FACE, "FACE", 0, "", ""},
+    {TH_FACE_SELECT, "FACE_SELECT", 0, "", ""},
+    {TH_FACE_BACK, "FACE_BACK", 0, "", ""},
+    {TH_FACE_FRONT, "FACE_FRONT", 0, "", ""},
+    {TH_NORMAL, "NORMAL", 0, "", ""},
+    {TH_VNORMAL, "VNORMAL", 0, "", ""},
+    {TH_LNORMAL, "LNORMAL", 0, "", ""},
+    {TH_FACE_DOT, "FACE_DOT", 0, "", ""},
+    {TH_FACEDOT_SIZE, "FACEDOT_SIZE", 0, "", ""},
+    {TH_CFRAME, "CFRAME", 0, "", ""},
+    {TH_TIME_SCRUB_BACKGROUND, "TIME_SCRUB_BACKGROUND", 0, "", ""},
+    {TH_TIME_MARKER_LINE, "TIME_MARKER_LINE", 0, "", ""},
+    {TH_TIME_MARKER_LINE_SELECTED, "TIME_MARKER_LINE_SELECTED", 0, "", ""},
+    {TH_TIME_KEYFRAME, "TIME_KEYFRAME", 0, "", ""},
+    {TH_TIME_GP_KEYFRAME, "TIME_GP_KEYFRAME", 0, "", ""},
+    {TH_NURB_ULINE, "NURB_ULINE", 0, "", ""},
+    {TH_NURB_VLINE, "NURB_VLINE", 0, "", ""},
+    {TH_NURB_SEL_ULINE, "NURB_SEL_ULINE", 0, "", ""},
+    {TH_NURB_SEL_VLINE, "NURB_SEL_VLINE", 0, "", ""},
+
+    {TH_HANDLE_FREE, "HANDLE_FREE", 0, "", ""},
+    {TH_HANDLE_AUTO, "HANDLE_AUTO", 0, "", ""},
+    {TH_HANDLE_VECT, "HANDLE_VECT", 0, "", ""},
+    {TH_HANDLE_ALIGN, "HANDLE_ALIGN", 0, "", ""},
+    {TH_HANDLE_AUTOCLAMP, "HANDLE_AUTOCLAMP", 0, "", ""},
+    {TH_HANDLE_SEL_FREE, "HANDLE_SEL_FREE", 0, "", ""},
+    {TH_HANDLE_SEL_AUTO, "HANDLE_SEL_AUTO", 0, "", ""},
+    {TH_HANDLE_SEL_VECT, "HANDLE_SEL_VECT", 0, "", ""},
+    {TH_HANDLE_SEL_ALIGN, "HANDLE_SEL_ALIGN", 0, "", ""},
+    {TH_HANDLE_SEL_AUTOCLAMP, "HANDLE_SEL_AUTOCLAMP", 0, "", ""},
+
+    {TH_ACTIVE_SPLINE, "ACTIVE_SPLINE", 0, "", ""},
+    {TH_ACTIVE_VERT, "ACTIVE_VERT", 0, "", "Equivalent of EDITMESH_ACTIVE for splines"},
+
+    {TH_SYNTAX_B, "SYNTAX_B", 0, "", ""},
+    {TH_SYNTAX_V, "SYNTAX_V", 0, "", ""},
+    {TH_SYNTAX_R, "SYNTAX_R", 0, "", ""},
+    {TH_SYNTAX_C, "SYNTAX_C", 0, "", ""},
+    {TH_SYNTAX_L, "SYNTAX_L", 0, "", ""},
+    {TH_SYNTAX_D, "SYNTAX_D", 0, "", ""},
+    {TH_SYNTAX_N, "SYNTAX_N", 0, "", ""},
+    {TH_SYNTAX_S, "SYNTAX_S", 0, "", ""},
+    {TH_LINENUMBERS, "LINENUMBERS", 0, "", ""},
+
+    {TH_BONE_SOLID, "BONE_SOLID", 0, "", ""},
+    {TH_BONE_POSE, "BONE_POSE", 0, "", ""},
+    {TH_BONE_POSE_ACTIVE, "BONE_POSE_ACTIVE", 0, "", ""},
+    {TH_BONE_LOCKED_WEIGHT, "BONE_LOCKED_WEIGHT", 0, "", ""},
+
+    {TH_STRIP, "STRIP", 0, "", ""},
+    {TH_STRIP_SELECT, "STRIP_SELECT", 0, "", ""},
+
+    /* KEYTYPES */
+    {TH_KEYTYPE_KEYFRAME, "KEYTYPE_KEYFRAME", 0, "", ""},
+    {TH_KEYTYPE_KEYFRAME_SELECT, "KEYTYPE_KEYFRAME_SELECT", 0, "", ""},
+    {TH_KEYTYPE_EXTREME, "KEYTYPE_EXTREME", 0, "", ""},
+    {TH_KEYTYPE_EXTREME_SELECT, "KEYTYPE_EXTREME_SELECT", 0, "", ""},
+    {TH_KEYTYPE_BREAKDOWN, "KEYTYPE_BREAKDOWN", 0, "", ""},
+    {TH_KEYTYPE_BREAKDOWN_SELECT, "KEYTYPE_BREAKDOWN_SELECT", 0, "", ""},
+    {TH_KEYTYPE_JITTER, "KEYTYPE_JITTER", 0, "", ""},
+    {TH_KEYTYPE_JITTER_SELECT, "KEYTYPE_JITTER_SELECT", 0, "", ""},
+    {TH_KEYTYPE_MOVEHOLD, "KEYTYPE_MOVEHOLD", 0, "", ""},
+    {TH_KEYTYPE_MOVEHOLD_SELECT, "KEYTYPE_MOVEHOLD_SELECT", 0, "", ""},
+
+    {TH_KEYBORDER, "KEYBORDER", 0, "", ""},
+    {TH_KEYBORDER_SELECT, "KEYBORDER_SELECT", 0, "", ""},
+
+    {TH_LIGHT, "LIGHT", 0, "", ""},
+    {TH_SPEAKER, "SPEAKER", 0, "", ""},
+    {TH_CAMERA, "CAMERA", 0, "", ""},
+    {TH_EMPTY, "EMPTY", 0, "", ""},
+
+    {TH_NODE, "NODE", 0, "", ""},
+    {TH_NODE_INPUT, "NODE_INPUT", 0, "", ""},
+    {TH_NODE_OUTPUT, "NODE_OUTPUT", 0, "", ""},
+    {TH_NODE_COLOR, "NODE_COLOR", 0, "", ""},
+    {TH_NODE_FILTER, "NODE_FILTER", 0, "", ""},
+    {TH_NODE_VECTOR, "NODE_VECTOR", 0, "", ""},
+    {TH_NODE_TEXTURE, "NODE_TEXTURE", 0, "", ""},
+    {TH_NODE_PATTERN, "NODE_PATTERN", 0, "", ""},
+    {TH_NODE_SCRIPT, "NODE_SCRIPT", 0, "", ""},
+    {TH_NODE_LAYOUT, "NODE_LAYOUT", 0, "", ""},
+    {TH_NODE_SHADER, "NODE_SHADER", 0, "", ""},
+    {TH_NODE_INTERFACE, "NODE_INTERFACE", 0, "", ""},
+    {TH_NODE_CONVERTER, "NODE_CONVERTER", 0, "", ""},
+    {TH_NODE_GROUP, "NODE_GROUP", 0, "", ""},
+    {TH_NODE_FRAME, "NODE_FRAME", 0, "", ""},
+    {TH_NODE_MATTE, "NODE_MATTE", 0, "", ""},
+    {TH_NODE_DISTORT, "NODE_DISTORT", 0, "", ""},
+    {TH_NODE_GEOMETRY, "NODE_GEOMETRY", 0, "", ""},
+    {TH_NODE_ATTRIBUTE, "NODE_ATTRIBUTE", 0, "", ""},
+
+    {TH_CONSOLE_OUTPUT, "CONSOLE_OUTPUT", 0, "", ""},
+    {TH_CONSOLE_INPUT, "CONSOLE_INPUT", 0, "", ""},
+    {TH_CONSOLE_INFO, "CONSOLE_INFO", 0, "", ""},
+    {TH_CONSOLE_ERROR, "CONSOLE_ERROR", 0, "", ""},
+    {TH_CONSOLE_CURSOR, "CONSOLE_CURSOR", 0, "", ""},
+    {TH_CONSOLE_SELECT, "CONSOLE_SELECT", 0, "", ""},
+
+    {TH_SEQ_MOVIE, "SEQ_MOVIE", 0, "", ""},
+    {TH_SEQ_MOVIECLIP, "SEQ_MOVIECLIP", 0, "", ""},
+    {TH_SEQ_MASK, "SEQ_MASK", 0, "", ""},
+    {TH_SEQ_IMAGE, "SEQ_IMAGE", 0, "", ""},
+    {TH_SEQ_SCENE, "SEQ_SCENE", 0, "", ""},
+    {TH_SEQ_AUDIO, "SEQ_AUDIO", 0, "", ""},
+    {TH_SEQ_EFFECT, "SEQ_EFFECT", 0, "", ""},
+    {TH_SEQ_META, "SEQ_META", 0, "", ""},
+    {TH_SEQ_TEXT, "SEQ_TEXT", 0, "", ""},
+    {TH_SEQ_PREVIEW, "SEQ_PREVIEW", 0, "", ""},
+    {TH_SEQ_COLOR, "SEQ_COLOR", 0, "", ""},
+    {TH_SEQ_ACTIVE, "SEQ_ACTIVE", 0, "", ""},
+    {TH_SEQ_SELECTED, "SEQ_SELECTED", 0, "", ""},
+
+    {TH_EDGE_SHARP, "EDGE_SHARP", 0, "", ""},
+    {TH_EDITMESH_ACTIVE, "EDITMESH_ACTIVE", 0, "", ""},
+
+    {TH_HANDLE_VERTEX, "HANDLE_VERTEX", 0, "", ""},
+    {TH_HANDLE_VERTEX_SELECT, "HANDLE_VERTEX_SELECT", 0, "", ""},
+    {TH_HANDLE_VERTEX_SIZE, "HANDLE_VERTEX_SIZE", 0, "", ""},
+
+    {TH_GP_VERTEX, "GP_VERTEX", 0, "", ""},
+    {TH_GP_VERTEX_SELECT, "GP_VERTEX_SELECT", 0, "", ""},
+    {TH_GP_VERTEX_SIZE, "GP_VERTEX_SIZE", 0, "", ""},
+
+    {TH_DOPESHEET_CHANNELOB, "DOPESHEET_CHANNELOB", 0, "", ""},
+    {TH_DOPESHEET_CHANNELSUBOB, "DOPESHEET_CHANNELSUBOB", 0, "", ""},
+    {TH_DOPESHEET_IPOLINE, "DOPESHEET_IPOLINE", 0, "", ""},
+
+    {TH_PREVIEW_BACK, "PREVIEW_BACK", 0, "", ""},
+
+    {TH_EDGE_CREASE, "EDGE_CREASE", 0, "", ""},
+
+    {TH_DRAWEXTRA_EDGELEN, "DRAWEXTRA_EDGELEN", 0, "", ""},
+    {TH_DRAWEXTRA_EDGEANG, "DRAWEXTRA_EDGEANG", 0, "", ""},
+    {TH_DRAWEXTRA_FACEAREA, "DRAWEXTRA_FACEAREA", 0, "", ""},
+    {TH_DRAWEXTRA_FACEANG, "DRAWEXTRA_FACEANG", 0, "", ""},
+
+    {TH_NODE_CURVING, "NODE_CURVING", 0, "", ""},
+    {TH_NODE_GRID_LEVELS, "NODE_GRID_LEVELS", 0, "", ""},
+
+    {TH_MARKER_OUTLINE, "MARKER_OUTLINE", 0, "", ""},
+    {TH_MARKER, "MARKER", 0, "", ""},
+    {TH_ACT_MARKER, "ACT_MARKER", 0, "", ""},
+    {TH_SEL_MARKER, "SEL_MARKER", 0, "", ""},
+    {TH_BUNDLE_SOLID, "BUNDLE_SOLID", 0, "", ""},
+    {TH_DIS_MARKER, "DIS_MARKER", 0, "", ""},
+    {TH_PATH_BEFORE, "PATH_BEFORE", 0, "", ""},
+    {TH_PATH_AFTER, "PATH_AFTER", 0, "", ""},
+    {TH_PATH_KEYFRAME_BEFORE, "PATH_KEYFRAME_BEFORE", 0, "", ""},
+    {TH_PATH_KEYFRAME_AFTER, "PATH_KEYFRAME_AFTER", 0, "", ""},
+    {TH_CAMERA_PATH, "CAMERA_PATH", 0, "", ""},
+    {TH_LOCK_MARKER, "LOCK_MARKER", 0, "", ""},
+
+    {TH_STITCH_PREVIEW_FACE, "STITCH_PREVIEW_FACE", 0, "", ""},
+    {TH_STITCH_PREVIEW_EDGE, "STITCH_PREVIEW_EDGE", 0, "", ""},
+    {TH_STITCH_PREVIEW_VERT, "STITCH_PREVIEW_VERT", 0, "", ""},
+    {TH_STITCH_PREVIEW_STITCHABLE, "STITCH_PREVIEW_STITCHABLE", 0, "", ""},
+    {TH_STITCH_PREVIEW_UNSTITCHABLE, "STITCH_PREVIEW_UNSTITCHABLE", 0, "", ""},
+    {TH_STITCH_PREVIEW_ACTIVE, "STITCH_PREVIEW_ACTIVE", 0, "", ""},
+
+    {TH_PAINT_CURVE_HANDLE, "PAINT_CURVE_HANDLE", 0, "", ""},
+    {TH_PAINT_CURVE_PIVOT, "PAINT_CURVE_PIVOT", 0, "", ""},
+
+    {TH_UV_SHADOW, "UV_SHADOW", 0, "", ""},
+
+    {TH_FREESTYLE_EDGE_MARK, "FREESTYLE_EDGE_MARK", 0, "", ""},
+    {TH_FREESTYLE_FACE_MARK, "FREESTYLE_FACE_MARK", 0, "", ""},
+
+    {TH_MATCH, "MATCH", 0, "", "Highlight color for search matches"},
+    {TH_SELECT_HIGHLIGHT, "SELECT_HIGHLIGHT", 0, "", "Highlight color for selected outliner item"},
+    {TH_SELECT_ACTIVE, "SELECT_ACTIVE", 0, "", "Highlight color for active outliner item"},
+    {TH_SELECTED_OBJECT, "SELECTED_OBJECT", 0, "", "Selected object color for outliner"},
+    {TH_ACTIVE_OBJECT, "ACTIVE_OBJECT", 0, "", "Active object color for outliner"},
+    {TH_EDITED_OBJECT, "EDITED_OBJECT", 0, "", "Edited object color for outliner"},
+    {TH_ROW_ALTERNATE, "ROW_ALTERNATE", 0, "", "Overlay on every other row"},
+
+    {TH_SKIN_ROOT, "SKIN_ROOT", 0, "", ""},
+
+    {TH_ANIM_ACTIVE, "ANIM_ACTIVE", 0, "", "Active action"},
+    {TH_ANIM_INACTIVE, "ANIM_INACTIVE", 0, "", "No active action"},
+    {TH_ANIM_PREVIEW_RANGE, "ANIM_PREVIEW_RANGE", 0, "", "Preview range overlay"},
+
+    {TH_ICON_SCENE, "ICON_SCENE", 0, "", ""},
+    {TH_ICON_COLLECTION, "ICON_COLLECTION", 0, "", ""},
+    {TH_ICON_OBJECT, "ICON_OBJECT", 0, "", ""},
+    {TH_ICON_OBJECT_DATA, "ICON_OBJECT_DATA", 0, "", ""},
+    {TH_ICON_MODIFIER, "ICON_MODIFIER", 0, "", ""},
+    {TH_ICON_SHADING, "ICON_SHADING", 0, "", ""},
+    {TH_ICON_FOLDER, "ICON_FOLDER", 0, "", ""},
+    {TH_ICON_FUND, "ICON_FUND", 0, "", ""},
+
+    {TH_SCROLL_TEXT, "SCROLL_TEXT", 0, "", ""},
+
+    {TH_NLA_TWEAK, "NLA_TWEAK", 0, "", "'tweaking' track in NLA"},
+    {TH_NLA_TWEAK_DUPLI,
+     "NLA_TWEAK_DUPLI",
+     0,
+     "",
+     "Error/warning flag for other strips referencing dupli strip"},
+
+    {TH_NLA_TRACK, "NLA_TRACK", 0, "", ""},
+    {TH_NLA_TRANSITION, "NLA_TRANSITION", 0, "", ""},
+    {TH_NLA_TRANSITION_SEL, "NLA_TRANSITION_SEL", 0, "", ""},
+    {TH_NLA_META, "NLA_META", 0, "", ""},
+    {TH_NLA_META_SEL, "NLA_META_SEL", 0, "", ""},
+    {TH_NLA_SOUND, "NLA_SOUND", 0, "", ""},
+    {TH_NLA_SOUND_SEL, "NLA_SOUND_SEL", 0, "", ""},
+
+    {TH_WIDGET_EMBOSS, "WIDGET_EMBOSS", 0, "", ""},
+    {TH_WIDGET_TEXT_CURSOR, "WIDGET_TEXT_CURSOR", 0, "", ""},
+    {TH_WIDGET_TEXT_SELECTION, "WIDGET_TEXT_SELECTION", 0, "", ""},
+    {TH_WIDGET_TEXT_HIGHLIGHT, "WIDGET_TEXT_HIGHLIGHT", 0, "", ""},
+    {TH_EDITOR_OUTLINE, "EDITOR_OUTLINE", 0, "", ""},
+
+    {TH_TRANSPARENT_CHECKER_PRIMARY, "TRANSPARENT_CHECKER_PRIMARY", 0, "", ""},
+    {TH_TRANSPARENT_CHECKER_SECONDARY, "TRANSPARENT_CHECKER_SECONDARY", 0, "", ""},
+    {TH_TRANSPARENT_CHECKER_SIZE, "TRANSPARENT_CHECKER_SIZE", 0, "", ""},
+
+    {TH_AXIS_X, "AXIS_X", 0, "", "X Axis"},
+    {TH_AXIS_Y, "AXIS_Y", 0, "", "Y Axis"},
+    {TH_AXIS_Z, "AXIS_Z", 0, "", "Z Axis"},
+
+    {TH_GIZMO_HI, "GIZMO_HI", 0, "", ""},
+    {TH_GIZMO_PRIMARY, "GIZMO_PRIMARY", 0, "", ""},
+    {TH_GIZMO_SECONDARY, "GIZMO_SECONDARY", 0, "", ""},
+    {TH_GIZMO_VIEW_ALIGN, "GIZMO_VIEW_ALIGN", 0, "", ""},
+    {TH_GIZMO_A, "GIZMO_A", 0, "", ""},
+    {TH_GIZMO_B, "GIZMO_B", 0, "", ""},
+
+    {TH_BACKGROUND_TYPE, "BACKGROUND_TYPE", 0, "", ""},
+
+    {TH_INFO_SELECTED, "INFO_SELECTED", 0, "", ""},
+    {TH_INFO_SELECTED_TEXT, "INFO_SELECTED_TEXT", 0, "", ""},
+    {TH_INFO_ERROR, "INFO_ERROR", 0, "", ""},
+    {TH_INFO_ERROR_TEXT, "INFO_ERROR_TEXT", 0, "", ""},
+    {TH_INFO_WARNING, "INFO_WARNING", 0, "", ""},
+    {TH_INFO_WARNING_TEXT, "INFO_WARNING_TEXT", 0, "", ""},
+    {TH_INFO_INFO, "INFO_INFO", 0, "", ""},
+    {TH_INFO_INFO_TEXT, "INFO_INFO_TEXT", 0, "", ""},
+    {TH_INFO_DEBUG, "INFO_DEBUG", 0, "", ""},
+    {TH_INFO_DEBUG_TEXT, "INFO_DEBUG_TEXT", 0, "", ""},
+    {TH_INFO_PROPERTY, "INFO_PROPERTY", 0, "", ""},
+    {TH_INFO_PROPERTY_TEXT, "INFO_PROPERTY_TEXT", 0, "", ""},
+    {TH_INFO_OPERATOR, "INFO_OPERATOR", 0, "", ""},
+    {TH_INFO_OPERATOR_TEXT, "INFO_OPERATOR_TEXT", 0, "", ""},
+    {TH_VIEW_OVERLAY, "VIEW_OVERLAY", 0, "", ""},
+
+    {TH_V3D_CLIPPING_BORDER, "V3D_CLIPPING_BORDER", 0, "", ""},
+
+    {TH_METADATA_BG, "METADATA_BG", 0, "", ""},
+    {TH_METADATA_TEXT, "METADATA_TEXT", 0, "", ""},
+
+    {TH_EDGE_BEVEL, "EDGE_BEVEL", 0, "", ""},
+    {TH_VERTEX_BEVEL, "VERTEX_BEVEL", 0, "", ""},
+    {0, NULL, 0, NULL, NULL},
+};
+
 #include "ED_screen.h"
 
 #include "WM_api.h"
@@ -652,17 +966,9 @@ static void rna_Region_add_keymap(ARegion *region, wmKeyMap *keymap)
   WM_event_add_keymap_handler_v2d_mask(&region->handlers, keymap);
 }
 
-static void rna_Region_theme_clear_color(ARegion *region)
+static void rna_Region_theme_clear_color(ARegion *UNUSED(region), int theme_id)
 {
-  switch (region->regiontype) {
-    case RGN_TYPE_HEADER:
-    case RGN_TYPE_TOOL_HEADER:
-      UI_ThemeClearColor(TH_HEADER);
-      break;
-    default:
-      UI_ThemeClearColor(TH_BACK);
-      break;
-  }
+  UI_ThemeClearColor(theme_id);
 }
 
 static void rna_Region_draw_handlers(ARegion *region, bContext *C, int draw_mode)
@@ -983,7 +1289,15 @@ static void rna_def_region(BlenderRNA *brna)
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
 
   func = RNA_def_function(srna, "theme_clear_color", "rna_Region_theme_clear_color");
-  RNA_def_function_ui_description(func, "Clear the region with its respective theme color");
+  RNA_def_function_ui_description(
+      func, "Set the background color of the region before drawing elements");
+  parm = RNA_def_enum(func,
+                      "theme_id",
+                      rna_enum_theme_id_items,
+                      TH_BACK,
+                      "Theme ID",
+                      "The theme whose color should be used");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
 
   static const EnumPropertyItem region_draw_mode_items[] = {
       {REGION_DRAW_POST_PIXEL, "POST_PIXEL", 0, "Post Pixel", ""},
