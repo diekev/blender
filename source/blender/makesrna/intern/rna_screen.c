@@ -765,11 +765,6 @@ static void region_properties_draw(const bContext *C, ARegion *region)
   ED_region_panels_ex(C, region, (const char *[]){CTX_data_mode_string(C), NULL});
 }
 
-static void region_header_init(wmWindowManager *UNUSED(wm), ARegion *region)
-{
-  ED_region_header_init(region);
-}
-
 static void init_default_region_type(ARegionType *art)
 {
   /* All custom regions use a panels layout. */
