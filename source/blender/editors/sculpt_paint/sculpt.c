@@ -1981,7 +1981,7 @@ static void calc_area_normal_and_center_task_cb(void *__restrict userdata,
     int(*orco_tris)[3];
     int orco_tris_num;
 
-    BKE_pbvh_node_get_bm_orco_data(data->nodes[n], &orco_tris, &orco_tris_num, &orco_coords);
+    BKE_pbvh_node_get_bm_orco_data(data->nodes[n], &orco_tris, &orco_tris_num, &orco_coords, NULL);
 
     for (int i = 0; i < orco_tris_num; i++) {
       const float *co_tri[3] = {
@@ -3265,7 +3265,7 @@ static void sculpt_topology_update(Sculpt *sd,
 
     if (BKE_pbvh_type(ss->pbvh) == PBVH_BMESH) {
       BKE_pbvh_node_mark_topology_update(nodes[n]);
-      BKE_pbvh_bmesh_node_save_orig(ss->bm, nodes[n]);
+      BKE_pbvh_bmesh_node_save_orig(ss->bm, ss->bm_log, nodes[n], false);
     }
   }
 
@@ -5749,15 +5749,14 @@ static int sculpt_brush_stroke_modal(bContext *C, wmOperator *op, const wmEvent 
   if (!started && ELEM(retval, OPERATOR_FINISHED, OPERATOR_CANCELLED)) {
     /* Did the stroke never start? If so push a blank sculpt undo
      * step to prevent a global undo step (which is triggered by the
-     * OPTYPE_UNDO flag in SCULPT_OT_brush_stroke).
+     * #OPTYPE_UNDO flag in #SCULPT_OT_brush_stroke).
      *
      * Having blank global undo steps interleaved with sculpt steps
      * corrupts the DynTopo undo stack.
      * See T101430.
      *
-     * Note: simply returning OPERATOR_CANCELLED was not
-     * sufficient to prevent this.
-     */
+     * NOTE: simply returning #OPERATOR_CANCELLED was not
+     * sufficient to prevent this. */
     Sculpt *sd = CTX_data_tool_settings(C)->sculpt;
     Brush *brush = BKE_paint_brush(&sd->paint);
 

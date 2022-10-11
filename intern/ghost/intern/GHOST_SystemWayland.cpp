@@ -4320,23 +4320,38 @@ bool GHOST_SystemWayland::window_cursor_grab_set(const GHOST_TGrabCursorMode mod
 #ifdef WITH_GHOST_WAYLAND_DYNLOAD
 bool ghost_wl_dynload_libraries()
 {
-  /* Only report when `libwayland-client` is not found when building without X11,
-   * which will be used as a fallback. */
 #  ifdef WITH_GHOST_X11
-  bool verbose = false;
+  /* When running in WAYLAND, let the user know when a missing library is the only reason
+   * WAYLAND could not be used. Otherwise it's not obvious why X11 is used as a fallback.
+   * Otherwise when X11 is used, reporting WAYLAND library warnings is unwelcome noise. */
+  bool verbose = getenv("WAYLAND_DISPLAY") != nullptr;
 #  else
   bool verbose = true;
+#  endif /* !WITH_GHOST_X11 */
+
+#  ifdef WITH_GHOST_WAYLAND_LIBDECOR
+  int8_t libdecor_init = -1;
 #  endif
 
   if (wayland_dynload_client_init(verbose) && /* `libwayland-client`. */
       wayland_dynload_cursor_init(verbose) && /* `libwayland-cursor`. */
       wayland_dynload_egl_init(verbose) &&    /* `libwayland-egl`. */
 #  ifdef WITH_GHOST_WAYLAND_LIBDECOR
-      wayland_dynload_libdecor_init(verbose) && /* `libdecor-0`. */
+      (libdecor_init = wayland_dynload_libdecor_init(verbose)) && /* `libdecor-0`. */
 #  endif
       true) {
     return true;
   }
+
+#  if defined(WITH_GHOST_WAYLAND_LIBDECOR) && defined(WITH_GHOST_X11)
+  if (libdecor_init == 0) {
+    /* LIBDECOR was the only reason X11 was used, let the user know they need it installed. */
+    fprintf(stderr,
+            "WAYLAND found but libdecor was not, install libdecor for Wayland support, "
+            "falling back to X11\n");
+  }
+#  endif
+
 #  ifdef WITH_GHOST_WAYLAND_LIBDECOR
   wayland_dynload_libdecor_exit();
 #  endif
