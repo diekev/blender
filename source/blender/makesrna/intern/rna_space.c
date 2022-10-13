@@ -3356,6 +3356,37 @@ static SpaceLink *rna_CustomSpaceType_create(const ScrArea *area, const Scene *U
 #  undef SPACETYPE_HAS_REGION
 }
 
+static bool rna_CustomSpaceType_eyedropper_color_sample(struct Main *UNUSED(bmain),
+                                                        struct SpaceLink *space,
+                                                        struct ARegion *region,
+                                                        const int pos[2],
+                                                        float r_color[3])
+{
+  PointerRNA ptr;
+  RNA_pointer_create(NULL, space->type->rna_ext.srna, space, &ptr);
+
+  // RNA_struct_find_function(&ptr, "eyedropper_color_sample");
+  extern FunctionRNA rna_Space_eyedropper_color_sample_func;
+  FunctionRNA *func = &rna_Space_eyedropper_color_sample_func;
+
+  ParameterList list;
+  RNA_parameter_list_create(&list, &ptr, func);
+  RNA_parameter_set_lookup(&list, "region", &region);
+  RNA_parameter_set_lookup(&list, "position", &pos);
+
+  space->type->rna_ext.call(NULL, &ptr, func, &list);
+
+  void *ret1, *ret2;
+  RNA_parameter_get_lookup(&list, "success", &ret1);
+  RNA_parameter_get_lookup(&list, "color", &ret2);
+  const bool ok = *(bool **)ret1;
+  copy_v3_v3(r_color, (float *)ret2);
+
+  RNA_parameter_list_free(&list);
+
+  return ok;
+}
+
 static void rna_Space_unregister(Main *bmain, StructRNA *type)
 {
   SpaceType *st = RNA_struct_blender_type_get(type);
@@ -3429,14 +3460,14 @@ static StructRNA *rna_Space_register(Main *bmain,
   SpaceType *st, dummyst = {NULL};
   SpaceLink dummyspace = {NULL};
   PointerRNA dummystr;
-  // int have_function[0];
+  int have_function[1];
 
   /* setup dummy space & space type to store static properties in */
   dummyspace.type = &dummyst;
   RNA_pointer_create(NULL, &RNA_Space, &dummyspace, &dummystr);
 
   /* validate the python class */
-  if (validate(&dummystr, data, NULL /*have_function*/) != 0) {
+  if (validate(&dummystr, data, have_function) != 0) {
     return NULL;
   }
 
@@ -3472,6 +3503,10 @@ static StructRNA *rna_Space_register(Main *bmain,
   st->spaceid = SPACE_CUSTOM;
   st->create = rna_CustomSpaceType_create;
   st->blend_write = BKE_spacetype_blend_write_custom;
+
+  /* Optional registrable functions. */
+  st->eyedropper_color_sample = (have_function[0]) ? rna_CustomSpaceType_eyedropper_color_sample :
+                                                     NULL;
 
   BKE_spacetype_register(st);
 
@@ -3593,6 +3628,8 @@ static void rna_def_space(BlenderRNA *brna)
 {
   StructRNA *srna;
   PropertyRNA *prop;
+  PropertyRNA *parm;
+  FunctionRNA *func;
 
   srna = RNA_def_struct(brna, "Space", NULL);
   RNA_def_struct_sdna(srna, "SpaceLink");
@@ -3630,6 +3667,36 @@ static void rna_def_space(BlenderRNA *brna)
   RNA_def_property_flag(prop, PROP_REGISTER);
   RNA_def_property_ui_text(
       prop, "Space Type Label", "Label to display for the SpaceType in the UI");
+
+  /* Functions. */
+  static float default_eyedropper_sample_color[] = {0.0f, 0.0f, 0.0f};
+  static int default_eyedropper_sample_position[] = {0, 0};
+  func = RNA_def_function(srna, "eyedropper_color_sample", NULL);
+  RNA_def_function_ui_description(func, "Sample a color for the eyedropper");
+  RNA_def_function_flag(func, FUNC_REGISTER_OPTIONAL);
+  parm = RNA_def_pointer(func, "region", "Region", "Region", "The region to sample from");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_int_array(
+      func,
+      "position",
+      2,
+      default_eyedropper_sample_position,
+      INT_MIN,
+      INT_MAX,
+      "Mouse Position",
+      "The mouse position relative to the region's x and y coordinate to sample from",
+      INT_MIN,
+      INT_MAX);
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_boolean(func,
+                         "success",
+                         false,
+                         "Success",
+                         "Whether a color could be sampled at the given coordinate");
+  RNA_def_function_output(func, parm);
+  parm = RNA_def_float_array(
+      func, "color", 3, default_eyedropper_sample_color, 0.0f, 1.0f, "Color", "", 0.0f, 1.0f);
+  RNA_def_function_output(func, parm);
 }
 
 /* for all spaces that use a mask */

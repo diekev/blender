@@ -1073,6 +1073,16 @@ static void image_blend_write(BlendWriter *writer, SpaceLink *sl)
   BLO_write_struct(writer, SpaceImage, sl);
 }
 
+static bool image_eyedropper_color_sample(struct Main *UNUSED(bmain),
+                                          struct SpaceLink *space,
+                                          struct ARegion *region,
+                                          const int pos[2],
+                                          float r_col[3])
+{
+  SpaceImage *sima = (SpaceImage *)space;
+  return ED_space_image_color_sample(sima, region, pos, r_col, NULL);
+}
+
 /**************************** spacetype *****************************/
 
 void ED_spacetype_image(void)
@@ -1101,6 +1111,7 @@ void ED_spacetype_image(void)
   st->blend_read_data = image_blend_read_data;
   st->blend_read_lib = image_blend_read_lib;
   st->blend_write = image_blend_write;
+  st->eyedropper_color_sample = image_eyedropper_color_sample;
 
   /* regions: main window */
   art = MEM_callocN(sizeof(ARegionType), "spacetype image region");

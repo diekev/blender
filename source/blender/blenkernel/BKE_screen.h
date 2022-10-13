@@ -127,6 +127,15 @@ typedef struct SpaceType {
    */
   void (*blend_write)(struct BlendWriter *writer, struct SpaceLink *space_link);
 
+  /**
+   * Sample a color for the eyedropper.
+   */
+  bool (*eyedropper_color_sample)(struct Main *bmain,
+                                  struct SpaceLink *space,
+                                  struct ARegion *region,
+                                  const int pos[2],
+                                  float r_col[3]);
+
   /* region type definitions */
   ListBase regiontypes;
 

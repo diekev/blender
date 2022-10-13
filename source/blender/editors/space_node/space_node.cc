@@ -1090,6 +1090,16 @@ static void node_blend_write(BlendWriter *writer, SpaceLink *sl)
   }
 }
 
+static bool node_eyedropper_color_sample(struct Main *bmain,
+                                         struct SpaceLink *space,
+                                         struct ARegion *region,
+                                         const int pos[2],
+                                         float r_col[3])
+{
+  SpaceNode *snode = (SpaceNode *)space;
+  return ED_space_node_color_sample(bmain, snode, region, pos, r_col);
+}
+
 }  // namespace blender::ed::space_node
 
 void ED_spacetype_node()
@@ -1120,6 +1130,7 @@ void ED_spacetype_node()
   st->blend_read_data = node_blend_read_data;
   st->blend_read_lib = node_blend_read_lib;
   st->blend_write = node_blend_write;
+  st->eyedropper_color_sample = node_eyedropper_color_sample;
 
   /* regions: main window */
   art = MEM_cnew<ARegionType>("spacetype node region");

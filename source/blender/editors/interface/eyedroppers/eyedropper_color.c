@@ -309,6 +309,29 @@ static bool eyedropper_cryptomatte_sample_fl(bContext *C,
   return false;
 }
 
+static bool eyedropper_color_sample_area(Main *bmain,
+                                         ScrArea *area,
+                                         const int mval[2],
+                                         float r_col[3])
+{
+  if (!area) {
+    return false;
+  }
+
+  SpaceLink *sl = area->spacedata.first;
+  if (!sl->type || !sl->type->eyedropper_color_sample) {
+    return false;
+  }
+
+  ARegion *region = BKE_area_find_region_xy(area, RGN_TYPE_WINDOW, mval);
+  if (!region) {
+    return false;
+  }
+
+  const int region_mval[2] = {mval[0] - region->winrct.xmin, mval[1] - region->winrct.ymin};
+  return sl->type->eyedropper_color_sample(bmain, sl, region, region_mval, r_col);
+}
+
 void eyedropper_color_sample_fl(bContext *C, const int m_xy[2], float r_col[3])
 {
   /* we could use some clever */
@@ -322,40 +345,8 @@ void eyedropper_color_sample_fl(bContext *C, const int m_xy[2], float r_col[3])
   ScrArea *area;
   datadropper_win_area_find(C, m_xy, mval, &win, &area);
 
-  if (area) {
-    if (area->spacetype == SPACE_IMAGE) {
-      ARegion *region = BKE_area_find_region_xy(area, RGN_TYPE_WINDOW, mval);
-      if (region) {
-        SpaceImage *sima = area->spacedata.first;
-        const int region_mval[2] = {mval[0] - region->winrct.xmin, mval[1] - region->winrct.ymin};
-
-        if (ED_space_image_color_sample(sima, region, region_mval, r_col, NULL)) {
-          return;
-        }
-      }
-    }
-    else if (area->spacetype == SPACE_NODE) {
-      ARegion *region = BKE_area_find_region_xy(area, RGN_TYPE_WINDOW, mval);
-      if (region) {
-        SpaceNode *snode = area->spacedata.first;
-        const int region_mval[2] = {mval[0] - region->winrct.xmin, mval[1] - region->winrct.ymin};
-
-        if (ED_space_node_color_sample(bmain, snode, region, region_mval, r_col)) {
-          return;
-        }
-      }
-    }
-    else if (area->spacetype == SPACE_CLIP) {
-      ARegion *region = BKE_area_find_region_xy(area, RGN_TYPE_WINDOW, mval);
-      if (region) {
-        SpaceClip *sc = area->spacedata.first;
-        const int region_mval[2] = {mval[0] - region->winrct.xmin, mval[1] - region->winrct.ymin};
-
-        if (ED_space_clip_color_sample(sc, region, region_mval, r_col)) {
-          return;
-        }
-      }
-    }
+  if (eyedropper_color_sample_area(bmain, area, mval, r_col)) {
+    return;
   }
 
   if (win) {

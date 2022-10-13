@@ -1269,6 +1269,16 @@ static void clip_blend_write(BlendWriter *writer, SpaceLink *sl)
   BLO_write_struct(writer, SpaceClip, sl);
 }
 
+static bool clip_eyedropper_color_sample(struct Main *UNUSED(bmain),
+                                         struct SpaceLink *space,
+                                         struct ARegion *region,
+                                         const int pos[2],
+                                         float r_col[3])
+{
+  SpaceClip *sc = (SpaceClip *)space;
+  return ED_space_clip_color_sample(sc, region, pos, r_col);
+}
+
 void ED_spacetype_clip(void)
 {
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype clip");
@@ -1292,6 +1302,7 @@ void ED_spacetype_clip(void)
   st->blend_read_data = clip_blend_read_data;
   st->blend_read_lib = clip_blend_read_lib;
   st->blend_write = clip_blend_write;
+  st->eyedropper_color_sample = clip_eyedropper_color_sample;
 
   /* regions: main window */
   art = MEM_callocN(sizeof(ARegionType), "spacetype clip region");
