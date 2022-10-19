@@ -1043,6 +1043,8 @@ eObjectMode BKE_paint_object_mode_from_paintmode(ePaintMode mode)
       return OB_MODE_TEXTURE_PAINT;
     case PAINT_MODE_SCULPT_UV:
       return OB_MODE_EDIT;
+    case PAINT_MODE_SCULPT_CURVES:
+      return OB_MODE_SCULPT_CURVES;
     case PAINT_MODE_INVALID:
     default:
       return OB_MODE_OBJECT;
@@ -1786,8 +1788,8 @@ static void sculpt_update_object(
       /* If the fully evaluated mesh has the same topology as the deform-only version, use it.
        * This matters because crazyspace evaluation is very restrictive and excludes even modifiers
        * that simply recompute vertex weights (which can even include Geometry Nodes). */
-      if (me_eval_deform->polys().data() == me_eval->polys().data() &&
-          me_eval_deform->loops().data() == me_eval->loops().data() &&
+      if (me_eval_deform->totpoly == me_eval->totpoly &&
+          me_eval_deform->totloop == me_eval->totloop &&
           me_eval_deform->totvert == me_eval->totvert) {
         BKE_sculptsession_free_deformMats(ss);
 
