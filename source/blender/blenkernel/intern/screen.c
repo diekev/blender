@@ -629,6 +629,9 @@ void BKE_spacetype_unregister(struct Main *bmain, struct SpaceType *st)
 {
   for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
     LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+      if (area->type == st) {
+        area->type = NULL;
+      }
       LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
         if (sl->type == st) {
           sl->type = NULL;
