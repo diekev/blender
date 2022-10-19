@@ -3360,6 +3360,16 @@ static SpaceLink *rna_CustomSpaceType_create(const ScrArea *area, const Scene *U
 #  undef SPACETYPE_HAS_REGION
 }
 
+/* Generic duplication callback for all custom space types. */
+static SpaceLink *rna_CustomSpaceType_duplicate(SpaceLink *sl)
+{
+  SpaceLink *new_sl = MEM_dupallocN(sl);
+  if (new_sl->id_properties) {
+    new_sl->id_properties = IDP_CopyProperty(sl->id_properties);
+  }
+  return new_sl;
+}
+
 static bool rna_CustomSpaceType_eyedropper_color_sample(struct Main *UNUSED(bmain),
                                                         struct SpaceLink *space,
                                                         struct ARegion *region,
@@ -3507,6 +3517,7 @@ static StructRNA *rna_Space_register(Main *bmain,
   st->spaceid = SPACE_CUSTOM;
   st->create = rna_CustomSpaceType_create;
   st->blend_write = BKE_spacetype_blend_write_custom;
+  st->duplicate = rna_CustomSpaceType_duplicate;
 
   /* Optional registrable functions. */
   st->eyedropper_color_sample = (have_function[0]) ? rna_CustomSpaceType_eyedropper_color_sample :
