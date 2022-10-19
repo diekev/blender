@@ -490,7 +490,7 @@ void WM_exit_ex(bContext *C, const bool do_python)
    * Don't run this code when built as a Python module as this runs when Python is in the
    * process of shutting down, where running a snippet like this will crash, see T82675.
    * Instead use the `atexit` module, installed by #BPY_python_start */
-  // BPY_run_string_eval(C, (const char *[]){"addon_utils", NULL}, "addon_utils.disable_all()");
+  BPY_run_string_eval(C, (const char *[]){"addon_utils", NULL}, "addon_utils.disable_all()");
 #endif
 
   BLI_timer_free();
