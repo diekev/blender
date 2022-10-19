@@ -1945,11 +1945,12 @@ static void pointer_handle_frame(void *data, struct wl_pointer * /*wl_pointer*/)
           GHOST_kTrackpadEventScroll,
           wl_fixed_to_int(scale * seat->pointer.xy[0]),
           wl_fixed_to_int(scale * seat->pointer.xy[1]),
-          /* NOTE: scaling the delta doesn't seem necessary. */
-          wl_fixed_to_int(seat->pointer_scroll.smooth_xy[0]),
-          wl_fixed_to_int(seat->pointer_scroll.smooth_xy[1]),
+          /* NOTE: scaling the delta doesn't seem necessary.
+           * NOTE: inverting delta gives correct results, see: QTBUG-85767. */
+          -wl_fixed_to_int(seat->pointer_scroll.smooth_xy[0]),
+          -wl_fixed_to_int(seat->pointer_scroll.smooth_xy[1]),
           /* TODO: investigate a way to request this configuration from the system. */
-          true));
+          false));
     }
 
     seat->pointer_scroll.smooth_xy[0] = 0;
@@ -3812,7 +3813,6 @@ GHOST_IWindow *GHOST_SystemWayland::createWindow(const char *title,
                                                  const uint32_t width,
                                                  const uint32_t height,
                                                  const GHOST_TWindowState state,
-                                                 const GHOST_TDrawingContextType type,
                                                  const GHOST_GLSettings glSettings,
                                                  const bool exclusive,
                                                  const bool is_dialog,
@@ -3832,7 +3832,7 @@ GHOST_IWindow *GHOST_SystemWayland::createWindow(const char *title,
       height,
       state,
       parentWindow,
-      type,
+      glSettings.context_type,
       is_dialog,
       ((glSettings.flags & GHOST_glStereoVisual) != 0),
       exclusive);
