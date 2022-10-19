@@ -1167,3 +1167,15 @@ class GeometryNode(NodeInternal):
     @classmethod
     def poll(cls, ntree):
         return ntree.bl_idname == 'GeometryNodeTree'
+
+
+# Dummy class to keep the reference in `bpy_types_dict` and avoid
+# errors like: "TypeError: expected Space subclass of class ..."
+class Space(StructRNA):
+    __slots__ = ()
+
+
+# Dummy class to keep the reference in `bpy_types_dict` and avoid
+# errors like: "TypeError: expected Region subclass of class ..."
+class Region(StructRNA):
+    __slots__ = ()
