@@ -3306,7 +3306,7 @@ static SpaceLink *rna_CustomSpaceType_create(const ScrArea *area, const Scene *U
 
   ARegion *region;
 
-  if (SPACETYPE_HAS_REGION(st, RGN_TYPE_UI)) {
+  if (SPACETYPE_HAS_REGION(st, RGN_TYPE_HEADER)) {
     region = BKE_spacedata_add_region(space, RGN_TYPE_HEADER, "Header for Custom Editor");
     region->alignment = (U.uiflag & USER_HEADER_BOTTOM) ? RGN_ALIGN_BOTTOM : RGN_ALIGN_TOP;
   }
