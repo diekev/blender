@@ -512,33 +512,10 @@ bool WM_region_use_viewport(ScrArea *area, ARegion *region)
 
 static const char *wm_area_name(ScrArea *area)
 {
-#define SPACE_NAME(space) \
-  case space: \
-    return #space;
-
-  switch (area->spacetype) {
-    SPACE_NAME(SPACE_EMPTY);
-    SPACE_NAME(SPACE_VIEW3D);
-    SPACE_NAME(SPACE_GRAPH);
-    SPACE_NAME(SPACE_OUTLINER);
-    SPACE_NAME(SPACE_PROPERTIES);
-    SPACE_NAME(SPACE_FILE);
-    SPACE_NAME(SPACE_IMAGE);
-    SPACE_NAME(SPACE_INFO);
-    SPACE_NAME(SPACE_SEQ);
-    SPACE_NAME(SPACE_TEXT);
-    SPACE_NAME(SPACE_ACTION);
-    SPACE_NAME(SPACE_NLA);
-    SPACE_NAME(SPACE_SCRIPT);
-    SPACE_NAME(SPACE_NODE);
-    SPACE_NAME(SPACE_CONSOLE);
-    SPACE_NAME(SPACE_USERPREF);
-    SPACE_NAME(SPACE_CLIP);
-    SPACE_NAME(SPACE_TOPBAR);
-    SPACE_NAME(SPACE_STATUSBAR);
-    default:
-      return "Unknown Space";
+  if (area->type) {
+      return area->type->idname;
   }
+  return "Unknown Space";
 }
 
 /** \} */
