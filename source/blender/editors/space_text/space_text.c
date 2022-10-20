@@ -415,6 +415,11 @@ static void text_blend_write(BlendWriter *writer, SpaceLink *sl)
   BLO_write_struct(writer, SpaceText, sl);
 }
 
+static const char *text_editor_menus_idname(const SpaceLink *UNUSED(sl))
+{
+  return "TEXT_MT_editor_menus";
+}
+
 /********************* registration ********************/
 
 void ED_spacetype_text(void)
@@ -438,6 +443,7 @@ void ED_spacetype_text(void)
   st->blend_read_data = text_blend_read_data;
   st->blend_read_lib = text_blend_read_lib;
   st->blend_write = text_blend_write;
+  st->editor_menus_idname = text_editor_menus_idname;
 
   /* regions: main window */
   art = MEM_callocN(sizeof(ARegionType), "spacetype text region");

@@ -3401,6 +3401,29 @@ static bool rna_CustomSpaceType_eyedropper_color_sample(struct Main *UNUSED(bmai
   return ok;
 }
 
+static const char *rna_CustomSpaceType_editor_menus_idname(const struct SpaceLink *self)
+{
+  SpaceType *type = self->type;
+  PointerRNA ptr;
+  RNA_pointer_create(NULL, type->rna_ext.srna, (SpaceLink *)self, &ptr);
+
+  // RNA_struct_find_function(&ptr, "editor_menus_idname");
+  extern FunctionRNA rna_Space_editor_menus_idname_func;
+  FunctionRNA *func = &rna_Space_editor_menus_idname_func;
+
+  ParameterList list;
+  RNA_parameter_list_create(&list, &ptr, func);
+
+  type->rna_ext.call(NULL, &ptr, func, &list);
+
+  void *ret;
+  RNA_parameter_get_lookup(&list, "menu_idname", &ret);
+
+  RNA_parameter_list_free(&list);
+
+  return (const char *)ret;
+}
+
 static void rna_Space_unregister(Main *bmain, StructRNA *type)
 {
   SpaceType *st = RNA_struct_blender_type_get(type);
@@ -3474,7 +3497,7 @@ static StructRNA *rna_Space_register(Main *bmain,
   SpaceType *st, dummyst = {NULL};
   SpaceLink dummyspace = {NULL};
   PointerRNA dummystr;
-  int have_function[1];
+  int have_function[2];
 
   /* setup dummy space & space type to store static properties in */
   dummyspace.type = &dummyst;
@@ -3522,6 +3545,7 @@ static StructRNA *rna_Space_register(Main *bmain,
   /* Optional registrable functions. */
   st->eyedropper_color_sample = (have_function[0]) ? rna_CustomSpaceType_eyedropper_color_sample :
                                                      NULL;
+  st->editor_menus_idname = (have_function[1]) ? rna_CustomSpaceType_editor_menus_idname : NULL;
 
   BKE_spacetype_register(st);
 
@@ -3711,6 +3735,15 @@ static void rna_def_space(BlenderRNA *brna)
   RNA_def_function_output(func, parm);
   parm = RNA_def_float_array(
       func, "color", 3, default_eyedropper_sample_color, 0.0f, 1.0f, "Color", "", 0.0f, 1.0f);
+  RNA_def_function_output(func, parm);
+
+  func = RNA_def_function(srna, "editor_menus_idname", NULL);
+  RNA_def_function_ui_description(func,
+                                  "Retrieve the id name of the menu which should be used as a "
+                                  "base for the search menu operator");
+  RNA_def_function_flag(func, FUNC_REGISTER_OPTIONAL);
+  parm = RNA_def_string(
+      func, "menu_idname", NULL, 0, "Menu ID Name", "The menu id name, as set by Menu.bl_idname");
   RNA_def_function_output(func, parm);
 }
 

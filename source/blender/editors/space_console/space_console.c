@@ -322,6 +322,11 @@ static void console_blend_write(BlendWriter *writer, SpaceLink *sl)
   BLO_write_struct(writer, SpaceConsole, sl);
 }
 
+static const char *console_editor_menus_idname(const SpaceLink *UNUSED(sl))
+{
+  return "CONSOLE_MT_editor_menus";
+}
+
 void ED_spacetype_console(void)
 {
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype console");
@@ -339,6 +344,7 @@ void ED_spacetype_console(void)
   st->dropboxes = console_dropboxes;
   st->blend_read_data = console_blend_read_data;
   st->blend_write = console_blend_write;
+  st->editor_menus_idname = console_editor_menus_idname;
 
   /* regions: main window */
   art = MEM_callocN(sizeof(ARegionType), "spacetype console region");

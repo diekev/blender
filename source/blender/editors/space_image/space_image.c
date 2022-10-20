@@ -1083,6 +1083,11 @@ static bool image_eyedropper_color_sample(struct Main *UNUSED(bmain),
   return ED_space_image_color_sample(sima, region, pos, r_col, NULL);
 }
 
+static const char *image_editor_menus_idname(const SpaceLink *UNUSED(sl))
+{
+  return "IMAGE_MT_editor_menus";
+}
+
 /**************************** spacetype *****************************/
 
 void ED_spacetype_image(void)
@@ -1112,6 +1117,7 @@ void ED_spacetype_image(void)
   st->blend_read_lib = image_blend_read_lib;
   st->blend_write = image_blend_write;
   st->eyedropper_color_sample = image_eyedropper_color_sample;
+  st->editor_menus_idname = image_editor_menus_idname;
 
   /* regions: main window */
   art = MEM_callocN(sizeof(ARegionType), "spacetype image region");

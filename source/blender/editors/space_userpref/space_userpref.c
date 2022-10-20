@@ -191,6 +191,11 @@ static void userpref_blend_write(BlendWriter *writer, SpaceLink *sl)
   BLO_write_struct(writer, SpaceUserPref, sl);
 }
 
+static const char *userpref_editor_menus_idname(const SpaceLink *UNUSED(sl))
+{
+  return "USERPREF_MT_editor_menus";
+}
+
 void ED_spacetype_userpref(void)
 {
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype userpref");
@@ -206,6 +211,7 @@ void ED_spacetype_userpref(void)
   st->operatortypes = userpref_operatortypes;
   st->keymap = userpref_keymap;
   st->blend_write = userpref_blend_write;
+  st->editor_menus_idname = userpref_editor_menus_idname;
 
   /* regions: main window */
   art = MEM_callocN(sizeof(ARegionType), "spacetype userpref region");

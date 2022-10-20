@@ -1279,6 +1279,12 @@ static bool clip_eyedropper_color_sample(struct Main *UNUSED(bmain),
   return ED_space_clip_color_sample(sc, region, pos, r_col);
 }
 
+static const char *clip_editor_menus_idname(const SpaceLink *sl)
+{
+  return (((const SpaceClip *)sl)->mode == SC_MODE_TRACKING) ? "CLIP_MT_tracking_editor_menus" :
+                                                               "CLIP_MT_masking_editor_menus";
+}
+
 void ED_spacetype_clip(void)
 {
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype clip");
@@ -1303,6 +1309,7 @@ void ED_spacetype_clip(void)
   st->blend_read_lib = clip_blend_read_lib;
   st->blend_write = clip_blend_write;
   st->eyedropper_color_sample = clip_eyedropper_color_sample;
+  st->editor_menus_idname = clip_editor_menus_idname;
 
   /* regions: main window */
   art = MEM_callocN(sizeof(ARegionType), "spacetype clip region");

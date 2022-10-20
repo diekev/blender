@@ -615,35 +615,9 @@ static MenuSearch_Data *menu_items_from_ui_create(
     break
 
       if (area != nullptr) {
-        SpaceLink *sl = (SpaceLink *)area->spacedata.first;
-        switch ((eSpace_Type)area->spacetype) {
-          SPACE_MENU_MAP(SPACE_VIEW3D, "VIEW3D_MT_editor_menus");
-          SPACE_MENU_MAP(SPACE_GRAPH, "GRAPH_MT_editor_menus");
-          SPACE_MENU_MAP(SPACE_OUTLINER, "OUTLINER_MT_editor_menus");
-          SPACE_MENU_NOP(SPACE_PROPERTIES);
-          SPACE_MENU_MAP(SPACE_FILE, "FILEBROWSER_MT_editor_menus");
-          SPACE_MENU_MAP(SPACE_IMAGE, "IMAGE_MT_editor_menus");
-          SPACE_MENU_MAP(SPACE_INFO, "INFO_MT_editor_menus");
-          SPACE_MENU_MAP(SPACE_SEQ, "SEQUENCER_MT_editor_menus");
-          SPACE_MENU_MAP(SPACE_TEXT, "TEXT_MT_editor_menus");
-          SPACE_MENU_MAP(SPACE_ACTION,
-                         (((const SpaceAction *)sl)->mode == SACTCONT_TIMELINE) ?
-                             "TIME_MT_editor_menus" :
-                             "DOPESHEET_MT_editor_menus");
-          SPACE_MENU_MAP(SPACE_NLA, "NLA_MT_editor_menus");
-          SPACE_MENU_MAP(SPACE_NODE, "NODE_MT_editor_menus");
-          SPACE_MENU_MAP(SPACE_CONSOLE, "CONSOLE_MT_editor_menus");
-          SPACE_MENU_MAP(SPACE_USERPREF, "USERPREF_MT_editor_menus");
-          SPACE_MENU_MAP(SPACE_CLIP,
-                         (((const SpaceClip *)sl)->mode == SC_MODE_TRACKING) ?
-                             "CLIP_MT_tracking_editor_menus" :
-                             "CLIP_MT_masking_editor_menus");
-          SPACE_MENU_NOP(SPACE_EMPTY);
-          SPACE_MENU_NOP(SPACE_SCRIPT);
-          SPACE_MENU_NOP(SPACE_STATUSBAR);
-          SPACE_MENU_NOP(SPACE_TOPBAR);
-          SPACE_MENU_NOP(SPACE_SPREADSHEET);
-          SPACE_MENU_NOP(SPACE_CUSTOM);
+        if (area->type && area->type->editor_menus_idname) {
+          SpaceLink *sl = (SpaceLink *)area->spacedata.first;
+          idname_array[idname_array_len++] = area->type->editor_menus_idname(sl);
         }
       }
       for (int i = 0; i < idname_array_len; i++) {

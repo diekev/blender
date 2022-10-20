@@ -255,6 +255,11 @@ static void info_blend_write(BlendWriter *writer, SpaceLink *sl)
   BLO_write_struct(writer, SpaceInfo, sl);
 }
 
+static const char *info_editor_menus_idname(const SpaceLink *UNUSED(sl))
+{
+  return "INFO_MT_editor_menus";
+}
+
 void ED_spacetype_info(void)
 {
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype info");
@@ -270,6 +275,7 @@ void ED_spacetype_info(void)
   st->operatortypes = info_operatortypes;
   st->keymap = info_keymap;
   st->blend_write = info_blend_write;
+  st->editor_menus_idname = info_editor_menus_idname;
 
   /* regions: main window */
   art = MEM_callocN(sizeof(ARegionType), "spacetype info region");

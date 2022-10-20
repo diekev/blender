@@ -842,6 +842,11 @@ static void graph_blend_write(BlendWriter *writer, SpaceLink *sl)
   sipo->runtime.ghost_curves = tmpGhosts;
 }
 
+static const char *graph_editor_menus_idname(const SpaceLink *UNUSED(sl))
+{
+  return "GRAPH_MT_editor_menus";
+}
+
 void ED_spacetype_ipo(void)
 {
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype ipo");
@@ -865,6 +870,7 @@ void ED_spacetype_ipo(void)
   st->blend_read_data = graph_blend_read_data;
   st->blend_read_lib = graph_blend_read_lib;
   st->blend_write = graph_blend_write;
+  st->editor_menus_idname = graph_editor_menus_idname;
 
   /* regions: main window */
   art = MEM_callocN(sizeof(ARegionType), "spacetype graphedit region");

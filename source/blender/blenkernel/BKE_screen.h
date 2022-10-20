@@ -136,6 +136,12 @@ typedef struct SpaceType {
                                   const int pos[2],
                                   float r_col[3]);
 
+  /**
+   * Optionnal callback to retrieve the id name for the menu which contains all other menus for the
+   * SpaceType.
+   */
+  const char *(*editor_menus_idname)(const struct SpaceLink *space);
+
   /* region type definitions */
   ListBase regiontypes;
 

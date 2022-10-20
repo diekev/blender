@@ -1034,6 +1034,11 @@ static void sequencer_blend_write(BlendWriter *writer, SpaceLink *sl)
   BLO_write_struct(writer, SpaceSeq, sl);
 }
 
+static const char *sequencer_editor_menus_idname(const SpaceLink *UNUSED(sl))
+{
+  return "SEQUENCER_MT_editor_menus";
+}
+
 void ED_spacetype_sequencer(void)
 {
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype sequencer");
@@ -1057,6 +1062,7 @@ void ED_spacetype_sequencer(void)
   st->blend_read_data = sequencer_blend_read_data;
   st->blend_read_lib = sequencer_blend_read_lib;
   st->blend_write = sequencer_blend_write;
+  st->editor_menus_idname = sequencer_editor_menus_idname;
 
   /* Create regions: */
   /* Main window. */

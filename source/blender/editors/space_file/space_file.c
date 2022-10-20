@@ -1034,6 +1034,11 @@ static void file_blend_write(BlendWriter *writer, SpaceLink *sl)
   }
 }
 
+static const char *file_editor_menus_idname(const SpaceLink *UNUSED(sl))
+{
+  return "FILEBROWSER_MT_editor_menus";
+}
+
 void ED_spacetype_file(void)
 {
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype file");
@@ -1060,6 +1065,7 @@ void ED_spacetype_file(void)
   st->blend_read_data = file_blend_read_data;
   st->blend_read_lib = file_blend_read_lib;
   st->blend_write = file_blend_write;
+  st->editor_menus_idname = file_editor_menus_idname;
 
   /* regions: main window */
   art = MEM_callocN(sizeof(ARegionType), "spacetype file region");

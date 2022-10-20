@@ -591,6 +591,11 @@ static void nla_blend_write(BlendWriter *writer, SpaceLink *sl)
   }
 }
 
+static const char *nla_editor_menus_idname(const SpaceLink *UNUSED(sl))
+{
+  return "NLA_MT_editor_menus";
+}
+
 void ED_spacetype_nla(void)
 {
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype nla");
@@ -610,6 +615,7 @@ void ED_spacetype_nla(void)
   st->blend_read_data = nla_blend_read_data;
   st->blend_read_lib = nla_blend_read_lib;
   st->blend_write = nla_blend_write;
+  st->editor_menus_idname = nla_editor_menus_idname;
 
   /* regions: main window */
   art = MEM_callocN(sizeof(ARegionType), "spacetype nla region");

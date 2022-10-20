@@ -2048,6 +2048,11 @@ static void view3d_blend_write(BlendWriter *writer, SpaceLink *sl)
   BKE_viewer_path_blend_write(writer, &v3d->viewer_path);
 }
 
+static const char *view3d_editor_menus_idname(const SpaceLink * /* sl */)
+{
+  return "VIEW3D_MT_editor_menus";
+}
+
 void ED_spacetype_view3d()
 {
   SpaceType *st = MEM_cnew<SpaceType>("spacetype view3d");
@@ -2072,6 +2077,7 @@ void ED_spacetype_view3d()
   st->blend_read_data = view3d_blend_read_data;
   st->blend_read_lib = view3d_blend_read_lib;
   st->blend_write = view3d_blend_write;
+  st->editor_menus_idname = view3d_editor_menus_idname;
 
   /* regions: main window */
   art = MEM_cnew<ARegionType>("spacetype view3d main region");

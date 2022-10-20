@@ -862,6 +862,12 @@ static void action_blend_write(BlendWriter *writer, SpaceLink *sl)
   BLO_write_struct(writer, SpaceAction, sl);
 }
 
+static const char *action_editor_menus_idname(const SpaceLink *sl)
+{
+  return (((const SpaceAction *)sl)->mode == SACTCONT_TIMELINE) ? "TIME_MT_editor_menus" :
+                                                                  "DOPESHEET_MT_editor_menus";
+}
+
 void ED_spacetype_action(void)
 {
   SpaceType *st = MEM_callocN(sizeof(SpaceType), "spacetype action");
@@ -885,6 +891,7 @@ void ED_spacetype_action(void)
   st->blend_read_data = action_blend_read_data;
   st->blend_read_lib = action_blend_read_lib;
   st->blend_write = action_blend_write;
+  st->editor_menus_idname = action_editor_menus_idname;
 
   /* regions: main window */
   art = MEM_callocN(sizeof(ARegionType), "spacetype action region");

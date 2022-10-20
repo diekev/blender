@@ -555,6 +555,11 @@ static void outliner_blend_write(BlendWriter *writer, SpaceLink *sl)
   write_space_outliner(writer, space_outliner);
 }
 
+static const char *outliner_editor_menus_idname(const SpaceLink * /* sl */)
+{
+  return "OUTLINER_MT_editor_menus";
+}
+
 }  // namespace blender::ed::outliner
 
 void ED_spacetype_outliner(void)
@@ -580,6 +585,7 @@ void ED_spacetype_outliner(void)
   st->blend_read_data = outliner_blend_read_data;
   st->blend_read_lib = outliner_blend_read_lib;
   st->blend_write = outliner_blend_write;
+  st->editor_menus_idname = outliner_editor_menus_idname;
 
   /* regions: main window */
   art = MEM_cnew<ARegionType>("spacetype outliner region");
