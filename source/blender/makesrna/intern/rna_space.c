@@ -3426,9 +3426,11 @@ static const char *rna_CustomSpaceType_editor_menus_idname(const struct SpaceLin
   void *ret;
   RNA_parameter_get_lookup(&list, "menu_idname", &ret);
 
+  const char *str_ret = (const char *)MEM_dupallocN(ret);
+
   RNA_parameter_list_free(&list);
 
-  return (const char *)ret;
+  return str_ret;
 }
 
 static void rna_Space_unregister(Main *bmain, StructRNA *type)
@@ -3750,7 +3752,8 @@ static void rna_def_space(BlenderRNA *brna)
                                   "base for the search menu operator");
   RNA_def_function_flag(func, FUNC_REGISTER_OPTIONAL);
   parm = RNA_def_string(
-      func, "menu_idname", NULL, 0, "Menu ID Name", "The menu id name, as set by Menu.bl_idname");
+      func, "menu_idname", NULL, 64, "Menu ID Name", "The menu id name, as set by Menu.bl_idname");
+  RNA_def_parameter_flags(parm, PROP_THICK_WRAP, 0); /* needed for string return value */
   RNA_def_function_output(func, parm);
 }
 

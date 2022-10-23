@@ -599,24 +599,20 @@ static MenuSearch_Data *menu_items_from_ui_create(
      * each space-type has a single root-menu that headers use. */
     {
       const char *idname_array[2] = {nullptr};
+      /* Menu idnames from custom space types have to be freed. */
+      bool needs_free[2] = {false};
       int idname_array_len = 0;
 
       /* Use negative for global (no area) context, populate the top-bar. */
       if (space_type_ui_index == -1) {
+        needs_free[idname_array_len] = false;
         idname_array[idname_array_len++] = "TOPBAR_MT_editor_menus";
       }
-
-#define SPACE_MENU_MAP(space_type, menu_id) \
-  case space_type: \
-    idname_array[idname_array_len++] = menu_id; \
-    break
-#define SPACE_MENU_NOP(space_type) \
-  case space_type: \
-    break
 
       if (area != nullptr) {
         if (area->type && area->type->editor_menus_idname) {
           SpaceLink *sl = (SpaceLink *)area->spacedata.first;
+          needs_free[idname_array_len] = area->type->spaceid == SPACE_CUSTOM;
           idname_array[idname_array_len++] = area->type->editor_menus_idname(sl);
         }
       }
@@ -628,10 +624,11 @@ static MenuSearch_Data *menu_items_from_ui_create(
             BLI_linklist_prepend(&menu_stack, mt);
           }
         }
+        if (needs_free[i]) {
+          MEM_freeN((char *)idname_array[i]);
+        }
       }
     }
-#undef SPACE_MENU_MAP
-#undef SPACE_MENU_NOP
 
     bool has_keymap_menu_items = false;
 
