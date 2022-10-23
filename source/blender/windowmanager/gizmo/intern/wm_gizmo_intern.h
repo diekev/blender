@@ -130,7 +130,7 @@ struct wmGizmoMap {
  */
 struct wmGizmoMapType {
   struct wmGizmoMapType *next, *prev;
-  const char *spaceid; /* BKE_ST_MAXNAME */
+  char spaceid[64]; /* BKE_ST_MAXNAME */
   short regionid;
   /* types of gizmo-groups for this gizmo-map type */
   ListBase grouptype_refs;

@@ -1201,7 +1201,7 @@ struct ARegion *WM_gizmomap_tooltip_init(struct bContext *C,
 wmGizmoMapType *WM_gizmomaptype_find(const struct wmGizmoMapType_Params *gzmap_params)
 {
   LISTBASE_FOREACH (wmGizmoMapType *, gzmap_type, &gizmomaptypes) {
-    if (STREQLEN(gzmap_type->spaceid, gzmap_params->spaceid, 64) &&
+    if (STREQ(gzmap_type->spaceid, gzmap_params->spaceid) &&
         gzmap_type->regionid == gzmap_params->regionid) {
       return gzmap_type;
     }
@@ -1219,7 +1219,7 @@ wmGizmoMapType *WM_gizmomaptype_ensure(const struct wmGizmoMapType_Params *gzmap
   }
 
   gzmap_type = MEM_callocN(sizeof(wmGizmoMapType), "gizmotype list");
-  gzmap_type->spaceid = gzmap_params->spaceid;
+  STRNCPY(gzmap_type->spaceid, gzmap_params->spaceid);
   gzmap_type->regionid = gzmap_params->regionid;
   BLI_addhead(&gizmomaptypes, gzmap_type);
 
