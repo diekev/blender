@@ -718,7 +718,7 @@ static wmKeyMap *wm_keymap_patch_update(ListBase *lb,
 
   /* remove previous keymap in list, we will replace it */
   wmKeyMap *km = WM_keymap_list_find(
-      lb, defaultmap->idname, defaultmap->spaceid, defaultmap->regionid);
+      lb, defaultmap->idname, defaultmap->space_idname, defaultmap->regionid);
   if (km) {
     expanded = (km->flag & (KEYMAP_EXPANDED | KEYMAP_CHILDREN_EXPANDED));
     WM_keymap_clear(km);
@@ -789,7 +789,7 @@ static void wm_keymap_diff_update(ListBase *lb,
   }
 
   /* remove previous diff keymap in list, we will replace it */
-  wmKeyMap *prevmap = WM_keymap_list_find(lb, km->idname, km->spaceid, km->regionid);
+  wmKeyMap *prevmap = WM_keymap_list_find(lb, km->idname, km->space_idname, km->regionid);
   if (prevmap) {
     WM_keymap_clear(prevmap);
     BLI_freelinkN(lb, prevmap);
@@ -846,41 +846,23 @@ wmKeyMap *WM_keymap_list_find_idname(ListBase *lb,
   return NULL;
 }
 
-static wmKeyMap *WM_keymap_list_find_spaceid(ListBase *lb,
-                                             const char *idname,
-                                             int spaceid,
-                                             int regionid)
+wmKeyMap *WM_keymap_list_find(ListBase *lb,
+                              const char *idname,
+                              const char *space_idname,
+                              int regionid)
 {
-  LISTBASE_FOREACH (wmKeyMap *, km, lb) {
-    if (km->spaceid == spaceid && km->regionid == regionid) {
-      if (STREQLEN(idname, km->idname, KMAP_MAX_NAME)) {
-        return km;
-      }
-    }
-  }
-
-  return NULL;
-}
-
-wmKeyMap *WM_keymap_list_find(ListBase *lb, const char *idname, int spaceid, int regionid)
-{
-  const char *space_idname = BKE_spacetype_idname_from_spaceid(spaceid);
-  wmKeyMap *km = WM_keymap_list_find_spaceid(lb, idname, spaceid, regionid);
-
-  if (km) {
-    return km;
-  }
-
   return WM_keymap_list_find_idname(lb, idname, space_idname, regionid);
 }
 
 wmKeyMap *WM_keymap_list_find_spaceid_or_empty(ListBase *lb,
                                                const char *idname,
-                                               int spaceid,
+                                               const char *space_idname,
                                                int regionid)
 {
   LISTBASE_FOREACH (wmKeyMap *, km, lb) {
-    if (ELEM(km->spaceid, spaceid, SPACE_EMPTY) && km->regionid == regionid) {
+    if ((STREQLEN(km->space_idname, space_idname, BKE_ST_MAXNAME) ||
+         STREQLEN(km->space_idname, "EMPTY", BKE_ST_MAXNAME)) &&
+        km->regionid == regionid) {
       if (STREQLEN(idname, km->idname, KMAP_MAX_NAME)) {
         return km;
       }
@@ -914,17 +896,21 @@ wmKeyMap *WM_keymap_ensure(wmKeyConfig *keyconf, const char *idname, int spaceid
   return WM_keymap_ensure_idname(keyconf, idname, space_idname, regionid);
 }
 
-wmKeyMap *WM_keymap_find_all(wmWindowManager *wm, const char *idname, int spaceid, int regionid)
+wmKeyMap *WM_keymap_find_all(wmWindowManager *wm,
+                             const char *idname,
+                             const char *space_idname,
+                             int regionid)
 {
-  return WM_keymap_list_find(&wm->userconf->keymaps, idname, spaceid, regionid);
+  return WM_keymap_list_find(&wm->userconf->keymaps, idname, space_idname, regionid);
 }
 
 wmKeyMap *WM_keymap_find_all_spaceid_or_empty(wmWindowManager *wm,
                                               const char *idname,
-                                              int spaceid,
+                                              const char *space_idname,
                                               int regionid)
 {
-  return WM_keymap_list_find_spaceid_or_empty(&wm->userconf->keymaps, idname, spaceid, regionid);
+  return WM_keymap_list_find_spaceid_or_empty(
+      &wm->userconf->keymaps, idname, space_idname, regionid);
 }
 
 /** \} */
@@ -1869,9 +1855,11 @@ static bool wm_keymap_test_and_clear_update(wmKeyMap *km)
 static wmKeyMap *wm_keymap_preset(wmWindowManager *wm, wmKeyMap *km)
 {
   wmKeyConfig *keyconf = WM_keyconfig_active(wm);
-  wmKeyMap *keymap = WM_keymap_list_find(&keyconf->keymaps, km->idname, km->spaceid, km->regionid);
+  wmKeyMap *keymap = WM_keymap_list_find(
+      &keyconf->keymaps, km->idname, km->space_idname, km->regionid);
   if (!keymap && wm->defaultconf) {
-    keymap = WM_keymap_list_find(&wm->defaultconf->keymaps, km->idname, km->spaceid, km->regionid);
+    keymap = WM_keymap_list_find(
+        &wm->defaultconf->keymaps, km->idname, km->space_idname, km->regionid);
   }
 
   return keymap;
@@ -1935,7 +1923,7 @@ void WM_keyconfig_update(wmWindowManager *wm)
         /* find keymaps */
         wmKeyMap *defaultmap = wm_keymap_preset(wm, km);
         wmKeyMap *addonmap = WM_keymap_list_find(
-            &wm->addonconf->keymaps, km->idname, km->spaceid, km->regionid);
+            &wm->addonconf->keymaps, km->idname, km->space_idname, km->regionid);
 
         /* diff */
         if (defaultmap) {
@@ -1949,9 +1937,9 @@ void WM_keyconfig_update(wmWindowManager *wm)
       /* find keymaps */
       wmKeyMap *defaultmap = wm_keymap_preset(wm, km);
       wmKeyMap *addonmap = WM_keymap_list_find(
-          &wm->addonconf->keymaps, km->idname, km->spaceid, km->regionid);
+          &wm->addonconf->keymaps, km->idname, km->space_idname, km->regionid);
       wmKeyMap *usermap = WM_keymap_list_find(
-          &U.user_keymaps, km->idname, km->spaceid, km->regionid);
+          &U.user_keymaps, km->idname, km->space_idname, km->regionid);
 
       /* For now only the default map defines modal key-maps,
        * if we support modal keymaps for 'addonmap', these will need to be enabled too. */
@@ -1999,7 +1987,7 @@ wmKeyMap *WM_keymap_active(const wmWindowManager *wm, wmKeyMap *keymap)
 
   /* first user defined keymaps */
   wmKeyMap *km = WM_keymap_list_find(
-      &wm->userconf->keymaps, keymap->idname, keymap->spaceid, keymap->regionid);
+      &wm->userconf->keymaps, keymap->idname, keymap->space_idname, keymap->regionid);
 
   if (km) {
     return km;
@@ -2025,7 +2013,7 @@ void WM_keymap_item_restore_to_default(wmWindowManager *wm, wmKeyMap *keymap, wm
   /* construct default keymap from preset + addons */
   wmKeyMap *defaultmap = wm_keymap_preset(wm, keymap);
   wmKeyMap *addonmap = WM_keymap_list_find(
-      &wm->addonconf->keymaps, keymap->idname, keymap->spaceid, keymap->regionid);
+      &wm->addonconf->keymaps, keymap->idname, keymap->space_idname, keymap->regionid);
 
   if (addonmap) {
     defaultmap = wm_keymap_copy(defaultmap);
@@ -2077,7 +2065,7 @@ void WM_keymap_restore_to_default(wmKeyMap *keymap, wmWindowManager *wm)
 {
   /* remove keymap from U.user_keymaps and update */
   wmKeyMap *usermap = WM_keymap_list_find(
-      &U.user_keymaps, keymap->idname, keymap->spaceid, keymap->regionid);
+      &U.user_keymaps, keymap->idname, keymap->space_idname, keymap->regionid);
 
   if (usermap) {
     WM_keymap_clear(usermap);

@@ -64,14 +64,17 @@ wmKeyMapItem *WM_keymap_add_item_copy(struct wmKeyMap *keymap, wmKeyMapItem *kmi
 bool WM_keymap_remove_item(struct wmKeyMap *keymap, struct wmKeyMapItem *kmi);
 int WM_keymap_item_to_string(const wmKeyMapItem *kmi, bool compact, char *result, int result_len);
 
-wmKeyMap *WM_keymap_list_find(ListBase *lb, const char *idname, int spaceid, int regionid);
+wmKeyMap *WM_keymap_list_find(ListBase *lb,
+                              const char *idname,
+                              const char *space_idname,
+                              int regionid);
 wmKeyMap *WM_keymap_list_find_idname(ListBase *lb,
                                      const char *idname,
                                      const char *space_idname,
                                      int regionid);
 wmKeyMap *WM_keymap_list_find_spaceid_or_empty(ListBase *lb,
                                                const char *idname,
-                                               int spaceid,
+                                               const char *space_idname,
                                                int regionid);
 wmKeyMap *WM_keymap_ensure(struct wmKeyConfig *keyconf,
                            const char *idname,
@@ -83,11 +86,11 @@ wmKeyMap *WM_keymap_ensure_idname(wmKeyConfig *keyconf,
                                   int regionid);
 wmKeyMap *WM_keymap_find_all(struct wmWindowManager *wm,
                              const char *idname,
-                             int spaceid,
+                             const char *space_idname,
                              int regionid);
 wmKeyMap *WM_keymap_find_all_spaceid_or_empty(struct wmWindowManager *wm,
                                               const char *idname,
-                                              int spaceid,
+                                              const char *space_idname,
                                               int regionid);
 wmKeyMap *WM_keymap_active(const struct wmWindowManager *wm, struct wmKeyMap *keymap);
 bool WM_keymap_remove(struct wmKeyConfig *keyconfig, struct wmKeyMap *keymap);

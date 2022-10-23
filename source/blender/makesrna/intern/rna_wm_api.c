@@ -453,10 +453,10 @@ static wmKeyMap *rna_keymap_new(wmKeyConfig *keyconf,
 
 static wmKeyMap *rna_keymap_find(wmKeyConfig *keyconf,
                                  const char *idname,
-                                 int spaceid,
+                                 const char *space_idname,
                                  int regionid)
 {
-  return WM_keymap_list_find(&keyconf->keymaps, idname, spaceid, regionid);
+  return WM_keymap_list_find(&keyconf->keymaps, idname, space_idname, regionid);
 }
 
 static wmKeyMap *rna_keymap_find_modal(wmKeyConfig *UNUSED(keyconf), const char *idname)
