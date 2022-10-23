@@ -2843,7 +2843,7 @@ void uiItemPopoverPanel(uiLayout *layout,
                         int icon);
 void uiItemPopoverPanelFromGroup(uiLayout *layout,
                                  struct bContext *C,
-                                 int space_id,
+                                 const char *space_type,
                                  int region_id,
                                  const char *context,
                                  const char *category);

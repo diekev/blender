@@ -3156,14 +3156,14 @@ void uiItemPopoverPanel(
 
 void uiItemPopoverPanelFromGroup(uiLayout *layout,
                                  bContext *C,
-                                 int space_id,
+                                 const char *space_type,
                                  int region_id,
                                  const char *context,
                                  const char *category)
 {
-  SpaceType *st = BKE_spacetype_from_id(space_id);
+  SpaceType *st = BKE_spacetype_from_idname(space_type);
   if (st == NULL) {
-    RNA_warning("space type not found %d", space_id);
+    RNA_warning("space type not found %s", space_type);
     return;
   }
   ARegionType *art = BKE_regiontype_from_id(st, region_id);

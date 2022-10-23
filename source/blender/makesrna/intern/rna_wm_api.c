@@ -1244,7 +1244,7 @@ void RNA_api_keymaps(StructRNA *srna)
 
   parm = RNA_def_string(func, "name", NULL, 0, "Name", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
-  RNA_def_string(func, "space_type", "SPACE_EMPTY", 64, "Space Type", "");
+  RNA_def_string(func, "space_type", "EMPTY", 64, "Space Type", "");
   RNA_def_enum(
       func, "region_type", rna_enum_region_type_items, RGN_TYPE_WINDOW, "Region Type", "");
   RNA_def_boolean(func, "modal", 0, "Modal", "Keymap for modal operators");
@@ -1261,7 +1261,7 @@ void RNA_api_keymaps(StructRNA *srna)
   func = RNA_def_function(srna, "find", "rna_keymap_find"); /* find_keymap */
   parm = RNA_def_string(func, "name", NULL, 0, "Name", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
-  RNA_def_enum(func, "space_type", rna_enum_space_type_items, SPACE_EMPTY, "Space Type", "");
+  RNA_def_string(func, "space_type", "EMPTY", 64, "Space Type", "");
   RNA_def_enum(
       func, "region_type", rna_enum_region_type_items, RGN_TYPE_WINDOW, "Region Type", "");
   parm = RNA_def_pointer(func, "keymap", "KeyMap", "Key Map", "Corresponding key map");

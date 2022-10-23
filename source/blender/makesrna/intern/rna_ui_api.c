@@ -457,12 +457,12 @@ static void rna_uiItemPopoverPanel(uiLayout *layout,
 
 static void rna_uiItemPopoverPanelFromGroup(uiLayout *layout,
                                             bContext *C,
-                                            int space_id,
+                                            const char *space_type,
                                             int region_id,
                                             const char *context,
                                             const char *category)
 {
-  uiItemPopoverPanelFromGroup(layout, C, space_id, region_id, context, category);
+  uiItemPopoverPanelFromGroup(layout, C, space_type, region_id, context, category);
 }
 
 static void rna_uiTemplateID(uiLayout *layout,
@@ -1284,7 +1284,7 @@ void RNA_api_ui_layout(StructRNA *srna)
 
   func = RNA_def_function(srna, "popover_group", "rna_uiItemPopoverPanelFromGroup");
   RNA_def_function_flag(func, FUNC_USE_CONTEXT);
-  parm = RNA_def_enum(func, "space_type", rna_enum_space_type_items, 0, "Space Type", "");
+  parm = RNA_def_string(func, "space_type", "EMPTY", 64, "Space Type", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_enum(
       func, "region_type", rna_enum_region_type_items, RGN_TYPE_WINDOW, "Region Type", "");
