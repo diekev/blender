@@ -5511,7 +5511,7 @@ static void add_item_for_space_type_cb(const SpaceType *spacetype, void *data)
 
   /* TODO: move icon and description to ModifierTypeInfo. */
   EnumPropertyItem md_item;
-  md_item.value = cb_data->totitem;
+  md_item.value = SPACE_CUSTOM + cb_data->totcustom;
   md_item.description = NULL;
   md_item.name = spacetype->name;
   md_item.identifier = spacetype->idname;
@@ -5539,6 +5539,7 @@ static const EnumPropertyItem *space_type_add_itemf(bContext *UNUSED(C),
     if (md_item->identifier[0]) {
       const SpaceType *space_type = BKE_spacetype_from_id(md_item->value);
 
+      md_item_.value = md_item->value;
       md_item_.description = md_item->description;
       md_item_.name = md_item->name;
       md_item_.identifier = space_type->idname;
@@ -5554,7 +5555,6 @@ static const EnumPropertyItem *space_type_add_itemf(bContext *UNUSED(C),
       group_item = NULL;
     }
 
-    md_item_.value = totitem;
     RNA_enum_item_add(&items, &totitem, &md_item_);
   }
 
