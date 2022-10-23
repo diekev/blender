@@ -951,6 +951,24 @@ static void rna_Region_draw_handlers(ARegion *region, bContext *C, int draw_mode
   ED_region_draw_cb_draw(C, region, draw_mode);
 }
 
+static void rna_Region_gizmos_tag_refresh(ARegion *region)
+{
+  if (!region->gizmo_map) {
+    fprintf(stderr, "Region has no gizmo_map\n");
+    return;
+  }
+  WM_gizmomap_tag_refresh(region->gizmo_map);
+}
+
+static void rna_Region_gizmos_draw(ARegion *region, bContext *C)
+{
+  if (!region->gizmo_map) {
+    fprintf(stderr, "Region has no gizmo_map\n");
+    return;
+  }
+  WM_gizmomap_draw(region->gizmo_map, C, WM_GIZMOMAP_DRAWSTEP_2D);
+}
+
 #else
 
 /* Area.spaces */
@@ -1331,6 +1349,14 @@ static void rna_def_region(BlenderRNA *brna)
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_enum(
       func, "draw_mode", region_draw_mode_items, REGION_DRAW_POST_PIXEL, "Draw Mode", "");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+
+  func = RNA_def_function(srna, "gizmos_tag_refresh", "rna_Region_gizmos_tag_refresh");
+  RNA_def_function_ui_description(func, "Refresh the gizmos for the region");
+
+  func = RNA_def_function(srna, "gizmos_draw", "rna_Region_gizmos_draw");
+  RNA_def_function_ui_description(func, "Draw the gizmos for the region");
+  parm = RNA_def_pointer(func, "context", "Context", "", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
 
   /* Registration. */
