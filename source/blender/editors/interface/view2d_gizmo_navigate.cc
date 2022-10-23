@@ -8,6 +8,7 @@
 #include "BLI_utildefines.h"
 
 #include "BKE_context.h"
+#include "BKE_screen.h"
 
 #include "ED_gizmo_library.h"
 #include "ED_screen.h"
@@ -91,8 +92,9 @@ static struct NavigateGizmoInfo g_navigate_params_for_view2d[GZ_INDEX_TOTAL] = {
     },
 };
 
-static struct NavigateGizmoInfo *navigate_params_from_space_type(short space_type)
+static struct NavigateGizmoInfo *navigate_params_from_space_type(const char *space_type_idname)
 {
+  const int space_type = BKE_spaceid_from_space_idname(space_type_idname);
   switch (space_type) {
     case SPACE_IMAGE:
       return g_navigate_params_for_space_image;

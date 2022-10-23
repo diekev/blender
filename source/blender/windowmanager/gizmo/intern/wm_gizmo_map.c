@@ -13,6 +13,7 @@
 #include "BLI_math.h"
 #include "BLI_math_bits.h"
 #include "BLI_rect.h"
+#include "BLI_string.h"
 
 #include "BKE_context.h"
 #include "BKE_global.h"
@@ -1200,7 +1201,7 @@ struct ARegion *WM_gizmomap_tooltip_init(struct bContext *C,
 wmGizmoMapType *WM_gizmomaptype_find(const struct wmGizmoMapType_Params *gzmap_params)
 {
   LISTBASE_FOREACH (wmGizmoMapType *, gzmap_type, &gizmomaptypes) {
-    if (gzmap_type->spaceid == gzmap_params->spaceid &&
+    if (STREQLEN(gzmap_type->spaceid, gzmap_params->spaceid, 64) &&
         gzmap_type->regionid == gzmap_params->regionid) {
       return gzmap_type;
     }

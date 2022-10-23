@@ -633,6 +633,19 @@ static void rna_GizmoGroup_bl_idname_set(PointerRNA *ptr, const char *value)
   }
 }
 
+/* just to work around 'const char *' warning and to ensure this is a python op */
+static void rna_GizmoGroup_bl_space_type_set(PointerRNA *ptr, const char *value)
+{
+  wmGizmoGroup *data = ptr->data;
+  char *str = (char *)data->type->gzmap_params.spaceid;
+  if (!str[0]) {
+    BLI_strncpy(str, value, MAX_NAME); /* utf8 already ensured */
+  }
+  else {
+    BLI_assert_msg(0, "setting the bl_space_type on a non-builtin operator");
+  }
+}
+
 static void rna_GizmoGroup_bl_label_set(PointerRNA *ptr, const char *value)
 {
   wmGizmoGroup *data = ptr->data;
@@ -797,6 +810,7 @@ static StructRNA *rna_GizmoGroup_register(Main *bmain,
   struct {
     char name[MAX_NAME];
     char idname[MAX_NAME];
+    char space_idname[64]; /* BKE_ST_MAXNAME */
   } temp_buffers;
 
   wmGizmoGroupType dummywgt = {NULL};
@@ -810,11 +824,12 @@ static StructRNA *rna_GizmoGroup_register(Main *bmain,
   dummywg.type = &dummywgt;
   dummywgt.name = temp_buffers.name;
   dummywgt.idname = temp_buffers.idname;
+  dummywgt.gzmap_params.spaceid = temp_buffers.space_idname;
 
   RNA_pointer_create(NULL, &RNA_GizmoGroup, &dummywg, &wgptr);
 
   /* Clear so we can detect if it's left unset. */
-  temp_buffers.idname[0] = temp_buffers.name[0] = '\0';
+  temp_buffers.idname[0] = temp_buffers.name[0] = temp_buffers.space_idname[0] = '\0';
 
   /* validate the python class */
   if (validate(&wgptr, data, have_function) != 0) {
@@ -857,6 +872,7 @@ static StructRNA *rna_GizmoGroup_register(Main *bmain,
     const char *strings[] = {
         temp_buffers.idname,
         temp_buffers.name,
+        temp_buffers.space_idname,
     };
     char *strings_table[ARRAY_SIZE(strings)];
     BLI_string_join_array_by_sep_char_with_tableN(
@@ -864,7 +880,8 @@ static StructRNA *rna_GizmoGroup_register(Main *bmain,
 
     dummywgt.idname = strings_table[0]; /* allocated string stored here */
     dummywgt.name = strings_table[1];
-    BLI_assert(ARRAY_SIZE(strings) == 2);
+    dummywgt.gzmap_params.spaceid = strings_table[2];
+    BLI_assert(ARRAY_SIZE(strings) == 3);
   }
 
   /* create a new gizmogroup type */
@@ -1351,9 +1368,10 @@ static void rna_def_gizmogroup(BlenderRNA *brna)
   // RNA_def_property_clear_flag(prop, PROP_EDITABLE);
   RNA_def_property_flag(prop, PROP_REGISTER);
 
-  prop = RNA_def_property(srna, "bl_space_type", PROP_ENUM, PROP_NONE);
-  RNA_def_property_enum_sdna(prop, NULL, "type->gzmap_params.spaceid");
-  RNA_def_property_enum_items(prop, rna_enum_space_type_items);
+  prop = RNA_def_property(srna, "bl_space_type", PROP_STRING, PROP_NONE);
+  RNA_def_property_string_sdna(prop, NULL, "type->gzmap_params.spaceid");
+  RNA_def_property_string_maxlength(prop, MAX_NAME); /* else it uses the pointer size! */
+  RNA_def_property_string_funcs(prop, NULL, NULL, "rna_GizmoGroup_bl_space_type_set");
   RNA_def_property_flag(prop, PROP_REGISTER);
   RNA_def_property_ui_text(prop, "Space Type", "The space where the panel is going to be used in");
 

@@ -328,7 +328,7 @@ typedef struct wmGizmoWrapper {
 } wmGizmoWrapper;
 
 struct wmGizmoMapType_Params {
-  short spaceid;
+  const char *spaceid; /* BKE_ST_MAXNAME */
   short regionid;
 };
 

@@ -1686,7 +1686,7 @@ static void ed_default_handlers(
       BLI_assert(&region->handlers == handlers);
       if (region->gizmo_map == NULL) {
         region->gizmo_map = WM_gizmomap_new_from_type(
-            &(const struct wmGizmoMapType_Params){area->spacetype, region->type->regionid});
+            &(const struct wmGizmoMapType_Params){area->type->idname, region->type->regionid});
       }
       WM_gizmomap_add_handlers(region, region->gizmo_map);
     }

@@ -781,7 +781,7 @@ static wmKeyMap *WM_gizmogroup_keymap_template_select_ex(
 {
   /* Use area and region id since we might have multiple gizmos
    * with the same name in different areas/regions. */
-  wmKeyMap *km = WM_keymap_ensure(kc, name, params->spaceid, params->regionid);
+  wmKeyMap *km = WM_keymap_ensure_idname(kc, name, params->spaceid, params->regionid);
   const bool do_init = BLI_listbase_is_empty(&km->items);
 
   /* FIXME(@campbellbarton): Currently hard coded. */
@@ -846,7 +846,7 @@ wmKeyMap *WM_gizmogroup_setup_keymap_generic_select(const wmGizmoGroupType *UNUS
                                                     wmKeyConfig *kc)
 {
   struct wmGizmoMapType_Params params = {
-      .spaceid = SPACE_EMPTY,
+      .spaceid = "EMPTY",
       .regionid = RGN_TYPE_WINDOW,
   };
   return WM_gizmogroup_keymap_template_select_ex(kc, "Generic Gizmo Select", &params);

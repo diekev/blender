@@ -287,7 +287,7 @@ static void MESH_GGT_add_bounds(struct wmGizmoGroupType *gzgt)
 
   gzgt->flag = WM_GIZMOGROUPTYPE_3D;
 
-  gzgt->gzmap_params.spaceid = SPACE_VIEW3D;
+  gzgt->gzmap_params.spaceid = "VIEW_3D";
   gzgt->gzmap_params.regionid = RGN_TYPE_WINDOW;
 
   gzgt->poll = gizmo_mesh_placement_poll;

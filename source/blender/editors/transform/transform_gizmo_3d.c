@@ -2079,7 +2079,7 @@ void VIEW3D_GGT_xform_gizmo(wmGizmoGroupType *gzgt)
   gzgt->flag = WM_GIZMOGROUPTYPE_3D | WM_GIZMOGROUPTYPE_TOOL_FALLBACK_KEYMAP |
                WM_GIZMOGROUPTYPE_DELAY_REFRESH_FOR_TWEAK;
 
-  gzgt->gzmap_params.spaceid = SPACE_VIEW3D;
+  gzgt->gzmap_params.spaceid = "VIEW_3D";
   gzgt->gzmap_params.regionid = RGN_TYPE_WINDOW;
 
   gzgt->poll = WIDGETGROUP_gizmo_poll_tool;
@@ -2311,7 +2311,7 @@ void VIEW3D_GGT_xform_cage(wmGizmoGroupType *gzgt)
   gzgt->flag |= WM_GIZMOGROUPTYPE_3D | WM_GIZMOGROUPTYPE_DRAW_MODAL_EXCLUDE |
                 WM_GIZMOGROUPTYPE_TOOL_FALLBACK_KEYMAP | WM_GIZMOGROUPTYPE_DELAY_REFRESH_FOR_TWEAK;
 
-  gzgt->gzmap_params.spaceid = SPACE_VIEW3D;
+  gzgt->gzmap_params.spaceid = "VIEW_3D";
   gzgt->gzmap_params.regionid = RGN_TYPE_WINDOW;
 
   gzgt->poll = WIDGETGROUP_xform_cage_poll;
@@ -2547,7 +2547,7 @@ void VIEW3D_GGT_xform_shear(wmGizmoGroupType *gzgt)
   gzgt->flag |= WM_GIZMOGROUPTYPE_3D | WM_GIZMOGROUPTYPE_DRAW_MODAL_EXCLUDE |
                 WM_GIZMOGROUPTYPE_TOOL_FALLBACK_KEYMAP | WM_GIZMOGROUPTYPE_DELAY_REFRESH_FOR_TWEAK;
 
-  gzgt->gzmap_params.spaceid = SPACE_VIEW3D;
+  gzgt->gzmap_params.spaceid = "VIEW_3D";
   gzgt->gzmap_params.regionid = RGN_TYPE_WINDOW;
 
   gzgt->poll = WIDGETGROUP_xform_shear_poll;

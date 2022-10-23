@@ -764,7 +764,7 @@ static void MESH_GGT_bisect(struct wmGizmoGroupType *gzgt)
 
   gzgt->flag = WM_GIZMOGROUPTYPE_3D | WM_GIZMOGROUPTYPE_DRAW_MODAL_EXCLUDE;
 
-  gzgt->gzmap_params.spaceid = SPACE_VIEW3D;
+  gzgt->gzmap_params.spaceid = "VIEW_3D";
   gzgt->gzmap_params.regionid = RGN_TYPE_WINDOW;
 
   gzgt->poll = gizmo_mesh_bisect_poll;
