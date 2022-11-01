@@ -5515,7 +5515,7 @@ static void add_item_for_space_type_cb(const SpaceType *spacetype, void *data)
   md_item.description = NULL;
   md_item.name = spacetype->name;
   md_item.identifier = spacetype->idname;
-  md_item.icon = ICON_NONE;  // TODO(space_type) spacetype->icon;
+  md_item.icon = spacetype->iconid;
 
   RNA_enum_item_add(&cb_data->items, &cb_data->totitem, &md_item);
   cb_data->totcustom += 1;

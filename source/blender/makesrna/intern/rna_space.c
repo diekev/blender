@@ -3765,6 +3765,13 @@ static void rna_def_space(BlenderRNA *brna)
   RNA_def_property_ui_text(
       prop, "Space Type Label", "Label to display for the SpaceType in the UI");
 
+  prop = RNA_def_property(srna, "bl_icon", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "type->iconid");
+  RNA_def_property_enum_items(prop, rna_enum_icon_items);
+  RNA_def_property_enum_default(prop, ICON_NODE);
+  RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL);
+  RNA_def_property_ui_text(prop, "Icon", "The space icon");
+
   /* Functions. */
   static float default_eyedropper_sample_color[] = {0.0f, 0.0f, 0.0f};
   static int default_eyedropper_sample_position[] = {0, 0};
