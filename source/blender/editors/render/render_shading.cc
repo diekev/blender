@@ -63,6 +63,7 @@
 #include "RNA_access.h"
 
 #include "WM_api.h"
+#include "WM_message.h"
 #include "WM_types.h"
 
 #include "ED_curve.h"
@@ -937,6 +938,9 @@ static int view_layer_add_exec(bContext *C, wmOperator *op)
   DEG_id_tag_update(&scene->id, ID_RECALC_BASE_FLAGS);
   DEG_relations_tag_update(CTX_data_main(C));
   WM_event_add_notifier(C, NC_SCENE | ND_LAYER, scene);
+
+  struct wmMsgBus *mbus = CTX_wm_message_bus(C);
+  WM_msg_publish_rna_prop(mbus, &scene->id, scene, Scene, view_layers);
 
   return OPERATOR_FINISHED;
 }

@@ -255,6 +255,8 @@ static int collection_new_exec(bContext *C, wmOperator *op)
 
   outliner_cleanup_tree(space_outliner);
   WM_main_add_notifier(NC_SCENE | ND_LAYER, nullptr);
+  struct wmMsgBus *mbus = CTX_wm_message_bus(C);
+  WM_msg_publish_rna_prop(mbus, &scene->id, view_layer, ViewLayer, layer_collection);
   return OPERATOR_FINISHED;
 }
 
@@ -602,8 +604,9 @@ static int collection_duplicate_exec(bContext *C, wmOperator *op)
   /* We are allowed to duplicated linked collections (they will become local IDs then),
    * but we should not allow its parent to be a linked ID, ever.
    * This can happen when a whole scene is linked e.g. */
+  Scene *scene;
   if (parent != nullptr && (ID_IS_LINKED(parent) || ID_IS_OVERRIDE_LIBRARY(parent))) {
-    Scene *scene = CTX_data_scene(C);
+    scene = CTX_data_scene(C);
     parent = (ID_IS_LINKED(scene) || ID_IS_OVERRIDE_LIBRARY(scene)) ? nullptr :
                                                                       scene->master_collection;
   }
@@ -620,6 +623,8 @@ static int collection_duplicate_exec(bContext *C, wmOperator *op)
                    nullptr :
                    scene_owner->master_collection;
     }
+
+    scene = scene_owner;
   }
 
   if (collection->flag & COLLECTION_IS_MASTER) {
@@ -640,6 +645,8 @@ static int collection_duplicate_exec(bContext *C, wmOperator *op)
 
   DEG_relations_tag_update(bmain);
   WM_main_add_notifier(NC_SCENE | ND_LAYER, CTX_data_scene(C));
+  struct wmMsgBus *mbus = CTX_wm_message_bus(C);
+  WM_msg_publish_rna_prop(mbus, &scene->id, scene, ViewLayer, layer_collection);
   ED_outliner_select_sync_from_object_tag(C);
 
   return OPERATOR_FINISHED;
@@ -730,6 +737,8 @@ static int collection_link_exec(bContext *C, wmOperator *op)
   DEG_relations_tag_update(bmain);
 
   WM_main_add_notifier(NC_SCENE | ND_LAYER, nullptr);
+  struct wmMsgBus *mbus = CTX_wm_message_bus(C);
+  WM_msg_publish_rna_prop(mbus, &scene->id, scene, ViewLayer, layer_collection);
 
   return OPERATOR_FINISHED;
 }
