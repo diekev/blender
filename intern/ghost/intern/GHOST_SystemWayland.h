@@ -23,6 +23,7 @@
 #  include <libdecor.h>
 #endif
 
+#include <mutex>
 #include <string>
 
 class GHOST_WindowWayland;
@@ -51,6 +52,8 @@ void ghost_wl_dynload_libraries_exit();
 #endif
 
 struct GWL_Output {
+  GHOST_SystemWayland *system = nullptr;
+
   struct wl_output *wl_output = nullptr;
   struct zxdg_output_v1 *xdg_output = nullptr;
   /** Dimensions in pixels. */
@@ -175,6 +178,9 @@ class GHOST_SystemWayland : public GHOST_System {
 
   /* WAYLAND utility functions. */
 
+  /** Set this seat to be active. */
+  void seat_active_set(const struct GWL_Seat *seat);
+
   /** Clear all references to this surface to prevent accessing NULL pointers. */
   void window_surface_unref(const wl_surface *wl_surface);
 
@@ -185,8 +191,6 @@ class GHOST_SystemWayland : public GHOST_System {
                               GHOST_TAxisFlag wrap_axis,
                               wl_surface *wl_surface,
                               int scale);
-
-  struct GWL_SimpleBuffer *clipboard_data(bool selection) const;
 
 #ifdef WITH_GHOST_WAYLAND_LIBDECOR
   static bool use_libdecor_runtime();

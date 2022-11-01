@@ -589,7 +589,7 @@ void DRW_shgroup_buffer_texture(DRWShadingGroup *shgroup,
                                 const char *name,
                                 GPUVertBuf *vertex_buffer)
 {
-  int location = GPU_shader_get_ssbo(shgroup->shader, name);
+  int location = GPU_shader_get_texture_binding(shgroup->shader, name);
   if (location == -1) {
     return;
   }
@@ -606,7 +606,7 @@ void DRW_shgroup_buffer_texture_ref(DRWShadingGroup *shgroup,
                                     const char *name,
                                     GPUVertBuf **vertex_buffer)
 {
-  int location = GPU_shader_get_ssbo(shgroup->shader, name);
+  int location = GPU_shader_get_texture_binding(shgroup->shader, name);
   if (location == -1) {
     return;
   }

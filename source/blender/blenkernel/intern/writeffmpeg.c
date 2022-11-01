@@ -492,7 +492,7 @@ static const AVCodec *get_av1_encoder(
 
   /* Apply AV1 encoder specific settings. */
   if (codec) {
-    if (strcmp(codec->name, "librav1e") == 0) {
+    if (STREQ(codec->name, "librav1e")) {
       /* Set "tiles" to 8 to enable multi-threaded encoding. */
       if (rd->threads > 8) {
         ffmpeg_dict_set_int(opts, "tiles", rd->threads);
@@ -530,7 +530,7 @@ static const AVCodec *get_av1_encoder(
       BLI_snprintf(buffer, sizeof(buffer), "keyint=%d", context->ffmpeg_gop_size);
       av_dict_set(opts, "rav1e-params", buffer, 0);
     }
-    else if (strcmp(codec->name, "libsvtav1") == 0) {
+    else if (STREQ(codec->name, "libsvtav1")) {
       /* Set preset value based on ffmpeg_preset.
        * Must check context->ffmpeg_preset again in case this encoder was selected due to the
        * absence of another. */
@@ -552,7 +552,7 @@ static const AVCodec *get_av1_encoder(
         ffmpeg_dict_set_int(opts, "qp", context->ffmpeg_crf);
       }
     }
-    else if (strcmp(codec->name, "libaom-av1") == 0) {
+    else if (STREQ(codec->name, "libaom-av1")) {
       /* Speed up libaom-av1 encoding by enabling multithreading and setting tiles. */
       ffmpeg_dict_set_int(opts, "row-mt", 1);
       const char *tiles_string = NULL;
@@ -1017,7 +1017,7 @@ static AVStream *alloc_audio_stream(FFMpegContext *context,
     return NULL;
   }
 
-  /* need to prevent floating point exception when using vorbis audio codec,
+  /* Need to prevent floating point exception when using VORBIS audio codec,
    * initialize this value in the same way as it's done in FFmpeg itself (sergey) */
   c->time_base.num = 1;
   c->time_base.den = c->sample_rate;

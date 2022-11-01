@@ -489,8 +489,8 @@ if(NOT APPLE)
   option(WITH_CYCLES_ONEAPI_BINARIES "Enable Ahead-Of-Time compilation for Cycles oneAPI device" OFF)
 
   # https://www.intel.com/content/www/us/en/develop/documentation/oneapi-dpcpp-cpp-compiler-dev-guide-and-reference/top/compilation/ahead-of-time-compilation.html
-  # acm-g10 is the architecture for the first Arc Alchemist GPUs but we'll keep using dg2 until IGC dependency is updated to support acm-g10.
-  set(CYCLES_ONEAPI_SPIR64_GEN_DEVICES "dg2" CACHE STRING "oneAPI Intel GPU architectures to build binaries for")
+  # acm-g10 is the target for the first Intel Arc Alchemist GPUs.
+  set(CYCLES_ONEAPI_SPIR64_GEN_DEVICES "acm-g10" CACHE STRING "oneAPI Intel GPU architectures to build binaries for")
   set(CYCLES_ONEAPI_SYCL_TARGETS spir64 spir64_gen CACHE STRING "oneAPI targets to build AOT binaries for")
 
   mark_as_advanced(CYCLES_ONEAPI_SPIR64_GEN_DEVICES)
@@ -567,6 +567,12 @@ option(WITH_GPU_BUILDTIME_SHADER_BUILDER  "Shader builder is a developer option 
 mark_as_advanced(
   WITH_OPENGL
   WITH_GPU_BUILDTIME_SHADER_BUILDER
+)
+
+# Vulkan
+option(WITH_VULKAN_BACKEND "Enable Vulkan as graphics backend (only for development)" OFF)
+mark_as_advanced(
+  WITH_VULKAN_BACKEND
 )
 
 # Metal
@@ -1221,6 +1227,13 @@ if(WITH_OPENGL)
   add_definitions(-DWITH_OPENGL)
 endif()
 
+
+# -----------------------------------------------------------------------------
+# Configure Vulkan.
+
+if(WITH_VULKAN_BACKEND)
+  add_definitions(-DWITH_VULKAN_BACKEND)
+endif()
 
 # -----------------------------------------------------------------------------
 # Configure Metal
