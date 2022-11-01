@@ -1050,6 +1050,14 @@ void UI_style_init_default(void)
 
 void UI_SetTheme(int spacetype, int regionid)
 {
+  if (spacetype >= SPACE_CUSTOM) {
+    /* Default to ThemeProperties for custom spaces, so highlight matches work. */
+    theme_active = U.themes.first;
+    theme_spacetype = SPACE_PROPERTIES;
+    theme_regionid = regionid;
+    return;
+  }
+
   if (spacetype) {
     /* later on, a local theme can be found too */
     theme_active = U.themes.first;
