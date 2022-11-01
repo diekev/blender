@@ -766,12 +766,10 @@ void ED_area_tag_refresh(ScrArea *area)
 
 const char *ED_area_region_search_filter_get(const ScrArea *area, const ARegion *region)
 {
-  /* Only the properties editor has a search string for now. */
-  if (area->spacetype == SPACE_PROPERTIES) {
-    SpaceProperties *sbuts = area->spacedata.first;
-    if (region->regiontype == RGN_TYPE_WINDOW) {
-      return ED_buttons_search_string_get(sbuts);
-    }
+  const SpaceType *type = area->type;
+  if (type && type->search_filter_get) {
+    SpaceLink *space_link = area->spacedata.first;
+    return type->search_filter_get(space_link, region);
   }
 
   return NULL;
@@ -782,9 +780,8 @@ void ED_region_search_filter_update(const ScrArea *area, ARegion *region)
   region->flag |= RGN_FLAG_SEARCH_FILTER_UPDATE;
 
   const char *search_filter = ED_area_region_search_filter_get(area, region);
-  SET_FLAG_FROM_TEST(region->flag,
-                     region->regiontype == RGN_TYPE_WINDOW && search_filter[0] != '\0',
-                     RGN_FLAG_SEARCH_FILTER_ACTIVE);
+  SET_FLAG_FROM_TEST(
+      region->flag, search_filter && search_filter[0] != '\0', RGN_FLAG_SEARCH_FILTER_ACTIVE);
 }
 
 /* *************************************************************** */

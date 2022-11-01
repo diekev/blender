@@ -142,6 +142,11 @@ typedef struct SpaceType {
    */
   const char *(*editor_menus_idname)(const struct SpaceLink *space);
 
+  /**
+   * Optionnal callback to retrieve the string to use for filtering the UI buttons.
+   */
+  const char *(*search_filter_get)(const struct SpaceLink *space, const struct ARegion *region);
+
   /* region type definitions */
   ListBase regiontypes;
 

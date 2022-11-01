@@ -3433,6 +3433,36 @@ static const char *rna_CustomSpaceType_editor_menus_idname(const struct SpaceLin
   return str_ret;
 }
 
+static const char *rna_CustomSpaceType_search_filter_get(const struct SpaceLink *self,
+                                                         const struct ARegion *region)
+{
+  SpaceType *type = self->type;
+  PointerRNA ptr;
+  RNA_pointer_create(NULL, type->rna_ext.srna, (SpaceLink *)self, &ptr);
+
+  // RNA_struct_find_function(&ptr, "search_filter_get");
+  extern FunctionRNA rna_Space_search_filter_get_func;
+  FunctionRNA *func = &rna_Space_search_filter_get_func;
+
+  ParameterList list;
+  RNA_parameter_list_create(&list, &ptr, func);
+  RNA_parameter_set_lookup(&list, "region", &region);
+
+  type->rna_ext.call(NULL, &ptr, func, &list);
+
+  void *ret = NULL;
+  RNA_parameter_get_lookup(&list, "search_filter", &ret);
+
+  const char *str_ret = ret;
+  if (str_ret) {
+    str_ret = BLI_strdup(str_ret);
+  }
+
+  RNA_parameter_list_free(&list);
+
+  return str_ret;
+}
+
 static void rna_Space_unregister(Main *bmain, StructRNA *type)
 {
   SpaceType *st = RNA_struct_blender_type_get(type);
@@ -3506,7 +3536,7 @@ static StructRNA *rna_Space_register(Main *bmain,
   SpaceType *st, dummyst = {NULL};
   SpaceLink dummyspace = {NULL};
   PointerRNA dummystr;
-  int have_function[2];
+  int have_function[3];
 
   /* setup dummy space & space type to store static properties in */
   dummyspace.type = &dummyst;
@@ -3555,6 +3585,7 @@ static StructRNA *rna_Space_register(Main *bmain,
   st->eyedropper_color_sample = (have_function[0]) ? rna_CustomSpaceType_eyedropper_color_sample :
                                                      NULL;
   st->editor_menus_idname = (have_function[1]) ? rna_CustomSpaceType_editor_menus_idname : NULL;
+  st->search_filter_get = (have_function[2]) ? rna_CustomSpaceType_search_filter_get : NULL;
 
   BKE_spacetype_register(st);
 
@@ -3568,6 +3599,19 @@ static IDProperty **rna_Space_idprops(PointerRNA *ptr)
 {
   SpaceLink *space = (SpaceLink *)ptr->data;
   return &space->id_properties;
+}
+
+// Same as rna_SpaceProperties_search_filter_update
+// TODO : deduplicate, allow passing the region or region type
+void rna_Space_search_filter_update(ID *owner, SpaceLink *link)
+{
+  bScreen *screen = (bScreen *)owner;
+  ScrArea *area = BKE_screen_find_area_from_space(screen, link);
+
+  /* Update the search filter flag for the main region with the panels. */
+  ARegion *main_region = BKE_area_find_region_type(area, RGN_TYPE_WINDOW);
+  BLI_assert(main_region != NULL);
+  ED_region_search_filter_update(area, main_region);
 }
 
 /** \} */
@@ -3704,6 +3748,11 @@ static void rna_def_space(BlenderRNA *brna)
 
   rna_def_space_generic_show_region_toggles(srna, (1 << RGN_TYPE_HEADER));
 
+  /* Other APIs */
+  func = RNA_def_function(srna, "search_filter_update", "rna_Space_search_filter_update");
+  RNA_def_function_flag(func, FUNC_USE_SELF_ID);
+  RNA_def_function_ui_description(func, "Update the region following a search filter event");
+
   /* Registration. */
   prop = RNA_def_property(srna, "bl_idname", PROP_STRING, PROP_NONE);
   RNA_def_property_string_sdna(prop, NULL, "type->idname");
@@ -3753,6 +3802,16 @@ static void rna_def_space(BlenderRNA *brna)
   RNA_def_function_flag(func, FUNC_REGISTER_OPTIONAL);
   parm = RNA_def_string(
       func, "menu_idname", NULL, 64, "Menu ID Name", "The menu id name, as set by Menu.bl_idname");
+  RNA_def_parameter_flags(parm, PROP_THICK_WRAP, 0); /* needed for string return value */
+  RNA_def_function_output(func, parm);
+
+  func = RNA_def_function(srna, "search_filter_get", NULL);
+  RNA_def_function_ui_description(func, "Retrieve the string to use for filtering UI buttons");
+  RNA_def_function_flag(func, FUNC_REGISTER_OPTIONAL);
+  parm = RNA_def_pointer(func, "region", "Region", "Region", "The region to sample from");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_string(
+      func, "search_filter", NULL, 64, "Search Filter", "The string to use for filtering");
   RNA_def_parameter_flags(parm, PROP_THICK_WRAP, 0); /* needed for string return value */
   RNA_def_function_output(func, parm);
 }

@@ -933,6 +933,15 @@ static void buttons_blend_write(BlendWriter *writer, SpaceLink *sl)
   BLO_write_struct(writer, SpaceProperties, sl);
 }
 
+static const char *buttons_search_filter_get(const SpaceLink *sl, const ARegion *region)
+{
+  SpaceProperties *sbuts = (SpaceProperties *)sl;
+  if (region->regiontype == RGN_TYPE_WINDOW) {
+    return ED_buttons_search_string_get(sbuts);
+  }
+  return NULL;
+}
+
 /** \} */
 
 /* -------------------------------------------------------------------- */
@@ -959,6 +968,7 @@ void ED_spacetype_buttons(void)
   st->blend_read_data = buttons_blend_read_data;
   st->blend_read_lib = buttons_blend_read_lib;
   st->blend_write = buttons_blend_write;
+  st->search_filter_get = buttons_search_filter_get;
 
   /* regions: main window */
   art = MEM_callocN(sizeof(ARegionType), "spacetype buttons region");
