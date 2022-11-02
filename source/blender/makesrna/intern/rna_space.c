@@ -3342,7 +3342,7 @@ static SpaceLink *rna_CustomSpaceType_create(const ScrArea *area, const Scene *U
   }
 
   if (SPACETYPE_HAS_REGION(st, RGN_TYPE_TOOL_PROPS)) {
-    region = BKE_spacedata_add_region(space, RGN_TYPE_TOOLS, "Tool Props for Custom Editor");
+    region = BKE_spacedata_add_region(space, RGN_TYPE_TOOL_PROPS, "Tool Props for Custom Editor");
     region->alignment = RGN_ALIGN_RIGHT;
     region->flag = RGN_FLAG_HIDDEN;
   }
