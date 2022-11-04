@@ -111,9 +111,9 @@ static void spreadsheet_free(SpaceLink *sl)
   BKE_viewer_path_clear(&sspreadsheet->viewer_path);
 }
 
-static void spreadsheet_init(wmWindowManager * /*wm*/, ScrArea *area)
+static void spreadsheet_init(const bContext *C)
 {
-  SpaceSpreadsheet *sspreadsheet = (SpaceSpreadsheet *)area->spacedata.first;
+  SpaceSpreadsheet *sspreadsheet = CTX_wm_space_spreadsheet(C);
   if (sspreadsheet->runtime == nullptr) {
     sspreadsheet->runtime = MEM_new<SpaceSpreadsheet_Runtime>(__func__);
   }

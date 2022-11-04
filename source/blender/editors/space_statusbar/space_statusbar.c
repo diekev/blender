@@ -52,7 +52,7 @@ static void statusbar_free(SpaceLink *UNUSED(sl))
 }
 
 /* spacetype; init callback */
-static void statusbar_init(struct wmWindowManager *UNUSED(wm), ScrArea *UNUSED(area))
+static void statusbar_init(const bContext *UNUSED(C))
 {
 }
 

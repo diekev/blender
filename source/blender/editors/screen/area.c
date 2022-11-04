@@ -1896,7 +1896,7 @@ bool ED_area_has_shared_border(struct ScrArea *a, struct ScrArea *b)
   return area_getorientation(a, b) != -1;
 }
 
-void ED_area_init(wmWindowManager *wm, wmWindow *win, ScrArea *area)
+void ED_area_init(const bContext *C, wmWindowManager *wm, wmWindow *win, ScrArea *area)
 {
   WorkSpace *workspace = WM_window_get_active_workspace(win);
   const bScreen *screen = BKE_workspace_active_screen_get(win->workspace_hook);
@@ -1933,9 +1933,13 @@ void ED_area_init(wmWindowManager *wm, wmWindow *win, ScrArea *area)
 
   /* default area handlers */
   ed_default_handlers(wm, area, NULL, &area->handlers, area->type->keymapflag);
+
+  /* Ensure the area is in the context, as it is NULL on file load. */
+  CTX_wm_area_set((bContext *)C, area);
+
   /* checks spacedata, adds own handlers */
   if (area->type->init) {
-    area->type->init(wm, area);
+    area->type->init(C);
   }
 
   /* clear all azones, add the area triangle widgets */
@@ -2093,7 +2097,7 @@ void ED_region_visibility_change_update(bContext *C, ScrArea *area, ARegion *reg
     UI_region_free_active_but_all(C, region);
   }
 
-  ED_area_init(CTX_wm_manager(C), CTX_wm_window(C), area);
+  ED_area_init(C, CTX_wm_manager(C), CTX_wm_window(C), area);
   ED_area_tag_redraw(area);
 }
 
@@ -2407,8 +2411,8 @@ void ED_area_swapspace(bContext *C, ScrArea *sa1, ScrArea *sa2)
   ED_area_data_copy(tmp, sa1, false);
   ED_area_data_copy(sa1, sa2, true);
   ED_area_data_copy(sa2, tmp, true);
-  ED_area_init(CTX_wm_manager(C), win, sa1);
-  ED_area_init(CTX_wm_manager(C), win, sa2);
+  ED_area_init(C, CTX_wm_manager(C), win, sa1);
+  ED_area_init(C, CTX_wm_manager(C), win, sa2);
 
   BKE_screen_area_free(tmp);
   MEM_freeN(tmp);
@@ -2523,7 +2527,7 @@ void ED_area_newspace(bContext *C, ScrArea *area, int type, const bool skip_regi
       region_align_info_to_area(area, region_align_info);
     }
 
-    ED_area_init(CTX_wm_manager(C), win, area);
+    ED_area_init(C, CTX_wm_manager(C), win, area);
 
     /* tell WM to refresh, cursor types etc */
     WM_event_add_mousemove(win);

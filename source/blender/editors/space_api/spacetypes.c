@@ -301,7 +301,7 @@ static void xxx_free(SpaceLink *UNUSED(sl))
 }
 
 /* spacetype; init callback for usage, should be re-doable. */
-static void xxx_init(wmWindowManager *UNUSED(wm), ScrArea *UNUSED(area))
+static void xxx_init(const bContext *UNUSED(C))
 {
 
   /* link area to SpaceXXX struct */

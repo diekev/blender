@@ -329,7 +329,7 @@ static void view3d_free(SpaceLink *sl)
 }
 
 /* spacetype; init callback */
-static void view3d_init(wmWindowManager * /*wm*/, ScrArea * /*area*/)
+static void view3d_init(const bContext *UNUSED(C))
 {
 }
 

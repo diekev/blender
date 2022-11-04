@@ -75,7 +75,7 @@ typedef struct SpaceType {
   void (*free)(struct SpaceLink *sl);
 
   /* init is to cope with file load, screen (size) changes, check handlers */
-  void (*init)(struct wmWindowManager *wm, struct ScrArea *area);
+  void (*init)(const struct bContext *C);
   /* exit is called when the area is hidden or removed */
   void (*exit)(struct wmWindowManager *wm, struct ScrArea *area);
   /* Listeners can react to bContext changes */

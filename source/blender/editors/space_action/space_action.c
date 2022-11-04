@@ -133,9 +133,9 @@ static void action_free(SpaceLink *UNUSED(sl))
 }
 
 /* spacetype; init callback */
-static void action_init(struct wmWindowManager *UNUSED(wm), ScrArea *area)
+static void action_init(const bContext *C)
 {
-  SpaceAction *saction = area->spacedata.first;
+  SpaceAction *saction = CTX_wm_space_action(C);
   saction->runtime.flag |= SACTION_RUNTIME_FLAG_NEED_CHAN_SYNC;
 }
 

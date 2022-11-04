@@ -603,7 +603,7 @@ void ED_screen_do_listen(bContext *C, const wmNotifier *note)
   }
 }
 
-void ED_screen_refresh(wmWindowManager *wm, wmWindow *win)
+void ED_screen_refresh(const bContext *C, wmWindowManager *wm, wmWindow *win)
 {
   bScreen *screen = WM_window_get_active_screen(win);
 
@@ -623,7 +623,7 @@ void ED_screen_refresh(wmWindowManager *wm, wmWindow *win)
     ED_screen_areas_iter (win, screen, area) {
       /* Set space-type and region callbacks, calls init() */
       /* Sets sub-windows for regions, adds handlers. */
-      ED_area_init(wm, win, area);
+      ED_area_init(C, wm, win, area);
     }
 
     /* wake up animtimer */
@@ -642,14 +642,14 @@ void ED_screen_refresh(wmWindowManager *wm, wmWindow *win)
   screen->context = ed_screen_context;
 }
 
-void ED_screens_init(Main *bmain, wmWindowManager *wm)
+void ED_screens_init(Main *bmain, const bContext *C, wmWindowManager *wm)
 {
   LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
     if (BKE_workspace_active_get(win->workspace_hook) == NULL) {
       BKE_workspace_active_set(win->workspace_hook, bmain->workspaces.first);
     }
 
-    ED_screen_refresh(wm, win);
+    ED_screen_refresh(C, wm, win);
     if (win->eventstate) {
       ED_screen_set_active_region(NULL, win, win->eventstate->xy);
     }
@@ -662,10 +662,13 @@ void ED_screens_init(Main *bmain, wmWindowManager *wm)
   }
 }
 
-void ED_screen_ensure_updated(wmWindowManager *wm, wmWindow *win, bScreen *screen)
+void ED_screen_ensure_updated(const bContext *C,
+                              wmWindowManager *wm,
+                              wmWindow *win,
+                              bScreen *screen)
 {
   if (screen->do_refresh) {
-    ED_screen_refresh(wm, win);
+    ED_screen_refresh(C, wm, win);
   }
 }
 
@@ -1114,7 +1117,7 @@ void screen_change_update(bContext *C, wmWindow *win, bScreen *screen)
 
   CTX_wm_window_set(C, win); /* stores C->wm.screen... hrmf */
 
-  ED_screen_refresh(CTX_wm_manager(C), win);
+  ED_screen_refresh(C, CTX_wm_manager(C), win);
 
   BKE_screen_view3d_scene_sync(screen, scene); /* sync new screen with scene data */
   WM_event_add_notifier(C, NC_WINDOW, NULL);

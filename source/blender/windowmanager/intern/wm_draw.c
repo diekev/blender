@@ -513,7 +513,7 @@ bool WM_region_use_viewport(ScrArea *area, ARegion *region)
 static const char *wm_area_name(ScrArea *area)
 {
   if (area->type) {
-      return area->type->idname;
+    return area->type->idname;
   }
   return "Unknown Space";
 }
@@ -1343,7 +1343,7 @@ void wm_draw_update(bContext *C)
       wm_window_make_drawable(wm, win);
 
       /* notifiers for screen redraw */
-      ED_screen_ensure_updated(wm, win, screen);
+      ED_screen_ensure_updated(C, wm, win, screen);
 
       wm_draw_window(C, win);
       wm_draw_update_clear_window(C, win);
