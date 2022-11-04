@@ -954,7 +954,6 @@ static void rna_Region_draw_handlers(ARegion *region, bContext *C, int draw_mode
 static void rna_Region_gizmos_tag_refresh(ARegion *region)
 {
   if (!region->gizmo_map) {
-    fprintf(stderr, "Region has no gizmo_map\n");
     return;
   }
   WM_gizmomap_tag_refresh(region->gizmo_map);
@@ -963,7 +962,6 @@ static void rna_Region_gizmos_tag_refresh(ARegion *region)
 static void rna_Region_gizmos_draw(ARegion *region, bContext *C)
 {
   if (!region->gizmo_map) {
-    fprintf(stderr, "Region has no gizmo_map\n");
     return;
   }
   WM_gizmomap_draw(region->gizmo_map, C, WM_GIZMOMAP_DRAWSTEP_2D);
