@@ -3367,6 +3367,26 @@ static SpaceLink *rna_CustomSpaceType_create(const ScrArea *area, const Scene *U
 #  undef SPACETYPE_HAS_REGION
 }
 
+static void rna_CustomSpaceType_init(const bContext *C)
+{
+  SpaceLink *sl = CTX_wm_space_data(C);
+  SpaceType *type = sl->type;
+  PointerRNA ptr;
+  RNA_pointer_create(NULL, type->rna_ext.srna, (SpaceLink *)sl, &ptr);
+
+  // RNA_struct_find_function(&ptr, "init");
+  extern FunctionRNA rna_Space_init_func;
+  FunctionRNA *func = &rna_Space_init_func;
+
+  ParameterList list;
+  RNA_parameter_list_create(&list, &ptr, func);
+  RNA_parameter_set_lookup(&list, "context", &C);
+
+  type->rna_ext.call(NULL, &ptr, func, &list);
+
+  RNA_parameter_list_free(&list);
+}
+
 /* Generic duplication callback for all custom space types. */
 static SpaceLink *rna_CustomSpaceType_duplicate(SpaceLink *sl)
 {
@@ -3536,7 +3556,7 @@ static StructRNA *rna_Space_register(Main *bmain,
   SpaceType *st, dummyst = {NULL};
   SpaceLink dummyspace = {NULL};
   PointerRNA dummystr;
-  int have_function[3];
+  int have_function[4];
 
   /* setup dummy space & space type to store static properties in */
   dummyspace.type = &dummyst;
@@ -3586,6 +3606,7 @@ static StructRNA *rna_Space_register(Main *bmain,
                                                      NULL;
   st->editor_menus_idname = (have_function[1]) ? rna_CustomSpaceType_editor_menus_idname : NULL;
   st->search_filter_get = (have_function[2]) ? rna_CustomSpaceType_search_filter_get : NULL;
+  st->init = (have_function[3]) ? rna_CustomSpaceType_init : NULL;
 
   BKE_spacetype_register(st);
 
@@ -3821,6 +3842,12 @@ static void rna_def_space(BlenderRNA *brna)
       func, "search_filter", NULL, 64, "Search Filter", "The string to use for filtering");
   RNA_def_parameter_flags(parm, PROP_THICK_WRAP, 0); /* needed for string return value */
   RNA_def_function_output(func, parm);
+
+  func = RNA_def_function(srna, "init", NULL);
+  RNA_def_function_ui_description(func, "Initialize the Space during file load, or editor switch");
+  RNA_def_function_flag(func, FUNC_REGISTER_OPTIONAL);
+  parm = RNA_def_pointer(func, "context", "Context", "Context", "");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
 }
 
 /* for all spaces that use a mask */
