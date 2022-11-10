@@ -40,7 +40,7 @@ def ensure_editor_keymap(window_manager, region_type):
     if not kc:
         return None
 
-    return kc.keymaps.new(name = "MyCustomEditor", space_type = "MY_CUSTOM_EDITOR_TYPE", region_type = region_type)
+    return kc.keymaps.new(name="MyCustomEditor", space_type="MY_CUSTOM_EDITOR_TYPE", region_type=region_type)
 
 
 # Add a custom header region for the editor.
@@ -210,7 +210,7 @@ def initialize_keymap():
         return
 
     # Add an item for show the UI region when pressing the 'N' key
-    item = keymap.keymap_items.new("wm.context_toggle", type = 'N', value = 'PRESS')
+    item = keymap.keymap_items.new("wm.context_toggle", type='N', value='PRESS')
     item.properties.data_path = 'space_data.show_region_ui'
 
 
