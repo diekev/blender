@@ -1157,6 +1157,18 @@ static void gwl_registry_entry_update_all(GWL_Display *display, const int interf
 /** \name Private Utility Functions
  * \{ */
 
+static void ghost_wl_display_report_error(struct wl_display *display)
+{
+  int ecode = wl_display_get_error(display);
+  GHOST_ASSERT(ecode, "Error not set!");
+  if ((ecode == EPIPE || ecode == ECONNRESET)) {
+    fprintf(stderr, "The Wayland connection broke. Did the Wayland compositor die?\n");
+  }
+  else {
+    fprintf(stderr, "The Wayland connection experienced a fatal error: %s\n", strerror(ecode));
+  }
+}
+
 /**
  * Callback for WAYLAND to run when there is an error.
  *
@@ -4985,6 +4997,42 @@ static const struct wl_registry_listener registry_listener = {
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Listener (Display), #wl_display_listener
+ * \{ */
+
+static CLG_LogRef LOG_WL_DISPLAY = {"ghost.wl.handle.display"};
+#define LOG (&LOG_WL_DISPLAY)
+
+static void display_handle_error(
+    void *data, struct wl_display *wl_display, void *object_id, uint32_t code, const char *message)
+{
+  GWL_Display *display = static_cast<GWL_Display *>(data);
+  GHOST_ASSERT(display->wl_display == wl_display, "Invalid internal state");
+  (void)display;
+
+  /* NOTE: code is #wl_display_error, there isn't a convenient way to convert to an ID. */
+  CLOG_INFO(LOG, 2, "error (code=%u, object_id=%p, message=%s)", code, object_id, message);
+}
+
+static void display_handle_delete_id(void *data, struct wl_display *wl_display, uint32_t id)
+{
+  GWL_Display *display = static_cast<GWL_Display *>(data);
+  GHOST_ASSERT(display->wl_display == wl_display, "Invalid internal state");
+  (void)display;
+
+  CLOG_INFO(LOG, 2, "delete_id (id=%u)", id);
+}
+
+static const struct wl_display_listener display_listener = {
+    display_handle_error,
+    display_handle_delete_id,
+};
+
+#undef LOG
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name GHOST Implementation
  *
  * WAYLAND specific implementation of the #GHOST_System interface.
@@ -5005,6 +5053,8 @@ GHOST_SystemWayland::GHOST_SystemWayland(bool background)
 
   /* This may be removed later if decorations are required, needed as part of registration. */
   display_->xdg_decor = new GWL_XDG_Decor_System;
+
+  wl_display_add_listener(display_->wl_display, &display_listener, display_);
 
   /* Register interfaces. */
   {
@@ -5114,10 +5164,14 @@ bool GHOST_SystemWayland::processEvents(bool waitForEvent)
 #endif /* WITH_INPUT_NDOF */
 
   if (waitForEvent) {
-    wl_display_dispatch(display_->wl_display);
+    if (wl_display_dispatch(display_->wl_display) == -1) {
+      ghost_wl_display_report_error(display_->wl_display);
+    }
   }
   else {
-    wl_display_roundtrip(display_->wl_display);
+    if (wl_display_roundtrip(display_->wl_display) == -1) {
+      ghost_wl_display_report_error(display_->wl_display);
+    }
   }
 
   if (getEventManager()->getNumEvents() > 0) {
