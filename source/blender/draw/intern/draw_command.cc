@@ -32,7 +32,7 @@ void ShaderBind::execute(RecordingState &state) const
 
 void FramebufferBind::execute() const
 {
-  GPU_framebuffer_bind(framebuffer);
+  GPU_framebuffer_bind(*framebuffer);
 }
 
 void ResourceBind::execute() const
@@ -43,6 +43,9 @@ void ResourceBind::execute() const
   switch (type) {
     case ResourceBind::Type::Sampler:
       GPU_texture_bind_ex(is_reference ? *texture_ref : texture, sampler, slot, false);
+      break;
+    case ResourceBind::Type::BufferSampler:
+      GPU_vertbuf_bind_as_texture(is_reference ? *vertex_buf_ref : vertex_buf, slot);
       break;
     case ResourceBind::Type::Image:
       GPU_texture_image_bind(is_reference ? *texture_ref : texture, slot);
@@ -158,6 +161,12 @@ void Clear::execute() const
   GPU_framebuffer_clear(fb, (eGPUFrameBufferBits)clear_channels, color, depth, stencil);
 }
 
+void ClearMulti::execute() const
+{
+  GPUFrameBuffer *fb = GPU_framebuffer_active_get();
+  GPU_framebuffer_multi_clear(fb, (const float(*)[4])colors);
+}
+
 void StateSet::execute(RecordingState &recording_state) const
 {
   /**
@@ -234,7 +243,8 @@ std::string ShaderBind::serialize() const
 
 std::string FramebufferBind::serialize() const
 {
-  return std::string(".framebuffer_bind(") + GPU_framebuffer_get_name(framebuffer) + ")";
+  return std::string(".framebuffer_bind(") +
+         (*framebuffer == nullptr ? "nullptr" : GPU_framebuffer_get_name(*framebuffer)) + ")";
 }
 
 std::string ResourceBind::serialize() const
@@ -244,6 +254,9 @@ std::string ResourceBind::serialize() const
       return std::string(".bind_texture") + (is_reference ? "_ref" : "") + "(" +
              std::to_string(slot) +
              (sampler != GPU_SAMPLER_MAX ? ", sampler=" + std::to_string(sampler) : "") + ")";
+    case Type::BufferSampler:
+      return std::string(".bind_vertbuf_as_texture") + (is_reference ? "_ref" : "") + "(" +
+             std::to_string(slot) + ")";
     case Type::Image:
       return std::string(".bind_image") + (is_reference ? "_ref" : "") + "(" +
              std::to_string(slot) + ")";
@@ -468,6 +481,15 @@ std::string Clear::serialize() const
     ss << "stencil=0b" << std::bitset<8>(stencil) << ")";
   }
   return std::string(".clear(") + ss.str() + ")";
+}
+
+std::string ClearMulti::serialize() const
+{
+  std::stringstream ss;
+  for (float4 color : Span<float4>(colors, colors_len)) {
+    ss << color << ", ";
+  }
+  return std::string(".clear_multi(colors={") + ss.str() + "})";
 }
 
 std::string StateSet::serialize() const
