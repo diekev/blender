@@ -1186,6 +1186,7 @@ static void rna_def_region(BlenderRNA *brna)
   RNA_def_struct_sdna(srna, "ARegion");
   RNA_def_struct_refine_func(srna, "rna_Region_refine");
   RNA_def_struct_register_funcs(srna, "rna_Region_register", "rna_Region_unregister", NULL);
+  RNA_def_struct_flag(srna, STRUCT_PUBLIC_NAMESPACE_INHERIT);
 
   prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "regiontype");

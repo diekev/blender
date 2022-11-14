@@ -3758,6 +3758,7 @@ static void rna_def_space(BlenderRNA *brna)
   RNA_def_struct_refine_func(srna, "rna_Space_refine");
   RNA_def_struct_register_funcs(srna, "rna_Space_register", "rna_Space_unregister", NULL);
   RNA_def_struct_idprops_func(srna, "rna_Space_idprops");
+  RNA_def_struct_flag(srna, STRUCT_PUBLIC_NAMESPACE_INHERIT);
 
   prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
   RNA_def_property_enum_sdna(prop, NULL, "spacetype");
