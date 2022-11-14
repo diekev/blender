@@ -1787,7 +1787,8 @@ typedef struct SpaceClip {
   char space_idname[64];
   /* End 'SpaceLink' header. */
 
-  char _pad1[4];
+  char gizmo_flag;
+  char _pad1[3];
 
   /** User defined offset, image is centered. */
   float xof, yof;
@@ -1887,6 +1888,13 @@ typedef enum eSpaceClip_GPencil_Source {
   SC_GPENCIL_SRC_CLIP = 0,
   SC_GPENCIL_SRC_TRACK = 1,
 } eSpaceClip_GPencil_Source;
+
+/** #SpaceClip.gizmo_flag */
+enum {
+  /** All gizmos. */
+  SCLIP_GIZMO_HIDE = (1 << 0),
+  SCLIP_GIZMO_HIDE_NAVIGATE = (1 << 1),
+};
 
 /** \} */
 
