@@ -932,7 +932,7 @@ wmKeyMap *WM_modalkeymap_ensure(wmKeyConfig *keyconf,
   /* init modal items from default config */
   wmWindowManager *wm = G_MAIN->wm.first;
   if (wm->defaultconf && wm->defaultconf != keyconf) {
-    wmKeyMap *defaultkm = WM_keymap_list_find(&wm->defaultconf->keymaps, km->idname, 0, 0);
+    wmKeyMap *defaultkm = WM_keymap_list_find(&wm->defaultconf->keymaps, km->idname, "", 0);
 
     if (defaultkm) {
       km->modal_items = defaultkm->modal_items;
@@ -1041,7 +1041,7 @@ static void wm_user_modal_keymap_set_items(wmWindowManager *wm, wmKeyMap *km)
       return;
     }
 
-    wmKeyMap *defaultkm = WM_keymap_list_find(&wm->defaultconf->keymaps, km->idname, 0, 0);
+    wmKeyMap *defaultkm = WM_keymap_list_find(&wm->defaultconf->keymaps, km->idname, "", 0);
     if (!defaultkm) {
       return;
     }
