@@ -226,7 +226,6 @@ bool BKE_mesh_runtime_ensure_edit_data(struct Mesh *mesh)
   if (mesh->runtime->edit_data != nullptr) {
     return false;
   }
-
   mesh->runtime->edit_data = MEM_cnew<EditMeshData>(__func__);
   return true;
 }
@@ -250,13 +249,16 @@ void BKE_mesh_runtime_clear_cache(Mesh *mesh)
 
 void BKE_mesh_runtime_clear_geometry(Mesh *mesh)
 {
+  /* Tagging shared caches dirty will free the allocated data if there is only one user. */
   free_bvh_cache(*mesh->runtime);
   free_normals(*mesh->runtime);
   free_subdiv_ccg(*mesh->runtime);
+  mesh->runtime->bounds_cache.tag_dirty();
   if (mesh->runtime->shrinkwrap_data) {
     BKE_shrinkwrap_boundary_data_free(mesh->runtime->shrinkwrap_data);
   }
   MEM_SAFE_FREE(mesh->runtime->subsurf_face_dot_tags);
+  MEM_SAFE_FREE(mesh->runtime->looptris.array);
 }
 
 void BKE_mesh_tag_coords_changed(Mesh *mesh)
@@ -269,17 +271,9 @@ void BKE_mesh_tag_coords_changed(Mesh *mesh)
 
 void BKE_mesh_tag_coords_changed_uniformly(Mesh *mesh)
 {
-  const bool vert_normals_were_dirty = BKE_mesh_vertex_normals_are_dirty(mesh);
-  const bool poly_normals_were_dirty = BKE_mesh_poly_normals_are_dirty(mesh);
-
-  BKE_mesh_tag_coords_changed(mesh);
-  /* The normals didn't change, since all verts moved by the same amount. */
-  if (!vert_normals_were_dirty) {
-    BKE_mesh_vertex_normals_clear_dirty(mesh);
-  }
-  if (!poly_normals_were_dirty) {
-    BKE_mesh_poly_normals_clear_dirty(mesh);
-  }
+  /* The normals and triangulation didn't change, since all verts moved by the same amount. */
+  free_bvh_cache(*mesh->runtime);
+  mesh->runtime->bounds_cache.tag_dirty();
 }
 
 bool BKE_mesh_is_deformed_only(const Mesh *mesh)
