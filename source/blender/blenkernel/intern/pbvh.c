@@ -746,6 +746,7 @@ void BKE_pbvh_build_mesh(PBVH *pbvh,
   pbvh->vdata = vdata;
   pbvh->ldata = ldata;
   pbvh->pdata = pdata;
+  pbvh->faces_num = mesh->totpoly;
 
   pbvh->face_sets_color_seed = mesh->face_sets_color_seed;
   pbvh->face_sets_color_default = mesh->face_sets_color_default;
@@ -833,6 +834,7 @@ void BKE_pbvh_build_grids(PBVH *pbvh,
   pbvh->gridkey = *key;
   pbvh->grid_hidden = grid_hidden;
   pbvh->subdiv_ccg = subdiv_ccg;
+  pbvh->faces_num = me->totpoly;
 
   /* Find maximum number of grids per face. */
   int max_grids = 1;
@@ -2018,6 +2020,11 @@ void BKE_pbvh_node_mark_update_color(PBVHNode *node)
   node->flag |= PBVH_UpdateColor | PBVH_UpdateDrawBuffers | PBVH_UpdateRedraw;
 }
 
+void BKE_pbvh_node_mark_update_face_sets(PBVHNode *node)
+{
+  node->flag |= PBVH_UpdateDrawBuffers | PBVH_UpdateRedraw;
+}
+
 void BKE_pbvh_mark_rebuild_pixels(PBVH *pbvh)
 {
   for (int n = 0; n < pbvh->totnode; n++) {
@@ -2120,6 +2127,20 @@ void BKE_pbvh_node_get_loops(PBVH *pbvh,
   if (r_loops) {
     *r_loops = pbvh->mloop;
   }
+}
+
+int BKE_pbvh_num_faces(const PBVH *pbvh)
+{
+  switch (pbvh->header.type) {
+    case PBVH_GRIDS:
+    case PBVH_FACES:
+      return pbvh->faces_num;
+    case PBVH_BMESH:
+      return pbvh->header.bm->totface;
+  }
+
+  BLI_assert_unreachable();
+  return 0;
 }
 
 void BKE_pbvh_node_get_verts(PBVH *pbvh,
@@ -3542,9 +3563,8 @@ BLI_INLINE int face_iter_prim_to_face(PBVHFaceIter *fd, int prim_index)
   if (fd->subdiv_ccg_) {
     return BKE_subdiv_ccg_grid_to_face_index(fd->subdiv_ccg_, prim_index);
   }
-  else {
-    return fd->looptri_[prim_index].poly;
-  }
+
+  return fd->looptri_[prim_index].poly;
 }
 
 static void pbvh_face_iter_step(PBVHFaceIter *fd, bool do_step)
@@ -3624,10 +3644,12 @@ static void pbvh_face_iter_step(PBVHFaceIter *fd, bool do_step)
       pbvh_face_iter_verts_reserve(fd, mp->totloop);
 
       const MLoop *ml = fd->mloop_ + mp->loopstart;
+      const int grid_area = fd->subdiv_key_.grid_area;
+
       for (int i = 0; i < mp->totloop; i++, ml++) {
         if (fd->pbvh_type_ == PBVH_GRIDS) {
           /* Grid corners. */
-          fd->verts[i].i = mp->loopstart + i;
+          fd->verts[i].i = (mp->loopstart + i) * grid_area + grid_area - 1;
         }
         else {
           fd->verts[i].i = ml->v;
@@ -3655,6 +3677,7 @@ void BKE_pbvh_face_iter_init(PBVH *pbvh, PBVHNode *node, PBVHFaceIter *fd)
   switch (BKE_pbvh_type(pbvh)) {
     case PBVH_GRIDS:
       fd->subdiv_ccg_ = pbvh->subdiv_ccg;
+      fd->subdiv_key_ = pbvh->gridkey;
       ATTR_FALLTHROUGH;
     case PBVH_FACES:
       fd->mpoly_ = pbvh->mpoly;

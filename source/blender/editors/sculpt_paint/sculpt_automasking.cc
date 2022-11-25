@@ -545,7 +545,11 @@ float SCULPT_automasking_factor_get(AutomaskingCache *automasking,
   }
 
   if (automasking->settings.flags & BRUSH_AUTOMASKING_BOUNDARY_FACE_SETS) {
-    if (!SCULPT_vertex_has_unique_face_set(ss, vert)) {
+    bool ignore = ss->cache && ss->cache->brush &&
+                  ss->cache->brush->sculpt_tool == SCULPT_TOOL_DRAW_FACE_SETS &&
+                  SCULPT_vertex_face_set_get(ss, vert) == ss->cache->paint_face_set;
+
+    if (!ignore && !SCULPT_vertex_has_unique_face_set(ss, vert)) {
       return 0.0f;
     }
   }
@@ -843,7 +847,10 @@ AutomaskingCache *SCULPT_automasking_cache_init(Sculpt *sd, Brush *brush, Object
     use_stroke_id = true;
 
     if (SCULPT_is_automasking_mode_enabled(sd, brush, BRUSH_AUTOMASKING_CAVITY_USE_CURVE)) {
-      BKE_curvemapping_init(brush->automasking_cavity_curve);
+      if (brush) {
+        BKE_curvemapping_init(brush->automasking_cavity_curve);
+      }
+
       BKE_curvemapping_init(sd->automasking_cavity_curve);
     }
 
