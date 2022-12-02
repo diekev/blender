@@ -679,7 +679,7 @@ void ntreeBlendReadData(BlendDataReader *reader, ID *owner_id, bNodeTree *ntree)
 
     /* Create the `nodes_by_id` cache eagerly so it can be expected to be valid. Because
      * we create it here we also have to check for zero identifiers from previous versions. */
-    if (ntree->runtime->nodes_by_id.contains_as(node->identifier)) {
+    if (node->identifier == 0 || ntree->runtime->nodes_by_id.contains_as(node->identifier)) {
       nodeUniqueID(ntree, node);
     }
     else {
@@ -2192,7 +2192,7 @@ void nodeUniqueID(bNodeTree *ntree, bNode *node)
 
   /* In the unlikely case that the random ID doesn't match, choose a new one until it does. */
   int32_t new_id = id_rng.get_int32();
-  while (ntree->runtime->nodes_by_id.contains_as(new_id)) {
+  while (ntree->runtime->nodes_by_id.contains_as(new_id) || new_id <= 0) {
     new_id = id_rng.get_int32();
   }
 
