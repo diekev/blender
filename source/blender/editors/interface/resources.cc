@@ -1046,9 +1046,9 @@ void UI_SetTheme(int spacetype, int regionid)
 {
   if (spacetype >= SPACE_CUSTOM) {
     /* Default to ThemeProperties for custom spaces, so highlight matches work. */
-    theme_active = U.themes.first;
-    theme_spacetype = SPACE_PROPERTIES;
-    theme_regionid = regionid;
+    g_theme_state.theme = static_cast<bTheme *>(U.themes.first);
+    g_theme_state.spacetype = SPACE_PROPERTIES;
+    g_theme_state.regionid = regionid;
     return;
   }
 
