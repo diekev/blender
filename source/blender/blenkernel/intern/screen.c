@@ -404,7 +404,7 @@ SpaceType *BKE_spacetype_from_idname(const char *idname)
   return NULL;
 }
 
-static SpaceType undefined_space_type = {};
+static SpaceType undefined_space_type = {0};
 
 static SpaceType *spacetype_fome_space(SpaceLink *space)
 {
