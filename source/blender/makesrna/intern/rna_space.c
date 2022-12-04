@@ -3645,7 +3645,7 @@ static StructRNA *rna_Space_register(Main *bmain,
   st->search_filter_get = (have_function[2]) ? rna_CustomSpaceType_search_filter_get : NULL;
   st->init = (have_function[3]) ? rna_CustomSpaceType_init : NULL;
 
-  BKE_spacetype_register(st);
+  BKE_spacetype_register(bmain, st);
 
   /* update while blender is running */
   WM_main_add_notifier(NC_WINDOW, NULL);

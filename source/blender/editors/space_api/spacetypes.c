@@ -408,7 +408,7 @@ void ED_spacetype_xxx(void)
   st.operatortypes = xxx_operatortypes;
   st.keymap = xxx_keymap;
 
-  BKE_spacetype_register(&st);
+  BKE_spacetype_register_builtin(&st, NULL);
 }
 
 /* ****************************** end template *********************** */

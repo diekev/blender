@@ -453,7 +453,7 @@ const struct ListBase *BKE_spacetypes_list(void);
 void BKE_regiontype_unregister(struct Main *bmain, struct SpaceType *st, struct ARegionType *art);
 
 /** Generic register function, used for registering a #SpaceType from the RNA. */
-void BKE_spacetype_register(struct SpaceType *st);
+void BKE_spacetype_register(struct Main *bmain, struct SpaceType *st);
 
 /** Registration function for builtin types. This will set the srna on the SpaceType. */
 void BKE_spacetype_register_builtin(struct SpaceType *st, struct StructRNA *srna);

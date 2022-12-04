@@ -605,7 +605,7 @@ int BKE_spaceid_from_space_idname(const char *idname)
   return SPACE_CUSTOM;
 }
 
-void BKE_spacetype_register(SpaceType *st)
+static void spacetype_register(SpaceType *st)
 {
   /* sanity check */
   SpaceType *stype = BKE_spacetype_from_idname(st->idname);
@@ -620,9 +620,31 @@ void BKE_spacetype_register(SpaceType *st)
   BLI_addtail(&spacetypes, st);
 }
 
+void BKE_spacetype_register(struct Main *bmain, SpaceType *st)
+{
+  spacetype_register(st);
+
+  /* Update spacedata to use the new SpaceType (in case the add-on got re-registered). */
+  for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
+    LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
+      bool spacelink_use_spacetype = false;
+      LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+        if (STREQ(sl->space_idname, st->idname)) {
+          spacelink_use_spacetype = true;
+          sl->type = st;
+        }
+      }
+
+      if (spacelink_use_spacetype) {
+        area->type = st;
+      }
+    }
+  }
+}
+
 void BKE_spacetype_register_builtin(struct SpaceType *st, struct StructRNA *srna)
 {
-  BKE_spacetype_register(st);
+  spacetype_register(st);
   st->rna_ext.srna = srna;
   BLI_strncpy(st->idname, BKE_spacetype_idname_from_spaceid(st->spaceid), sizeof(st->idname));
 }
