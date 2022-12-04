@@ -383,7 +383,7 @@ SpaceType *BKE_spacetype_from_id(int spaceid)
 
       spaceid--;
     }
-    return NULL;
+    return &SpaceTypeUndefined;
   }
 
   LISTBASE_FOREACH (SpaceType *, st, &spacetypes) {
@@ -404,11 +404,11 @@ SpaceType *BKE_spacetype_from_idname(const char *idname)
   return NULL;
 }
 
-static SpaceType undefined_space_type = {0};
+SpaceType SpaceTypeUndefined = {0};
 
 static SpaceType *spacetype_fome_space(SpaceLink *space)
 {
-  if (space->type && space->type != &undefined_space_type) {
+  if (space->type && space->type != &SpaceTypeUndefined) {
     return space->type;
   }
 
@@ -418,7 +418,7 @@ static SpaceType *spacetype_fome_space(SpaceLink *space)
       return space_type;
     }
 
-    return &undefined_space_type;
+    return &SpaceTypeUndefined;
   }
 
   SpaceType *space_type = BKE_spacetype_from_id(space->spacetype);
@@ -426,13 +426,13 @@ static SpaceType *spacetype_fome_space(SpaceLink *space)
     return space_type;
   }
 
-  return &undefined_space_type;
+  return &SpaceTypeUndefined;
 }
 
 static void spacelink_set_spacetype(SpaceLink *space_link, SpaceType *space_type)
 {
-  if (space_type == NULL || space_type == &undefined_space_type) {
-    space_link->type = &undefined_space_type;
+  if (space_type == NULL || space_type == &SpaceTypeUndefined) {
+    space_link->type = &SpaceTypeUndefined;
     if (space_link->spacetype != SPACE_CUSTOM) {
       space_link->spacetype = SPACE_EMPTY;
       space_link->space_idname[0] = '\0';
@@ -487,11 +487,13 @@ ARegionType *BKE_regiontype_from_id(const SpaceType *st, int regionid)
   return NULL;
 }
 
+ARegionType RegionTypeUndefined[RGN_TYPE_NUM] = {{0}};
+
 static void area_unset_regiontype(ScrArea *area, ARegionType *art)
 {
   LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
     if (region->type == art) {
-      region->type = NULL;
+      region->type = &RegionTypeUndefined[art->regionid];
     }
   }
 }
@@ -630,11 +632,11 @@ void BKE_spacetype_unregister(struct Main *bmain, struct SpaceType *st)
   for (bScreen *screen = bmain->screens.first; screen; screen = screen->id.next) {
     LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
       if (area->type == st) {
-        area->type = NULL;
+        area->type = &SpaceTypeUndefined;
       }
       LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
         if (sl->type == st) {
-          sl->type = NULL;
+          sl->type = &SpaceTypeUndefined;
         }
       }
     }

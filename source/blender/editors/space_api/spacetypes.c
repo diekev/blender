@@ -21,6 +21,7 @@
 #include "GPU_state.h"
 
 #include "UI_interface.h"
+#include "UI_resources.h"
 #include "UI_view2d.h"
 
 #include "ED_anim_api.h"
@@ -55,7 +56,71 @@
 #include "ED_util.h"
 #include "ED_uvedit.h"
 
+#include "BLI_math.h"
 #include "io_ops.h"
+
+static void undefined_header_region_draw(const bContext *C, ARegion *region)
+{
+  UI_ThemeClearColor(TH_BACK);
+
+  /* Height of buttons and scaling needed to achieve it. */
+  const int buttony = min_ii(UI_UNIT_Y, region->winy - 2 * UI_DPI_FAC);
+
+  /* Vertically center buttons. */
+  int xco = UI_HEADER_OFFSET;
+  int yco = buttony + (region->winy - buttony) / 2;
+
+  uiBlock *block = UI_block_begin(C, region, "Undefined", UI_EMBOSS);
+  const uiStyle *style = UI_style_get_dpi();
+  uiLayout *layout = UI_block_layout(
+      block, UI_LAYOUT_HORIZONTAL, UI_LAYOUT_HEADER, xco, yco, buttony, 1, 0, style);
+
+  uiTemplateHeader(layout, (bContext *)C);
+
+  UI_block_layout_resolve(block, &xco, &yco);
+
+  UI_block_end(C, block);
+}
+
+static void undefined_region_draw(const bContext *UNUSED(C), ARegion *UNUSED(region))
+{
+  UI_ThemeClearColor(TH_REDALERT);
+}
+
+static void register_undefined_space_type(void)
+{
+  SpaceTypeUndefined.spaceid = SPACE_CUSTOM;
+  STRNCPY(SpaceTypeUndefined.idname, "SpaceTypeUndefined");
+  STRNCPY(SpaceTypeUndefined.name, "Undefined");
+  SpaceTypeUndefined.iconid = ICON_VIEW3D;
+
+  /* Add every possible region type. We assume that the actual #ARegions where already created
+   * either via file reading, or when initializing the space before the add-on was unregistered. */
+#define ADD_UNDEFINED_REGION(region_type) \
+  RegionTypeUndefined[region_type].regionid = region_type; \
+  RegionTypeUndefined[region_type].draw = undefined_region_draw; \
+  BLI_addhead(&SpaceTypeUndefined.regiontypes, &RegionTypeUndefined[region_type]);
+
+  ADD_UNDEFINED_REGION(RGN_TYPE_WINDOW);
+  ADD_UNDEFINED_REGION(RGN_TYPE_UI);
+  ADD_UNDEFINED_REGION(RGN_TYPE_CHANNELS);
+  ADD_UNDEFINED_REGION(RGN_TYPE_TOOLS);
+  ADD_UNDEFINED_REGION(RGN_TYPE_TOOL_PROPS);
+  ADD_UNDEFINED_REGION(RGN_TYPE_PREVIEW);
+  ADD_UNDEFINED_REGION(RGN_TYPE_NAV_BAR);
+  ADD_UNDEFINED_REGION(RGN_TYPE_EXECUTE);
+  ADD_UNDEFINED_REGION(RGN_TYPE_FOOTER);
+  ADD_UNDEFINED_REGION(RGN_TYPE_TOOL_HEADER);
+
+  // TODO : RGN_TYPE_HUD
+
+#undef ADD_UNDEFINED_REGION
+
+  /* Special case for header so we can display the space template menu. */
+  RegionTypeUndefined[RGN_TYPE_HEADER].regionid = RGN_TYPE_HEADER;
+  RegionTypeUndefined[RGN_TYPE_HEADER].draw = undefined_header_region_draw;
+  BLI_addhead(&SpaceTypeUndefined.regiontypes, &RegionTypeUndefined[RGN_TYPE_HEADER]);
+}
 
 void ED_spacetypes_init(void)
 {
@@ -82,6 +147,8 @@ void ED_spacetypes_init(void)
   ED_spacetype_statusbar();
   ED_spacetype_topbar();
   ED_spacetype_spreadsheet();
+
+  register_undefined_space_type();
 
   /* Register operator types for screen and all spaces. */
   ED_operatortypes_userpref();

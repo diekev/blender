@@ -162,6 +162,9 @@ typedef struct SpaceType {
   ExtensionRNA rna_ext;
 } SpaceType;
 
+/* Represent an undefined space type, used when add-ons are unregistered during execution. */
+extern SpaceType SpaceTypeUndefined;
+
 /* region types are also defined using spacetypes_init, via a callback */
 
 typedef struct wmRegionListenerParams {
@@ -270,6 +273,10 @@ typedef struct ARegionType {
   /* RNA integration. */
   ExtensionRNA rna_ext;
 } ARegionType;
+
+/* Represent undefined region types, used when add-ons are unregistered during execution.
+ * 14 = RGN_TYPE_NUM */
+extern ARegionType RegionTypeUndefined[14];
 
 /* panel types */
 
