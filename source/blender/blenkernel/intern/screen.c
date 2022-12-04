@@ -406,7 +406,7 @@ SpaceType *BKE_spacetype_from_idname(const char *idname)
 
 SpaceType SpaceTypeUndefined = {0};
 
-static SpaceType *spacetype_fome_space(SpaceLink *space)
+static SpaceType *spacetype_from_space(SpaceLink *space)
 {
   if (space->type && space->type != &SpaceTypeUndefined) {
     return space->type;
@@ -449,7 +449,7 @@ static void spacelink_set_spacetype(SpaceLink *space_link, SpaceType *space_type
 
 static SpaceType *spacetype_ensure(SpaceLink *space)
 {
-  SpaceType *space_type = spacetype_fome_space(space);
+  SpaceType *space_type = spacetype_from_space(space);
   spacelink_set_spacetype(space, space_type);
   return space_type;
 }
