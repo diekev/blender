@@ -8,7 +8,10 @@
 
 #include "kernel/light/distribution.h"
 #include "kernel/light/light.h"
-#include "kernel/light/tree.h"
+
+#ifdef __LIGHT_TREE__
+#  include "kernel/light/tree.h"
+#endif
 
 #include "kernel/sample/mapping.h"
 #include "kernel/sample/mis.h"
@@ -522,7 +525,7 @@ ccl_device_inline bool light_sample_new_position(KernelGlobals kg,
     else
 #endif
     {
-      /* Handled in triangle_light_sample for effeciency. */
+      /* Handled in triangle_light_sample for efficiency. */
     }
     return true;
   }
