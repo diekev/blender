@@ -41,7 +41,7 @@ ccl_device float light_tree_cos_bounding_box_angle(const BoundingBox bbox,
                                       (i & 2) ? bbox.max.y : bbox.min.y,
                                       (i & 4) ? bbox.max.z : bbox.min.z);
 
-    /* Caculate the bounding box angle. */
+    /* Calculate the bounding box angle. */
     float3 point_to_corner = normalize(corner - P);
     cos_theta_u = fminf(cos_theta_u, dot(point_to_centroid, point_to_corner));
   }
@@ -58,9 +58,8 @@ ccl_device float3 compute_v(
     const float3 centroid, const float3 P, const float3 D, const float3 bcone_axis, const float t)
 {
   const float3 unnormalized_v0 = P - centroid;
-  float len_v0;
   const float3 unnormalized_v1 = unnormalized_v0 + D * fminf(t, 1e12f);
-  const float3 v0 = normalize_len(unnormalized_v0, &len_v0);
+  const float3 v0 = normalize(unnormalized_v0);
   const float3 v1 = normalize(unnormalized_v1);
 
   const float3 o0 = v0;
@@ -69,10 +68,11 @@ ccl_device float3 compute_v(
 
   const float dot_o0_a = dot(o0, bcone_axis);
   const float dot_o1_a = dot(o1, bcone_axis);
-  const float cos_phi0 = dot_o0_a / sqrtf(sqr(dot_o0_a) + sqr(dot_o1_a));
+  const float inv_len = inversesqrtf(sqr(dot_o0_a) + sqr(dot_o1_a));
+  const float cos_phi0 = dot_o0_a * inv_len;
 
   return (dot_o1_a < 0 || dot(v0, v1) > cos_phi0) ? (dot_o0_a > dot(v1, bcone_axis) ? v0 : v1) :
-                                                    cos_phi0 * o0 + sin_from_cos(cos_phi0) * o1;
+                                                    cos_phi0 * o0 + dot_o1_a * inv_len * o1;
 }
 
 /* This is the general function for calculating the importance of either a cluster or an emitter.
@@ -461,7 +461,7 @@ ccl_device int light_tree_cluster_select_emitter(KernelGlobals kg,
 
   for (int i = 0; i < knode->num_prims; i++) {
     int current_index = -knode->child_index + i;
-    /* maximum importance = importance[0], mininum importance = importance[1] */
+    /* maximum importance = importance[0], minimum importance = importance[1] */
     float importance[2];
     light_tree_emitter_importance<in_volume_segment>(
         kg, P, N_or_D, t, has_transmission, current_index, importance[0], importance[1]);
@@ -552,8 +552,8 @@ ccl_device bool get_left_probability(KernelGlobals kg,
 
 template<bool in_volume_segment>
 ccl_device_noinline bool light_tree_sample(KernelGlobals kg,
-                                           ccl_private float &randu,
-                                           ccl_private float &randv,
+                                           float randu,
+                                           float randv,
                                            const float time,
                                            const float3 P,
                                            const float3 N_or_D,
@@ -561,10 +561,7 @@ ccl_device_noinline bool light_tree_sample(KernelGlobals kg,
                                            const int shader_flags,
                                            const int bounce,
                                            const uint32_t path_flag,
-                                           ccl_private int &emitter_object,
-                                           ccl_private int &emitter_prim,
-                                           ccl_private int &emitter_shader_flag,
-                                           ccl_private float &emitter_pdf_selection)
+                                           ccl_private LightSample *ls)
 {
   if (!kernel_data.integrator.use_direct_light) {
     return false;
@@ -610,16 +607,42 @@ ccl_device_noinline bool light_tree_sample(KernelGlobals kg,
     return false;
   }
 
-  /* Return info about chosen emitter. */
+  /* Sample a point on the chosen emitter */
   ccl_global const KernelLightTreeEmitter *kemitter = &kernel_data_fetch(light_tree_emitters,
                                                                          selected_light);
 
-  emitter_object = kemitter->mesh_light.object_id;
-  emitter_prim = kemitter->prim_id;
-  emitter_shader_flag = kemitter->mesh_light.shader_flag;
-  emitter_pdf_selection = pdf_leaf * pdf_emitter_from_leaf;
+  /* TODO: this is the same code as light_distribution_sample, except the index is determined
+   * differently. Would it be better to refactor this into a separate function? */
+  const int prim = kemitter->prim_id;
+  if (prim >= 0) {
+    /* Mesh light. */
+    const int object = kemitter->mesh_light.object_id;
 
-  return true;
+    /* Exclude synthetic meshes from shadow catcher pass. */
+    if ((path_flag & PATH_RAY_SHADOW_CATCHER_PASS) &&
+        !(kernel_data_fetch(object_flag, object) & SD_OBJECT_SHADOW_CATCHER)) {
+      return false;
+    }
+
+    const int mesh_shader_flag = kemitter->mesh_light.shader_flag;
+    if (!triangle_light_sample<in_volume_segment>(kg, prim, object, randu, randv, time, ls, P)) {
+      return false;
+    }
+    ls->shader |= mesh_shader_flag;
+  }
+  else {
+    if (UNLIKELY(light_select_reached_max_bounces(kg, ~prim, bounce))) {
+      return false;
+    }
+
+    if (!light_sample<in_volume_segment>(kg, ~prim, randu, randv, P, path_flag, ls)) {
+      return false;
+    }
+  }
+
+  ls->pdf_selection = pdf_leaf * pdf_emitter_from_leaf;
+  ls->pdf *= ls->pdf_selection;
+  return (ls->pdf > 0);
 }
 
 /* We need to be able to find the probability of selecting a given light for MIS. */

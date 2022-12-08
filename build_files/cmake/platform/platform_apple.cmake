@@ -260,7 +260,12 @@ if(WITH_BOOST)
   endif()
   find_package(Boost COMPONENTS ${_boost_FIND_COMPONENTS})
 
+  # Boost Python is separate to avoid linking Python into tests that don't need it.
   set(BOOST_LIBRARIES ${Boost_LIBRARIES})
+  if(WITH_USD AND USD_PYTHON_SUPPORT)
+    set(BOOST_PYTHON_LIBRARIES ${Boost_PYTHON${PYTHON_VERSION_NO_DOTS}_LIBRARY})
+    list(REMOVE_ITEM BOOST_LIBRARIES ${BOOST_PYTHON_LIBRARIES})
+  endif()
   set(BOOST_INCLUDE_DIR ${Boost_INCLUDE_DIRS})
   set(BOOST_DEFINITIONS)
 
@@ -496,7 +501,7 @@ if(PLATFORM_BUNDLED_LIBRARIES)
   # Environment variables to run precompiled executables that needed libraries.
   list(JOIN PLATFORM_BUNDLED_LIBRARY_DIRS ":" _library_paths)
   set(PLATFORM_ENV_BUILD "DYLD_LIBRARY_PATH=\"${_library_paths};${DYLD_LIBRARY_PATH}\"")
-  set(PLATFORM_ENV_INSTALL "DYLD_LIBRARY_PATH=${CMAKE_INSTALL_PREFIX_WITH_CONFIG}Blender.app/Contents/Resources/lib/;$DYLD_LIBRARY_PATH")
+  set(PLATFORM_ENV_INSTALL "DYLD_LIBRARY_PATH=${CMAKE_INSTALL_PREFIX_WITH_CONFIG}/Blender.app/Contents/Resources/lib/;$DYLD_LIBRARY_PATH")
   unset(_library_paths)
 endif()
 
