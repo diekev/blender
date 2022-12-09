@@ -75,9 +75,9 @@ void ShaderCreateInfo::finalize()
     if (info.early_fragment_test_) {
       early_fragment_test_ = true;
     }
-    /* Override depth-write with additional info if this specifies a writing mode
-     * other than the default. */
-    if (info.depth_write_ != DepthWrite::NONE) {
+    /* Modify depth write if has been changed from default.
+     * `UNCHANGED` implies gl_FragDepth is not used at all. */
+    if (info.depth_write_ != DepthWrite::UNCHANGED) {
       depth_write_ = info.depth_write_;
     }
 
@@ -343,6 +343,13 @@ void gpu_shader_create_info_init()
     overlay_motion_path_line = overlay_motion_path_line_no_geom;
     overlay_motion_path_line_clipped = overlay_motion_path_line_clipped_no_geom;
 
+    /* Workbench shadows.
+     * Note: Updates additional-info used by workbench shadow permutations.
+     * Must be prepared prior to permutation preparation. */
+    workbench_shadow_manifold = workbench_shadow_manifold_no_geom;
+    workbench_shadow_no_manifold = workbench_shadow_no_manifold_no_geom;
+    workbench_shadow_caps = workbench_shadow_caps_no_geom;
+
     /* Conservative rasterization. */
     basic_depth_mesh_conservative = basic_depth_mesh_conservative_no_geom;
     basic_depth_mesh_conservative_clipped = basic_depth_mesh_conservative_no_geom_clipped;
@@ -416,7 +423,8 @@ bool gpu_shader_create_info_compile_all()
   for (ShaderCreateInfo *info : g_create_infos->values()) {
     info->finalize();
     if (info->do_static_compilation_) {
-      if ((GPU_compute_shader_support() == false && info->compute_source_ != nullptr) ||
+      if ((info->metal_backend_only_ && GPU_backend_get_type() != GPU_BACKEND_METAL) ||
+          (GPU_compute_shader_support() == false && info->compute_source_ != nullptr) ||
           (GPU_geometry_shader_support() == false && info->geometry_source_ != nullptr) ||
           (GPU_shader_image_load_store_support() == false && info->has_resource_image()) ||
           (GPU_shader_storage_buffer_objects_support() == false && info->has_resource_storage())) {
