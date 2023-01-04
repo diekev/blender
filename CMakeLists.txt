@@ -832,27 +832,17 @@ endif()
 # enable boost for cycles, audaspace or i18n
 # otherwise if the user disabled
 
-set_and_warn_dependency(WITH_BOOST WITH_CYCLES         OFF)
 set_and_warn_dependency(WITH_BOOST WITH_INTERNATIONAL  OFF)
 set_and_warn_dependency(WITH_BOOST WITH_OPENVDB        OFF)
-set_and_warn_dependency(WITH_BOOST WITH_OPENCOLORIO    OFF)
 set_and_warn_dependency(WITH_BOOST WITH_QUADRIFLOW     OFF)
 set_and_warn_dependency(WITH_BOOST WITH_USD            OFF)
-set_and_warn_dependency(WITH_BOOST WITH_ALEMBIC        OFF)
 if(WITH_CYCLES)
+  set_and_warn_dependency(WITH_BOOST   WITH_CYCLES_OSL   OFF)
   set_and_warn_dependency(WITH_PUGIXML WITH_CYCLES_OSL   OFF)
-endif()
-set_and_warn_dependency(WITH_PUGIXML WITH_OPENIMAGEIO  OFF)
-
-if(WITH_BOOST AND NOT (WITH_CYCLES OR WITH_OPENIMAGEIO OR WITH_INTERNATIONAL OR
-  WITH_OPENVDB OR WITH_OPENCOLORIO OR WITH_USD OR WITH_ALEMBIC))
-  message(STATUS "No dependencies need 'WITH_BOOST' forcing WITH_BOOST=OFF")
-  set(WITH_BOOST OFF)
 endif()
 
 set_and_warn_dependency(WITH_TBB WITH_CYCLES            OFF)
 set_and_warn_dependency(WITH_TBB WITH_USD               OFF)
-set_and_warn_dependency(WITH_TBB WITH_OPENIMAGEDENOISE  OFF)
 set_and_warn_dependency(WITH_TBB WITH_OPENVDB           OFF)
 set_and_warn_dependency(WITH_TBB WITH_MOD_FLUID         OFF)
 
@@ -861,13 +851,9 @@ set_and_warn_dependency(WITH_OPENVDB WITH_NANOVDB       OFF)
 
 # OpenVDB and OpenColorIO uses 'half' type from OpenEXR
 set_and_warn_dependency(WITH_IMAGE_OPENEXR WITH_OPENVDB OFF)
-set_and_warn_dependency(WITH_IMAGE_OPENEXR WITH_OPENCOLORIO  OFF)
 
 # Haru needs `TIFFFaxBlackCodes` & `TIFFFaxWhiteCodes` symbols from TIFF.
 set_and_warn_dependency(WITH_IMAGE_TIFF WITH_HARU       OFF)
-
-# USD needs OpenSubDiv, since that is used by the Cycles Hydra render delegate.
-set_and_warn_dependency(WITH_OPENSUBDIV WITH_USD        OFF)
 
 # auto enable openimageio for cycles
 if(WITH_CYCLES)
@@ -880,17 +866,6 @@ if(WITH_CYCLES)
   endif()
 else()
   set(WITH_CYCLES_OSL OFF)
-endif()
-
-# auto enable openimageio linking dependencies
-if(WITH_OPENIMAGEIO)
-  set(WITH_IMAGE_OPENEXR ON)
-  set(WITH_IMAGE_TIFF ON)
-endif()
-
-# auto enable alembic linking dependencies
-if(WITH_ALEMBIC)
-  set(WITH_IMAGE_OPENEXR ON)
 endif()
 
 # don't store paths to libs for portable distribution
@@ -1095,14 +1070,6 @@ if(WITH_CYCLES)
       "Configure OIIO or disable WITH_CYCLES"
     )
   endif()
-  if(NOT WITH_BOOST)
-    message(
-      FATAL_ERROR
-      "Cycles requires WITH_BOOST, the library may not have been found. "
-      "Configure BOOST or disable WITH_CYCLES"
-    )
-  endif()
-
   if(WITH_CYCLES_OSL)
     if(NOT WITH_LLVM)
       message(
@@ -2008,24 +1975,6 @@ endif()
 if(0)
   print_all_vars()
 endif()
-
-set(LIBDIR_STALE)
-
-if(UNIX AND NOT APPLE)
-  # Only search for the path if it's found on the system.
-  if(EXISTS "../lib/linux_centos7_x86_64")
-    set(LIBDIR_STALE "/lib/linux_centos7_x86_64/")
-  endif()
-endif()
-
-if(LIBDIR_STALE)
-  print_cached_vars_containing_value(
-    "${LIBDIR_STALE}"
-    "\nWARNING: found cached references to old library paths!\n"
-    "\nIt is *strongly* recommended to reference updated library paths!\n"
-  )
-endif()
-unset(LIBDIR_STALE)
 
 # Should be the last step of configuration.
 if(POSTCONFIGURE_SCRIPT)

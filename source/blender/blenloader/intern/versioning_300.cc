@@ -28,6 +28,7 @@
 #include "DNA_curves_types.h"
 #include "DNA_genfile.h"
 #include "DNA_gpencil_modifier_types.h"
+#include "DNA_light_types.h"
 #include "DNA_lineart_types.h"
 #include "DNA_listBase.h"
 #include "DNA_mask_types.h"
@@ -50,6 +51,7 @@
 #include "BKE_collection.h"
 #include "BKE_colortools.h"
 #include "BKE_curve.h"
+#include "BKE_curves.hh"
 #include "BKE_data_transfer.h"
 #include "BKE_deform.h"
 #include "BKE_fcurve.h"
@@ -3835,6 +3837,13 @@ void blo_do_versions_300(FileData *fd, Library * /*lib*/, Main *bmain)
       }
     }
   }
+
+  if (!MAIN_VERSION_ATLEAST(bmain, 305, 7)) {
+    LISTBASE_FOREACH (Light *, light, &bmain->lights) {
+      light->radius = light->area_size;
+    }
+  }
+
   /**
    * Versioning code until next subversion bump goes here.
    *
@@ -3849,6 +3858,10 @@ void blo_do_versions_300(FileData *fd, Library * /*lib*/, Main *bmain)
     const int CV_SCULPT_SELECTION_ENABLED = (1 << 1);
     LISTBASE_FOREACH (Curves *, curves_id, &bmain->hair_curves) {
       curves_id->flag &= ~CV_SCULPT_SELECTION_ENABLED;
+    }
+    LISTBASE_FOREACH (Curves *, curves_id, &bmain->hair_curves) {
+      BKE_id_attribute_rename(&curves_id->id, ".selection_point_float", ".selection", nullptr);
+      BKE_id_attribute_rename(&curves_id->id, ".selection_curve_float", ".selection", nullptr);
     }
   }
 }
