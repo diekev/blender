@@ -272,6 +272,7 @@ static void mesh_blend_write(BlendWriter *writer, ID *id, const void *id_address
       BKE_mesh_legacy_bevel_weight_from_layers(mesh);
       BKE_mesh_legacy_face_set_from_generic(mesh, poly_layers);
       BKE_mesh_legacy_edge_crease_from_layers(mesh);
+      BKE_mesh_legacy_sharp_edges_to_flags(mesh);
       BKE_mesh_legacy_attribute_strings_to_flags(mesh);
       mesh->active_color_attribute = nullptr;
       mesh->default_color_attribute = nullptr;
@@ -510,14 +511,13 @@ static bool is_uv_bool_sublayer(CustomDataLayer const *l)
          is_sublayer_name(UV_PINNED_NAME, name);
 }
 
-/** Thresh is threshold for comparing vertices, UV's, vertex colors, weights, etc. */
+/** Thresh is threshold for comparing vertices, UVs, vertex colors, weights, etc. */
 static int customdata_compare(
     CustomData *c1, CustomData *c2, const int total_length, Mesh *m1, Mesh *m2, const float thresh)
 {
   CustomDataLayer *l1, *l2;
   int layer_count1 = 0, layer_count2 = 0, j;
-  const uint64_t cd_mask_non_generic = CD_MASK_MEDGE | CD_MASK_MPOLY | CD_MASK_PROP_BYTE_COLOR |
-                                       CD_MASK_MDEFORMVERT;
+  const uint64_t cd_mask_non_generic = CD_MASK_MEDGE | CD_MASK_MPOLY | CD_MASK_MDEFORMVERT;
   const uint64_t cd_mask_all_attr = CD_MASK_PROP_ALL | cd_mask_non_generic;
   const Span<MLoop> loops_1 = m1->loops();
   const Span<MLoop> loops_2 = m2->loops();
@@ -1830,8 +1830,6 @@ void BKE_mesh_calc_normals_split_ex(Mesh *mesh,
                                     MLoopNorSpaceArray *r_lnors_spacearr,
                                     float (*r_corner_normals)[3])
 {
-  short(*clnors)[2] = nullptr;
-
   /* Note that we enforce computing clnors when the clnor space array is requested by caller here.
    * However, we obviously only use the auto-smooth angle threshold
    * only in case auto-smooth is enabled. */
@@ -1840,7 +1838,9 @@ void BKE_mesh_calc_normals_split_ex(Mesh *mesh,
   const float split_angle = (mesh->flag & ME_AUTOSMOOTH) != 0 ? mesh->smoothresh : float(M_PI);
 
   /* may be nullptr */
-  clnors = (short(*)[2])CustomData_get_layer(&mesh->ldata, CD_CUSTOMLOOPNORMAL);
+  short(*clnors)[2] = (short(*)[2])CustomData_get_layer(&mesh->ldata, CD_CUSTOMLOOPNORMAL);
+  const bool *sharp_edges = static_cast<const bool *>(
+      CustomData_get_layer_named(&mesh->edata, CD_PROP_BOOL, "sharp_edge"));
 
   const Span<float3> positions = mesh->vert_positions();
   const Span<MEdge> edges = mesh->edges();
@@ -1860,6 +1860,7 @@ void BKE_mesh_calc_normals_split_ex(Mesh *mesh,
                               polys.size(),
                               use_split_normals,
                               split_angle,
+                              sharp_edges,
                               nullptr,
                               r_lnors_spacearr,
                               clnors);
