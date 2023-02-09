@@ -9,7 +9,7 @@
 
 #include "DNA_defs.h"
 
-/* XXX(@campbellbarton): temp feature. */
+/* XXX(@ideasman42): temp feature. */
 #define DURIAN_CAMERA_SWITCH
 
 /**
@@ -793,6 +793,8 @@ typedef struct RenderData {
   float simplify_particles;
   float simplify_particles_render;
   float simplify_volumes;
+  float simplify_shadows;
+  float simplify_shadows_render;
 
   /** Freestyle line thickness options. */
   int line_thickness_mode;
@@ -1829,6 +1831,8 @@ typedef struct SceneEEVEE {
   int shadow_method DNA_DEPRECATED;
   int shadow_cube_size;
   int shadow_cascade_size;
+  int shadow_pool_size;
+  char _pad[4];
 
   struct LightCache *light_cache DNA_DEPRECATED;
   struct LightCache *light_cache_data;
@@ -2702,6 +2706,7 @@ enum {
   SCE_EEVEE_OVERSCAN = (1 << 21),
   SCE_EEVEE_DOF_HQ_SLIGHT_FOCUS = (1 << 22),
   SCE_EEVEE_DOF_JITTER = (1 << 23),
+  SCE_EEVEE_SHADOW_ENABLED = (1 << 24),
 };
 
 /** #SceneEEVEE.shadow_method */
