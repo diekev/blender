@@ -10,6 +10,16 @@
 #include "bmesh.h"
 
 #ifdef __cplusplus
+#  include "BLI_string_ref.hh"
+
+/**
+ * \return Whether attributes with the given name are stored in special flags or fields in BMesh
+ * rather than in the regular custom data blocks.
+ */
+bool BM_attribute_stored_in_bmesh_builtin(const blender::StringRef name);
+#endif
+
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -82,7 +92,6 @@ void BM_mesh_bm_to_me(struct Main *bmain,
  * - Ignore shape-keys.
  * - Ignore vertex-parents.
  * - Ignore selection history.
- * - Uses simpler method to calculate #ME_EDGEDRAW
  * - Uses #CD_MASK_DERIVEDMESH instead of #CD_MASK_MESH.
  *
  * \note Was `cddm_from_bmesh_ex` in 2.7x, removed `MFace` support.
