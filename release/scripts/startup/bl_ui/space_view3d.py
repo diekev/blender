@@ -161,6 +161,8 @@ class VIEW3D_HT_tool_header(Header):
             sub.prop(context.object.data, "use_mirror_y", text="Y", toggle=True)
             sub.prop(context.object.data, "use_mirror_z", text="Z", toggle=True)
 
+            layout.prop(context.object.data, "use_sculpt_collision", icon='MOD_PHYSICS', icon_only=True, toggle=True)
+
         # Expand panels from the side-bar as popovers.
         popover_kw = {"space_type": 'VIEW_3D', "region_type": 'UI', "category": "Tool"}
 
@@ -2052,6 +2054,7 @@ class VIEW3D_MT_select_edit_curves(Menu):
         layout.operator("curves.select_all", text="Invert").action = 'INVERT'
         layout.operator("curves.select_random", text="Random")
         layout.operator("curves.select_end", text="Endpoints")
+        layout.operator("curves.select_linked", text="Linked")
 
 
 class VIEW3D_MT_select_sculpt_curves(Menu):
@@ -6706,13 +6709,12 @@ class VIEW3D_PT_overlay_sculpt(Panel):
     def poll(cls, context):
         return (
             context.mode == 'SCULPT' and
-            (context.sculpt_object and context.tool_settings.sculpt)
+            context.sculpt_object
         )
 
     def draw(self, context):
         layout = self.layout
         tool_settings = context.tool_settings
-        sculpt = tool_settings.sculpt
 
         view = context.space_data
         overlay = view.overlay

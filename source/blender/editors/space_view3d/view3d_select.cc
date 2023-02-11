@@ -1303,6 +1303,7 @@ static bool view3d_lasso_select(bContext *C,
                                 const int mcoords_len,
                                 const eSelectOp sel_op)
 {
+  using namespace blender;
   Object *ob = CTX_data_active_object(C);
   bool changed_multi = false;
 
@@ -1362,6 +1363,23 @@ static bool view3d_lasso_select(bContext *C,
         case OB_MBALL:
           changed = do_lasso_select_meta(vc, mcoords, mcoords_len, sel_op);
           break;
+        case OB_CURVES: {
+          Curves &curves_id = *static_cast<Curves *>(vc->obedit->data);
+          bke::CurvesGeometry &curves = curves_id.geometry.wrap();
+          changed = ed::curves::select_lasso(
+              *vc,
+              curves,
+              eAttrDomain(curves_id.selection_domain),
+              Span<int2>(reinterpret_cast<const int2 *>(mcoords), mcoords_len),
+              sel_op);
+          if (changed) {
+            /* Use #ID_RECALC_GEOMETRY instead of #ID_RECALC_SELECT because it is handled as a
+             * generic attribute for now. */
+            DEG_id_tag_update(static_cast<ID *>(vc->obedit->data), ID_RECALC_GEOMETRY);
+            WM_event_add_notifier(C, NC_GEOM | ND_DATA, vc->obedit->data);
+          }
+          break;
+        }
         default:
           BLI_assert_msg(0, "lasso select on incorrect object type");
           break;
@@ -3957,7 +3975,7 @@ static int view3d_box_select_exec(bContext *C, wmOperator *op)
           }
           break;
         case OB_CURVES: {
-          Curves &curves_id = *static_cast<Curves *>(vc.obact->data);
+          Curves &curves_id = *static_cast<Curves *>(vc.obedit->data);
           bke::CurvesGeometry &curves = curves_id.geometry.wrap();
           changed = ed::curves::select_box(
               vc, curves, eAttrDomain(curves_id.selection_domain), rect, sel_op);
@@ -4701,6 +4719,7 @@ static bool obedit_circle_select(bContext *C,
                                  const int mval[2],
                                  float rad)
 {
+  using namespace blender;
   bool changed = false;
   BLI_assert(ELEM(sel_op, SEL_OP_SET, SEL_OP_ADD, SEL_OP_SUB));
   switch (vc->obedit->type) {
@@ -4723,6 +4742,20 @@ static bool obedit_circle_select(bContext *C,
     case OB_MBALL:
       changed = mball_circle_select(vc, sel_op, mval, rad);
       break;
+    case OB_CURVES: {
+      Curves &curves_id = *static_cast<Curves *>(vc->obedit->data);
+      bke::CurvesGeometry &curves = curves_id.geometry.wrap();
+      changed = ed::curves::select_circle(
+          *vc, curves, eAttrDomain(curves_id.selection_domain), mval, rad, sel_op);
+      if (changed) {
+        /* Use #ID_RECALC_GEOMETRY instead of #ID_RECALC_SELECT because it is handled as a
+         * generic attribute for now. */
+        DEG_id_tag_update(static_cast<ID *>(vc->obedit->data), ID_RECALC_GEOMETRY);
+        WM_event_add_notifier(C, NC_GEOM | ND_DATA, vc->obedit->data);
+      }
+      break;
+    }
+
     default:
       BLI_assert(0);
       break;
