@@ -150,7 +150,7 @@ static void graph_init(const bContext *C)
   /* force immediate init of any invalid F-Curve colors */
   /* XXX: but, don't do SIPO_TEMP_NEEDCHANSYNC (i.e. channel select state sync)
    * as this is run on each region resize; setting this here will cause selection
-   * state to be lost on area/region resizing. T35744.
+   * state to be lost on area/region resizing. #35744.
    */
   ScrArea *area = CTX_wm_area(C);
   ED_area_tag_refresh(area);
