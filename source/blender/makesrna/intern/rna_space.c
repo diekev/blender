@@ -3404,6 +3404,11 @@ static SpaceLink *rna_CustomSpaceType_create(const ScrArea *area, const Scene *U
 #  undef SPACETYPE_HAS_REGION
 }
 
+/* Mandatory callback, nothing to do for now. */
+static void rna_SpaceType_free(SpaceLink *UNUSED(sl))
+{
+}
+
 static void rna_CustomSpaceType_init(const bContext *C)
 {
   SpaceLink *sl = CTX_wm_space_data(C);
@@ -3637,6 +3642,7 @@ static StructRNA *rna_Space_register(Main *bmain,
   st->create = rna_CustomSpaceType_create;
   st->blend_write = BKE_spacetype_blend_write_custom;
   st->duplicate = rna_CustomSpaceType_duplicate;
+  st->free = rna_SpaceType_free;
 
   /* Optional registrable functions. */
   st->eyedropper_color_sample = (have_function[0]) ? rna_CustomSpaceType_eyedropper_color_sample :
