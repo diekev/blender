@@ -2470,7 +2470,9 @@ void ED_area_newspace(bContext *C, ScrArea *area, int type, const bool skip_regi
     /* check previously stored space */
     SpaceLink *sl = NULL;
     LISTBASE_FOREACH (SpaceLink *, sl_iter, &area->spacedata) {
-      if (sl_iter->spacetype == type) {
+      /* Use the SpaceType to compare as the enum value for custom editor might match with a
+       * different custom space type. */
+      if (sl_iter->type == st) {
         sl = sl_iter;
         break;
       }
