@@ -1379,6 +1379,26 @@ static void rna_def_region(BlenderRNA *brna)
   RNA_def_property_flag(prop, PROP_REGISTER);
   RNA_def_property_ui_text(prop, "Region Type", "The type of region");
 
+  static const EnumPropertyItem region_default_keymaps_items[] = {
+      {ED_KEYMAP_UI, "UI", 0, "UI Region", ""},
+      {ED_KEYMAP_GIZMO, "GIZMO", 0, "Gizmo", ""},
+      {ED_KEYMAP_TOOL, "TOOL", 0, "Tool", ""},
+      {ED_KEYMAP_VIEW2D, "VIEW2D", 0, "View 2D", ""},
+      {ED_KEYMAP_ANIMATION, "ANIMATION", 0, "Animation", ""},
+      {ED_KEYMAP_FRAMES, "FRAMES", 0, "Frames", ""},
+      {ED_KEYMAP_HEADER, "HEADER", 0, "Header", ""},
+      {ED_KEYMAP_FOOTER, "FOOTER", 0, "Footer", ""},
+      {ED_KEYMAP_GPENCIL, "GPENCIL", 0, "Grease Pencil", ""},
+      {ED_KEYMAP_NAVBAR, "NAVBAR", 0, "Navigation Bar", ""},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  prop = RNA_def_property(srna, "bl_default_keymaps", PROP_ENUM, PROP_NONE);
+  RNA_def_property_enum_sdna(prop, NULL, "type->keymapflag");
+  RNA_def_property_flag(prop, PROP_REGISTER_OPTIONAL | PROP_ENUM_FLAG);
+  RNA_def_property_enum_items(prop, region_default_keymaps_items);
+  RNA_def_property_ui_text(prop, "Default Keymaps", "The default keymaps to add to the region.");
+
   func = RNA_def_function(srna, "init", NULL);
   RNA_def_function_ui_description(func, "Can be used to initialize handlers for this region.");
   RNA_def_function_flag(func, FUNC_REGISTER | FUNC_ALLOW_WRITE);
