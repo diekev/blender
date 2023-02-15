@@ -413,7 +413,7 @@ static SpaceType *spacetype_from_space(SpaceLink *space)
     return space->type;
   }
 
-  if (space->spacetype == SPACE_CUSTOM) {
+  if (space->spacetype >= SPACE_CUSTOM) {
     SpaceType *space_type = BKE_spacetype_from_idname(space->space_idname);
     if (space_type) {
       return space_type;
@@ -434,7 +434,7 @@ static void spacelink_set_spacetype(SpaceLink *space_link, SpaceType *space_type
 {
   if (space_type == NULL || space_type == &SpaceTypeUndefined) {
     space_link->type = &SpaceTypeUndefined;
-    if (space_link->spacetype != SPACE_CUSTOM) {
+    if (space_link->spacetype < SPACE_CUSTOM) {
       space_link->spacetype = SPACE_EMPTY;
       space_link->space_idname[0] = '\0';
     }
@@ -459,7 +459,7 @@ void BKE_spacetype_foreach_custom_type(void (*callback)(const SpaceType *spacety
                                        void *callback_data)
 {
   LISTBASE_FOREACH (SpaceType *, st, &spacetypes) {
-    if (st->spaceid == SPACE_CUSTOM) {
+    if (st->spaceid >= SPACE_CUSTOM) {
       callback(st, callback_data);
     }
   }
@@ -1654,9 +1654,9 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
 
     /* if we do not have the spacetype registered we cannot
      * free it, so don't allocate any new memory for such spacetypes. */
-    //    if (!BKE_spacetype_exists(sl->spacetype)) {
-    //      sl->spacetype = SPACE_EMPTY;
-    //    }
+    if (!BKE_spacetype_exists(sl->spacetype) && sl->spacetype < SPACE_CUSTOM) {
+      sl->spacetype = SPACE_EMPTY;
+    }
 
     LISTBASE_FOREACH (ARegion *, region, &sl->regionbase) {
       direct_link_region(reader, region, sl->spacetype);
