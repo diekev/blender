@@ -4222,6 +4222,10 @@ static uiBut *ui_def_but(uiBlock *block,
     but->flag |= UI_BUT_UNDO;
   }
 
+  if (ELEM(but->type, UI_BTYPE_COLOR)) {
+    but->dragflag |= UI_BUT_DRAG_FULL_BUT;
+  }
+
   BLI_addtail(&block->buttons, but);
 
   if (block->curlayout) {
@@ -5886,6 +5890,16 @@ void UI_but_drawflag_enable(uiBut *but, int flag)
 void UI_but_drawflag_disable(uiBut *but, int flag)
 {
   but->drawflag &= ~flag;
+}
+
+void UI_but_dragflag_enable(uiBut *but, int flag)
+{
+  but->dragflag |= flag;
+}
+
+void UI_but_dragflag_disable(uiBut *but, int flag)
+{
+  but->dragflag &= ~flag;
 }
 
 void UI_but_disable(uiBut *but, const char *disabled_hint)
