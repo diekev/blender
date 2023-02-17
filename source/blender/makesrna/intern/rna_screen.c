@@ -733,6 +733,31 @@ static void region_draw(const struct bContext *C, struct ARegion *region)
   RNA_parameter_list_free(&list);
 }
 
+static void region_listener(const wmRegionListenerParams *params)
+{
+  /* We are called via params->region->type->listener, so this is valid, and we are the right type.
+   */
+  ARegionType *type = params->region->type;
+  PointerRNA ptr;
+  RNA_pointer_create(NULL, type->rna_ext.srna, NULL, &ptr); /* dummy */
+
+  // RNA_struct_find_function(&ptr, "listener");
+  extern FunctionRNA rna_Space_listener_func;
+  FunctionRNA *func = &rna_Space_listener_func;
+
+  ParameterList list;
+  RNA_parameter_list_create(&list, &ptr, func);
+  RNA_parameter_set_lookup(&list, "window", &params->window);
+  RNA_parameter_set_lookup(&list, "area", &params->area);
+  RNA_parameter_set_lookup(&list, "region", &params->region);
+  RNA_parameter_set_lookup(&list, "scene", &params->scene);
+  RNA_parameter_set_lookup(&list, "notifier", &params->notifier);
+
+  type->rna_ext.call(NULL, &ptr, func, &list);
+
+  RNA_parameter_list_free(&list);
+}
+
 static StructRNA *rna_Region_refine(PointerRNA *ptr)
 {
   ARegion *region = (ARegion *)ptr->data;
@@ -843,7 +868,7 @@ static StructRNA *rna_Region_register(Main *bmain,
   ARegionType dummyart = {NULL};
   ARegion dummyregion = {NULL};
   PointerRNA dummyptr;
-  int have_function[3];
+  int have_function[4];
 
   /* setup dummy region & region type to store static properties in */
   dummyregion.type = &dummyart;
@@ -921,6 +946,7 @@ static StructRNA *rna_Region_register(Main *bmain,
     art->init = (have_function[0]) ? region_init : NULL;
     art->exit = (have_function[1]) ? region_exit : art->exit;
     art->draw = (have_function[2]) ? region_draw : art->draw;
+    art->listener = (have_function[3]) ? region_listener : NULL;
   }
 
   rna_SpaceType_def_show_region_props(st, art->regionid);
@@ -1416,6 +1442,27 @@ static void rna_def_region(BlenderRNA *brna)
   RNA_def_function_flag(func, FUNC_REGISTER_OPTIONAL);
   parm = RNA_def_pointer(func, "context", "Context", "", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+
+  func = RNA_def_function(srna, "listener", NULL);
+  RNA_def_function_ui_description(
+      func,
+      "Receive notifications from operations modifying the context. "
+      "This will be called for each area containing an instance of the region");
+  RNA_def_function_flag(func, FUNC_NO_SELF | FUNC_REGISTER_OPTIONAL);
+  parm = RNA_def_pointer(func, "window", "Window", "Window", "");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_pointer(func, "area", "Area", "Area", "The area being visited. Can be null");
+  RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+  parm = RNA_def_pointer(func, "region", "Region", "Region", "The region being visited");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_pointer(func, "scene", "Scene", "Scene", "The current scene");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_pointer(func,
+                         "notifier",
+                         "Notifier",
+                         "Notifier",
+                         "The notification sent. It is perfectly normal to ignore it");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
 }
 
 static void rna_def_screen(BlenderRNA *brna)

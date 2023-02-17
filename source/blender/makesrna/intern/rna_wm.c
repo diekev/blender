@@ -517,6 +517,12 @@ const EnumPropertyItem rna_enum_wm_report_items[] = {
     {0, NULL, 0, NULL, NULL},
 };
 
+/* Items for wmNotifier.data. Empty by default as each wmNotifier.category has its own list. */
+static EnumPropertyItem rna_notifier_data_items[] = {
+    {0, "NONE", 0, "", ""},
+    {0, NULL, 0, NULL, NULL},
+};
+
 #ifdef RNA_RUNTIME
 
 #  include "BLI_string_utils.h"
@@ -1802,6 +1808,219 @@ static void rna_KeyMapItem_update(Main *UNUSED(bmain), Scene *UNUSED(scene), Poi
   WM_keyconfig_update_tag(NULL, kmi);
 }
 
+#  define NOTIFIER_PROPERTY_GETTER(property_name) \
+    static int rna_Notifier_##property_name##_get(PointerRNA *ptr) \
+    { \
+      wmNotifier *notifier = ptr->data; \
+      return notifier->property_name; \
+    }
+
+NOTIFIER_PROPERTY_GETTER(category)
+NOTIFIER_PROPERTY_GETTER(data)
+NOTIFIER_PROPERTY_GETTER(subtype)
+NOTIFIER_PROPERTY_GETTER(action)
+
+/* NC_WM (window-manager). */
+static EnumPropertyItem rna_notifier_data_window_manager_items[] = {
+    {ND_FILEREAD, "FILEREAD", 0, "FILEREAD", ""},
+    {ND_FILESAVE, "FILESAVE", 0, "FILESAVE", ""},
+    {ND_DATACHANGED, "DATACHANGED", 0, "DATACHANGED", ""},
+    {ND_HISTORY, "HISTORY", 0, "HISTORY", ""},
+    {ND_JOB, "JOB", 0, "JOB", ""},
+    {ND_UNDO, "UNDO", 0, "UNDO", ""},
+    {ND_XR_DATA_CHANGED, "XR_DATA_CHANGED", 0, "XR_DATA_CHANGED", ""},
+    {ND_LIB_OVERRIDE_CHANGED, "LIB_OVERRIDE_CHANGED", 0, "LIB_OVERRIDE_CHANGED", ""},
+    {0, NULL, 0, NULL, NULL},
+};
+
+/* NC_SCREEN */
+static EnumPropertyItem rna_notifier_data_screen_items[] = {
+    {ND_LAYOUTBROWSE, "LAYOUTBROWSE", 0, "LAYOUTBROWSE", ""},
+    {ND_LAYOUTDELETE, "LAYOUTDELETE", 0, "LAYOUTDELETE", ""},
+    {ND_ANIMPLAY, "ANIMPLAY", 0, "ANIMPLAY", ""},
+    {ND_GPENCIL, "GPENCIL", 0, "GPENCIL", ""},
+    {ND_LAYOUTSET, "LAYOUTSET", 0, "LAYOUTSET", ""},
+    {ND_SKETCH, "SKETCH", 0, "SKETCH", ""},
+    {ND_WORKSPACE_SET, "WORKSPACE_SET", 0, "WORKSPACE_SET", ""},
+    {ND_WORKSPACE_DELETE, "WORKSPACE_DELETE", 0, "WORKSPACE_DELETE", ""},
+    {0, NULL, 0, NULL, NULL},
+};
+
+/* NC_SCENE Scene */
+static EnumPropertyItem rna_notifier_data_scene_items[] = {
+    {ND_SCENEBROWSE, "SCENEBROWSE", 0, "SCENEBROWSE", ""},
+    {ND_MARKERS, "MARKERS", 0, "MARKERS", ""},
+    {ND_FRAME, "FRAME", 0, "FRAME", ""},
+    {ND_RENDER_OPTIONS, "RENDER_OPTIONS", 0, "RENDER_OPTIONS", ""},
+    {ND_NODES, "NODES", 0, "NODES", ""},
+    {ND_SEQUENCER, "SEQUENCER", 0, "SEQUENCER", ""},
+    {ND_OB_ACTIVE, "OB_ACTIVE", 0, "OB_ACTIVE", ""},
+    {ND_OB_SELECT, "OB_SELECT", 0, "OB_SELECT", ""},
+    {ND_OB_VISIBLE, "OB_VISIBLE", 0, "OB_VISIBLE", ""},
+    {ND_OB_RENDER, "OB_RENDER", 0, "OB_RENDER", ""},
+    {ND_MODE, "MODE", 0, "MODE", ""},
+    {ND_RENDER_RESULT, "RENDER_RESULT", 0, "RENDER_RESULT", ""},
+    {ND_COMPO_RESULT, "COMPO_RESULT", 0, "COMPO_RESULT", ""},
+    {ND_KEYINGSET, "KEYINGSET", 0, "KEYINGSET", ""},
+    {ND_TOOLSETTINGS, "TOOLSETTINGS", 0, "TOOLSETTINGS", ""},
+    {ND_LAYER, "LAYER", 0, "LAYER", ""},
+    {ND_FRAME_RANGE, "FRAME_RANGE", 0, "FRAME_RANGE", ""},
+    {ND_TRANSFORM_DONE, "TRANSFORM_DONE", 0, "TRANSFORM_DONE", ""},
+    {ND_WORLD, "WORLD", 0, "WORLD", ""},
+    {ND_LAYER_CONTENT, "LAYER_CONTENT", 0, "LAYER_CONTENT", ""},
+    {0, NULL, 0, NULL, NULL},
+};
+
+/* NC_OBJECT Object */
+static EnumPropertyItem rna_notifier_data_object_items[] = {
+    {ND_TRANSFORM, "TRANSFORM", 0, "TRANSFORM", ""},
+    {ND_OB_SHADING, "OB_SHADING", 0, "OB_SHADING", ""},
+    {ND_POSE, "POSE", 0, "POSE", ""},
+    {ND_BONE_ACTIVE, "BONE_ACTIVE", 0, "BONE_ACTIVE", ""},
+    {ND_BONE_SELECT, "BONE_SELECT", 0, "BONE_SELECT", ""},
+    {ND_DRAW, "DRAW", 0, "DRAW", ""},
+    {ND_MODIFIER, "MODIFIER", 0, "MODIFIER", ""},
+    {ND_KEYS, "KEYS", 0, "KEYS", ""},
+    {ND_CONSTRAINT, "CONSTRAINT", 0, "CONSTRAINT", ""},
+    {ND_PARTICLE, "PARTICLE", 0, "PARTICLE", ""},
+    {ND_POINTCACHE, "POINTCACHE", 0, "POINTCACHE", ""},
+    {ND_PARENT, "PARENT", 0, "PARENT", ""},
+    {ND_LOD, "LOD", 0, "LOD", ""},
+    {ND_DRAW_RENDER_VIEWPORT, "DRAW_RENDER_VIEWPORT", 0, "DRAW_RENDER_VIEWPORT", ""},
+    {ND_SHADERFX, "SHADERFX", 0, "SHADERFX", ""},
+    {ND_DRAW_ANIMVIZ, "DRAW_ANIMVIZ", 0, "DRAW_ANIMVIZ", ""},
+    {0, NULL, 0, NULL, NULL},
+};
+
+/* NC_MATERIAL Material */
+static EnumPropertyItem rna_notifier_data_material_items[] = {
+    {ND_SHADING, "SHADING", 0, "SHADING", ""},
+    {ND_SHADING_DRAW, "SHADING_DRAW", 0, "SHADING_DRAW", ""},
+    {ND_SHADING_LINKS, "SHADING_LINKS", 0, "SHADING_LINKS", ""},
+    {ND_SHADING_PREVIEW, "SHADING_PREVIEW", 0, "SHADING_PREVIEW", ""},
+    {0, NULL, 0, NULL, NULL},
+};
+
+/* NC_LAMP Light */
+static EnumPropertyItem rna_notifier_data_light_items[] = {
+    {ND_LIGHTING, "LIGHTING", 0, "LIGHTING", ""},
+    {ND_LIGHTING_DRAW, "LIGHTING_DRAW", 0, "LIGHTING_DRAW", ""},
+    {0, NULL, 0, NULL, NULL},
+};
+
+/* NC_WORLD World */
+static EnumPropertyItem rna_notifier_data_world_items[] = {
+    {ND_WORLD_DRAW, "WORLD_DRAW", 0, "WORLD_DRAW", ""},
+    {0, NULL, 0, NULL, NULL},
+};
+
+/* NC_TEXT Text */
+static EnumPropertyItem rna_notifier_data_text_items[] = {
+    {ND_CURSOR, "CURSOR", 0, "CURSOR", ""},
+    {ND_DISPLAY, "DISPLAY", 0, "DISPLAY", ""},
+    {0, NULL, 0, NULL, NULL},
+};
+
+/* NC_ANIMATION Animato */
+static EnumPropertyItem rna_notifier_data_animation_items[] = {
+    {ND_KEYFRAME, "KEYFRAME", 0, "KEYFRAME", ""},
+    {ND_KEYFRAME_PROP, "KEYFRAME_PROP", 0, "KEYFRAME_PROP", ""},
+    {ND_ANIMCHAN, "ANIMCHAN", 0, "ANIMCHAN", ""},
+    {ND_NLA, "NLA", 0, "NLA", ""},
+    {ND_NLA_ACTCHANGE, "NLA_ACTCHANGE", 0, "NLA_ACTCHANGE", ""},
+    {ND_FCURVES_ORDER, "FCURVES_ORDER", 0, "FCURVES_ORDER", ""},
+    {ND_NLA_ORDER, "NLA_ORDER", 0, "NLA_ORDER", ""},
+    {0, NULL, 0, NULL, NULL},
+};
+
+/* NC_GPENCIL */
+static EnumPropertyItem rna_notifier_data_grease_pencil_items[] = {
+    {ND_GPENCIL_EDITMODE, "GPENCIL_EDITMODE", 0, "GPENCIL_EDITMODE", ""},
+    {0, NULL, 0, NULL, NULL},
+};
+
+/* NC_GEOM Geometry */
+static EnumPropertyItem rna_notifier_data_geometry_items[] = {
+    {ND_SELECT, "SELECT", 0, "SELECT", ""},
+    {ND_DATA, "DATA", 0, "DATA", ""},
+    {ND_VERTEX_GROUP, "VERTEX_GROUP", 0, "VERTEX_GROUP", ""},
+    {0, NULL, 0, NULL, NULL},
+};
+
+/* NC_SPACE */
+static EnumPropertyItem rna_notifier_data_space_items[] = {
+    {ND_SPACE_CONSOLE, "SPACE_CONSOLE", 0, "SPACE_CONSOLE", ""},
+    {ND_SPACE_INFO_REPORT, "SPACE_INFO_REPORT", 0, "SPACE_INFO_REPORT", ""},
+    {ND_SPACE_INFO, "SPACE_INFO", 0, "SPACE_INFO", ""},
+    {ND_SPACE_IMAGE, "SPACE_IMAGE", 0, "SPACE_IMAGE", ""},
+    {ND_SPACE_FILE_PARAMS, "SPACE_FILE_PARAMS", 0, "SPACE_FILE_PARAMS", ""},
+    {ND_SPACE_FILE_LIST, "SPACE_FILE_LIST", 0, "SPACE_FILE_LIST", ""},
+    {ND_SPACE_ASSET_PARAMS, "SPACE_ASSET_PARAMS", 0, "SPACE_ASSET_PARAMS", ""},
+    {ND_SPACE_NODE, "SPACE_NODE", 0, "SPACE_NODE", ""},
+    {ND_SPACE_OUTLINER, "SPACE_OUTLINER", 0, "SPACE_OUTLINER", ""},
+    {ND_SPACE_VIEW3D, "SPACE_VIEW3D", 0, "SPACE_VIEW3D", ""},
+    {ND_SPACE_PROPERTIES, "SPACE_PROPERTIES", 0, "SPACE_PROPERTIES", ""},
+    {ND_SPACE_TEXT, "SPACE_TEXT", 0, "SPACE_TEXT", ""},
+    {ND_SPACE_TIME, "SPACE_TIME", 0, "SPACE_TIME", ""},
+    {ND_SPACE_GRAPH, "SPACE_GRAPH", 0, "SPACE_GRAPH", ""},
+    {ND_SPACE_DOPESHEET, "SPACE_DOPESHEET", 0, "SPACE_DOPESHEET", ""},
+    {ND_SPACE_NLA, "SPACE_NLA", 0, "SPACE_NLA", ""},
+    {ND_SPACE_SEQUENCER, "SPACE_SEQUENCER", 0, "SPACE_SEQUENCER", ""},
+    {ND_SPACE_NODE_VIEW, "SPACE_NODE_VIEW", 0, "SPACE_NODE_VIEW", ""},
+    {ND_SPACE_CHANGED, "SPACE_CHANGED", 0, "SPACE_CHANGED", ""},
+    {ND_SPACE_CLIP, "SPACE_CLIP", 0, "SPACE_CLIP", ""},
+    {ND_SPACE_FILE_PREVIEW, "SPACE_FILE_PREVIEW", 0, "SPACE_FILE_PREVIEW", ""},
+    {ND_SPACE_SPREADSHEET, "SPACE_SPREADSHEET", 0, "SPACE_SPREADSHEET", ""},
+    {0, NULL, 0, NULL, NULL},
+};
+
+/* NC_ASSET */
+static EnumPropertyItem rna_notifier_data_asset_items[] = {
+    {ND_ASSET_LIST, "ASSET_LIST", 0, "ASSET_LIST", ""},
+    {ND_ASSET_LIST_PREVIEW, "ASSET_LIST_PREVIEW", 0, "ASSET_LIST_PREVIEW", ""},
+    {ND_ASSET_LIST_READING, "ASSET_LIST_READING", 0, "ASSET_LIST_READING", ""},
+    {ND_ASSET_CATALOGS, "ASSET_CATALOGS", 0, "ASSET_CATALOGS", ""},
+    {0, NULL, 0, NULL, NULL},
+};
+
+static const EnumPropertyItem *rna_Notifier_data_itemf(bContext *UNUSED(C),
+                                                       PointerRNA *ptr,
+                                                       PropertyRNA *UNUSED(prop),
+                                                       bool *UNUSED(r_free))
+{
+  wmNotifier *notifier = ptr->data;
+
+  switch (notifier->category) {
+    case NC_WM:
+      return rna_notifier_data_window_manager_items;
+    case NC_SCREEN:
+      return rna_notifier_data_screen_items;
+    case NC_SCENE:
+      return rna_notifier_data_scene_items;
+    case NC_OBJECT:
+      return rna_notifier_data_object_items;
+    case NC_MATERIAL:
+      return rna_notifier_data_material_items;
+    case NC_LAMP:
+      return rna_notifier_data_light_items;
+    case NC_WORLD:
+      return rna_notifier_data_world_items;
+    case NC_TEXT:
+      return rna_notifier_data_text_items;
+    case NC_ANIMATION:
+      return rna_notifier_data_animation_items;
+    case NC_GPENCIL:
+      return rna_notifier_data_grease_pencil_items;
+    case NC_GEOM:
+      return rna_notifier_data_geometry_items;
+    case NC_SPACE:
+      return rna_notifier_data_space_items;
+    case NC_ASSET:
+      return rna_notifier_data_asset_items;
+  }
+
+  return rna_notifier_data_items;
+}
 #else /* RNA_RUNTIME */
 
 /**
@@ -2837,6 +3056,93 @@ static void rna_def_keyconfig(BlenderRNA *brna)
   RNA_api_keymapitem(srna);
 }
 
+static void rna_def_notifier(BlenderRNA *brna)
+{
+  StructRNA *srna;
+  PropertyRNA *prop;
+
+  srna = RNA_def_struct(brna, "Notifier", NULL);
+  RNA_def_struct_sdna(srna, "wmNotifier");
+  RNA_def_struct_ui_text(srna, "Notifier", "");
+
+  static EnumPropertyItem rna_notifier_category_items[] = {
+      {NC_WM, "WM", 0, "Window Manager", ""},
+      {NC_WINDOW, "WINDOW", 0, "Window", ""},
+      {NC_WORKSPACE, "WORKSPACE", 0, "Workspace", ""},
+      {NC_SCREEN, "SCREEN", 0, "Screen", ""},
+      {NC_SCENE, "SCENE", 0, "Scene", ""},
+      {NC_OBJECT, "OBJECT", 0, "Object", ""},
+      {NC_MATERIAL, "MATERIAL", 0, "Material", ""},
+      {NC_TEXTURE, "TEXTURE", 0, "Texture", ""},
+      {NC_LAMP, "LAMP", 0, "Lamp", ""},
+      {NC_GROUP, "COLLECTION", 0, "Collection", ""},
+      {NC_IMAGE, "IMAGE", 0, "Image", ""},
+      {NC_BRUSH, "BRUSH", 0, "Brush", ""},
+      {NC_TEXT, "TEXT", 0, "Text", ""},
+      {NC_WORLD, "WORLD", 0, "World", ""},
+      {NC_ANIMATION, "ANIMATION", 0, "Animation", ""},
+      {NC_SPACE, "SPACE", 0, "Space", ""},
+      {NC_GEOM, "GEOM", 0, "Geometry", ""},
+      {NC_NODE, "NODE", 0, "Node", ""},
+      {NC_ID, "ID", 0, "ID", ""},
+      {NC_PAINTCURVE, "PAINT_CURVE", 0, "Paint Curve", ""},
+      {NC_MOVIECLIP, "MOVIE_CLIP", 0, "Movie Clip", ""},
+      {NC_MASK, "MASK", 0, "Mask", ""},
+      {NC_GPENCIL, "GREASE_PENCIL", 0, "Grease Pencil", ""},
+      {NC_LINESTYLE, "LINESTYLE", 0, "LineStyle", ""},
+      {NC_CAMERA, "CAMERA", 0, "Camera", ""},
+      {NC_LIGHTPROBE, "LIGHTPROBE", 0, "Light Probe", ""},
+      {NC_ASSET, "ASSET", 0, "Asset", ""},
+      {NC_VIEWER_PATH, "VIEWER_PATH", 0, "Viewer Path", ""},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  static EnumPropertyItem rna_notifier_subtype_items[] = {
+      {NS_MODE_OBJECT, "MODE_OBJECT", 0, "MODE_OBJECT", ""},
+      {NS_EDITMODE_MESH, "EDITMODE_MESH", 0, "EDITMODE_MESH", ""},
+      {NS_EDITMODE_CURVE, "EDITMODE_CURVE", 0, "EDITMODE_CURVE", ""},
+      {NS_EDITMODE_SURFACE, "EDITMODE_SURFACE", 0, "EDITMODE_SURFACE", ""},
+      {NS_EDITMODE_TEXT, "EDITMODE_TEXT", 0, "EDITMODE_TEXT", ""},
+      {NS_EDITMODE_MBALL, "EDITMODE_MBALL", 0, "EDITMODE_MBALL", ""},
+      {NS_EDITMODE_LATTICE, "EDITMODE_LATTICE", 0, "EDITMODE_LATTICE", ""},
+      {NS_EDITMODE_ARMATURE, "EDITMODE_ARMATURE", 0, "EDITMODE_ARMATURE", ""},
+      {NS_MODE_POSE, "MODE_POSE", 0, "MODE_POSE", ""},
+      {NS_MODE_PARTICLE, "MODE_PARTICLE", 0, "MODE_PARTICLE", ""},
+      {NS_EDITMODE_CURVES, "EDITMODE_CURVES", 0, "EDITMODE_CURVES", ""},
+      {NS_VIEW3D_GPU, "VIEW3D_GPU", 0, "VIEW3D_GPU", ""},
+      {NS_VIEW3D_SHADING, "VIEW3D_SHADING", 0, "VIEW3D_SHADING", ""},
+      {NS_LAYER_COLLECTION, "LAYER_COLLECTION", 0, "LAYER_COLLECTION", ""},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+  static EnumPropertyItem rna_notifier_action_items[] = {
+      {NA_EDITED, "EDITED", 0, "EDITED", ""},
+      {NA_EVALUATED, "EVALUATED", 0, "EVALUATED", ""},
+      {NA_ADDED, "ADDED", 0, "ADDED", ""},
+      {NA_REMOVED, "REMOVED", 0, "REMOVED", ""},
+      {NA_RENAME, "RENAME", 0, "RENAME", ""},
+      {NA_SELECTED, "SELECTED", 0, "SELECTED", ""},
+      {NA_ACTIVATED, "ACTIVATED", 0, "ACTIVATED", ""},
+      {NA_PAINTING, "PAINTING", 0, "PAINTING", ""},
+      {NA_JOB_FINISHED, "JOB_FINISHED", 0, "JOB_FINISHED", ""},
+      {0, NULL, 0, NULL, NULL},
+  };
+
+#  define NOTIFIER_PROPERTY(property_name, property_ui_name) \
+    prop = RNA_def_property(srna, #property_name, PROP_ENUM, PROP_NONE); \
+    RNA_def_property_clear_flag(prop, PROP_EDITABLE); \
+    RNA_def_property_enum_funcs(prop, "rna_Notifier_" #property_name "_get", NULL, NULL); \
+    RNA_def_property_enum_items(prop, rna_notifier_##property_name##_items); \
+    RNA_def_property_ui_text(prop, property_ui_name, "")
+
+  NOTIFIER_PROPERTY(category, "Category");
+  NOTIFIER_PROPERTY(subtype, "Subtype");
+  NOTIFIER_PROPERTY(action, "Action");
+
+  NOTIFIER_PROPERTY(data, "Data");
+  RNA_def_property_enum_funcs(prop, NULL, NULL, "rna_Notifier_data_itemf");
+}
+
 void RNA_def_wm(BlenderRNA *brna)
 {
   rna_def_operator(brna);
@@ -2854,6 +3160,7 @@ void RNA_def_wm(BlenderRNA *brna)
   rna_def_windowmanager(brna);
   rna_def_keyconfig_prefs(brna);
   rna_def_keyconfig(brna);
+  rna_def_notifier(brna);
 }
 
 #endif /* RNA_RUNTIME */

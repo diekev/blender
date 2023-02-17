@@ -3429,6 +3429,30 @@ static void rna_CustomSpaceType_init(const bContext *C)
   RNA_parameter_list_free(&list);
 }
 
+static void rna_CustomSpaceType_listener(const wmSpaceTypeListenerParams *params)
+{
+  /* We are called via params->area->type->listener, so this is valid, and we are the right type.
+   */
+  SpaceType *type = params->area->type;
+  PointerRNA ptr;
+  RNA_pointer_create(NULL, type->rna_ext.srna, NULL, &ptr);
+
+  // RNA_struct_find_function(&ptr, "listener");
+  extern FunctionRNA rna_Space_listener_func;
+  FunctionRNA *func = &rna_Space_listener_func;
+
+  ParameterList list;
+  RNA_parameter_list_create(&list, &ptr, func);
+  RNA_parameter_set_lookup(&list, "window", &params->window);
+  RNA_parameter_set_lookup(&list, "area", &params->area);
+  RNA_parameter_set_lookup(&list, "scene", &params->scene);
+  RNA_parameter_set_lookup(&list, "notifier", &params->notifier);
+
+  type->rna_ext.call(NULL, &ptr, func, &list);
+
+  RNA_parameter_list_free(&list);
+}
+
 /* Generic duplication callback for all custom space types. */
 static SpaceLink *rna_CustomSpaceType_duplicate(SpaceLink *sl)
 {
@@ -3598,7 +3622,7 @@ static StructRNA *rna_Space_register(Main *bmain,
   SpaceType *st, dummyst = {NULL};
   SpaceLink dummyspace = {NULL};
   PointerRNA dummystr;
-  int have_function[4];
+  int have_function[5];
 
   /* setup dummy space & space type to store static properties in */
   dummyspace.type = &dummyst;
@@ -3650,6 +3674,7 @@ static StructRNA *rna_Space_register(Main *bmain,
   st->editor_menus_idname = (have_function[1]) ? rna_CustomSpaceType_editor_menus_idname : NULL;
   st->search_filter_get = (have_function[2]) ? rna_CustomSpaceType_search_filter_get : NULL;
   st->init = (have_function[3]) ? rna_CustomSpaceType_init : NULL;
+  st->listener = (have_function[4]) ? rna_CustomSpaceType_listener : NULL;
 
   BKE_spacetype_register(bmain, st);
 
@@ -3891,6 +3916,27 @@ static void rna_def_space(BlenderRNA *brna)
   RNA_def_function_ui_description(func, "Initialize the Space during file load, or editor switch");
   RNA_def_function_flag(func, FUNC_REGISTER_OPTIONAL);
   parm = RNA_def_pointer(func, "context", "Context", "Context", "");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+
+  /* -------- Listener --------- */
+
+  func = RNA_def_function(srna, "listener", NULL);
+  RNA_def_function_ui_description(
+      func,
+      "Receive notifications from operations modifying the context. "
+      "This will be called for each area containing an instance of the space");
+  RNA_def_function_flag(func, FUNC_NO_SELF | FUNC_REGISTER_OPTIONAL);
+  parm = RNA_def_pointer(func, "window", "Window", "Window", "");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_pointer(func, "area", "Area", "Area", "The area being visited");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_pointer(func, "scene", "Scene", "Scene", "The current scene");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_pointer(func,
+                         "notifier",
+                         "Notifier",
+                         "Notifier",
+                         "The notification sent. It is perfectly normal to ignore it");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
 }
 
