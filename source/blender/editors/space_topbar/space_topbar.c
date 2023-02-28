@@ -70,7 +70,7 @@ static void topbar_free(SpaceLink *UNUSED(sl))
 }
 
 /* spacetype; init callback */
-static void topbar_init(const bContext *UNUSED(C))
+static void topbar_init(struct wmWindowManager *UNUSED(wm), ScrArea *UNUSED(area))
 {
 }
 

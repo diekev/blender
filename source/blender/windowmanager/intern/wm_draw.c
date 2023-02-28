@@ -1357,7 +1357,7 @@ void wm_draw_update(bContext *C)
       wm_window_make_drawable(wm, win);
 
       /* notifiers for screen redraw */
-      ED_screen_ensure_updated(C, wm, win, screen);
+      ED_screen_ensure_updated(wm, win, screen);
 
       wm_draw_window(C, win);
       wm_draw_update_clear_window(C, win);

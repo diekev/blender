@@ -294,10 +294,9 @@ static void clip_free(SpaceLink *sl)
 }
 
 /* spacetype; init callback */
-static void clip_init(const bContext *C)
+static void clip_init(struct wmWindowManager *UNUSED(wm), ScrArea *area)
 {
   ListBase *lb = WM_dropboxmap_find("Clip", SPACE_CLIP, 0);
-  ScrArea *area = CTX_wm_area(C);
 
   /* add drop boxes */
   WM_event_add_dropbox_handler(&area->handlers, lb);
@@ -714,7 +713,7 @@ static void clip_refresh(const bContext *C, ScrArea *area)
       C, region_channels, channels_visible, RGN_ALIGN_LEFT, false);
 
   if (view_changed) {
-    ED_area_init(C, wm, window, area);
+    ED_area_init(wm, window, area);
     ED_area_tag_redraw(area);
   }
 

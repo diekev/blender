@@ -3409,9 +3409,9 @@ static void rna_SpaceType_free(SpaceLink *UNUSED(sl))
 {
 }
 
-static void rna_CustomSpaceType_init(const bContext *C)
+static void rna_CustomSpaceType_init(struct wmWindowManager *wm, struct ScrArea *area)
 {
-  SpaceLink *sl = CTX_wm_space_data(C);
+  SpaceLink *sl = area->spacedata.first;
   SpaceType *type = sl->type;
   PointerRNA ptr;
   RNA_pointer_create(NULL, type->rna_ext.srna, (SpaceLink *)sl, &ptr);
@@ -3422,7 +3422,8 @@ static void rna_CustomSpaceType_init(const bContext *C)
 
   ParameterList list;
   RNA_parameter_list_create(&list, &ptr, func);
-  RNA_parameter_set_lookup(&list, "context", &C);
+  RNA_parameter_set_lookup(&list, "window_manager", &wm);
+  RNA_parameter_set_lookup(&list, "area", &area);
 
   type->rna_ext.call(NULL, &ptr, func, &list);
 
@@ -3916,7 +3917,9 @@ static void rna_def_space(BlenderRNA *brna)
   func = RNA_def_function(srna, "init", NULL);
   RNA_def_function_ui_description(func, "Initialize the Space during file load, or editor switch");
   RNA_def_function_flag(func, FUNC_REGISTER_OPTIONAL);
-  parm = RNA_def_pointer(func, "context", "Context", "Context", "");
+  parm = RNA_def_pointer(func, "window_manager", "WindowManager", "Window Manager", "");
+  RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+  parm = RNA_def_pointer(func, "area", "Area", "Area", "");
   RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
 
   /* -------- Listener --------- */

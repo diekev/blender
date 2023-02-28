@@ -136,13 +136,12 @@ static void graph_free(SpaceLink *sl)
 }
 
 /* spacetype; init callback */
-static void graph_init(const bContext *C)
+static void graph_init(struct wmWindowManager *wm, ScrArea *area)
 {
-  SpaceGraph *sipo = CTX_wm_space_graph(C);
+  SpaceGraph *sipo = (SpaceGraph *)area->spacedata.first;
 
   /* init dopesheet data if non-existent (i.e. for old files) */
   if (sipo->ads == NULL) {
-    wmWindowManager *wm = CTX_wm_manager(C);
     sipo->ads = MEM_callocN(sizeof(bDopeSheet), "GraphEdit DopeSheet");
     sipo->ads->source = (ID *)WM_window_get_active_scene(wm->winactive);
   }
@@ -152,7 +151,6 @@ static void graph_init(const bContext *C)
    * as this is run on each region resize; setting this here will cause selection
    * state to be lost on area/region resizing. #35744.
    */
-  ScrArea *area = CTX_wm_area(C);
   ED_area_tag_refresh(area);
 }
 

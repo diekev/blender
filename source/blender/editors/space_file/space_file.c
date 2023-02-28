@@ -171,9 +171,9 @@ static void file_free(SpaceLink *sl)
 }
 
 /* spacetype; init callback, area size changes, screen set, etc */
-static void file_init(const bContext *C)
+static void file_init(wmWindowManager *UNUSED(wm), ScrArea *area)
 {
-  SpaceFile *sfile = CTX_wm_space_file(C);
+  SpaceFile *sfile = (SpaceFile *)area->spacedata.first;
 
   if (sfile->layout) {
     sfile->layout->dirty = true;
@@ -290,7 +290,7 @@ static void file_ensure_valid_region_state(bContext *C,
   }
 
   if (needs_init) {
-    ED_area_init(C, wm, win, area);
+    ED_area_init(wm, win, area);
   }
 }
 

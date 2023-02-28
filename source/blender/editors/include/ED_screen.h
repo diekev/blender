@@ -202,10 +202,7 @@ int ED_area_header_switchbutton(const struct bContext *C, struct uiBlock *block,
 /**
  * Called in screen_refresh, or screens_init, also area size changes.
  */
-void ED_area_init(const struct bContext *C,
-                  struct wmWindowManager *wm,
-                  struct wmWindow *win,
-                  struct ScrArea *area);
+void ED_area_init(struct wmWindowManager *wm, struct wmWindow *win, struct ScrArea *area);
 void ED_area_exit(struct bContext *C, struct ScrArea *area);
 int ED_screen_area_active(const struct bContext *C);
 void ED_screen_global_areas_refresh(struct wmWindow *win);
@@ -286,7 +283,7 @@ ScrArea *ED_screen_areas_iter_next(const bScreen *screen, const ScrArea *area);
 /**
  * File read, set all screens, ....
  */
-void ED_screens_init(struct Main *bmain, const struct bContext *C, struct wmWindowManager *wm);
+void ED_screens_init(struct Main *bmain, struct wmWindowManager *wm);
 /**
  * Only for edge lines between areas.
  */
@@ -296,9 +293,8 @@ void ED_screen_draw_edges(struct wmWindow *win);
  * Make this screen usable.
  * for file read and first use, for scaling window, area moves.
  */
-void ED_screen_refresh(const struct bContext *C, struct wmWindowManager *wm, struct wmWindow *win);
-void ED_screen_ensure_updated(const struct bContext *C,
-                              struct wmWindowManager *wm,
+void ED_screen_refresh(struct wmWindowManager *wm, struct wmWindow *win);
+void ED_screen_ensure_updated(struct wmWindowManager *wm,
                               struct wmWindow *win,
                               struct bScreen *screen);
 void ED_screen_do_listen(struct bContext *C, const struct wmNotifier *note);

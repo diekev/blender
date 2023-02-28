@@ -87,7 +87,7 @@ static void console_free(SpaceLink *sl)
 }
 
 /* spacetype; init callback */
-static void console_init(const bContext *UNUSED(C))
+static void console_init(struct wmWindowManager *UNUSED(wm), ScrArea *UNUSED(area))
 {
 }
 

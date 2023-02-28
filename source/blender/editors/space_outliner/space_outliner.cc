@@ -365,9 +365,9 @@ static void outliner_free(SpaceLink *sl)
 }
 
 /* spacetype; init callback */
-static void outliner_init(const bContext *C)
+static void outliner_init(wmWindowManager * /*wm*/, ScrArea *area)
 {
-  SpaceOutliner *space_outliner = CTX_wm_space_outliner(C);
+  SpaceOutliner *space_outliner = static_cast<SpaceOutliner *>(area->spacedata.first);
 
   if (space_outliner->runtime == nullptr) {
     space_outliner->runtime = MEM_new<SpaceOutliner_Runtime>("SpaceOutliner_Runtime");

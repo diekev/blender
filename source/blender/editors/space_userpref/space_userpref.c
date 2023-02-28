@@ -84,7 +84,7 @@ static void userpref_free(SpaceLink *UNUSED(sl))
 }
 
 /* spacetype; init callback */
-static void userpref_init(const bContext *UNUSED(C))
+static void userpref_init(struct wmWindowManager *UNUSED(wm), ScrArea *UNUSED(area))
 {
 }
 

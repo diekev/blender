@@ -109,9 +109,9 @@ static void buttons_free(SpaceLink *sl)
 }
 
 /* spacetype; init callback */
-static void buttons_init(const bContext *C)
+static void buttons_init(struct wmWindowManager *UNUSED(wm), ScrArea *area)
 {
-  SpaceProperties *sbuts = CTX_wm_space_properties(C);
+  SpaceProperties *sbuts = (SpaceProperties *)area->spacedata.first;
 
   if (sbuts->runtime == NULL) {
     sbuts->runtime = MEM_mallocN(sizeof(SpaceProperties_Runtime), __func__);

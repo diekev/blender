@@ -171,9 +171,8 @@ static void image_free(SpaceLink *sl)
 }
 
 /* spacetype; init callback, add handlers */
-static void image_init(const bContext *C)
+static void image_init(struct wmWindowManager *UNUSED(wm), ScrArea *area)
 {
-  ScrArea *area = CTX_wm_area(C);
   ListBase *lb = WM_dropboxmap_find("Image", SPACE_IMAGE, 0);
 
   /* add drop boxes */

@@ -317,9 +317,9 @@ static void node_free(SpaceLink *sl)
 }
 
 /* spacetype; init callback */
-static void node_init(const bContext *C)
+static void node_init(wmWindowManager * /*wm*/, ScrArea *area)
 {
-  SpaceNode *snode = CTX_wm_space_node(C);
+  SpaceNode *snode = (SpaceNode *)area->spacedata.first;
 
   if (snode->runtime == nullptr) {
     snode->runtime = MEM_new<SpaceNode_Runtime>(__func__);

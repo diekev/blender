@@ -94,7 +94,7 @@ static void text_free(SpaceLink *sl)
 }
 
 /* spacetype; init callback */
-static void text_init(const bContext *UNUSED(C))
+static void text_init(struct wmWindowManager *UNUSED(wm), ScrArea *UNUSED(area))
 {
 }
 
