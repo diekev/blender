@@ -641,7 +641,7 @@ static void cloth_apply_vgroup(ClothModifierData *clmd, Mesh *mesh)
           if (dvert->dw[j].def_nr == (clmd->sim_parms->vgroup_mass - 1)) {
             verts->goal = dvert->dw[j].weight;
 
-            /* goalfac= 1.0f; */ /* UNUSED */
+            // goalfac = 1.0f; /* UNUSED */
 
             /* Kicking goal factor to simplify things...who uses that anyway? */
             // ABS (clmd->sim_parms->maxgoal - clmd->sim_parms->mingoal);
@@ -1185,7 +1185,7 @@ static Mesh *cloth_make_rest_mesh(ClothModifierData *clmd, Mesh *mesh)
   for (const int i : positions.index_range()) {
     positions[i] = verts[i].xrest;
   }
-  BKE_mesh_tag_coords_changed(new_mesh);
+  BKE_mesh_tag_positions_changed(new_mesh);
 
   return new_mesh;
 }
@@ -1531,7 +1531,7 @@ static bool cloth_build_springs(ClothModifierData *clmd, Mesh *mesh)
     BKE_bvhtree_from_mesh_get(&treedata, tmp_mesh ? tmp_mesh : mesh, BVHTREE_FROM_LOOPTRI, 2);
     rng = BLI_rng_new_srandom(0);
 
-    const float(*vert_normals)[3] = BKE_mesh_vertex_normals_ensure(tmp_mesh ? tmp_mesh : mesh);
+    const float(*vert_normals)[3] = BKE_mesh_vert_normals_ensure(tmp_mesh ? tmp_mesh : mesh);
 
     for (int i = 0; i < mvert_num; i++) {
       if (find_internal_spring_target_vertex(
@@ -1779,7 +1779,7 @@ static bool cloth_build_springs(ClothModifierData *clmd, Mesh *mesh)
           index2 = ((tspring->ij == tspring2->kl) ? (tspring->kl) : (tspring->ij));
 
           /* Check for existing spring. */
-          /* Check also if startpoint is equal to endpoint. */
+          /* Check also if start-point is equal to endpoint. */
           if ((index2 != tspring2->ij) && !BLI_edgeset_haskey(edgeset, tspring2->ij, index2)) {
             spring = (ClothSpring *)MEM_callocN(sizeof(ClothSpring), "cloth spring");
 
@@ -1889,7 +1889,8 @@ static bool cloth_build_springs(ClothModifierData *clmd, Mesh *mesh)
 
   /* NOTE: the edges may already exist so run reinsert. */
 
-  /* insert other near springs in edgeset AFTER bending springs are calculated (for selfcolls) */
+  /* Insert other near springs in `edgeset` AFTER bending springs are calculated
+   * (for self-collision). */
   for (int i = 0; i < numedges; i++) { /* struct springs */
     BLI_edgeset_add(edgeset, edges[i].v1, edges[i].v2);
   }
