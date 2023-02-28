@@ -835,7 +835,7 @@ static StructRNA *rna_GizmoGroup_register(Main *bmain,
   bool have_function[6];
 
   /* setup dummy gizmogroup & gizmogroup type to store static properties in */
-  dummy_gizmo_group.type = &dummywgt;
+  dummy_gizmo_group.type = &dummy_wgt;
   dummy_wgt.name = temp_buffers.name;
   dummy_wgt.idname = temp_buffers.idname;
   dummy_wgt.gzmap_params.spaceid = temp_buffers.space_idname;

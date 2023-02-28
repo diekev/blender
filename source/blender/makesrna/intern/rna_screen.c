@@ -764,17 +764,17 @@ static StructRNA *rna_Region_refine(PointerRNA *ptr)
   return (region->type && region->type->rna_ext.srna) ? region->type->rna_ext.srna : &RNA_Region;
 }
 
-static void rna_Region_unregister(Main *bmain, StructRNA *type)
+static bool rna_Region_unregister(Main *bmain, StructRNA *type)
 {
   ARegionType *art = RNA_struct_blender_type_get(type);
 
   if (!art) {
-    return;
+    return false;
   }
 
   SpaceType *st = BKE_spacetype_from_idname(art->space_type);
   if (!st) {
-    return;
+    return false;
   }
 
   RNA_struct_free_extension(type, &art->rna_ext);
@@ -784,6 +784,7 @@ static void rna_Region_unregister(Main *bmain, StructRNA *type)
 
   /* update while blender is running */
   WM_main_add_notifier(NC_WINDOW, NULL);
+  return true;
 }
 
 static void region_properties_draw(const bContext *C, ARegion *region)
@@ -868,7 +869,7 @@ static StructRNA *rna_Region_register(Main *bmain,
   ARegionType dummyart = {NULL};
   ARegion dummyregion = {NULL};
   PointerRNA dummyptr;
-  int have_function[4];
+  bool have_function[4];
 
   /* setup dummy region & region type to store static properties in */
   dummyregion.type = &dummyart;

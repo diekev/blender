@@ -3549,12 +3549,12 @@ static const char *rna_CustomSpaceType_search_filter_get(const struct SpaceLink 
   return str_ret;
 }
 
-static void rna_Space_unregister(Main *bmain, StructRNA *type)
+static bool rna_Space_unregister(Main *bmain, StructRNA *type)
 {
   SpaceType *st = RNA_struct_blender_type_get(type);
 
   if (!st) {
-    return;
+    return false;
   }
 
   RNA_struct_free_extension(type, &st->rna_ext);
@@ -3564,6 +3564,7 @@ static void rna_Space_unregister(Main *bmain, StructRNA *type)
 
   /* update while blender is running */
   WM_main_add_notifier(NC_WINDOW, NULL);
+  return true;
 }
 
 /* This is based on #rna_def_space_generic_show_region_toggles. */
@@ -3622,7 +3623,7 @@ static StructRNA *rna_Space_register(Main *bmain,
   SpaceType *st, dummyst = {NULL};
   SpaceLink dummyspace = {NULL};
   PointerRNA dummystr;
-  int have_function[5];
+  bool have_function[5];
 
   /* setup dummy space & space type to store static properties in */
   dummyspace.type = &dummyst;
