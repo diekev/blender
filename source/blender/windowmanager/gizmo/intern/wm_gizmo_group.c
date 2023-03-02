@@ -23,6 +23,7 @@
 #include "BKE_context.h"
 #include "BKE_main.h"
 #include "BKE_report.h"
+#include "BKE_screen.h"
 #include "BKE_workspace.h"
 
 #include "RNA_access.h"
@@ -846,7 +847,7 @@ wmKeyMap *WM_gizmogroup_setup_keymap_generic_select(const wmGizmoGroupType *UNUS
                                                     wmKeyConfig *kc)
 {
   struct wmGizmoMapType_Params params = {
-      .spaceid = "EMPTY",
+      .spaceid = SPACE_EMPTY_IDNAME,
       .regionid = RGN_TYPE_WINDOW,
   };
   return WM_gizmogroup_keymap_template_select_ex(kc, "Generic Gizmo Select", &params);

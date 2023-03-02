@@ -25,6 +25,7 @@
 #include "BKE_paint.h"
 #include "BKE_pointcache.h"
 #include "BKE_scene.h"
+#include "BKE_screen.h"
 #include "BLI_array_utils.h"
 
 #include "WM_api.h"
@@ -2168,7 +2169,7 @@ void VIEW3D_GGT_xform_gizmo(wmGizmoGroupType *gzgt)
   gzgt->flag = WM_GIZMOGROUPTYPE_3D | WM_GIZMOGROUPTYPE_TOOL_FALLBACK_KEYMAP |
                WM_GIZMOGROUPTYPE_DELAY_REFRESH_FOR_TWEAK;
 
-  gzgt->gzmap_params.spaceid = "VIEW_3D";
+  gzgt->gzmap_params.spaceid = SPACE_VIEW3D_IDNAME;
   gzgt->gzmap_params.regionid = RGN_TYPE_WINDOW;
 
   gzgt->poll = WIDGETGROUP_gizmo_poll_tool;

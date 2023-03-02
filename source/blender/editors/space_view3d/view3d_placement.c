@@ -12,6 +12,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "BKE_context.h"
+#include "BKE_screen.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -1544,7 +1545,7 @@ void VIEW3D_GGT_placement(wmGizmoGroupType *gzgt)
 
   gzgt->flag |= WM_GIZMOGROUPTYPE_3D | WM_GIZMOGROUPTYPE_SCALE | WM_GIZMOGROUPTYPE_DRAW_MODAL_ALL;
 
-  gzgt->gzmap_params.spaceid = "VIEW_3D";
+  gzgt->gzmap_params.spaceid = SPACE_VIEW3D_IDNAME;
   gzgt->gzmap_params.regionid = RGN_TYPE_WINDOW;
 
   gzgt->poll = ED_gizmo_poll_or_unlink_delayed_from_tool;

@@ -728,7 +728,7 @@ static void CLIP_GGT_navigate(wmGizmoGroupType *gzgt)
 static void clip_gizmos(void)
 {
   wmGizmoMapType *gzmap_type = WM_gizmomaptype_ensure(
-      &(const struct wmGizmoMapType_Params){"CLIP_EDITOR", RGN_TYPE_WINDOW});
+      &(const struct wmGizmoMapType_Params){SPACE_CLIP_IDNAME, RGN_TYPE_WINDOW});
 
   WM_gizmogrouptype_append_and_link(gzmap_type, CLIP_GGT_navigate);
 }

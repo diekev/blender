@@ -168,7 +168,7 @@ wmKeyMap *WM_keymap_guess_from_context(const bContext *C)
     return NULL;
   }
 
-  wmKeyMap *km = WM_keymap_find_all(CTX_wm_manager(C), km_id, "EMPTY", 0);
+  wmKeyMap *km = WM_keymap_find_all(CTX_wm_manager(C), km_id, SPACE_EMPTY_IDNAME, 0);
   BLI_assert(km);
   return km;
 }
@@ -199,25 +199,25 @@ wmKeyMap *WM_keymap_guess_opname(const bContext *C, const char *opname)
     }
 
     if (km == NULL) {
-      km = WM_keymap_find_all(wm, "Window", "EMPTY", 0);
+      km = WM_keymap_find_all(wm, "Window", SPACE_EMPTY_IDNAME, 0);
     }
   }
   /* Screen & Render */
   else if (STRPREFIX(opname, "SCREEN_OT") || STRPREFIX(opname, "RENDER_OT") ||
            STRPREFIX(opname, "SOUND_OT") || STRPREFIX(opname, "SCENE_OT")) {
-    km = WM_keymap_find_all(wm, "Screen", "EMPTY", 0);
+    km = WM_keymap_find_all(wm, "Screen", SPACE_EMPTY_IDNAME, 0);
   }
   /* Grease Pencil */
   else if (STRPREFIX(opname, "GPENCIL_OT")) {
-    km = WM_keymap_find_all(wm, "Grease Pencil", "EMPTY", 0);
+    km = WM_keymap_find_all(wm, "Grease Pencil", SPACE_EMPTY_IDNAME, 0);
   }
   /* Markers */
   else if (STRPREFIX(opname, "MARKER_OT")) {
-    km = WM_keymap_find_all(wm, "Markers", "EMPTY", 0);
+    km = WM_keymap_find_all(wm, "Markers", SPACE_EMPTY_IDNAME, 0);
   }
   /* Import/Export */
   else if (STRPREFIX(opname, "IMPORT_") || STRPREFIX(opname, "EXPORT_")) {
-    km = WM_keymap_find_all(wm, "Window", "EMPTY", 0);
+    km = WM_keymap_find_all(wm, "Window", SPACE_EMPTY_IDNAME, 0);
   }
 
   /* 3D View */
@@ -227,91 +227,92 @@ wmKeyMap *WM_keymap_guess_opname(const bContext *C, const char *opname)
   else if (STRPREFIX(opname, "OBJECT_OT")) {
     /* exception, this needs to work outside object mode too */
     if (STRPREFIX(opname, "OBJECT_OT_mode_set")) {
-      km = WM_keymap_find_all(wm, "Object Non-modal", "EMPTY", 0);
+      km = WM_keymap_find_all(wm, "Object Non-modal", SPACE_EMPTY_IDNAME, 0);
     }
     else {
-      km = WM_keymap_find_all(wm, "Object Mode", "EMPTY", 0);
+      km = WM_keymap_find_all(wm, "Object Mode", SPACE_EMPTY_IDNAME, 0);
     }
   }
   /* Object mode related */
   else if (STRPREFIX(opname, "GROUP_OT") || STRPREFIX(opname, "MATERIAL_OT") ||
            STRPREFIX(opname, "PTCACHE_OT") || STRPREFIX(opname, "RIGIDBODY_OT")) {
-    km = WM_keymap_find_all(wm, "Object Mode", "EMPTY", 0);
+    km = WM_keymap_find_all(wm, "Object Mode", SPACE_EMPTY_IDNAME, 0);
   }
 
   /* Editing Modes */
   else if (STRPREFIX(opname, "MESH_OT")) {
-    km = WM_keymap_find_all(wm, "Mesh", "EMPTY", 0);
+    km = WM_keymap_find_all(wm, "Mesh", SPACE_EMPTY_IDNAME, 0);
 
     /* some mesh operators are active in object mode too, like add-prim */
     if (km && !WM_keymap_poll((bContext *)C, km)) {
-      km = WM_keymap_find_all(wm, "Object Mode", "EMPTY", 0);
+      km = WM_keymap_find_all(wm, "Object Mode", SPACE_EMPTY_IDNAME, 0);
     }
   }
   else if (STRPREFIX(opname, "CURVE_OT") || STRPREFIX(opname, "SURFACE_OT")) {
-    km = WM_keymap_find_all(wm, "Curve", "EMPTY", 0);
+    km = WM_keymap_find_all(wm, "Curve", SPACE_EMPTY_IDNAME, 0);
 
     /* some curve operators are active in object mode too, like add-prim */
     if (km && !WM_keymap_poll((bContext *)C, km)) {
-      km = WM_keymap_find_all(wm, "Object Mode", "EMPTY", 0);
+      km = WM_keymap_find_all(wm, "Object Mode", SPACE_EMPTY_IDNAME, 0);
     }
   }
   else if (STRPREFIX(opname, "ARMATURE_OT") || STRPREFIX(opname, "SKETCH_OT")) {
-    km = WM_keymap_find_all(wm, "Armature", "EMPTY", 0);
+    km = WM_keymap_find_all(wm, "Armature", SPACE_EMPTY_IDNAME, 0);
   }
   else if (STRPREFIX(opname, "POSE_OT") || STRPREFIX(opname, "POSELIB_OT")) {
-    km = WM_keymap_find_all(wm, "Pose", "EMPTY", 0);
+    km = WM_keymap_find_all(wm, "Pose", SPACE_EMPTY_IDNAME, 0);
   }
   else if (STRPREFIX(opname, "SCULPT_OT")) {
     switch (CTX_data_mode_enum(C)) {
       case CTX_MODE_SCULPT:
-        km = WM_keymap_find_all(wm, "Sculpt", "EMPTY", 0);
+        km = WM_keymap_find_all(wm, "Sculpt", SPACE_EMPTY_IDNAME, 0);
         break;
       default:
         break;
     }
   }
   else if (STRPREFIX(opname, "CURVES_OT")) {
-    km = WM_keymap_find_all(wm, "Curves", "EMPTY", 0);
+    km = WM_keymap_find_all(wm, "Curves", SPACE_EMPTY_IDNAME, 0);
   }
   else if (STRPREFIX(opname, "SCULPT_CURVES_OT")) {
-    km = WM_keymap_find_all(wm, "Sculpt Curves", "EMPTY", 0);
+    km = WM_keymap_find_all(wm, "Sculpt Curves", SPACE_EMPTY_IDNAME, 0);
   }
   else if (STRPREFIX(opname, "MBALL_OT")) {
-    km = WM_keymap_find_all(wm, "Metaball", "EMPTY", 0);
+    km = WM_keymap_find_all(wm, "Metaball", SPACE_EMPTY_IDNAME, 0);
 
     /* some mball operators are active in object mode too, like add-prim */
     if (km && !WM_keymap_poll((bContext *)C, km)) {
-      km = WM_keymap_find_all(wm, "Object Mode", "EMPTY", 0);
+      km = WM_keymap_find_all(wm, "Object Mode", SPACE_EMPTY_IDNAME, 0);
     }
   }
   else if (STRPREFIX(opname, "LATTICE_OT")) {
-    km = WM_keymap_find_all(wm, "Lattice", "EMPTY", 0);
+    km = WM_keymap_find_all(wm, "Lattice", SPACE_EMPTY_IDNAME, 0);
   }
   else if (STRPREFIX(opname, "PARTICLE_OT")) {
-    km = WM_keymap_find_all(wm, "Particle", "EMPTY", 0);
+    km = WM_keymap_find_all(wm, "Particle", SPACE_EMPTY_IDNAME, 0);
   }
   else if (STRPREFIX(opname, "FONT_OT")) {
-    km = WM_keymap_find_all(wm, "Font", "EMPTY", 0);
+    km = WM_keymap_find_all(wm, "Font", SPACE_EMPTY_IDNAME, 0);
   }
   /* Paint Face Mask */
   else if (STRPREFIX(opname, "PAINT_OT_face_select")) {
-    km = WM_keymap_find_all(wm, "Paint Face Mask (Weight, Vertex, Texture)", "EMPTY", 0);
+    km = WM_keymap_find_all(
+        wm, "Paint Face Mask (Weight, Vertex, Texture)", SPACE_EMPTY_IDNAME, 0);
   }
   else if (STRPREFIX(opname, "PAINT_OT")) {
     /* check for relevant mode */
     switch (CTX_data_mode_enum(C)) {
       case CTX_MODE_PAINT_WEIGHT:
-        km = WM_keymap_find_all(wm, "Weight Paint", "EMPTY", 0);
+        km = WM_keymap_find_all(wm, "Weight Paint", SPACE_EMPTY_IDNAME, 0);
         break;
       case CTX_MODE_PAINT_VERTEX:
-        km = WM_keymap_find_all(wm, "Vertex Paint", "EMPTY", 0);
+        km = WM_keymap_find_all(wm, "Vertex Paint", SPACE_EMPTY_IDNAME, 0);
         break;
       case CTX_MODE_PAINT_TEXTURE:
-        km = WM_keymap_find_all(wm, "Image Paint", "EMPTY", 0);
+        km = WM_keymap_find_all(wm, "Image Paint", SPACE_EMPTY_IDNAME, 0);
         break;
       case CTX_MODE_SCULPT:
-        km = WM_keymap_find_all(wm, "Sculpt", "EMPTY", 0);
+        km = WM_keymap_find_all(wm, "Sculpt", SPACE_EMPTY_IDNAME, 0);
         break;
       default:
         break;
@@ -319,7 +320,7 @@ wmKeyMap *WM_keymap_guess_opname(const bContext *C, const char *opname)
   }
   /* General 2D View, not bound to a specific spacetype. */
   else if (STRPREFIX(opname, "VIEW2D_OT")) {
-    km = WM_keymap_find_all(wm, "View2D", "EMPTY", 0);
+    km = WM_keymap_find_all(wm, "View2D", SPACE_EMPTY_IDNAME, 0);
   }
   /* Image Editor */
   else if (STRPREFIX(opname, "IMAGE_OT")) {
@@ -330,20 +331,20 @@ wmKeyMap *WM_keymap_guess_opname(const bContext *C, const char *opname)
     km = WM_keymap_find_all(wm, "Clip", sl->type->idname, 0);
   }
   else if (STRPREFIX(opname, "MASK_OT")) {
-    km = WM_keymap_find_all(wm, "Mask Editing", "EMPTY", 0);
+    km = WM_keymap_find_all(wm, "Mask Editing", SPACE_EMPTY_IDNAME, 0);
   }
   /* UV Editor */
   else if (STRPREFIX(opname, "UV_OT")) {
     /* Hack to allow using UV unwrapping ops from 3DView/editmode.
      * Mesh keymap is probably not ideal, but best place I could find to put those. */
     if (sl->spacetype == SPACE_VIEW3D) {
-      km = WM_keymap_find_all(wm, "Mesh", "EMPTY", 0);
+      km = WM_keymap_find_all(wm, "Mesh", SPACE_EMPTY_IDNAME, 0);
       if (km && !WM_keymap_poll((bContext *)C, km)) {
         km = NULL;
       }
     }
     if (!km) {
-      km = WM_keymap_find_all(wm, "UV Editor", "EMPTY", 0);
+      km = WM_keymap_find_all(wm, "UV Editor", SPACE_EMPTY_IDNAME, 0);
     }
   }
   /* Node Editor */
@@ -352,17 +353,17 @@ wmKeyMap *WM_keymap_guess_opname(const bContext *C, const char *opname)
   }
   /* Animation Editor Channels */
   else if (STRPREFIX(opname, "ANIM_OT_channels")) {
-    km = WM_keymap_find_all(wm, "Animation Channels", "EMPTY", 0);
+    km = WM_keymap_find_all(wm, "Animation Channels", SPACE_EMPTY_IDNAME, 0);
   }
   /* Animation Generic - after channels */
   else if (STRPREFIX(opname, "ANIM_OT")) {
     if (sl->spacetype == SPACE_VIEW3D) {
       switch (CTX_data_mode_enum(C)) {
         case CTX_MODE_OBJECT:
-          km = WM_keymap_find_all(wm, "Object Mode", "EMPTY", 0);
+          km = WM_keymap_find_all(wm, "Object Mode", SPACE_EMPTY_IDNAME, 0);
           break;
         case CTX_MODE_POSE:
-          km = WM_keymap_find_all(wm, "Pose", "EMPTY", 0);
+          km = WM_keymap_find_all(wm, "Pose", SPACE_EMPTY_IDNAME, 0);
           break;
         default:
           break;
@@ -373,7 +374,7 @@ wmKeyMap *WM_keymap_guess_opname(const bContext *C, const char *opname)
     }
 
     if (!km) {
-      km = WM_keymap_find_all(wm, "Animation", "EMPTY", 0);
+      km = WM_keymap_find_all(wm, "Animation", SPACE_EMPTY_IDNAME, 0);
     }
   }
   /* Graph Editor */
@@ -437,7 +438,7 @@ wmKeyMap *WM_keymap_guess_opname(const bContext *C, const char *opname)
         km = WM_keymap_find_all(wm, "NLA Editor", sl->type->idname, 0);
         break;
       case SPACE_IMAGE:
-        km = WM_keymap_find_all(wm, "UV Editor", "EMPTY", 0);
+        km = WM_keymap_find_all(wm, "UV Editor", SPACE_EMPTY_IDNAME, 0);
         break;
       case SPACE_NODE:
         km = WM_keymap_find_all(wm, "Node Editor", sl->type->idname, 0);

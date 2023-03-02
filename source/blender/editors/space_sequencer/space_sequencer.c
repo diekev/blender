@@ -441,7 +441,7 @@ static void SEQUENCER_GGT_gizmo2d(wmGizmoGroupType *gzgt)
   gzgt->flag |= (WM_GIZMOGROUPTYPE_TOOL_FALLBACK_KEYMAP |
                  WM_GIZMOGROUPTYPE_DELAY_REFRESH_FOR_TWEAK);
 
-  gzgt->gzmap_params.spaceid = "SEQUENCE_EDITOR";
+  gzgt->gzmap_params.spaceid = SPACE_SEQ_IDNAME;
   gzgt->gzmap_params.regionid = RGN_TYPE_PREVIEW;
 
   ED_widgetgroup_gizmo2d_xform_callbacks_set(gzgt);
@@ -455,7 +455,7 @@ static void SEQUENCER_GGT_gizmo2d_translate(wmGizmoGroupType *gzgt)
   gzgt->flag |= (WM_GIZMOGROUPTYPE_TOOL_FALLBACK_KEYMAP |
                  WM_GIZMOGROUPTYPE_DELAY_REFRESH_FOR_TWEAK);
 
-  gzgt->gzmap_params.spaceid = "SEQUENCE_EDITOR";
+  gzgt->gzmap_params.spaceid = SPACE_SEQ_IDNAME;
   gzgt->gzmap_params.regionid = RGN_TYPE_PREVIEW;
 
   ED_widgetgroup_gizmo2d_xform_no_cage_callbacks_set(gzgt);
@@ -469,7 +469,7 @@ static void SEQUENCER_GGT_gizmo2d_resize(wmGizmoGroupType *gzgt)
   gzgt->flag |= (WM_GIZMOGROUPTYPE_TOOL_FALLBACK_KEYMAP |
                  WM_GIZMOGROUPTYPE_DELAY_REFRESH_FOR_TWEAK);
 
-  gzgt->gzmap_params.spaceid = "SEQUENCE_EDITOR";
+  gzgt->gzmap_params.spaceid = SPACE_SEQ_IDNAME;
   gzgt->gzmap_params.regionid = RGN_TYPE_PREVIEW;
 
   ED_widgetgroup_gizmo2d_resize_callbacks_set(gzgt);
@@ -483,7 +483,7 @@ static void SEQUENCER_GGT_gizmo2d_rotate(wmGizmoGroupType *gzgt)
   gzgt->flag |= (WM_GIZMOGROUPTYPE_TOOL_FALLBACK_KEYMAP |
                  WM_GIZMOGROUPTYPE_DELAY_REFRESH_FOR_TWEAK);
 
-  gzgt->gzmap_params.spaceid = "SEQUENCE_EDITOR";
+  gzgt->gzmap_params.spaceid = SPACE_SEQ_IDNAME;
   gzgt->gzmap_params.regionid = RGN_TYPE_PREVIEW;
 
   ED_widgetgroup_gizmo2d_rotate_callbacks_set(gzgt);
@@ -492,7 +492,7 @@ static void SEQUENCER_GGT_gizmo2d_rotate(wmGizmoGroupType *gzgt)
 static void sequencer_gizmos(void)
 {
   wmGizmoMapType *gzmap_type = WM_gizmomaptype_ensure(
-      &(const struct wmGizmoMapType_Params){"SEQUENCE_EDITOR", RGN_TYPE_PREVIEW});
+      &(const struct wmGizmoMapType_Params){SPACE_SEQ_IDNAME, RGN_TYPE_PREVIEW});
 
   WM_gizmotype_append(GIZMO_GT_retime_handle_add);
   WM_gizmotype_append(GIZMO_GT_retime_handle);

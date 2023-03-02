@@ -11,6 +11,7 @@
 #include "DNA_space_types.h"
 
 #include "BKE_context.h"
+#include "BKE_screen.h"
 
 #include "BLI_span.hh"
 
@@ -98,7 +99,7 @@ void SEQUENCER_GGT_gizmo_retime(wmGizmoGroupType *gzgt)
 
   gzgt->flag = WM_GIZMOGROUPTYPE_DRAW_MODAL_ALL;
 
-  gzgt->gzmap_params.spaceid = "SEQUENCE_EDITOR";
+  gzgt->gzmap_params.spaceid = SPACE_SEQ_IDNAME;
   gzgt->gzmap_params.regionid = RGN_TYPE_WINDOW;
 
   gzgt->poll = gizmogroup_retime_poll;

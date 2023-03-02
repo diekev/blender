@@ -17,6 +17,8 @@
 
 #include "DNA_screen_types.h"
 
+#include "BKE_screen.h"
+
 #include "UI_interface.h"
 #include "UI_interface_icons.h"
 #include "UI_resources.h"
@@ -1284,7 +1286,7 @@ void RNA_api_ui_layout(StructRNA *srna)
 
   func = RNA_def_function(srna, "popover_group", "rna_uiItemPopoverPanelFromGroup");
   RNA_def_function_flag(func, FUNC_USE_CONTEXT);
-  parm = RNA_def_string(func, "space_type", "EMPTY", 64, "Space Type", "");
+  parm = RNA_def_string(func, "space_type", SPACE_EMPTY_IDNAME, 64, "Space Type", "");
   RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
   parm = RNA_def_enum(
       func, "region_type", rna_enum_region_type_items, RGN_TYPE_WINDOW, "Region Type", "");

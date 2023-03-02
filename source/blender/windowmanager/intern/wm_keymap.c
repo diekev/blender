@@ -863,7 +863,7 @@ wmKeyMap *WM_keymap_list_find_spaceid_or_empty(ListBase *lb,
 {
   LISTBASE_FOREACH (wmKeyMap *, km, lb) {
     if ((STREQLEN(km->space_idname, space_idname, BKE_ST_MAXNAME) ||
-         STREQLEN(km->space_idname, "EMPTY", BKE_ST_MAXNAME)) &&
+         STREQLEN(km->space_idname, SPACE_EMPTY_IDNAME, BKE_ST_MAXNAME)) &&
         km->regionid == regionid) {
       if (STREQLEN(idname, km->idname, KMAP_MAX_NAME)) {
         return km;

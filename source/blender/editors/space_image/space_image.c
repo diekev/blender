@@ -471,7 +471,7 @@ static void IMAGE_GGT_gizmo2d(wmGizmoGroupType *gzgt)
   gzgt->flag |= (WM_GIZMOGROUPTYPE_DRAW_MODAL_EXCLUDE | WM_GIZMOGROUPTYPE_TOOL_FALLBACK_KEYMAP |
                  WM_GIZMOGROUPTYPE_DELAY_REFRESH_FOR_TWEAK);
 
-  gzgt->gzmap_params.spaceid = "IMAGE_EDITOR";
+  gzgt->gzmap_params.spaceid = SPACE_IMAGE_IDNAME;
   gzgt->gzmap_params.regionid = RGN_TYPE_WINDOW;
 
   ED_widgetgroup_gizmo2d_xform_callbacks_set(gzgt);
@@ -485,7 +485,7 @@ static void IMAGE_GGT_gizmo2d_translate(wmGizmoGroupType *gzgt)
   gzgt->flag |= (WM_GIZMOGROUPTYPE_DRAW_MODAL_EXCLUDE | WM_GIZMOGROUPTYPE_TOOL_FALLBACK_KEYMAP |
                  WM_GIZMOGROUPTYPE_DELAY_REFRESH_FOR_TWEAK);
 
-  gzgt->gzmap_params.spaceid = "IMAGE_EDITOR";
+  gzgt->gzmap_params.spaceid = SPACE_IMAGE_IDNAME;
   gzgt->gzmap_params.regionid = RGN_TYPE_WINDOW;
 
   ED_widgetgroup_gizmo2d_xform_no_cage_callbacks_set(gzgt);
@@ -499,7 +499,7 @@ static void IMAGE_GGT_gizmo2d_resize(wmGizmoGroupType *gzgt)
   gzgt->flag |= (WM_GIZMOGROUPTYPE_DRAW_MODAL_EXCLUDE | WM_GIZMOGROUPTYPE_TOOL_FALLBACK_KEYMAP |
                  WM_GIZMOGROUPTYPE_DELAY_REFRESH_FOR_TWEAK);
 
-  gzgt->gzmap_params.spaceid = "IMAGE_EDITOR";
+  gzgt->gzmap_params.spaceid = SPACE_IMAGE_IDNAME;
   gzgt->gzmap_params.regionid = RGN_TYPE_WINDOW;
 
   ED_widgetgroup_gizmo2d_resize_callbacks_set(gzgt);
@@ -513,7 +513,7 @@ static void IMAGE_GGT_gizmo2d_rotate(wmGizmoGroupType *gzgt)
   gzgt->flag |= (WM_GIZMOGROUPTYPE_DRAW_MODAL_EXCLUDE | WM_GIZMOGROUPTYPE_TOOL_FALLBACK_KEYMAP |
                  WM_GIZMOGROUPTYPE_DELAY_REFRESH_FOR_TWEAK);
 
-  gzgt->gzmap_params.spaceid = "IMAGE_EDITOR";
+  gzgt->gzmap_params.spaceid = SPACE_IMAGE_IDNAME;
   gzgt->gzmap_params.regionid = RGN_TYPE_WINDOW;
 
   ED_widgetgroup_gizmo2d_rotate_callbacks_set(gzgt);
@@ -527,7 +527,7 @@ static void IMAGE_GGT_navigate(wmGizmoGroupType *gzgt)
 static void image_widgets(void)
 {
   wmGizmoMapType *gzmap_type = WM_gizmomaptype_ensure(
-      &(const struct wmGizmoMapType_Params){"IMAGE_EDITOR", RGN_TYPE_WINDOW});
+      &(const struct wmGizmoMapType_Params){SPACE_IMAGE_IDNAME, RGN_TYPE_WINDOW});
 
   WM_gizmogrouptype_append(IMAGE_GGT_gizmo2d);
   WM_gizmogrouptype_append(IMAGE_GGT_gizmo2d_translate);

@@ -1020,7 +1020,7 @@ static void view3d_dropboxes()
 
 static void view3d_widgets()
 {
-  wmGizmoMapType_Params params{"VIEW_3D", RGN_TYPE_WINDOW};
+  wmGizmoMapType_Params params{SPACE_VIEW3D_IDNAME, RGN_TYPE_WINDOW};
   wmGizmoMapType *gzmap_type = WM_gizmomaptype_ensure(&params);
 
   WM_gizmogrouptype_append_and_link(gzmap_type, VIEW3D_GGT_xform_gizmo_context);

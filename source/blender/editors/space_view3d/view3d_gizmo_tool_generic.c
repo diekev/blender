@@ -9,6 +9,7 @@
 
 #include "BKE_context.h"
 #include "BKE_global.h"
+#include "BKE_screen.h"
 
 #include "ED_gizmo_library.h"
 #include "ED_gizmo_utils.h"
@@ -197,7 +198,7 @@ void VIEW3D_GGT_tool_generic_handle_normal(wmGizmoGroupType *gzgt)
   gzgt->flag |= (WM_GIZMOGROUPTYPE_3D | WM_GIZMOGROUPTYPE_TOOL_FALLBACK_KEYMAP |
                  WM_GIZMOGROUPTYPE_DELAY_REFRESH_FOR_TWEAK);
 
-  gzgt->gzmap_params.spaceid = "VIEW_3D";
+  gzgt->gzmap_params.spaceid = SPACE_VIEW3D_IDNAME;
   gzgt->gzmap_params.regionid = RGN_TYPE_WINDOW;
 
   gzgt->poll = WIDGETGROUP_tool_generic_poll;
@@ -225,7 +226,7 @@ void VIEW3D_GGT_tool_generic_handle_free(wmGizmoGroupType *gzgt)
    * is better suited to being activated immediately. */
   gzgt->flag |= (WM_GIZMOGROUPTYPE_3D | WM_GIZMOGROUPTYPE_TOOL_FALLBACK_KEYMAP);
 
-  gzgt->gzmap_params.spaceid = "VIEW_3D";
+  gzgt->gzmap_params.spaceid = SPACE_VIEW3D_IDNAME;
   gzgt->gzmap_params.regionid = RGN_TYPE_WINDOW;
 
   gzgt->poll = WIDGETGROUP_tool_generic_poll;

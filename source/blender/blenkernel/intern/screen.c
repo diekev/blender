@@ -530,38 +530,42 @@ typedef struct {
   const char *type_name;
 } SpaceTypeIDNamePair;
 
+// For some reason the mixture of macros and litteral strings for the second member is messing up
+// clang-format; so it is deactivated.
+// clang-format off
 static const SpaceTypeIDNamePair space_types_idnames[] = {
-    {SPACE_EMPTY, "EMPTY"},
-    {SPACE_VIEW3D, "VIEW_3D"},
-    {SPACE_GRAPH, "GRAPH_EDITOR"},
+    {SPACE_EMPTY, SPACE_EMPTY_IDNAME},
+    {SPACE_VIEW3D, SPACE_VIEW3D_IDNAME},
+    {SPACE_GRAPH, SPACE_GRAPH_IDNAME},
     {SPACE_OUTLINER, "OUTLINER"},
-    {SPACE_PROPERTIES, "PROPERTIES"},
-    {SPACE_FILE, "FILE_BROWSER"},
-    {SPACE_IMAGE, "IMAGE_EDITOR"},
-    {SPACE_INFO, "INFO"},
-    {SPACE_SEQ, "SEQUENCE_EDITOR"},
+    {SPACE_PROPERTIES, SPACE_PROPERTIES_IDNAME},
+    {SPACE_FILE, SPACE_FILE_IDNAME},
+    {SPACE_IMAGE, SPACE_IMAGE_IDNAME},
+    {SPACE_INFO, SPACE_INFO_IDNAME},
+    {SPACE_SEQ, SPACE_SEQ_IDNAME},
     {SPACE_TEXT, "TEXT_EDITOR"},
 #ifdef DNA_DEPRECATED_ALLOW
-    {SPACE_IMASEL, "EMPTY"},
-    {SPACE_SOUND, "EMPTY"},
+    {SPACE_IMASEL, SPACE_EMPTY_IDNAME},
+    {SPACE_SOUND, SPACE_EMPTY_IDNAME},
 #endif
     {SPACE_ACTION, "DOPESHEET_EDITOR"},
     {SPACE_NLA, "NLA_EDITOR"},
     {SPACE_SCRIPT, "SCRIPT"},
 #ifdef DNA_DEPRECATED_ALLOW
-    {SPACE_TIME, "EMPTY"},
+    {SPACE_TIME, SPACE_EMPTY_IDNAME},
 #endif
-    {SPACE_NODE, "NODE_EDITOR"},
+    {SPACE_NODE, SPACE_NODE_IDNAME},
 #ifdef DNA_DEPRECATED_ALLOW
-    {SPACE_LOGIC, "EMPTY"},
+    {SPACE_LOGIC, SPACE_EMPTY_IDNAME},
 #endif
     {SPACE_CONSOLE, "CONSOLE"},
-    {SPACE_USERPREF, "PREFERENCES"},
-    {SPACE_CLIP, "CLIP_EDITOR"},
+    {SPACE_USERPREF, SPACE_USERPREF_IDNAME},
+    {SPACE_CLIP, SPACE_CLIP_IDNAME},
     {SPACE_TOPBAR, "TOPBAR"},
     {SPACE_STATUSBAR, "STATUSBAR"},
     {SPACE_SPREADSHEET, "SPREADSHEET"},
 };
+// clang-format on
 
 const char *BKE_spacetype_idname_from_spaceid(int spaceid)
 {

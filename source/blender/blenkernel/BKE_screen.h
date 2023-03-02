@@ -53,6 +53,19 @@ struct wmWindowManager;
 
 #define BKE_ST_MAXNAME 64
 
+/* #SpaceType.idname for common, built-in editors. */
+#define SPACE_EMPTY_IDNAME "EMPTY"
+#define SPACE_FILE_IDNAME "FILE_BROWSER"
+#define SPACE_GRAPH_IDNAME "GRAPH_EDITOR"
+#define SPACE_IMAGE_IDNAME "IMAGE_EDITOR"
+#define SPACE_INFO_IDNAME "INFO"
+#define SPACE_USERPREF_IDNAME "PREFERENCES"
+#define SPACE_VIEW3D_IDNAME "VIEW_3D"
+#define SPACE_PROPERTIES_IDNAME "PROPERTIES"
+#define SPACE_SEQ_IDNAME "SEQUENCE_EDITOR"
+#define SPACE_NODE_IDNAME "NODE_EDITOR"
+#define SPACE_CLIP_IDNAME "CLIP_EDITOR"
+
 typedef struct wmSpaceTypeListenerParams {
   struct wmWindow *window;
   struct ScrArea *area;

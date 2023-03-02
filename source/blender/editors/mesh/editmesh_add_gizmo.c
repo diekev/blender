@@ -16,6 +16,7 @@
 #include "BKE_context.h"
 #include "BKE_editmesh.h"
 #include "BKE_scene.h"
+#include "BKE_screen.h"
 
 #include "ED_gizmo_library.h"
 #include "ED_gizmo_utils.h"
@@ -287,7 +288,7 @@ static void MESH_GGT_add_bounds(struct wmGizmoGroupType *gzgt)
 
   gzgt->flag = WM_GIZMOGROUPTYPE_3D;
 
-  gzgt->gzmap_params.spaceid = "VIEW_3D";
+  gzgt->gzmap_params.spaceid = SPACE_VIEW3D_IDNAME;
   gzgt->gzmap_params.regionid = RGN_TYPE_WINDOW;
 
   gzgt->poll = gizmo_mesh_placement_poll;
