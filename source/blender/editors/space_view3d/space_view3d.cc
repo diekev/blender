@@ -1752,7 +1752,7 @@ void ED_view3d_buttons_region_layout_ex(const bContext *C,
 
   /* Allow drawing 3D view toolbar from non 3D view space type. */
   if (category_override != nullptr) {
-    SpaceType *st = BKE_spacetype_from_id(SPACE_VIEW3D);
+    SpaceType *st = BKE_builtin_spacetype_from_id(SPACE_VIEW3D);
     ARegionType *art = BKE_regiontype_from_id(st, RGN_TYPE_UI);
     paneltypes = &art->paneltypes;
   }

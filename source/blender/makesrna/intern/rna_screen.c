@@ -538,7 +538,9 @@ static const EnumPropertyItem *rna_Area_ui_type_itemf(bContext *C,
       continue;
     }
 
-    SpaceType *st = item_from->identifier[0] ? BKE_spacetype_from_id(item_from->value) : NULL;
+    /* #rna_enum_space_type_items is only referencing built-in space types. */
+    SpaceType *st = item_from->identifier[0] ? BKE_builtin_spacetype_from_id(item_from->value) :
+                                               NULL;
     int totitem_prev = totitem;
     if (st && st->space_subtype_item_extend != NULL) {
       st->space_subtype_item_extend(C, &item, &totitem);
@@ -587,7 +589,7 @@ static int rna_Area_ui_type_get(PointerRNA *ptr)
   if (type == NULL || area_changing) {
     type = BKE_spacetype_from_id(area_type);
     if (type == NULL) {
-      type = BKE_spacetype_from_id(SPACE_VIEW3D);
+      type = BKE_builtin_spacetype_from_id(SPACE_VIEW3D);
     }
     BLI_assert(type != NULL);
   }
@@ -637,7 +639,7 @@ static PointerRNA rna_Region_data_get(PointerRNA *ptr)
   if (region->regiondata != NULL) {
     if (region->regiontype == RGN_TYPE_WINDOW) {
       /* We could make this static, it won't change at run-time. */
-      SpaceType *st = BKE_spacetype_from_id(SPACE_VIEW3D);
+      SpaceType *st = BKE_builtin_spacetype_from_id(SPACE_VIEW3D);
       if (region->type == BKE_regiontype_from_id(st, region->regiontype)) {
         PointerRNA newptr;
         RNA_pointer_create(&screen->id, &RNA_RegionView3D, region->regiondata, &newptr);

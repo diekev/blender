@@ -651,7 +651,7 @@ static void wm_xr_raycast_init(wmOperator *op)
 
   op->customdata = MEM_callocN(sizeof(XrRaycastData), __func__);
 
-  SpaceType *st = BKE_spacetype_from_id(SPACE_VIEW3D);
+  SpaceType *st = BKE_builtin_spacetype_from_id(SPACE_VIEW3D);
   if (!st) {
     return;
   }
@@ -672,7 +672,7 @@ static void wm_xr_raycast_uninit(wmOperator *op)
     return;
   }
 
-  SpaceType *st = BKE_spacetype_from_id(SPACE_VIEW3D);
+  SpaceType *st = BKE_builtin_spacetype_from_id(SPACE_VIEW3D);
   if (st) {
     ARegionType *art = BKE_regiontype_from_id(st, RGN_TYPE_XR);
     if (art) {

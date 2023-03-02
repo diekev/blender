@@ -75,7 +75,7 @@ static int depthdropper_init(bContext *C, wmOperator *op)
   SpaceType *st;
   ARegionType *art;
 
-  st = BKE_spacetype_from_id(SPACE_VIEW3D);
+  st = BKE_builtin_spacetype_from_id(SPACE_VIEW3D);
   art = BKE_regiontype_from_id(st, RGN_TYPE_WINDOW);
 
   DepthDropper *ddr = MEM_cnew<DepthDropper>(__func__);

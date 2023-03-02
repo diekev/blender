@@ -1502,7 +1502,7 @@ void DRW_draw_callbacks_post_scene(void)
         }
       }
       if ((v3d->flag2 & V3D_XR_SHOW_CUSTOM_OVERLAYS) != 0) {
-        SpaceType *st = BKE_spacetype_from_id(SPACE_VIEW3D);
+        SpaceType *st = BKE_builtin_spacetype_from_id(SPACE_VIEW3D);
         if (st) {
           ARegionType *art = BKE_regiontype_from_id(st, RGN_TYPE_XR);
           if (art) {
@@ -1584,7 +1584,7 @@ void DRW_draw_callbacks_post_scene(void)
           }
         }
         if ((v3d->flag2 & V3D_XR_SHOW_CUSTOM_OVERLAYS) != 0) {
-          SpaceType *st = BKE_spacetype_from_id(SPACE_VIEW3D);
+          SpaceType *st = BKE_builtin_spacetype_from_id(SPACE_VIEW3D);
           if (st) {
             ARegionType *art = BKE_regiontype_from_id(st, RGN_TYPE_XR);
             if (art) {

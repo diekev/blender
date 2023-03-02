@@ -162,7 +162,7 @@ static void do_version_area_change_space_to_space_action(ScrArea *area, const Sc
   }
   BLI_freelistN(&area->regionbase);
 
-  SpaceType *stype = BKE_spacetype_from_id(SPACE_ACTION);
+  SpaceType *stype = BKE_builtin_spacetype_from_id(SPACE_ACTION);
   SpaceAction *saction = (SpaceAction *)BKE_spacetype_area_spacelink_add(stype, area, scene);
   area->type = stype;
   area->spacetype = stype->spaceid;

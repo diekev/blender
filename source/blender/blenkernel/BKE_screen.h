@@ -445,6 +445,7 @@ typedef struct Menu {
 /* Space-types. */
 
 struct SpaceType *BKE_spacetype_from_id(int spaceid);
+struct SpaceType *BKE_builtin_spacetype_from_id(int spaceid);
 struct SpaceType *BKE_spacetype_from_idname(const char *idname);
 struct ARegionType *BKE_regiontype_from_id_or_first(const struct SpaceType *st, int regionid);
 struct ARegionType *BKE_regiontype_from_id(const struct SpaceType *st, int regionid);

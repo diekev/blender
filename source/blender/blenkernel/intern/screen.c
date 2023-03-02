@@ -387,6 +387,11 @@ SpaceType *BKE_spacetype_from_id(int spaceid)
     return &SpaceTypeUndefined;
   }
 
+  return BKE_builtin_spacetype_from_id(spaceid);
+}
+
+SpaceType *BKE_builtin_spacetype_from_id(int spaceid)
+{
   LISTBASE_FOREACH (SpaceType *, st, &spacetypes) {
     if (st->spaceid == spaceid) {
       return st;

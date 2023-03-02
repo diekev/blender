@@ -1222,7 +1222,7 @@ void blo_do_versions_250(FileData *fd, Library *lib, Main *bmain)
             }
 
             if (region && (region->regiontype == RGN_TYPE_PREVIEW)) {
-              SpaceType *st = BKE_spacetype_from_id(SPACE_SEQ);
+              SpaceType *st = BKE_builtin_spacetype_from_id(SPACE_SEQ);
               BKE_area_region_free(st, region);
               BLI_freelinkN(regionbase, region);
             }
