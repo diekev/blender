@@ -1885,6 +1885,11 @@ static void area_ensure_space_type_for_init(ScrArea *area)
   area->type = BKE_spacetype_from_idname(area->spacetype_idname);
 
   if (area->type == nullptr) {
+    if (area->spacetype >= SPACE_CUSTOM) {
+      area->type = &SpaceTypeUndefined;
+      return;
+    }
+
     area->spacetype = SPACE_VIEW3D;
     STRNCPY(area->spacetype_idname, SPACE_VIEW3D_IDNAME);
     area->type = BKE_spacetype_from_id(area->spacetype);
