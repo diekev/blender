@@ -152,7 +152,7 @@ ScrArea *render_view_open(bContext *C, int mx, int my, ReportList *reports)
                        my,
                        sizex,
                        sizey,
-                       SPACE_IMAGE,
+                       SPACE_IMAGE_IDNAME,
                        true,
                        false,
                        true,
@@ -181,7 +181,7 @@ ScrArea *render_view_open(bContext *C, int mx, int my, ReportList *reports)
       }
 
       /* this function returns with changed context */
-      area = ED_screen_full_newspace(C, area, SPACE_IMAGE);
+      area = ED_screen_full_newspace(C, area, SPACE_IMAGE_IDNAME);
     }
   }
 
@@ -200,7 +200,7 @@ ScrArea *render_view_open(bContext *C, int mx, int my, ReportList *reports)
       /* find largest open non-image area */
       area = biggest_non_image_area(C);
       if (area) {
-        ED_area_newspace(C, area, SPACE_IMAGE, true);
+        ED_area_newspace(C, area, SPACE_IMAGE_IDNAME, true);
         sima = static_cast<SpaceImage *>(area->spacedata.first);
 
         /* Makes "Escape" go back to previous space. */

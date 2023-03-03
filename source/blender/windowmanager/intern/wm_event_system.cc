@@ -2640,7 +2640,7 @@ static eHandlerActionFlag wm_handler_fileselect_do(bContext *C,
                                             WM_window_pixels_y(win) / 2,
                                             U.file_space_data.temp_win_sizex * UI_DPI_FAC,
                                             U.file_space_data.temp_win_sizey * UI_DPI_FAC,
-                                            SPACE_FILE,
+                                            SPACE_FILE_IDNAME,
                                             U.filebrowser_display_type,
                                             true))) {
         ARegion *region_header = BKE_area_find_region_type(area, RGN_TYPE_HEADER);

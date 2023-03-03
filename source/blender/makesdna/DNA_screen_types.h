@@ -385,6 +385,11 @@ typedef struct ScrArea {
   char butspacetype;
   short butspacetype_subtype;
 
+  /** ID name for #spacetype above. */
+  char spacetype_idname[64];
+  /** ID name for #butspacetype above. */
+  char butspacetype_idname[64];
+
   /** Size. */
   short winx, winy;
 

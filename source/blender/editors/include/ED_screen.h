@@ -226,7 +226,10 @@ void ED_area_status_text(ScrArea *area, const char *str);
 /**
  * \param skip_region_exit: Skip calling area exit callback. Set for opening temp spaces.
  */
-void ED_area_newspace(struct bContext *C, ScrArea *area, int type, bool skip_region_exit);
+void ED_area_newspace(struct bContext *C,
+                      ScrArea *area,
+                      const char *space_idname,
+                      bool skip_region_exit);
 void ED_area_prevspace(struct bContext *C, ScrArea *area);
 void ED_area_swapspace(struct bContext *C, ScrArea *sa1, ScrArea *sa2);
 int ED_area_headersize(void);
@@ -249,7 +252,7 @@ void ED_area_update_region_sizes(struct wmWindowManager *wm,
                                  struct wmWindow *win,
                                  struct ScrArea *area);
 bool ED_area_has_shared_border(struct ScrArea *a, struct ScrArea *b);
-ScrArea *ED_area_offscreen_create(struct wmWindow *win, eSpace_Type space_type);
+ScrArea *ED_area_offscreen_create(struct wmWindow *win, const char *space_type);
 void ED_area_offscreen_free(struct wmWindowManager *wm,
                             struct wmWindow *win,
                             struct ScrArea *area);
@@ -324,7 +327,7 @@ void ED_screen_exit(struct bContext *C, struct wmWindow *window, struct bScreen 
 void ED_screen_animation_timer(struct bContext *C, int redraws, int sync, int enable);
 void ED_screen_animation_timer_update(struct bScreen *screen, int redraws);
 void ED_screen_restore_temp_type(struct bContext *C, ScrArea *area);
-ScrArea *ED_screen_full_newspace(struct bContext *C, ScrArea *area, int type);
+ScrArea *ED_screen_full_newspace(struct bContext *C, ScrArea *area, const char *space_type_idname);
 /**
  * \a was_prev_temp for the case previous space was a temporary full-screen as well
  */
@@ -369,7 +372,7 @@ ScrArea *ED_screen_temp_space_open(struct bContext *C,
                                    int y,
                                    int sizex,
                                    int sizey,
-                                   eSpace_Type space_type,
+                                   const char *space_type_idname,
                                    int display_type,
                                    bool dialog);
 void ED_screens_header_tools_menu_create(struct bContext *C, struct uiLayout *layout, void *arg);

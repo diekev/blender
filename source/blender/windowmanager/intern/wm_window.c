@@ -852,7 +852,7 @@ wmWindow *WM_window_open(bContext *C,
                          int y,
                          int sizex,
                          int sizey,
-                         int space_type,
+                         const char *space_type_idname,
                          bool toplevel,
                          bool dialog,
                          bool temp,
@@ -899,7 +899,8 @@ wmWindow *WM_window_open(bContext *C,
       const bScreen *screen = WM_window_get_active_screen(win_iter);
       if (screen && screen->temp && BLI_listbase_is_single(&screen->areabase)) {
         ScrArea *area = screen->areabase.first;
-        if (space_type == (area->butspacetype ? area->butspacetype : area->spacetype)) {
+        if (STREQ(space_type_idname,
+                  (area->butspacetype ? area->butspacetype_idname : area->spacetype_idname))) {
           win = win_iter;
           break;
         }
@@ -957,10 +958,10 @@ wmWindow *WM_window_open(bContext *C,
    */
 
   /* ensure it shows the right spacetype editor */
-  if (space_type != SPACE_EMPTY) {
+  if (!STREQ(space_type_idname, SPACE_EMPTY_IDNAME)) {
     ScrArea *area = screen->areabase.first;
     CTX_wm_area_set(C, area);
-    ED_area_newspace(C, area, space_type, false);
+    ED_area_newspace(C, area, space_type_idname, false);
   }
 
   ED_screen_change(C, screen);
@@ -1009,7 +1010,7 @@ int wm_window_new_exec(bContext *C, wmOperator *op)
                             0,
                             win_src->sizex * 0.95f,
                             win_src->sizey * 0.9f,
-                            area->spacetype,
+                            area->spacetype_idname,
                             false,
                             false,
                             false,

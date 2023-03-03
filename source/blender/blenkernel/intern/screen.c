@@ -561,8 +561,8 @@ static const SpaceTypeIDNamePair space_types_idnames[] = {
     {SPACE_CONSOLE, "CONSOLE"},
     {SPACE_USERPREF, SPACE_USERPREF_IDNAME},
     {SPACE_CLIP, SPACE_CLIP_IDNAME},
-    {SPACE_TOPBAR, "TOPBAR"},
-    {SPACE_STATUSBAR, "STATUSBAR"},
+    {SPACE_TOPBAR, SPACE_TOPBAR_IDNAME},
+    {SPACE_STATUSBAR, SPACE_STATUSBAR_IDNAME},
     {SPACE_SPREADSHEET, "SPREADSHEET"},
 };
 // clang-format on
@@ -1602,6 +1602,7 @@ static void direct_link_area(BlendDataReader *reader, ScrArea *area)
 
   /* Should always be unset so that rna_Area_type_get works correctly. */
   area->butspacetype = SPACE_EMPTY;
+  area->butspacetype_idname[0] = '\0';
 
   area->region_active_win = -1;
 

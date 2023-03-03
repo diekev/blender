@@ -53,7 +53,7 @@ static ScrArea *screen_addarea_ex(ScrAreaMap *area_map,
                                   ScrVert *top_left,
                                   ScrVert *top_right,
                                   ScrVert *bottom_right,
-                                  const eSpace_Type space_type)
+                                  const char *space_type)
 {
   ScrArea *area = MEM_callocN(sizeof(ScrArea), "addscrarea");
 
@@ -61,7 +61,8 @@ static ScrArea *screen_addarea_ex(ScrAreaMap *area_map,
   area->v2 = top_left;
   area->v3 = top_right;
   area->v4 = bottom_right;
-  area->spacetype = space_type;
+  area->spacetype = BKE_spaceid_from_space_idname(space_type);
+  STRNCPY(area->spacetype_idname, space_type);
 
   BLI_addtail(&area_map->areabase, area);
 
@@ -72,7 +73,7 @@ static ScrArea *screen_addarea(bScreen *screen,
                                ScrVert *left_top,
                                ScrVert *right_top,
                                ScrVert *right_bottom,
-                               const eSpace_Type space_type)
+                               const char *space_type)
 {
   return screen_addarea_ex(
       AREAMAP_FROM_SCREEN(screen), left_bottom, left_top, right_top, right_bottom, space_type);
@@ -128,7 +129,7 @@ ScrArea *area_split(const wmWindow *win,
 
     if (fac > 0.5f) {
       /* new areas: top */
-      newa = screen_addarea(screen, sv1, area->v2, area->v3, sv2, area->spacetype);
+      newa = screen_addarea(screen, sv1, area->v2, area->v3, sv2, area->spacetype_idname);
 
       /* area below */
       area->v2 = sv1;
@@ -136,7 +137,7 @@ ScrArea *area_split(const wmWindow *win,
     }
     else {
       /* new areas: bottom */
-      newa = screen_addarea(screen, area->v1, sv1, sv2, area->v4, area->spacetype);
+      newa = screen_addarea(screen, area->v1, sv1, sv2, area->v4, area->spacetype_idname);
 
       /* area above */
       area->v1 = sv1;
@@ -159,7 +160,7 @@ ScrArea *area_split(const wmWindow *win,
 
     if (fac > 0.5f) {
       /* new areas: right */
-      newa = screen_addarea(screen, sv1, sv2, area->v3, area->v4, area->spacetype);
+      newa = screen_addarea(screen, sv1, sv2, area->v3, area->v4, area->spacetype_idname);
 
       /* area left */
       area->v3 = sv2;
@@ -167,7 +168,7 @@ ScrArea *area_split(const wmWindow *win,
     }
     else {
       /* new areas: left */
-      newa = screen_addarea(screen, area->v1, area->v2, sv2, sv1, area->spacetype);
+      newa = screen_addarea(screen, area->v1, area->v2, sv2, sv1, area->spacetype_idname);
 
       /* area right */
       area->v1 = sv1;
@@ -204,7 +205,7 @@ bScreen *screen_add(Main *bmain, const char *name, const rcti *rect)
   screen_geom_edge_add(screen, sv4, sv1);
 
   /* dummy type, no spacedata */
-  screen_addarea(screen, sv1, sv2, sv3, sv4, SPACE_EMPTY);
+  screen_addarea(screen, sv1, sv2, sv3, sv4, SPACE_EMPTY_IDNAME);
 
   return screen;
 }
@@ -589,9 +590,9 @@ bool screen_area_close(struct bContext *C, bScreen *screen, ScrArea *area)
   return screen_area_join_ex(C, screen, sa2, area, true);
 }
 
-void screen_area_spacelink_add(Scene *scene, ScrArea *area, eSpace_Type space_type)
+void screen_area_spacelink_add(Scene *scene, ScrArea *area, const char *space_type)
 {
-  SpaceType *stype = BKE_spacetype_from_id(space_type);
+  SpaceType *stype = BKE_spacetype_from_idname(space_type);
   BKE_spacetype_area_spacelink_add(stype, area, scene);
 }
 
@@ -987,7 +988,7 @@ int ED_screen_area_active(const bContext *C)
  */
 static ScrArea *screen_area_create_with_geometry(ScrAreaMap *area_map,
                                                  const rcti *rect,
-                                                 eSpace_Type space_type)
+                                                 const char *space_type)
 {
   ScrVert *bottom_left = screen_geom_vertex_add_ex(area_map, rect->xmin, rect->ymin);
   ScrVert *top_left = screen_geom_vertex_add_ex(area_map, rect->xmin, rect->ymax);
@@ -1016,7 +1017,7 @@ static void screen_area_set_geometry_rect(ScrArea *area, const rcti *rect)
 
 static void screen_global_area_refresh(wmWindow *win,
                                        bScreen *screen,
-                                       const eSpace_Type space_type,
+                                       const char *space_type,
                                        GlobalAreaAlign align,
                                        const rcti *rect,
                                        const short height_cur,
@@ -1030,7 +1031,7 @@ static void screen_global_area_refresh(wmWindow *win,
 
   ScrArea *area = NULL;
   LISTBASE_FOREACH (ScrArea *, area_iter, &win->global_areas.areabase) {
-    if (area_iter->spacetype == space_type) {
+    if (STREQ(area_iter->spacetype_idname, space_type)) {
       area = area_iter;
       break;
     }
@@ -1071,7 +1072,7 @@ static void screen_global_topbar_area_refresh(wmWindow *win, bScreen *screen)
   rect.ymin = rect.ymax - size;
 
   screen_global_area_refresh(
-      win, screen, SPACE_TOPBAR, GLOBAL_AREA_ALIGN_TOP, &rect, size, size, size);
+      win, screen, SPACE_TOPBAR_IDNAME, GLOBAL_AREA_ALIGN_TOP, &rect, size, size, size);
 }
 
 static void screen_global_statusbar_area_refresh(wmWindow *win, bScreen *screen)
@@ -1084,8 +1085,14 @@ static void screen_global_statusbar_area_refresh(wmWindow *win, bScreen *screen)
   BLI_rcti_init(&rect, 0, WM_window_pixels_x(win) - 1, 0, WM_window_pixels_y(win) - 1);
   rect.ymax = rect.ymin + size_max;
 
-  screen_global_area_refresh(
-      win, screen, SPACE_STATUSBAR, GLOBAL_AREA_ALIGN_BOTTOM, &rect, size, size_min, size_max);
+  screen_global_area_refresh(win,
+                             screen,
+                             SPACE_STATUSBAR_IDNAME,
+                             GLOBAL_AREA_ALIGN_BOTTOM,
+                             &rect,
+                             size,
+                             size_min,
+                             size_max);
 }
 
 void ED_screen_global_areas_sync(wmWindow *win)
@@ -1278,7 +1285,7 @@ void ED_screen_scene_change(bContext *C,
   }
 }
 
-ScrArea *ED_screen_full_newspace(bContext *C, ScrArea *area, int type)
+ScrArea *ED_screen_full_newspace(bContext *C, ScrArea *area, const char *space_type_idname)
 {
   bScreen *newscreen = NULL;
   ScrArea *newsa = NULL;
@@ -1302,7 +1309,8 @@ ScrArea *ED_screen_full_newspace(bContext *C, ScrArea *area, int type)
     newsl->link_flag |= SPACE_FLAG_TYPE_WAS_ACTIVE;
   }
 
-  ED_area_newspace(C, newsa, type, (newsl && newsl->link_flag & SPACE_FLAG_TYPE_TEMPORARY));
+  ED_area_newspace(
+      C, newsa, space_type_idname, (newsl && newsl->link_flag & SPACE_FLAG_TYPE_TEMPORARY));
 
   if (newscreen) {
     ED_screen_change(C, newscreen);
@@ -1564,7 +1572,7 @@ ScrArea *ED_screen_temp_space_open(bContext *C,
                                    int y,
                                    int sizex,
                                    int sizey,
-                                   eSpace_Type space_type,
+                                   const char *space_type_idname,
                                    int display_type,
                                    bool dialog)
 {
@@ -1578,7 +1586,7 @@ ScrArea *ED_screen_temp_space_open(bContext *C,
                          y,
                          sizex,
                          sizey,
-                         (int)space_type,
+                         space_type_idname,
                          false,
                          dialog,
                          true,
@@ -1591,12 +1599,12 @@ ScrArea *ED_screen_temp_space_open(bContext *C,
 
       if (ctx_area != NULL && ctx_area->full) {
         area = ctx_area;
-        ED_area_newspace(C, ctx_area, space_type, true);
+        ED_area_newspace(C, ctx_area, space_type_idname, true);
         area->flag |= AREA_FLAG_STACKED_FULLSCREEN;
         ((SpaceLink *)area->spacedata.first)->link_flag |= SPACE_FLAG_TYPE_TEMPORARY;
       }
       else {
-        area = ED_screen_full_newspace(C, ctx_area, (int)space_type);
+        area = ED_screen_full_newspace(C, ctx_area, space_type_idname);
         ((SpaceLink *)area->spacedata.first)->link_flag |= SPACE_FLAG_TYPE_TEMPORARY;
       }
       break;

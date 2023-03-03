@@ -4020,11 +4020,40 @@ void blo_do_versions_300(FileData *fd, Library * /*lib*/, Main *bmain)
     LISTBASE_FOREACH (ScrArea *, area, &screen->areabase) {
       LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
         if (sl->space_idname[0] != '\0') {
+          if (sl == area->spacedata.first) {
+            STRNCPY(area->spacetype_idname, sl->space_idname);
+          }
           continue;
         }
 
         SpaceType *st = BKE_spacetype_from_id(sl->spacetype);
         STRNCPY(sl->space_idname, st->idname);
+
+        if (sl == area->spacedata.first) {
+          STRNCPY(area->spacetype_idname, st->idname);
+        }
+      }
+    }
+  }
+
+  LISTBASE_FOREACH (wmWindowManager *, wm, &bmain->wm) {
+    LISTBASE_FOREACH (wmWindow *, win, &wm->windows) {
+      LISTBASE_FOREACH (ScrArea *, area, &win->global_areas.areabase) {
+        LISTBASE_FOREACH (SpaceLink *, sl, &area->spacedata) {
+          if (sl->space_idname[0] != '\0') {
+            if (sl == area->spacedata.first) {
+              STRNCPY(area->spacetype_idname, sl->space_idname);
+            }
+            continue;
+          }
+
+          SpaceType *st = BKE_spacetype_from_id(sl->spacetype);
+          STRNCPY(sl->space_idname, st->idname);
+
+          if (sl == area->spacedata.first) {
+            STRNCPY(area->spacetype_idname, st->idname);
+          }
+        }
       }
     }
   }

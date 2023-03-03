@@ -1219,7 +1219,7 @@ void wm_xr_session_actions_update(wmWindowManager *wm)
     if (win) {
       /* Ensure an XR area exists for events. */
       if (!xr->runtime->area) {
-        xr->runtime->area = ED_area_offscreen_create(win, SPACE_VIEW3D);
+        xr->runtime->area = ED_area_offscreen_create(win, SPACE_VIEW3D_IDNAME);
       }
 
       /* Set XR area object type flags for operators. */

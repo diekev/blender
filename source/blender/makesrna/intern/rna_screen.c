@@ -443,6 +443,8 @@ static void rna_Area_type_set(PointerRNA *ptr, int value)
   }
 
   area->butspacetype = value;
+  SpaceType *st = BKE_spacetype_from_id(area->butspacetype);
+  STRNCPY(area->butspacetype_idname, st->idname);
 }
 
 static void rna_Area_type_update(bContext *C, PointerRNA *ptr)
@@ -468,7 +470,7 @@ static void rna_Area_type_update(bContext *C, PointerRNA *ptr)
       CTX_wm_area_set(C, area);
       CTX_wm_region_set(C, NULL);
 
-      ED_area_newspace(C, area, area->butspacetype, true);
+      ED_area_newspace(C, area, area->butspacetype_idname, true);
       ED_area_tag_redraw(area);
 
       /* Unset so that rna_Area_type_get uses spacetype instead. */

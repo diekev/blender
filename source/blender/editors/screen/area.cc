@@ -1880,6 +1880,17 @@ bool ED_area_has_shared_border(ScrArea *a, ScrArea *b)
   return area_getorientation(a, b) != -1;
 }
 
+static void area_ensure_space_type_for_init(ScrArea *area)
+{
+  area->type = BKE_spacetype_from_idname(area->spacetype_idname);
+
+  if (area->type == nullptr) {
+    area->spacetype = SPACE_VIEW3D;
+    STRNCPY(area->spacetype_idname, SPACE_VIEW3D_IDNAME);
+    area->type = BKE_spacetype_from_id(area->spacetype);
+  }
+}
+
 void ED_area_init(wmWindowManager *wm, wmWindow *win, ScrArea *area)
 {
   WorkSpace *workspace = WM_window_get_active_workspace(win);
@@ -1895,12 +1906,7 @@ void ED_area_init(wmWindowManager *wm, wmWindow *win, ScrArea *area)
   WM_window_rect_calc(win, &window_rect);
 
   /* Set type-definitions. */
-  area->type = BKE_spacetype_from_id(area->spacetype);
-
-  if (area->type == nullptr) {
-    area->spacetype = SPACE_VIEW3D;
-    area->type = BKE_spacetype_from_id(area->spacetype);
-  }
+  area_ensure_space_type_for_init(area);
 
   LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
     region->type = BKE_regiontype_from_id_or_first(area->type, region->regiontype);
@@ -1963,22 +1969,18 @@ void ED_area_init(wmWindowManager *wm, wmWindow *win, ScrArea *area)
 static void area_offscreen_init(ScrArea *area)
 {
   area->flag |= AREA_FLAG_OFFSCREEN;
-  area->type = BKE_spacetype_from_id(area->spacetype);
-
-  if (area->type == nullptr) {
-    area->spacetype = SPACE_VIEW3D;
-    area->type = BKE_spacetype_from_id(area->spacetype);
-  }
+  area_ensure_space_type_for_init(area);
 
   LISTBASE_FOREACH (ARegion *, region, &area->regionbase) {
     region->type = BKE_regiontype_from_id_or_first(area->type, region->regiontype);
   }
 }
 
-ScrArea *ED_area_offscreen_create(wmWindow *win, eSpace_Type space_type)
+ScrArea *ED_area_offscreen_create(wmWindow *win, const char *space_type)
 {
   ScrArea *area = MEM_cnew<ScrArea>(__func__);
-  area->spacetype = space_type;
+  STRNCPY(area->spacetype_idname, space_type);
+  area->spacetype = BKE_spaceid_from_space_idname(space_type);
 
   screen_area_spacelink_add(WM_window_get_active_scene(win), area, space_type);
   area_offscreen_init(area);
@@ -2104,10 +2106,11 @@ void ED_region_toggle_hidden(bContext *C, ARegion *region)
 
 void ED_area_data_copy(ScrArea *area_dst, ScrArea *area_src, const bool do_free)
 {
-  const char spacetype = area_dst->spacetype;
+  const char *spacetype = area_dst->spacetype_idname;
   const short flag_copy = HEADER_NO_PULLDOWN;
 
   area_dst->spacetype = area_src->spacetype;
+  STRNCPY(area_dst->spacetype_idname, area_src->spacetype_idname);
   area_dst->type = area_src->type;
 
   area_dst->flag = (area_dst->flag & ~flag_copy) | (area_src->flag & flag_copy);
@@ -2122,13 +2125,13 @@ void ED_area_data_copy(ScrArea *area_dst, ScrArea *area_src, const bool do_free)
 
   /* regions */
   if (do_free) {
-    SpaceType *st = BKE_spacetype_from_id(spacetype);
+    SpaceType *st = BKE_spacetype_from_idname(spacetype);
     LISTBASE_FOREACH (ARegion *, region, &area_dst->regionbase) {
       BKE_area_region_free(st, region);
     }
     BLI_freelistN(&area_dst->regionbase);
   }
-  SpaceType *st = BKE_spacetype_from_id(area_src->spacetype);
+  SpaceType *st = BKE_spacetype_from_idname(area_src->spacetype_idname);
   LISTBASE_FOREACH (ARegion *, region, &area_src->regionbase) {
     ARegion *newar = BKE_area_region_copy(st, region);
     BLI_addtail(&area_dst->regionbase, newar);
@@ -2406,11 +2409,14 @@ void ED_area_swapspace(bContext *C, ScrArea *sa1, ScrArea *sa2)
   ED_area_tag_refresh(sa2);
 }
 
-void ED_area_newspace(bContext *C, ScrArea *area, int type, const bool skip_region_exit)
+void ED_area_newspace(bContext *C,
+                      ScrArea *area,
+                      const char *space_idname,
+                      const bool skip_region_exit)
 {
   wmWindow *win = CTX_wm_window(C);
 
-  if (area->spacetype != type) {
+  if (!STREQ(area->spacetype_idname, space_idname)) {
     SpaceLink *slold = static_cast<SpaceLink *>(area->spacedata.first);
     /* store area->type->exit callback */
     void (*area_exit)(wmWindowManager *, ScrArea *) = area->type ? area->type->exit : nullptr;
@@ -2445,9 +2451,10 @@ void ED_area_newspace(bContext *C, ScrArea *area, int type, const bool skip_regi
       area->type->exit = area_exit;
     }
 
-    SpaceType *st = BKE_spacetype_from_id(type);
+    SpaceType *st = BKE_spacetype_from_idname(space_idname);
 
-    area->spacetype = type;
+    area->spacetype = st->spaceid;
+    STRNCPY(area->spacetype_idname, st->idname);
     area->type = st;
 
     /* If st->create may be called, don't use context until then. The
@@ -2552,7 +2559,7 @@ void ED_area_prevspace(bContext *C, ScrArea *area)
   SpaceLink *prevspace = sl ? area_get_prevspace(area) : nullptr;
 
   if (prevspace) {
-    ED_area_newspace(C, area, prevspace->spacetype, false);
+    ED_area_newspace(C, area, prevspace->space_idname, false);
     /* We've exited the space, so it can't be considered temporary anymore. */
     sl->link_flag &= ~SPACE_FLAG_TYPE_TEMPORARY;
   }

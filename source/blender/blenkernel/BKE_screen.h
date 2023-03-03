@@ -65,6 +65,8 @@ struct wmWindowManager;
 #define SPACE_SEQ_IDNAME "SEQUENCE_EDITOR"
 #define SPACE_NODE_IDNAME "NODE_EDITOR"
 #define SPACE_CLIP_IDNAME "CLIP_EDITOR"
+#define SPACE_TOPBAR_IDNAME "TOPBAR"
+#define SPACE_STATUSBAR_IDNAME "STATUSBAR"
 
 typedef struct wmSpaceTypeListenerParams {
   struct wmWindow *window;
